@@ -130,6 +130,7 @@ const GENERATORS_7 = makeGenerators(7);
 
 const TWO_COLOR_GENS = new Set([4, 9, 10, 11, 14]);
 const FOUR_COLOR_GEN = 12;
+const STRIPE_GENS = new Set([0, 1, 2, 3]);
 
 // Weighted generator selection (stripes get low weight)
 const GEN_WEIGHTS = [
@@ -179,7 +180,7 @@ function buildMediumPuzzles() {
     const r = rng(i * 7919 + 42);
     const palIdx = Math.floor(r() * PALETTES.length);
     const pal = shuffle(PALETTES[palIdx], r);
-    const validGens = GENERATORS_7.map((g, idx) => idx).filter(idx => !TWO_COLOR_GENS.has(idx) && idx !== FOUR_COLOR_GEN);
+    const validGens = GENERATORS_7.map((g, idx) => idx).filter(idx => !TWO_COLOR_GENS.has(idx) && idx !== FOUR_COLOR_GEN && !STRIPE_GENS.has(idx));
     const validWeights = validGens.map(idx => GEN_WEIGHTS[idx]);
     const totalW = validWeights.reduce((a, b) => a + b, 0);
     let roll = r() * totalW;
@@ -193,7 +194,7 @@ function buildMediumPuzzles() {
     const grid = GENERATORS_7[genIdx](shapeIndices, numShapes);
     const solution = grid.map(row => row.map(si => `${pal[si % pal.length]}|${si}`));
 
-    const numBlanks = Math.min(5 + Math.floor(i / 4), 14);
+    const numBlanks = Math.min(10 + Math.floor(i / 3), 24);
     const allCells = [];
     for (let row = 0; row < 7; row++) for (let col = 0; col < 7; col++) allCells.push(`${row}-${col}`);
     const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
