@@ -547,25 +547,42 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
   );
 }
 
-function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode }) {
+function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remaining }) {
   const isEasy = mode === "easy" || mode === "blind";
+  const isBlind = mode === "blind";
   return (
     <div style={{ display: "flex", gap: 10, justifyContent: "center", padding: "16px 0", flexWrap: "wrap" }}>
       {tokens.map((token, i) => {
         const { color, shapeIndex } = parseToken(token);
         const selected = selectedToken === token;
+        const left = remaining ? (remaining[token] ?? 0) : null;
+        const exhausted = isBlind && left !== null && left <= 0;
         return (
           <div key={i} onClick={() => onSelect(token)}
             style={{
               width: cellSize, height: cellSize, borderRadius: 12, backgroundColor: color,
               border: selected ? `3px solid ${C.text}` : "3px solid transparent",
-              cursor: "pointer", transition: "all 0.2s cubic-bezier(0.4,0,0.2,1)",
+              cursor: exhausted ? "not-allowed" : "pointer", transition: "all 0.2s cubic-bezier(0.4,0,0.2,1)",
               transform: selected ? "scale(1.15)" : "scale(1)",
+              opacity: exhausted ? 0.35 : 1,
               boxShadow: selected ? `0 0 20px ${color}66` : `0 2px 8px ${color}33`,
               position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >
             {SHAPES[shapeIndex % SHAPES.length](cellSize * 0.5, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
+            {isBlind && left !== null && (
+              <div style={{
+                position: "absolute", top: -6, right: -6,
+                backgroundColor: exhausted ? C.textDim : C.text,
+                color: C.bg, fontSize: 10, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace",
+                width: 18, height: 18, borderRadius: 9,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                lineHeight: 1,
+              }}>
+                {left}
+              </div>
+            )}
           </div>
         );
       })}
@@ -795,6 +812,27 @@ export default function Pattrn() {
   const isBlind = difficulty === "blind" && !isDaily;
   const progressKey = isCascade ? cascadeRunIndex : currentPuzzle;
 
+  // For blind mode: count how many of each token exist in the solution vs placed
+  const tokenRemaining = useMemo(() => {
+    if (!isBlind || !puzzle) return {};
+    const solutionCounts = {};
+    puzzle.solution.flat().forEach(t => { solutionCounts[t] = (solutionCounts[t] || 0) + 1; });
+    const usedCounts = {};
+    for (const key of puzzle.blanks) {
+      let token;
+      if (lockedCells.has(key)) {
+        const [r, c] = key.split("-").map(Number);
+        token = puzzle.solution[r][c];
+      } else if (fills[key]) {
+        token = fills[key];
+      }
+      if (token) usedCounts[token] = (usedCounts[token] || 0) + 1;
+    }
+    const remaining = {};
+    puzzle.usedTokens.forEach(t => { remaining[t] = (solutionCounts[t] || 0) - (usedCounts[t] || 0); });
+    return remaining;
+  }, [isBlind, puzzle, fills, lockedCells]);
+
   const stopTimer = useCallback(() => {
     timerIsCascadeRun.current = false;
     if (timerInterval.current) {
@@ -882,10 +920,11 @@ export default function Pattrn() {
     if (!puzzle.blanks.has(key)) return;
     if (lockedCells.has(key)) return;
     if (selectedToken) {
+      if (isBlind && fills[key] !== selectedToken && (tokenRemaining[selectedToken] || 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
-  }, [gameState, puzzle, lockedCells, selectedToken]);
+  }, [gameState, puzzle, lockedCells, selectedToken, isBlind, fills, tokenRemaining]);
 
   const handleCellClick = (r, c) => {
     if (gameState !== "playing") return;
@@ -893,6 +932,7 @@ export default function Pattrn() {
     if (!puzzle.blanks.has(key)) return;
     if (lockedCells.has(key)) return;
     if (selectedToken) {
+      if (isBlind && fills[key] !== selectedToken && (tokenRemaining[selectedToken] || 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     } else {
@@ -929,6 +969,7 @@ export default function Pattrn() {
   const handleTokenSelect = (token) => {
     setSelectedToken(token);
     if (selectedCell && puzzle.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
+      if (isBlind && fills[selectedCell] !== token && (tokenRemaining[token] || 0) <= 0) return;
       setFills(prev => ({ ...prev, [selectedCell]: token }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(selectedCell); return n; });
       setSelectedCell(null);
@@ -1725,32 +1766,7 @@ export default function Pattrn() {
           <div style={{ fontSize: 10, color: C.textDim, textAlign: "center", letterSpacing: 1, marginBottom: 2, textTransform: "uppercase" }}>
             {isBlind ? "Pick a tile" : puzzle.mode === "easy" ? "Pick a shape" : "Pick a tile"}
           </div>
-          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} />
-          {isCascade && (
-            <button
-              onClick={() => {
-                const freshState = { level: 0, lives: 3, elapsedSeconds: 0, fills: {}, attempts: 0 };
-                const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: freshState }, cascadeRunStateLastIndex: cascadeRunIndex };
-                setProgress(nextProgress);
-                saveProgress(nextProgress);
-                setAttempts(0);
-                setElapsedTime(0);
-                setCascadeLevel(0);
-                setCascadeLives(3);
-                cascadeAttemptsRef.current = 0;
-                startPuzzle(cascadeRunIndex, "cascade");
-              }}
-              style={{
-                marginTop: 14, background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
-                padding: "8px 16px", fontSize: 11, color: C.textDim, cursor: "pointer",
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase", transition: "all 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-            >
-              Start again
-            </button>
-          )}
+          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} />
         </div>
       )}
 
