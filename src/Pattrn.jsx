@@ -500,6 +500,16 @@ function formatTime(seconds) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function solutionFillsFromPuzzle(puzzle) {
+  if (!puzzle?.blanks?.size || !puzzle.solution) return {};
+  const fills = {};
+  for (const key of puzzle.blanks) {
+    const [r, c] = key.split("-").map(Number);
+    fills[key] = puzzle.solution[r][c];
+  }
+  return fills;
+}
+
 // --- Helper: parse token ---
 function parseToken(token) {
   const idx = token.lastIndexOf("|");
@@ -783,23 +793,40 @@ export default function Pattrn() {
         }
       } else {
         setCurrentPuzzle(levelNum);
-        setFills({});
-        setAttempts(0);
-        setElapsedTime(0);
+        const puzzleSet = mode === "daily" ? buildDailyPuzzles() : (PUZZLE_SETS[mode] || []);
+        const puz = puzzleSet[levelNum];
+        const prog = loadProgress();
+        const tms = loadTimes();
+        const dProg = prog[mode] || {};
+        const dTimes = tms[mode] || {};
+        const alreadyCompleted = (dProg[levelNum] ?? 0) > 0 && dTimes[levelNum] != null && puz;
+        if (alreadyCompleted) {
+          setFills(solutionFillsFromPuzzle(puz));
+          setAttempts(dProg[levelNum]);
+          setElapsedTime(dTimes[levelNum]);
+          setGameState("won");
+          setLockedCells(new Set(puz.blanks));
+          setWrongCells(new Set());
+          setShowParticles(false);
+        } else {
+          setFills({});
+          setAttempts(0);
+          setElapsedTime(0);
+          setGameState("playing");
+          setWrongCells(new Set());
+          setLockedCells(new Set());
+          setShowParticles(false);
+          if (timerInterval.current) {
+            clearInterval(timerInterval.current);
+            timerInterval.current = null;
+          }
+          timerStart.current = Date.now();
+          timerInterval.current = setInterval(() => {
+            setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+          }, 1000);
+        }
         setSelectedCell(null);
         setSelectedToken(null);
-        setGameState("playing");
-        setWrongCells(new Set());
-        setLockedCells(new Set());
-        setShowParticles(false);
-        if (timerInterval.current) {
-          clearInterval(timerInterval.current);
-          timerInterval.current = null;
-        }
-        timerStart.current = Date.now();
-        timerInterval.current = setInterval(() => {
-          setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
-        }, 1000);
       }
       setView("play");
       return;
@@ -890,12 +917,13 @@ export default function Pattrn() {
     return 0;
   }, []);
 
-  const startPuzzle = (idx, diff) => {
+  const startPuzzle = (idx, diff, forceRestart = false) => {
     cancelWrongCellClear();
     if (diff) setDifficulty(diff);
     setCurrentPuzzle(idx);
+    const effectiveDiff = diff ?? difficulty;
     let cascadeElapsed = 0;
-    if (difficulty === "cascade" || diff === "cascade") {
+    if (effectiveDiff === "cascade") {
       setCascadeRunIndex(idx);
       cascadeRunIndexRef.current = idx;
       const runStateMap = loadProgress().cascadeRunState || {};
@@ -915,8 +943,32 @@ export default function Pattrn() {
       const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [idx]: runState }, cascadeRunStateLastIndex: idx };
       setProgress(nextProgress);
       saveProgress(nextProgress);
-    }
-    if (!(difficulty === "cascade" || diff === "cascade")) {
+    } else {
+      // Non-cascade: if level already completed (and not force restart), show completed state (filled grid + time)
+      const puzzleSet = effectiveDiff === "daily" ? buildDailyPuzzles() : (PUZZLE_SETS[effectiveDiff] || []);
+      const puz = puzzleSet[idx];
+      const prog = loadProgress();
+      const tms = loadTimes();
+      const dProg = prog[effectiveDiff] || {};
+      const dTimes = tms[effectiveDiff] || {};
+      const savedAttempts = dProg[idx] ?? 0;
+      const savedTime = dTimes[idx];
+      const alreadyCompleted = !forceRestart && savedAttempts > 0 && savedTime != null && puz;
+      if (alreadyCompleted) {
+        setFills(solutionFillsFromPuzzle(puz));
+        setAttempts(savedAttempts);
+        setElapsedTime(savedTime);
+        setGameState("won");
+        setLockedCells(new Set(puz.blanks));
+        setSelectedCell(null);
+        setSelectedToken(null);
+        setWrongCells(new Set());
+        setClearedBlanks(new Set());
+        setShowParticles(false);
+        stopTimer();
+        setView("play");
+        return;
+      }
       setFills({});
       setAttempts(0);
     }
@@ -927,9 +979,9 @@ export default function Pattrn() {
     setLockedCells(new Set());
     setClearedBlanks(new Set());
     setShowParticles(false);
-    if (difficulty !== "cascade" && diff !== "cascade") setElapsedTime(0);
+    if (effectiveDiff !== "cascade") setElapsedTime(0);
     stopTimer();
-    timerIsCascadeRun.current = difficulty === "cascade" || diff === "cascade";
+    timerIsCascadeRun.current = effectiveDiff === "cascade";
     timerStart.current = Date.now() - cascadeElapsed * 1000;
     timerInterval.current = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
@@ -2000,6 +2052,20 @@ export default function Pattrn() {
               >
                 {shareMsg || "Share"}
               </button>
+              {!isCascade && (
+                <button onClick={() => startPuzzle(currentPuzzle, undefined, true)}
+                  style={{
+                    backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
+                    padding: "12px 24px", borderRadius: 12, fontSize: 13, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    textTransform: "uppercase", transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
+                >
+                  Retry
+                </button>
+              )}
               {(isDaily || isCascade) ? (
                 <button onClick={() => { setView("menu"); }}
                   style={{
