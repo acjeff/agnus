@@ -630,15 +630,16 @@ export default function Pattrn() {
       if (isBlind) {
         setLockedCells(newLocked);
       }
-      // Clear wrong fills after wrongRemove animation completes (1s)
+      // Clear wrong fills after wrongRemove animation completes
+      // Animation reaches opacity:0 at 80% (800ms) and holds; timeout at 1050ms for safe margin
       setTimeout(() => {
+        setWrongCells(new Set());
         setFills(prev => {
           const next = { ...prev };
           for (const k of wrong) delete next[k];
           return next;
         });
-        setWrongCells(new Set());
-      }, 1000);
+      }, 1050);
     }
   };
 
@@ -1025,7 +1026,7 @@ export default function Pattrn() {
       display: "flex", flexDirection: "column", alignItems: "center",
       padding: "24px 16px", position: "relative", overflow: "hidden",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes wrongRemove { 0%{transform:scale(1);opacity:1} 8%{transform:translateX(-5px) scale(0.97);opacity:1} 16%{transform:translateX(5px) scale(0.97);opacity:1} 24%{transform:translateX(-3px) scale(0.97);opacity:1} 32%{transform:translateX(3px) scale(0.97);opacity:1} 40%{transform:scale(0.95);opacity:1} 60%{transform:scale(0.95);opacity:0.9} 100%{transform:scale(0);opacity:0} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes wrongRemove { 0%{transform:scale(1);opacity:1} 8%{transform:translateX(-5px) scale(0.97);opacity:1} 16%{transform:translateX(5px) scale(0.97);opacity:1} 24%{transform:translateX(-3px) scale(0.97);opacity:1} 32%{transform:translateX(3px) scale(0.97);opacity:1} 40%{transform:scale(0.95);opacity:1} 55%{transform:scale(0.95);opacity:0.85} 80%{transform:scale(0);opacity:0} 100%{transform:scale(0);opacity:0} }`}</style>
 
       <Particles show={showParticles} />
 
