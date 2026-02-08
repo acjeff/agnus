@@ -276,9 +276,7 @@ function buildBlindPuzzles() {
   return puzzles;
 }
 
-// --- Daily: 50 historic days (fixed seeds from epoch), same for everyone ---
-const DAILY_EPOCH = Math.floor(new Date(Date.UTC(2025, 0, 1, 0, 0, 0, 0)).getTime() / 1000);
-
+// --- Daily: index 0 = today, 1 = yesterday, ... 49 = 49 days ago (UTC); dates in dd-mm-yyyy ---
 function getDateString(date = new Date()) {
   const y = date.getUTCFullYear();
   const m = String(date.getUTCMonth() + 1).padStart(2, "0");
@@ -287,12 +285,21 @@ function getDateString(date = new Date()) {
 }
 
 function getDailySeedForIndex(i) {
-  return DAILY_EPOCH + i * 86400;
+  const now = new Date();
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+  const thatDayMs = todayStart.getTime() - i * 86400000;
+  const thatDay = new Date(thatDayMs);
+  const midnightUtc = Date.UTC(thatDay.getUTCFullYear(), thatDay.getUTCMonth(), thatDay.getUTCDate(), 0, 0, 0, 0);
+  return Math.floor(midnightUtc / 1000);
 }
 
 function getDailyDateLabel(i) {
-  const d = new Date(getDailySeedForIndex(i) * 1000);
-  return getDateString(d);
+  const ts = getDailySeedForIndex(i) * 1000;
+  const d = new Date(ts);
+  const day = String(d.getUTCDate()).padStart(2, "0");
+  const month = String(d.getUTCMonth() + 1).padStart(2, "0");
+  const year = d.getUTCFullYear();
+  return `${day}-${month}-${year}`;
 }
 
 function buildDailyPuzzle(seed) {
@@ -328,19 +335,14 @@ function buildDailyPuzzles() {
 }
 
 function getTodayDailyIndex() {
-  const now = new Date();
-  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
-  const todayTs = Math.floor(todayStart.getTime() / 1000);
-  const dayIndex = Math.floor((todayTs - DAILY_EPOCH) / 86400);
-  return ((dayIndex % 50) + 50) % 50;
+  return 0;
 }
 
 function getDailyStreak(progress) {
   const daily = progress.daily || {};
-  const todayIdx = getTodayDailyIndex();
-  if ((daily[todayIdx] ?? 0) <= 0) return 0;
+  if ((daily[0] ?? 0) <= 0) return 0;
   let streak = 1;
-  for (let i = todayIdx - 1; i >= 0; i--) {
+  for (let i = 1; i < 50; i++) {
     if ((daily[i] ?? 0) > 0) streak++;
     else break;
   }
@@ -387,7 +389,6 @@ const PUZZLE_SETS = {
   medium: buildMediumPuzzles(),
   hard: buildHardPuzzles(),
   blind: buildBlindPuzzles(),
-  daily: buildDailyPuzzles(),
 };
 
 // --- Persistent storage using localStorage ---
@@ -622,9 +623,11 @@ export default function Pattrn() {
   const timerInterval = useRef(null);
   const isPainting = useRef(false);
 
+  const todayDateStr = getDateString();
   const isDaily = difficulty === "daily";
   const isCascade = difficulty === "cascade";
-  const puzzles = isCascade ? [] : (PUZZLE_SETS[difficulty] || []);
+  const dailyPuzzles = useMemo(() => buildDailyPuzzles(), [todayDateStr]);
+  const puzzles = isCascade ? [] : isDaily ? dailyPuzzles : (PUZZLE_SETS[difficulty] || []);
   const cascadePuzzle = useMemo(
     () => (isCascade ? buildCascadePuzzle(cascadeLevel, getCascadeRunSeed(cascadeRunIndex)) : null),
     [isCascade, cascadeLevel, cascadeRunIndex]
