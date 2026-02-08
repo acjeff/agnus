@@ -285,6 +285,7 @@ const PUZZLE_SETS = {
 
 // --- Persistent storage using localStorage ---
 const STORAGE_KEY = "pattrn-progress-v3";
+const TIMES_KEY = "pattrn-times-v1";
 
 function loadProgress() {
   try {
@@ -301,6 +302,30 @@ function saveProgress(progress) {
   } catch (e) {
     console.error("Save failed:", e);
   }
+}
+
+function loadTimes() {
+  try {
+    const raw = localStorage.getItem(TIMES_KEY);
+    return raw ? JSON.parse(raw) : { easy: {}, medium: {}, hard: {}, blind: {} };
+  } catch {
+    return { easy: {}, medium: {}, hard: {}, blind: {} };
+  }
+}
+
+function saveTimes(times) {
+  try {
+    localStorage.setItem(TIMES_KEY, JSON.stringify(times));
+  } catch (e) {
+    console.error("Save times failed:", e);
+  }
+}
+
+function formatTime(seconds) {
+  if (seconds == null) return "--:--";
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
 // --- Helper: parse token ---
@@ -438,12 +463,24 @@ export default function Pattrn() {
   const [lockedCells, setLockedCells] = useState(new Set()); // for blind mode
   const [showParticles, setShowParticles] = useState(false);
   const [progress, setProgress] = useState(() => loadProgress());
+  const [times, setTimes] = useState(() => loadTimes());
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [shareMsg, setShareMsg] = useState("");
+  const timerStart = useRef(null);
+  const timerInterval = useRef(null);
   const isPainting = useRef(false);
 
   const puzzles = PUZZLE_SETS[difficulty];
   const puzzle = puzzles[currentPuzzle];
   const diffProgress = progress[difficulty] || {};
   const isBlind = difficulty === "blind";
+
+  const stopTimer = useCallback(() => {
+    if (timerInterval.current) {
+      clearInterval(timerInterval.current);
+      timerInterval.current = null;
+    }
+  }, []);
 
   const startPuzzle = (idx, diff) => {
     if (diff) setDifficulty(diff);
@@ -456,6 +493,13 @@ export default function Pattrn() {
     setWrongCells(new Set());
     setLockedCells(new Set());
     setShowParticles(false);
+    setElapsedTime(0);
+    // Start timer
+    stopTimer();
+    timerStart.current = Date.now();
+    timerInterval.current = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+    }, 1000);
     setView("play");
   };
 
@@ -504,6 +548,11 @@ export default function Pattrn() {
     };
   }, []);
 
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => stopTimer();
+  }, [stopTimer]);
+
   const handleTokenSelect = (token) => {
     setSelectedToken(token);
     if (selectedCell && puzzle.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
@@ -549,6 +598,8 @@ export default function Pattrn() {
 
     if (allCorrect) {
       setGameState("won");
+      stopTimer();
+      const finalTime = timerStart.current ? Math.round((Date.now() - timerStart.current) / 1000) : elapsedTime;
       if (isBlind) setLockedCells(new Set([...puzzle.blanks]));
       setShowParticles(true);
       setTimeout(() => setShowParticles(false), 1500);
@@ -556,8 +607,15 @@ export default function Pattrn() {
       const newProgress = { ...progress, [difficulty]: newDiffProgress };
       setProgress(newProgress);
       saveProgress(newProgress);
+      // Save time
+      const diffTimes = times[difficulty] || {};
+      const newDiffTimes = { ...diffTimes, [currentPuzzle]: finalTime };
+      const newTimes = { ...times, [difficulty]: newDiffTimes };
+      setTimes(newTimes);
+      saveTimes(newTimes);
     } else if (newAttempts >= maxAttempts) {
       setGameState("lost");
+      stopTimer();
       setWrongCells(wrong);
       if (isBlind) setLockedCells(newLocked);
       const newDiffProgress = { ...diffProgress, [currentPuzzle]: 0 };
@@ -568,13 +626,16 @@ export default function Pattrn() {
       setWrongCells(wrong);
       if (isBlind) {
         setLockedCells(newLocked);
-        // Clear wrong fills so player can re-fill them
+      }
+      // Clear wrong fills after brief red flash for all modes
+      setTimeout(() => {
         setFills(prev => {
           const next = { ...prev };
           for (const k of wrong) delete next[k];
           return next;
         });
-      }
+        setWrongCells(new Set());
+      }, 600);
     }
   };
 
@@ -586,6 +647,141 @@ export default function Pattrn() {
 
   const completedCount = Object.keys(diffProgress).filter(k => diffProgress[k] > 0).length;
   const totalAttempted = Object.keys(diffProgress).length;
+
+  const diffTimes = times[difficulty] || {};
+
+  const generateShareText = () => {
+    const allProgress = progress;
+    const allTimes = times;
+    let totalSolved = 0;
+    let totalAttemptedAll = 0;
+    let totalGold = 0;
+    let totalSilver = 0;
+    let totalBronze = 0;
+    let totalFailed = 0;
+    let bestTimeAll = null;
+    const lines = [];
+
+    for (const d of DIFFICULTIES) {
+      const dp = allProgress[d.key] || {};
+      const dt = allTimes[d.key] || {};
+      let solved = 0, attempted = 0, gold = 0, silver = 0, bronze = 0, failed = 0;
+      let bestTime = null;
+      const row = [];
+
+      for (let i = 0; i < 50; i++) {
+        const result = dp[i];
+        if (result === undefined) {
+          row.push("\u2B1C"); // white square - not attempted
+        } else {
+          attempted++;
+          if (result === 0) {
+            failed++;
+            row.push("\uD83D\uDFE5"); // red square - failed
+          } else if (result <= 2) {
+            gold++;
+            solved++;
+            row.push("\uD83D\uDFE8"); // yellow square - gold
+          } else if (result <= 4) {
+            silver++;
+            solved++;
+            row.push("\u2B1C"); // we'll use specific emojis
+            // Actually let's use better emojis
+          } else {
+            bronze++;
+            solved++;
+          }
+          if (result > 0 && dt[i] != null) {
+            if (bestTime === null || dt[i] < bestTime) bestTime = dt[i];
+          }
+        }
+      }
+
+      totalSolved += solved;
+      totalAttemptedAll += attempted;
+      totalGold += gold;
+      totalSilver += silver;
+      totalBronze += bronze;
+      totalFailed += failed;
+      if (bestTime != null && (bestTimeAll === null || bestTime < bestTimeAll)) bestTimeAll = bestTime;
+    }
+
+    // Build cleaner share text
+    let text = "PATTRN \uD83E\uDDE9\n\n";
+
+    for (const d of DIFFICULTIES) {
+      const dp = allProgress[d.key] || {};
+      const dt = allTimes[d.key] || {};
+      let solved = 0, gold = 0, silver = 0, bronze = 0, failed = 0;
+      let bestTime = null;
+      let totalTime = 0;
+      let timedCount = 0;
+
+      for (let i = 0; i < 50; i++) {
+        const result = dp[i];
+        if (result !== undefined) {
+          if (result === 0) failed++;
+          else {
+            solved++;
+            if (result <= 2) gold++;
+            else if (result <= 4) silver++;
+            else bronze++;
+            if (dt[i] != null) {
+              if (bestTime === null || dt[i] < bestTime) bestTime = dt[i];
+              totalTime += dt[i];
+              timedCount++;
+            }
+          }
+        }
+      }
+
+      const bar = [];
+      for (let i = 0; i < 50; i++) {
+        const result = dp[i];
+        if (result === undefined) bar.push("\u2591");
+        else if (result === 0) bar.push("\u2593");
+        else if (result <= 2) bar.push("\u2588");
+        else if (result <= 4) bar.push("\u2593");
+        else bar.push("\u2592");
+      }
+
+      const emoji = d.key === "blind" ? "\uD83D\uDE48" : d.key === "hard" ? "\uD83D\uDD25" : d.key === "medium" ? "\u26A1" : "\u2B50";
+      text += `${emoji} ${d.label}: ${solved}/50 solved`;
+      if (bestTime != null) text += ` \u2022 best ${formatTime(bestTime)}`;
+      if (timedCount > 0) text += ` \u2022 avg ${formatTime(Math.round(totalTime / timedCount))}`;
+      text += "\n";
+      // Compact grid: 10 per row, 5 rows
+      for (let row = 0; row < 5; row++) {
+        text += bar.slice(row * 10, (row + 1) * 10).join("") + "\n";
+      }
+      text += "\n";
+    }
+
+    text += `\u2605 ${totalGold} gold \u2022 \u25CF ${totalSilver} silver \u2022 \u25C6 ${totalBronze} bronze \u2022 \u2717 ${totalFailed} failed\n`;
+    text += `Total: ${totalSolved}/200 solved`;
+    if (bestTimeAll != null) text += ` \u2022 Fastest: ${formatTime(bestTimeAll)}`;
+
+    return text;
+  };
+
+  const handleShare = async () => {
+    const text = generateShareText();
+    try {
+      await navigator.clipboard.writeText(text);
+      setShareMsg("Copied!");
+      setTimeout(() => setShareMsg(""), 2000);
+    } catch {
+      // Fallback for older browsers
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      setShareMsg("Copied!");
+      setTimeout(() => setShareMsg(""), 2000);
+    }
+  };
 
   const gridSize = puzzle ? puzzle.gridSize : 5;
   const cellSize = gridSize === 7 ? 42 : 56;
@@ -676,6 +872,21 @@ export default function Pattrn() {
           </div>
         </div>
 
+        {/* Share button */}
+        <button onClick={handleShare}
+          style={{
+            marginBottom: 20, padding: "10px 28px", borderRadius: 10,
+            backgroundColor: "transparent", border: `1.5px solid ${C.accent}`,
+            color: C.accent, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+            fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase",
+            transition: "all 0.2s", animation: "fadeUp 0.5s 0.12s ease both",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.accent; e.currentTarget.style.color = C.bg; }}
+          onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = C.accent; }}
+        >
+          {shareMsg || "Share Stats"}
+        </button>
+
         {/* Puzzle grid */}
         <div style={{
           display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
@@ -685,13 +896,14 @@ export default function Pattrn() {
             const result = diffProgress[i];
             const solved = result > 0;
             const failed = result === 0;
+            const time = diffTimes[i];
             return (
               <button key={i} onClick={() => startPuzzle(i)}
                 style={{
                   aspectRatio: "1", borderRadius: 10, border: `1.5px solid ${solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border}`,
                   backgroundColor: solved ? C.correct + "15" : failed ? C.incorrect + "10" : C.surface,
                   cursor: "pointer", display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center", gap: 2,
+                  alignItems: "center", justifyContent: "center", gap: 1,
                   transition: "all 0.15s", position: "relative",
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.borderColor = C.accent; }}
@@ -704,6 +916,11 @@ export default function Pattrn() {
                   {i + 1}
                 </span>
                 {result !== undefined && <ScoreBadge attempts={result} />}
+                {solved && time != null && (
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 8, color: C.textDim, lineHeight: 1 }}>
+                    {formatTime(time)}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -743,7 +960,7 @@ export default function Pattrn() {
 
       {/* Top bar */}
       <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridSize === 7 ? 380 : 360, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-        <button onClick={() => setView("menu")}
+        <button onClick={() => { stopTimer(); setView("menu"); }}
           style={{
             background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
             color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
@@ -765,14 +982,17 @@ export default function Pattrn() {
         <div style={{ width: 80 }} />
       </div>
 
-      {/* Attempt dots */}
+      {/* Timer + Attempt dots */}
+      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, marginBottom: 6, letterSpacing: 2 }}>
+        {formatTime(elapsedTime)}
+      </div>
       <AttemptDots max={maxAttempts} used={attempts} won={gameState === "won"} />
       <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>
         {gameState === "playing" ? (
           isBlind && lockedCount > 0
             ? `${lockedCount}/${totalBlanks} locked \u2022 ${maxAttempts - attempts} guess${maxAttempts - attempts !== 1 ? "es" : ""} left`
             : `${maxAttempts - attempts} ${isBlind ? "guess" : "attempt"}${maxAttempts - attempts !== 1 ? "es" : ""} left`
-        ) : gameState === "won" ? `Solved in ${attempts}!` : "Out of attempts"}
+        ) : gameState === "won" ? `Solved in ${attempts} \u2022 ${formatTime(elapsedTime)}` : "Out of attempts"}
       </div>
 
       {/* Grid */}
@@ -847,21 +1067,41 @@ export default function Pattrn() {
             <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: 12, animation: "fadeUp 0.4s ease" }}>
               &#x2713; {isBlind ? "Cracked it!" : "Perfect"}
             </div>
-            {currentPuzzle < totalPuzzles - 1 && (
-              <button onClick={() => startPuzzle(currentPuzzle + 1)}
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button onClick={() => {
+                const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
+                const text = `PATTRN \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+                navigator.clipboard.writeText(text).catch(() => {});
+                setShareMsg("Copied!");
+                setTimeout(() => setShareMsg(""), 2000);
+              }}
                 style={{
-                  backgroundColor: C.accent, color: C.bg, border: "none",
-                  padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
-                  textTransform: "uppercase", transition: "all 0.2s",
-                  boxShadow: `0 4px 20px ${C.accent}44`,
+                  backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
+                  padding: "12px 24px", borderRadius: 12, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase", transition: "all 0.15s",
                 }}
-                onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                onMouseLeave={e => e.target.style.transform = "translateY(0)"}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
               >
-                Next &rarr;
+                {shareMsg || "Share"}
               </button>
-            )}
+              {currentPuzzle < totalPuzzles - 1 && (
+                <button onClick={() => startPuzzle(currentPuzzle + 1)}
+                  style={{
+                    backgroundColor: C.accent, color: C.bg, border: "none",
+                    padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
+                    textTransform: "uppercase", transition: "all 0.2s",
+                    boxShadow: `0 4px 20px ${C.accent}44`,
+                  }}
+                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
+                >
+                  Next &rarr;
+                </button>
+              )}
+            </div>
           </div>
         )}
 
