@@ -508,15 +508,21 @@ function parseToken(token) {
 
 // --- Components ---
 
-function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerEnter, cellSize, iconSize, mode }) {
+function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0 }) {
   const showContent = isRevealed || isLocked || !isBlank || isFilled;
   const parsed = showContent && token ? parseToken(token) : null;
   const isEasy = mode === "easy";
+  const fallAnimation = isPrefilled ? `fallIntoPlace 0.5s ${fallDelay}s cubic-bezier(0.34, 1.56, 0.64, 1) both` : "none";
+  const wrongAnimation = isWrong ? `fallOff 0.32s ${wrongFallDelay}s cubic-bezier(0.55, 0.09, 0.68, 0.53) forwards` : "none";
+  const isEmptyUnfilled = isBlank && !isFilled && !isRevealed && !isLocked;
+  const emptyCellAnimation = isEmptyUnfilled && emptyCellDelay != null ? `emptyCellIn 0.35s ${emptyCellDelay}s ease-out forwards` : "none";
+  const winAnimation = isWon && showContent ? `tilesWinCelebrate 0.6s ${winCelebrateDelay}s cubic-bezier(0.34, 1.56, 0.64, 1) both` : "none";
 
   return (
     <div
       onClick={onClick}
       onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
       onPointerEnter={onPointerEnter}
       style={{
         width: cellSize, height: cellSize, borderRadius: cellSize > 44 ? 10 : 8,
@@ -529,19 +535,17 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
         cursor: isBlank && !isRevealed && !isLocked ? "pointer" : "default",
         transition: "all 0.15s cubic-bezier(0.4,0,0.2,1)",
         transform: isSelected ? "scale(1.08)" : "scale(1)",
-        opacity: isBlank && !isFilled && !isRevealed && !isLocked ? 0.45 : 1,
+        opacity: isEmptyUnfilled && emptyCellDelay != null ? 0 : (isBlank && !isFilled && !isRevealed && !isLocked ? 0.45 : 1),
         boxShadow: isLocked ? `0 0 14px ${C.correct}55`
           : isCorrect ? `0 0 14px ${C.correct}55`
           : isWrong ? `0 0 12px ${C.incorrect}66`
           : isSelected ? `0 0 14px ${C.accent}44` : "none",
         position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
         touchAction: "none", userSelect: "none",
-        animation: isWrong ? "shake 0.4s ease" : "none",
+        zIndex: isWrong ? 10 : undefined,
+        animation: winAnimation !== "none" ? winAnimation : wrongAnimation !== "none" ? wrongAnimation : emptyCellAnimation !== "none" ? emptyCellAnimation : fallAnimation,
       }}
     >
-      {isBlank && !isFilled && !isRevealed && !isLocked && (
-        <span style={{ color: C.textDim, fontSize: cellSize > 44 ? 18 : 14, fontWeight: 300 }}>?</span>
-      )}
       {showContent && parsed && SHAPES[parsed.shapeIndex % SHAPES.length](iconSize, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
     </div>
   );
@@ -549,14 +553,13 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
 
 function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remaining }) {
   const isEasy = mode === "easy" || mode === "blind";
-  const isBlind = mode === "blind";
   return (
     <div style={{ display: "flex", gap: 10, justifyContent: "center", padding: "16px 0", flexWrap: "wrap" }}>
       {tokens.map((token, i) => {
         const { color, shapeIndex } = parseToken(token);
         const selected = selectedToken === token;
-        const left = remaining ? (remaining[token] ?? 0) : null;
-        const exhausted = isBlind && left !== null && left <= 0;
+        const left = remaining && remaining[token] !== undefined ? remaining[token] : null;
+        const exhausted = left !== null && left <= 0;
         return (
           <div key={i} onClick={() => onSelect(token)}
             style={{
@@ -570,7 +573,7 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
             }}
           >
             {SHAPES[shapeIndex % SHAPES.length](cellSize * 0.5, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
-            {isBlind && left !== null && (
+            {left !== null && (
               <div style={{
                 position: "absolute", top: -6, right: -6,
                 backgroundColor: exhausted ? C.textDim : C.text,
@@ -696,6 +699,8 @@ export default function Pattrn() {
   const cascadeAttemptsRef = useRef(0);
   const cascadeRunIndexRef = useRef(0);
   const isPainting = useRef(false);
+  const pendingCellRef = useRef(null);
+  const justHandledInPointerUpRef = useRef(null);
 
   const hasSyncedUrl = useRef(false);
 
@@ -767,7 +772,26 @@ export default function Pattrn() {
             }
           }, 1000);
         }
-      } else setCurrentPuzzle(levelNum);
+      } else {
+        setCurrentPuzzle(levelNum);
+        setFills({});
+        setAttempts(0);
+        setElapsedTime(0);
+        setSelectedCell(null);
+        setSelectedToken(null);
+        setGameState("playing");
+        setWrongCells(new Set());
+        setLockedCells(new Set());
+        setShowParticles(false);
+        if (timerInterval.current) {
+          clearInterval(timerInterval.current);
+          timerInterval.current = null;
+        }
+        timerStart.current = Date.now();
+        timerInterval.current = setInterval(() => {
+          setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+        }, 1000);
+      }
       setView("play");
       return;
     }
@@ -812,11 +836,15 @@ export default function Pattrn() {
   const isBlind = difficulty === "blind" && !isDaily;
   const progressKey = isCascade ? cascadeRunIndex : currentPuzzle;
 
-  // For blind mode: count how many of each token exist in the solution vs placed
+  // How many of each token still need to be placed (only counts blanks, not full grid)
   const tokenRemaining = useMemo(() => {
-    if (!isBlind || !puzzle) return {};
-    const solutionCounts = {};
-    puzzle.solution.flat().forEach(t => { solutionCounts[t] = (solutionCounts[t] || 0) + 1; });
+    if (!puzzle) return {};
+    const neededInBlanks = {};
+    for (const key of puzzle.blanks) {
+      const [r, c] = key.split("-").map(Number);
+      const token = puzzle.solution[r][c];
+      if (token) neededInBlanks[token] = (neededInBlanks[token] || 0) + 1;
+    }
     const usedCounts = {};
     for (const key of puzzle.blanks) {
       let token;
@@ -829,9 +857,16 @@ export default function Pattrn() {
       if (token) usedCounts[token] = (usedCounts[token] || 0) + 1;
     }
     const remaining = {};
-    puzzle.usedTokens.forEach(t => { remaining[t] = (solutionCounts[t] || 0) - (usedCounts[t] || 0); });
+    puzzle.usedTokens.forEach(t => { remaining[t] = (neededInBlanks[t] || 0) - (usedCounts[t] || 0); });
     return remaining;
-  }, [isBlind, puzzle, fills, lockedCells]);
+  }, [puzzle, fills, lockedCells]);
+
+  // Default to first tile when game loads with no selection
+  useEffect(() => {
+    if (view === "play" && puzzle?.usedTokens?.length && selectedToken === null) {
+      setSelectedToken(puzzle.usedTokens[0]);
+    }
+  }, [view, puzzle, selectedToken]);
 
   const stopTimer = useCallback(() => {
     timerIsCascadeRun.current = false;
@@ -920,46 +955,84 @@ export default function Pattrn() {
     if (!puzzle.blanks.has(key)) return;
     if (lockedCells.has(key)) return;
     if (selectedToken) {
-      if (isBlind && fills[key] !== selectedToken && (tokenRemaining[selectedToken] || 0) <= 0) return;
+      if (fills[key] === selectedToken) {
+        setFills(prev => { const next = { ...prev }; delete next[key]; return next; });
+        setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
+        return;
+      }
+      if ((tokenRemaining[selectedToken] ?? 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, isBlind, fills, tokenRemaining]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining]);
 
-  const handleCellClick = (r, c) => {
-    if (gameState !== "playing") return;
+  const applyCellAction = useCallback((r, c) => {
     const key = `${r}-${c}`;
-    if (!puzzle.blanks.has(key)) return;
-    if (lockedCells.has(key)) return;
+    if (!puzzle.blanks.has(key) || lockedCells.has(key)) return;
     if (selectedToken) {
-      if (isBlind && fills[key] !== selectedToken && (tokenRemaining[selectedToken] || 0) <= 0) return;
+      if (fills[key] === selectedToken) {
+        setFills(prev => { const next = { ...prev }; delete next[key]; return next; });
+        setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
+        return;
+      }
+      if ((tokenRemaining[selectedToken] ?? 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     } else {
       setSelectedCell(key);
     }
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining]);
+
+  const handleCellPointerUp = useCallback((r, c) => {
+    if (gameState !== "playing") return;
+    const key = `${r}-${c}`;
+    const isSameCellAsPress = pendingCellRef.current === key;
+    if (isSameCellAsPress) {
+      applyCellAction(r, c);
+      justHandledInPointerUpRef.current = key;
+      pendingCellRef.current = null;
+    }
+  }, [gameState, applyCellAction]);
+
+  const handleCellClick = (r, c) => {
+    if (gameState !== "playing") return;
+    const key = `${r}-${c}`;
+    if (key === justHandledInPointerUpRef.current) {
+      justHandledInPointerUpRef.current = null;
+      return;
+    }
+    applyCellAction(r, c);
   };
 
   const handleCellPointerDown = (r, c) => {
     if (!selectedToken || gameState !== "playing") return;
     isPainting.current = true;
-    paintCell(r, c);
+    pendingCellRef.current = `${r}-${c}`;
   };
 
   const handleCellPointerEnter = (r, c) => {
     if (!isPainting.current || !selectedToken) return;
+    pendingCellRef.current = null;
     paintCell(r, c);
   };
 
   useEffect(() => {
-    const stopPaint = () => { isPainting.current = false; };
+    const stopPaint = () => {
+      isPainting.current = false;
+      if (pendingCellRef.current) {
+        const key = pendingCellRef.current;
+        pendingCellRef.current = null;
+        const [r, c] = key.split("-").map(Number);
+        paintCell(r, c);
+      }
+    };
     window.addEventListener("pointerup", stopPaint);
     window.addEventListener("pointercancel", stopPaint);
     return () => {
       window.removeEventListener("pointerup", stopPaint);
       window.removeEventListener("pointercancel", stopPaint);
     };
-  }, []);
+  }, [paintCell]);
 
   // Clean up timer on unmount
   useEffect(() => {
@@ -969,7 +1042,7 @@ export default function Pattrn() {
   const handleTokenSelect = (token) => {
     setSelectedToken(token);
     if (selectedCell && puzzle.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
-      if (isBlind && fills[selectedCell] !== token && (tokenRemaining[token] || 0) <= 0) return;
+      if (fills[selectedCell] !== token && (tokenRemaining[token] ?? 0) <= 0) return;
       setFills(prev => ({ ...prev, [selectedCell]: token }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(selectedCell); return n; });
       setSelectedCell(null);
@@ -1095,16 +1168,24 @@ export default function Pattrn() {
       if (isBlind) {
         setLockedCells(newLocked);
       }
-      // Shake for 400ms, hold red border, then clear at 800ms
-      // The cell's own CSS transition handles the smooth visual change to blank
+      // Wait for all wrong-cell fall-off animations to finish (staggered delay + duration) before clearing
+      const n = puzzle.gridSize * puzzle.gridSize;
+      const maxStagger = (n - 1) * 0.015;
+      const fallOffDuration = 0.32;
+      const clearDelayMs = (maxStagger + fallOffDuration + 0.05) * 1000;
       setTimeout(() => {
-        setWrongCells(new Set());
+        // Clear fills first so cells lose content; then clear wrong state on next tick.
+        // Otherwise clearing wrongCells first removes the animation while the cell still
+        // has content, causing a one-frame flash of the tile back in place.
         setFills(prev => {
           const next = { ...prev };
           for (const k of wrong) delete next[k];
           return next;
         });
-      }, 800);
+        requestAnimationFrame(() => {
+          setWrongCells(new Set());
+        });
+      }, clearDelayMs);
     }
   };
 
@@ -1643,7 +1724,7 @@ export default function Pattrn() {
       display: "flex", flexDirection: "column", alignItems: "center",
       padding: "24px 16px", position: "relative", overflow: "hidden",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} }`}</style>
 
       <Particles show={showParticles} />
 
@@ -1729,6 +1810,7 @@ export default function Pattrn() {
           display: "flex", flexDirection: "column", gap: gridSize >= 7 ? 3 : 4, padding: gridSize >= 7 ? 10 : 14,
           backgroundColor: C.surface, borderRadius: 16,
           border: `1px solid ${C.border}`, boxShadow: `0 8px 32px ${C.bg}88`,
+          overflow: "visible",
         }}>
           {puzzle.solution.map((row, r) => (
             <div key={r} style={{ display: "flex", gap: gridSize >= 7 ? 3 : 4 }}>
@@ -1739,16 +1821,31 @@ export default function Pattrn() {
                 const fillToken = isBlankCell ? (isLockedCell ? token : fills[key]) : token;
                 const isRevealed = (gameState === "lost") && isBlankCell && !isLockedCell;
                 const displayToken = isRevealed ? token : fillToken;
+                const cellIndex = r * gridSize + c;
+                const isWrongCell = wrongCells.has(key) && gameState !== "lost";
+                const fallDelay = isBlankCell ? 0 : cellIndex * 0.032;
+                const wrongFallDelay = isWrongCell ? cellIndex * 0.015 : 0;
+                const totalCells = gridSize * gridSize;
+                const emptyCellDelay = (totalCells - 1) * 0.032 + 0.5;
+                const isWon = gameState === "won";
+                const winCelebrateDelay = isWon ? cellIndex * 0.04 : 0;
                 return (
                   <Cell key={key} token={displayToken} isBlank={isBlankCell}
                     isSelected={selectedCell === key}
                     isFilled={!!fills[key] || isLockedCell}
-                    isCorrect={gameState === "won" && isBlankCell}
-                    isWrong={wrongCells.has(key) && gameState !== "lost"}
+                    isCorrect={isWon && isBlankCell}
+                    isWrong={isWrongCell}
                     isRevealed={isRevealed}
                     isLocked={isLockedCell && gameState === "playing"}
+                    isPrefilled={!isBlankCell}
+                    fallDelay={fallDelay}
+                    wrongFallDelay={wrongFallDelay}
+                    emptyCellDelay={emptyCellDelay}
+                    isWon={isWon}
+                    winCelebrateDelay={winCelebrateDelay}
                     onClick={() => handleCellClick(r, c)}
                     onPointerDown={() => handleCellPointerDown(r, c)}
+                    onPointerUp={() => handleCellPointerUp(r, c)}
                     onPointerEnter={() => handleCellPointerEnter(r, c)}
                     cellSize={cellSize} iconSize={iconSize}
                     mode={puzzle.mode}
@@ -1772,19 +1869,23 @@ export default function Pattrn() {
 
       {/* Actions */}
       <div style={{ marginTop: 20, animation: "fadeUp 0.4s 0.2s ease both", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-        {gameState === "playing" && allFilled && (
-          <button onClick={checkSolution}
+        {gameState === "playing" && (
+          <button
+            onClick={allFilled ? checkSolution : undefined}
+            disabled={!allFilled}
             style={{
-              backgroundColor: isBlind ? "#e06040" : C.accent,
-              color: isBlind ? "#fff" : C.bg,
+              backgroundColor: allFilled ? (isBlind ? "#e06040" : C.accent) : C.surfaceLight,
+              color: allFilled ? (isBlind ? "#fff" : C.bg) : C.textDim,
               border: "none",
               padding: "14px 48px", borderRadius: 12, fontSize: 15, fontWeight: 700,
-              fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
+              fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+              cursor: allFilled ? "pointer" : "not-allowed",
               textTransform: "uppercase", transition: "all 0.2s",
-              boxShadow: isBlind ? "0 4px 20px #e0604044" : `0 4px 20px ${C.accent}44`,
+              boxShadow: allFilled ? (isBlind ? "0 4px 20px #e0604044" : `0 4px 20px ${C.accent}44`) : "none",
+              opacity: allFilled ? 1 : 0.7,
             }}
-            onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-            onMouseLeave={e => e.target.style.transform = "translateY(0)"}
+            onMouseEnter={e => { if (allFilled) e.target.style.transform = "translateY(-2px)"; }}
+            onMouseLeave={e => { e.target.style.transform = "translateY(0)"; }}
           >
             {isBlind ? "Guess" : "Check"}
           </button>
