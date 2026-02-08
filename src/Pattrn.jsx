@@ -552,7 +552,7 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
           : isBlank && !isFilled && !isRevealed ? `2.5px dashed ${C.border}`
           : "2.5px solid transparent",
         cursor: isBlank && !isRevealed && !isLocked ? "pointer" : "default",
-        transition: "all 0.15s cubic-bezier(0.4,0,0.2,1)",
+        transition: "transform 0.15s cubic-bezier(0.4,0,0.2,1), border-color 0.15s cubic-bezier(0.4,0,0.2,1), box-shadow 0.15s cubic-bezier(0.4,0,0.2,1), background-color 0.15s cubic-bezier(0.4,0,0.2,1)",
         transform: isSelected ? "scale(1.08)" : "scale(1)",
         opacity: isEmptyUnfilled && emptyCellDelay != null ? 0 : (isBlank && !isFilled && !isRevealed && !isLocked ? 0.45 : 1),
         boxShadow: isLocked ? `0 0 14px ${C.correct}55`
@@ -1379,15 +1379,12 @@ export default function Pattrn() {
       wrongCellClearTimeoutRef.current = setTimeout(() => {
         wrongCellClearTimeoutRef.current = null;
         setClearedBlanks(prev => { const next = new Set(prev); for (const k of wrongSet) next.add(k); return next; });
-        // Clear fills first so cells lose content; then clear wrong state on next tick.
         setFills(prev => {
           const next = { ...prev };
           for (const k of wrongSet) delete next[k];
           return next;
         });
-        requestAnimationFrame(() => {
-          setWrongCells(new Set());
-        });
+        setWrongCells(new Set());
       }, clearDelayMs);
     }
   };
