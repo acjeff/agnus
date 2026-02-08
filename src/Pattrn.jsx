@@ -276,11 +276,118 @@ function buildBlindPuzzles() {
   return puzzles;
 }
 
+// --- Daily: 50 historic days (fixed seeds from epoch), same for everyone ---
+const DAILY_EPOCH = Math.floor(new Date(Date.UTC(2025, 0, 1, 0, 0, 0, 0)).getTime() / 1000);
+
+function getDateString(date = new Date()) {
+  const y = date.getUTCFullYear();
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function getDailySeedForIndex(i) {
+  return DAILY_EPOCH + i * 86400;
+}
+
+function getDailyDateLabel(i) {
+  const d = new Date(getDailySeedForIndex(i) * 1000);
+  return getDateString(d);
+}
+
+function buildDailyPuzzle(seed) {
+  const r = rng(seed);
+  const palIdx = Math.floor(r() * PALETTES.length);
+  const pal = shuffle(PALETTES[palIdx], r);
+  const validGens = GENERATORS_7.map((g, idx) => idx).filter(idx => !TWO_COLOR_GENS.has(idx) && idx !== FOUR_COLOR_GEN && !STRIPE_GENS.has(idx));
+  const validWeights = validGens.map(idx => GEN_WEIGHTS[idx]);
+  const totalW = validWeights.reduce((a, b) => a + b, 0);
+  let roll = r() * totalW;
+  let genIdx = validGens[validGens.length - 1];
+  for (let vi = 0; vi < validGens.length; vi++) {
+    roll -= validWeights[vi];
+    if (roll <= 0) { genIdx = validGens[vi]; break; }
+  }
+  const numShapes = 3;
+  const shapeIndices = Array.from({ length: numShapes }, (_, k) => k);
+  const grid = GENERATORS_7[genIdx](shapeIndices, numShapes);
+  const solution = grid.map(row => row.map(si => `${pal[si % pal.length]}|${si}`));
+  const numBlanks = 14;
+  const allCells = [];
+  for (let row = 0; row < 7; row++) for (let col = 0; col < 7; col++) allCells.push(`${row}-${col}`);
+  const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
+  const usedTokens = [...new Set(solution.flat())];
+  return { id: 0, solution, blanks, usedTokens, gridSize: 7, mode: "medium" };
+}
+
+function buildDailyPuzzles() {
+  return Array.from({ length: 50 }, (_, i) => {
+    const p = buildDailyPuzzle(getDailySeedForIndex(i));
+    return { ...p, id: i };
+  });
+}
+
+function getTodayDailyIndex() {
+  const now = new Date();
+  const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+  const todayTs = Math.floor(todayStart.getTime() / 1000);
+  const dayIndex = Math.floor((todayTs - DAILY_EPOCH) / 86400);
+  return ((dayIndex % 50) + 50) % 50;
+}
+
+function getDailyStreak(progress) {
+  const daily = progress.daily || {};
+  const todayIdx = getTodayDailyIndex();
+  if ((daily[todayIdx] ?? 0) <= 0) return 0;
+  let streak = 1;
+  for (let i = todayIdx - 1; i >= 0; i--) {
+    if ((daily[i] ?? 0) > 0) streak++;
+    else break;
+  }
+  return streak;
+}
+
+// --- CASCADE: 50 runs, each 3×3 → 9×9 with 3 lives; progress = how far you got per run ---
+const CASCADE_LEVELS = [3, 4, 5, 6, 7, 8, 9]; // gridSize per level 0..6
+const CASCADE_RUN_SEED_BASE = 50000;
+
+function getCascadeRunSeed(runIndex) {
+  return CASCADE_RUN_SEED_BASE + runIndex * 9999;
+}
+
+function buildCascadePuzzle(level, runSeed) {
+  const sz = CASCADE_LEVELS[level];
+  const gens = makeGenerators(sz);
+  const r = rng((runSeed ?? 0) * 100 + level);
+  const palIdx = Math.floor(r() * PALETTES.length);
+  const pal = shuffle(PALETTES[palIdx], r);
+  const validGens = gens.map((_, idx) => idx).filter(idx => !TWO_COLOR_GENS.has(idx) && idx !== FOUR_COLOR_GEN && !STRIPE_GENS.has(idx));
+  const validWeights = validGens.map(idx => GEN_WEIGHTS[idx]);
+  const totalW = validWeights.reduce((a, b) => a + b, 0);
+  let roll = r() * totalW;
+  let genIdx = validGens[validGens.length - 1];
+  for (let vi = 0; vi < validGens.length; vi++) {
+    roll -= validWeights[vi];
+    if (roll <= 0) { genIdx = validGens[vi]; break; }
+  }
+  const numShapes = Math.min(3, sz);
+  const shapeIndices = Array.from({ length: numShapes }, (_, k) => k);
+  const grid = gens[genIdx](shapeIndices, numShapes);
+  const solution = grid.map(row => row.map(si => `${pal[si % pal.length]}|${si}`));
+  const numBlanks = Math.max(1, Math.floor((sz * sz) * 0.25));
+  const allCells = [];
+  for (let row = 0; row < sz; row++) for (let col = 0; col < sz; col++) allCells.push(`${row}-${col}`);
+  const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
+  const usedTokens = [...new Set(solution.flat())];
+  return { id: level, solution, blanks, usedTokens, gridSize: sz, mode: "medium" };
+}
+
 const PUZZLE_SETS = {
   easy: buildEasyPuzzles(),
   medium: buildMediumPuzzles(),
   hard: buildHardPuzzles(),
   blind: buildBlindPuzzles(),
+  daily: buildDailyPuzzles(),
 };
 
 // --- Persistent storage using localStorage ---
@@ -290,9 +397,17 @@ const TIMES_KEY = "pattrn-times-v1";
 function loadProgress() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : { easy: {}, medium: {}, hard: {}, blind: {} };
+    const base = raw ? JSON.parse(raw) : {};
+    return {
+      easy: base.easy ?? {},
+      medium: base.medium ?? {},
+      hard: base.hard ?? {},
+      blind: base.blind ?? {},
+      daily: base.daily ?? {},
+      cascade: base.cascade ?? {},
+    };
   } catch {
-    return { easy: {}, medium: {}, hard: {}, blind: {} };
+    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} };
   }
 }
 
@@ -307,9 +422,17 @@ function saveProgress(progress) {
 function loadTimes() {
   try {
     const raw = localStorage.getItem(TIMES_KEY);
-    return raw ? JSON.parse(raw) : { easy: {}, medium: {}, hard: {}, blind: {} };
+    const base = raw ? JSON.parse(raw) : {};
+    return {
+      easy: base.easy ?? {},
+      medium: base.medium ?? {},
+      hard: base.hard ?? {},
+      blind: base.blind ?? {},
+      daily: base.daily ?? {},
+      cascade: base.cascade ?? {},
+    };
   } catch {
-    return { easy: {}, medium: {}, hard: {}, blind: {} };
+    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} };
   }
 }
 
@@ -466,7 +589,12 @@ const DIFFICULTIES = [
   { key: "medium", label: "Medium", desc: "7\u00D77 \u2022 Paired" },
   { key: "hard", label: "Hard", desc: "7\u00D77 \u2022 Mixed" },
   { key: "blind", label: "Blind", desc: "5\u00D75 \u2022 No Clues" },
+  { key: "daily", label: "Daily", desc: "1 a day" },
+  { key: "cascade", label: "Cascade", desc: "Keep on" },
 ];
+
+const ROW1_KEYS = ["easy", "medium", "hard"];
+const ROW2_KEYS = ["blind", "daily", "cascade"];
 
 // --- Main App ---
 export default function Pattrn() {
@@ -485,15 +613,26 @@ export default function Pattrn() {
   const [times, setTimes] = useState(() => loadTimes());
   const [elapsedTime, setElapsedTime] = useState(0);
   const [shareMsg, setShareMsg] = useState("");
+  const [dailyShareMsg, setDailyShareMsg] = useState("");
   const [showShareModal, setShowShareModal] = useState(false);
+  const [cascadeLevel, setCascadeLevel] = useState(0);
+  const [cascadeLives, setCascadeLives] = useState(3);
+  const [cascadeRunIndex, setCascadeRunIndex] = useState(0);
   const timerStart = useRef(null);
   const timerInterval = useRef(null);
   const isPainting = useRef(false);
 
-  const puzzles = PUZZLE_SETS[difficulty];
-  const puzzle = puzzles[currentPuzzle];
+  const isDaily = difficulty === "daily";
+  const isCascade = difficulty === "cascade";
+  const puzzles = isCascade ? [] : (PUZZLE_SETS[difficulty] || []);
+  const cascadePuzzle = useMemo(
+    () => (isCascade ? buildCascadePuzzle(cascadeLevel, getCascadeRunSeed(cascadeRunIndex)) : null),
+    [isCascade, cascadeLevel, cascadeRunIndex]
+  );
+  const puzzle = isCascade ? cascadePuzzle : puzzles[currentPuzzle];
   const diffProgress = progress[difficulty] || {};
-  const isBlind = difficulty === "blind";
+  const isBlind = difficulty === "blind" && !isDaily;
+  const progressKey = isCascade ? cascadeRunIndex : currentPuzzle;
 
   // For blind mode: count how many of each token exist in the solution vs placed
   const tokenRemaining = useMemo(() => {
@@ -526,6 +665,11 @@ export default function Pattrn() {
   const startPuzzle = (idx, diff) => {
     if (diff) setDifficulty(diff);
     setCurrentPuzzle(idx);
+    if (difficulty === "cascade" || diff === "cascade") {
+      setCascadeRunIndex(idx);
+      setCascadeLevel(0);
+      setCascadeLives(3);
+    }
     setFills({});
     setSelectedCell(null);
     setSelectedToken(null);
@@ -535,7 +679,6 @@ export default function Pattrn() {
     setLockedCells(new Set());
     setShowParticles(false);
     setElapsedTime(0);
-    // Start timer
     stopTimer();
     timerStart.current = Date.now();
     timerInterval.current = setInterval(() => {
@@ -543,6 +686,21 @@ export default function Pattrn() {
     }, 1000);
     setView("play");
   };
+
+  const resetCascadeLevelState = useCallback(() => {
+    setFills({});
+    setAttempts(0);
+    setGameState("playing");
+    setWrongCells(new Set());
+    setSelectedCell(null);
+    setSelectedToken(null);
+    setElapsedTime(0);
+    stopTimer();
+    timerStart.current = Date.now();
+    timerInterval.current = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+    }, 1000);
+  }, []);
 
   const paintCell = useCallback((r, c) => {
     if (gameState !== "playing") return;
@@ -641,31 +799,68 @@ export default function Pattrn() {
     }
 
     if (allCorrect) {
-      setGameState("won");
-      stopTimer();
-      const finalTime = timerStart.current ? Math.round((Date.now() - timerStart.current) / 1000) : elapsedTime;
-      if (isBlind) setLockedCells(new Set([...puzzle.blanks]));
-      setShowParticles(true);
-      setTimeout(() => setShowParticles(false), 1500);
-      const newDiffProgress = { ...diffProgress, [currentPuzzle]: newAttempts };
-      const newProgress = { ...progress, [difficulty]: newDiffProgress };
-      setProgress(newProgress);
-      saveProgress(newProgress);
-      // Save time
-      const diffTimes = times[difficulty] || {};
-      const newDiffTimes = { ...diffTimes, [currentPuzzle]: finalTime };
-      const newTimes = { ...times, [difficulty]: newDiffTimes };
-      setTimes(newTimes);
-      saveTimes(newTimes);
-    } else if (newAttempts >= maxAttempts) {
-      setGameState("lost");
-      stopTimer();
-      setWrongCells(wrong);
-      if (isBlind) setLockedCells(newLocked);
-      const newDiffProgress = { ...diffProgress, [currentPuzzle]: 0 };
-      const newProgress = { ...progress, [difficulty]: newDiffProgress };
-      setProgress(newProgress);
-      saveProgress(newProgress);
+      if (isCascade) {
+        const levelsCompleted = cascadeLevel + 1;
+        const prevBest = (progress.cascade || {})[cascadeRunIndex] ?? 0;
+        const newBest = Math.max(prevBest, levelsCompleted);
+        const newProgress = { ...progress, cascade: { ...(progress.cascade || {}), [cascadeRunIndex]: newBest } };
+        setProgress(newProgress);
+        saveProgress(newProgress);
+        setShowParticles(true);
+        setTimeout(() => setShowParticles(false), 1500);
+        if (cascadeLevel < 6) {
+          stopTimer();
+          setCascadeLevel((l) => l + 1);
+          setTimeout(() => resetCascadeLevelState(), 400);
+        } else {
+          setGameState("won");
+          stopTimer();
+        }
+      } else {
+        setGameState("won");
+        stopTimer();
+        const finalTime = timerStart.current ? Math.round((Date.now() - timerStart.current) / 1000) : elapsedTime;
+        if (isBlind) setLockedCells(new Set([...puzzle.blanks]));
+        setShowParticles(true);
+        setTimeout(() => setShowParticles(false), 1500);
+        const newDiffProgress = { ...diffProgress, [progressKey]: newAttempts };
+        const newProgress = { ...progress, [difficulty]: newDiffProgress };
+        setProgress(newProgress);
+        saveProgress(newProgress);
+        const diffTimes = times[difficulty] || {};
+        const newDiffTimes = { ...diffTimes, [progressKey]: finalTime };
+        const newTimes = { ...times, [difficulty]: newDiffTimes };
+        setTimes(newTimes);
+        saveTimes(newTimes);
+      }
+      } else if (newAttempts >= maxAttempts) {
+      if (isCascade) {
+        const newLives = cascadeLives - 1;
+        setCascadeLives(newLives);
+        const levelsReached = cascadeLevel; // failed this level, so completed 0..cascadeLevel-1 = cascadeLevel levels
+        const prevBest = (progress.cascade || {})[cascadeRunIndex] ?? 0;
+        const newBest = Math.max(prevBest, levelsReached);
+        const newProgress = { ...progress, cascade: { ...(progress.cascade || {}), [cascadeRunIndex]: newBest } };
+        setProgress(newProgress);
+        saveProgress(newProgress);
+        if (newLives > 0) {
+          stopTimer();
+          setTimeout(() => resetCascadeLevelState(), 800);
+        } else {
+          setGameState("lost");
+          stopTimer();
+          setWrongCells(wrong);
+        }
+      } else {
+        setGameState("lost");
+        stopTimer();
+        setWrongCells(wrong);
+        if (isBlind) setLockedCells(newLocked);
+        const newDiffProgress = { ...diffProgress, [progressKey]: 0 };
+        const newProgress = { ...progress, [difficulty]: newDiffProgress };
+        setProgress(newProgress);
+        saveProgress(newProgress);
+      }
     } else {
       setWrongCells(wrong);
       if (isBlind) {
@@ -690,8 +885,12 @@ export default function Pattrn() {
     ? activeBlanks.every(k => fills[k])
     : puzzle ? [...puzzle.blanks].every(k => fills[k]) : false;
 
-  const completedCount = Object.keys(diffProgress).filter(k => diffProgress[k] > 0).length;
-  const totalAttempted = Object.keys(diffProgress).length;
+  const completedCount = isCascade
+    ? Object.keys(diffProgress).filter(k => /^\d+$/.test(k) && diffProgress[k] === 7).length
+    : Object.keys(diffProgress).filter(k => diffProgress[k] > 0).length;
+  const totalAttempted = isCascade
+    ? Object.keys(diffProgress).filter(k => /^\d+$/.test(k)).length
+    : Object.keys(diffProgress).length;
 
   const diffTimes = times[difficulty] || {};
 
@@ -710,15 +909,21 @@ export default function Pattrn() {
 
       for (let i = 0; i < 50; i++) {
         const result = dp[i];
-        if (result === undefined) grid.push("none");
-        else if (result === 0) { failed++; grid.push("failed"); }
-        else if (result <= 2) { gold++; solved++; grid.push("gold"); }
-        else if (result <= 4) { silver++; solved++; grid.push("silver"); }
-        else { bronze++; solved++; grid.push("bronze"); }
-        if (result > 0 && dt[i] != null) {
-          if (bestTime === null || dt[i] < bestTime) bestTime = dt[i];
-          totalTime += dt[i];
-          timedCount++;
+        if (d.key === "cascade") {
+          if (result === undefined) grid.push("none");
+          else if (result === 7) { solved++; gold++; grid.push("gold"); }
+          else { failed++; grid.push("failed"); }
+        } else {
+          if (result === undefined) grid.push("none");
+          else if (result === 0) { failed++; grid.push("failed"); }
+          else if (result <= 2) { gold++; solved++; grid.push("gold"); }
+          else if (result <= 4) { silver++; solved++; grid.push("silver"); }
+          else { bronze++; solved++; grid.push("bronze"); }
+          if (result > 0 && dt[i] != null) {
+            if (bestTime === null || dt[i] < bestTime) bestTime = dt[i];
+            totalTime += dt[i];
+            timedCount++;
+          }
         }
       }
 
@@ -737,7 +942,7 @@ export default function Pattrn() {
 
   const generateShareText = () => {
     const { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll } = getShareData();
-    const emojis = { easy: "\u2B50", medium: "\u26A1", hard: "\uD83D\uDD25", blind: "\uD83D\uDE48" };
+    const emojis = { easy: "\u2B50", medium: "\u26A1", hard: "\uD83D\uDD25", blind: "\uD83D\uDE48", daily: "\uD83D\uDCC5", cascade: "\uD83C\uDF00" };
     const blockChars = { none: "\u2591", failed: "\u2593", gold: "\u2588", silver: "\u2593", bronze: "\u2592" };
 
     let text = "PATTRN \uD83E\uDDE9\n\n";
@@ -752,7 +957,7 @@ export default function Pattrn() {
       text += "\n";
     }
     text += `\u2605 ${totalGold} gold \u2022 \u25CF ${totalSilver} silver \u2022 \u25C6 ${totalBronze} bronze \u2022 \u2717 ${totalFailed} failed\n`;
-    text += `Total: ${totalSolved}/200 solved`;
+    text += `Total: ${totalSolved}/300 solved`;
     if (bestTimeAll != null) text += ` \u2022 Fastest: ${formatTime(bestTimeAll)}`;
     return text;
   };
@@ -773,9 +978,27 @@ export default function Pattrn() {
     setTimeout(() => setShareMsg(""), 2000);
   };
 
+  const copyDailyShareText = async () => {
+    const dailySolved = Object.keys(progress.daily || {}).filter(k => (progress.daily || {})[k] > 0).length;
+    const cascadeSolved = Object.keys(progress.cascade || {}).filter(k => /^\d+$/.test(k) && (progress.cascade || {})[k] === 7).length;
+    const text = `PATTRN \uD83E\uDDE9\n\uD83D\uDCC5 Daily: ${dailySolved}/50\n\uD83C\uDF00 Cascade: ${cascadeSolved}/50`;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+    }
+    setShareMsg("Copied!");
+    setTimeout(() => setShareMsg(""), 2000);
+  };
+
   const gridSize = puzzle ? puzzle.gridSize : 5;
-  const cellSize = gridSize === 7 ? 42 : 56;
-  const iconSize = gridSize === 7 ? 22 : 28;
+  const cellSize = gridSize <= 5 ? 56 : gridSize === 6 ? 48 : gridSize === 7 ? 42 : gridSize === 8 ? 38 : 34;
+  const iconSize = gridSize <= 5 ? 28 : gridSize === 6 ? 24 : gridSize === 7 ? 22 : gridSize === 8 ? 18 : 16;
   const pickerSize = 48;
 
   // --- MENU VIEW ---
@@ -788,7 +1011,7 @@ export default function Pattrn() {
       }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
-        <div style={{ textAlign: "center", marginBottom: 24, animation: "fadeUp 0.5s ease" }}>
+        <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease" }}>
           <h1 style={{ fontFamily: "'Space Mono', monospace", fontSize: 36, fontWeight: 700, letterSpacing: 6, margin: 0, color: C.accent, textTransform: "uppercase" }}>
             pattrn
           </h1>
@@ -797,48 +1020,119 @@ export default function Pattrn() {
           </p>
         </div>
 
-        {/* Difficulty Tabs */}
+        {/* Daily overview: streak, play today, share */}
+        {(() => {
+          const todayIdx = getTodayDailyIndex();
+          const todayResult = (progress.daily || {})[todayIdx];
+          const todayTime = (times.daily || {})[todayIdx];
+          const streak = getDailyStreak(progress);
+          const todayLabel = getDailyDateLabel(todayIdx);
+          return (
+            <div style={{
+              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.02s ease both",
+              borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`,
+              backgroundColor: C.surface, padding: "12px 16px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.accent }}>Today: {todayLabel}</span>
+                  {streak > 0 && (
+                    <span style={{ fontSize: 12, color: C.textDim }}>🔥 {streak} day streak</span>
+                  )}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {todayResult > 0 && (
+                    <span style={{ fontSize: 11, color: C.textDim }}>
+                      <ScoreBadge attempts={todayResult} />
+                      {todayTime != null && ` ${formatTime(todayTime)}`}
+                    </span>
+                  )}
+                  <button
+                    onClick={async () => {
+                      const medal = todayResult <= 2 ? "\u2605" : todayResult <= 4 ? "\u25CF" : "\u25C6";
+                      const streakPart = streak > 0 ? ` 🔥 ${streak} day streak` : "";
+                      const text = todayResult > 0
+                        ? `PATTRN Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
+                        : `PATTRN Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
+                      try { await navigator.clipboard.writeText(text); } catch { /* fallback */ }
+                      setDailyShareMsg("Copied!");
+                      setTimeout(() => setDailyShareMsg(""), 2000);
+                    }}
+                    style={{
+                      padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                      background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                    }}
+                  >
+                    {dailyShareMsg || "Share"}
+                  </button>
+                  <button
+                    onClick={() => { setDifficulty("daily"); startPuzzle(todayIdx, "daily"); }}
+                    style={{
+                      padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      background: C.accent, color: C.bg, border: "none", cursor: "pointer",
+                    }}
+                  >
+                    Play today
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Mode selector: two rows — Easy / Medium / Hard, then Blind / Daily / Cascade */}
         <div style={{
-          display: "flex", gap: 0, marginBottom: 20, animation: "fadeUp 0.5s 0.05s ease both",
-          borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`,
+          marginBottom: 20, animation: "fadeUp 0.5s 0.05s ease both",
+          width: "100%", maxWidth: 360,
+          display: "flex", flexDirection: "column", gap: 8,
         }}>
-          {DIFFICULTIES.map((d, idx) => {
-            const active = difficulty === d.key;
-            const dp = progress[d.key] || {};
-            const solved = Object.keys(dp).filter(k => dp[k] > 0).length;
-            return (
-              <button key={d.key} onClick={() => setDifficulty(d.key)}
-                style={{
-                  background: active ? (d.key === "blind" ? "#e06040" : C.accent) : C.surface,
-                  color: active ? (d.key === "blind" ? "#fff" : C.bg) : C.textDim,
-                  border: "none",
-                  borderRight: idx < DIFFICULTIES.length - 1 ? `1px solid ${C.border}` : "none",
-                  padding: "12px 12px",
-                  cursor: "pointer",
-                  fontFamily: "'Space Mono', monospace",
-                  fontSize: 11,
-                  fontWeight: active ? 700 : 400,
-                  letterSpacing: 1,
-                  textTransform: "uppercase",
-                  transition: "all 0.2s",
-                  display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                  minWidth: 78,
-                }}
-              >
-                <span>{d.label}</span>
-                <span style={{
-                  fontSize: 8, letterSpacing: 0.5,
-                  color: active ? (d.key === "blind" ? "#fff9" : C.bg + "aa") : C.textDim,
-                  fontWeight: 400,
-                }}>{d.desc}</span>
-                <span style={{
-                  fontSize: 8, marginTop: 2,
-                  color: active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim,
-                  fontWeight: 400,
-                }}>{solved}/50</span>
-              </button>
-            );
-          })}
+          {[ROW1_KEYS, ROW2_KEYS].map((rowKeys, rowIdx) => (
+            <div key={rowIdx} style={{ display: "flex", gap: 8 }}>
+              {rowKeys.map((key) => {
+                const d = DIFFICULTIES.find((x) => x.key === key);
+                if (!d) return null;
+                const active = difficulty === d.key;
+                const dp = progress[d.key] || {};
+                const solved = d.key === "cascade"
+                  ? Object.keys(dp).filter((k) => /^\d+$/.test(k) && dp[k] === 7).length
+                  : Object.keys(dp).filter((k) => dp[k] > 0).length;
+                return (
+                  <button
+                    key={d.key}
+                    onClick={() => setDifficulty(d.key)}
+                    style={{
+                      flex: 1,
+                      padding: "12px 8px",
+                      background: active ? (d.key === "blind" ? "#e06040" : C.accent) : C.surface,
+                      color: active ? (d.key === "blind" ? "#fff" : C.bg) : C.textDim,
+                      border: `1px solid ${active ? "transparent" : C.border}`,
+                      borderRadius: 10,
+                      cursor: "pointer",
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: 11,
+                      fontWeight: active ? 700 : 400,
+                      letterSpacing: 0.5,
+                      textTransform: "uppercase",
+                      transition: "background 0.2s, color 0.2s",
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      gap: 2,
+                    }}
+                  >
+                    <span style={{ whiteSpace: "nowrap" }}>{d.label}</span>
+                    <span style={{
+                      fontSize: 8,
+                      color: active ? (d.key === "blind" ? "#fff9" : C.bg + "aa") : C.textDim,
+                    }}>{d.desc}</span>
+                    <span style={{ fontSize: 8, color: active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{solved}/50</span>
+                  </button>
+                );
+              })}
+            </div>
+          ))}
         </div>
 
         {/* Stats summary */}
@@ -877,18 +1171,20 @@ export default function Pattrn() {
           Share Stats
         </button>
 
-        {/* Puzzle grid */}
+        {/* Puzzle grid: 50 for each mode */}
         <div style={{
           display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
           maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
         }}>
-          {puzzles.map((p, i) => {
-            const result = diffProgress[i];
-            const solved = result > 0;
-            const failed = result === 0;
-            const time = diffTimes[i];
+          {(isCascade ? Array.from({ length: 50 }, (_, i) => i) : puzzles).map((p, i) => {
+            const idx = isCascade ? i : p?.id ?? i;
+            const result = isCascade ? (diffProgress[idx] ?? -1) : diffProgress[idx];
+            const solved = isCascade ? result === 7 : result > 0;
+            const failed = isCascade ? (result >= 0 && result < 7) : result === 0;
+            const time = diffTimes[idx];
+            const cascadeLevels = result >= 0 && result <= 7 ? result : null;
             return (
-              <button key={i} onClick={() => startPuzzle(i)}
+              <button key={i} onClick={() => startPuzzle(i, view === "menu" ? difficulty : undefined)}
                 style={{
                   aspectRatio: "1", borderRadius: 10, border: `1.5px solid ${solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border}`,
                   backgroundColor: solved ? C.correct + "15" : failed ? C.incorrect + "10" : C.surface,
@@ -900,16 +1196,26 @@ export default function Pattrn() {
                 onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border; }}
               >
                 <span style={{
-                  fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", fontSize: isDaily ? 9 : 15, fontWeight: 700,
                   color: solved ? C.correct : failed ? C.incorrect : C.text,
                 }}>
-                  {i + 1}
+                  {isDaily ? getDailyDateLabel(i) : i + 1}
                 </span>
-                {result !== undefined && <ScoreBadge attempts={result} />}
-                {solved && time != null && (
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 8, color: C.textDim, lineHeight: 1 }}>
-                    {formatTime(time)}
-                  </span>
+                {isCascade ? (
+                  cascadeLevels !== null && (
+                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: C.textDim }}>
+                      {cascadeLevels === 7 ? "9×9" : cascadeLevels >= 0 ? `${CASCADE_LEVELS[cascadeLevels]}×${CASCADE_LEVELS[cascadeLevels]}` : ""}
+                    </span>
+                  )
+                ) : (
+                  <>
+                    {result !== undefined && <ScoreBadge attempts={result} />}
+                    {solved && time != null && (
+                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 8, color: C.textDim, lineHeight: 1 }}>
+                        {formatTime(time)}
+                      </span>
+                    )}
+                  </>
                 )}
               </button>
             );
@@ -953,7 +1259,7 @@ export default function Pattrn() {
 
                 {/* Overall stats */}
                 <div style={{
-                  display: "flex", justifyContent: "center", gap: 16, marginBottom: 20,
+                  display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginBottom: 20,
                   padding: "10px 16px", borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}`,
                 }}>
                   <div style={{ textAlign: "center" }}>
@@ -962,16 +1268,27 @@ export default function Pattrn() {
                   </div>
                   <div style={{ width: 1, backgroundColor: C.border }} />
                   <div style={{ textAlign: "center" }}>
-                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700 }}>200</div>
+                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700 }}>300</div>
                     <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>total</div>
                   </div>
-                  {bestTimeAll != null && <>
-                    <div style={{ width: 1, backgroundColor: C.border }} />
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.correct }}>{formatTime(bestTimeAll)}</div>
-                      <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>fastest</div>
-                    </div>
-                  </>}
+                  {getDailyStreak(progress) > 0 && (
+                    <>
+                      <div style={{ width: 1, backgroundColor: C.border }} />
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.gold }}>🔥 {getDailyStreak(progress)}</div>
+                        <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>day streak</div>
+                      </div>
+                    </>
+                  )}
+                  {bestTimeAll != null && (
+                    <>
+                      <div style={{ width: 1, backgroundColor: C.border }} />
+                      <div style={{ textAlign: "center" }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.correct }}>{formatTime(bestTimeAll)}</div>
+                        <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>fastest</div>
+                      </div>
+                    </>
+                  )}
                 </div>
 
                 {/* Per-difficulty sections */}
@@ -1020,7 +1337,7 @@ export default function Pattrn() {
                 </div>
 
                 {/* Action buttons */}
-                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
                   <button onClick={copyShareText}
                     style={{
                       backgroundColor: C.accent, color: C.bg, border: "none",
@@ -1031,7 +1348,19 @@ export default function Pattrn() {
                     onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
                     onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
                   >
-                    {shareMsg || "Copy"}
+                    {shareMsg || "Copy all"}
+                  </button>
+                  <button onClick={copyDailyShareText}
+                    style={{
+                      backgroundColor: "transparent", color: C.accent, border: `1.5px solid ${C.accent}`,
+                      padding: "10px 28px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.accent; e.currentTarget.style.color = C.bg; }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = C.accent; }}
+                  >
+                    Copy Daily
                   </button>
                   <button onClick={() => setShowShareModal(false)}
                     style={{
@@ -1055,7 +1384,8 @@ export default function Pattrn() {
   }
 
   // --- PLAY VIEW ---
-  const diffLabel = DIFFICULTIES.find(d => d.key === difficulty)?.label || "";
+  const diffLabel = isDaily ? "Daily" : isCascade ? "Cascade" : DIFFICULTIES.find(d => d.key === difficulty)?.label || "";
+  const cascadeLevelLabel = isCascade && puzzle ? `${puzzle.gridSize}×${puzzle.gridSize}` : null;
   const totalPuzzles = puzzles.length;
   const lockedCount = lockedCells.size;
   const totalBlanks = puzzle ? puzzle.blanks.size : 0;
@@ -1072,8 +1402,8 @@ export default function Pattrn() {
       <Particles show={showParticles} />
 
       {/* Top bar */}
-      <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridSize === 7 ? 380 : 360, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-        <button onClick={() => { stopTimer(); setView("menu"); }}
+      <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridSize >= 7 ? 380 : 360, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
+        <button onClick={() => { stopTimer(); setView("menu"); if (difficulty === "daily" || difficulty === "cascade") setDifficulty("easy"); }}
           style={{
             background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
             color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
@@ -1086,13 +1416,21 @@ export default function Pattrn() {
         </button>
         <div style={{ flex: 1, textAlign: "center" }}>
           <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
-            {diffLabel}{" "}
+            {diffLabel}{isDaily ? ` ${getDailyDateLabel(currentPuzzle)}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
           </span>
-          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700, color: C.accent, letterSpacing: 3 }}>
-            #{currentPuzzle + 1}
-          </span>
+          {!isDaily && !isCascade && (
+            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700, color: C.accent, letterSpacing: 3 }}>
+              #{currentPuzzle + 1}
+            </span>
+          )}
         </div>
-        <div style={{ width: 80 }} />
+        <div style={{ width: 80, display: "flex", justifyContent: "flex-end", gap: 4 }}>
+          {isCascade && (
+            Array.from({ length: 3 }, (_, i) => (
+              <span key={i} style={{ fontSize: 18, color: i < cascadeLives ? C.incorrect : C.border }}>♥</span>
+            ))
+          )}
+        </div>
       </div>
 
       {/* Timer + Attempt dots */}
@@ -1102,21 +1440,23 @@ export default function Pattrn() {
       <AttemptDots max={maxAttempts} used={attempts} won={gameState === "won"} />
       <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>
         {gameState === "playing" ? (
-          isBlind && lockedCount > 0
+          isCascade
+            ? `${cascadeLives} live${cascadeLives !== 1 ? "s" : ""} \u2022 ${maxAttempts - attempts} attempt${maxAttempts - attempts !== 1 ? "s" : ""} left`
+            : isBlind && lockedCount > 0
             ? `${lockedCount}/${totalBlanks} locked \u2022 ${maxAttempts - attempts} guess${maxAttempts - attempts !== 1 ? "es" : ""} left`
             : `${maxAttempts - attempts} ${isBlind ? "guess" : "attempt"}${maxAttempts - attempts !== 1 ? "es" : ""} left`
-        ) : gameState === "won" ? `Solved in ${attempts} \u2022 ${formatTime(elapsedTime)}` : "Out of attempts"}
+        ) : gameState === "won" ? (isCascade ? `Run complete!` : `Solved in ${attempts} \u2022 ${formatTime(elapsedTime)}`) : (isCascade ? `${cascadeLives === 0 ? "Run over" : "Out of attempts"}` : "Out of attempts")}
       </div>
 
       {/* Grid */}
       <div style={{ animation: "slideIn 0.3s ease", touchAction: "none" }}>
         <div style={{
-          display: "flex", flexDirection: "column", gap: gridSize === 7 ? 3 : 4, padding: gridSize === 7 ? 10 : 14,
+          display: "flex", flexDirection: "column", gap: gridSize >= 7 ? 3 : 4, padding: gridSize >= 7 ? 10 : 14,
           backgroundColor: C.surface, borderRadius: 16,
           border: `1px solid ${C.border}`, boxShadow: `0 8px 32px ${C.bg}88`,
         }}>
           {puzzle.solution.map((row, r) => (
-            <div key={r} style={{ display: "flex", gap: gridSize === 7 ? 3 : 4 }}>
+            <div key={r} style={{ display: "flex", gap: gridSize >= 7 ? 3 : 4 }}>
               {row.map((token, c) => {
                 const key = `${r}-${c}`;
                 const isBlankCell = puzzle.blanks.has(key);
@@ -1178,12 +1518,20 @@ export default function Pattrn() {
         {gameState === "won" && (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: 12, animation: "fadeUp 0.4s ease" }}>
-              &#x2713; {isBlind ? "Cracked it!" : "Perfect"}
+              &#x2713; {isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : "Perfect"}
             </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={() => {
-                const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-                const text = `PATTRN \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+                let text;
+                if (isCascade) {
+                  text = `PATTRN Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
+                } else                 if (isDaily) {
+                  const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
+                  text = `PATTRN Daily ${getDailyDateLabel(currentPuzzle)} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+                } else {
+                  const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
+                  text = `PATTRN \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+                }
                 navigator.clipboard.writeText(text).catch(() => {});
                 setShareMsg("Copied!");
                 setTimeout(() => setShareMsg(""), 2000);
@@ -1199,7 +1547,21 @@ export default function Pattrn() {
               >
                 {shareMsg || "Share"}
               </button>
-              {currentPuzzle < totalPuzzles - 1 && (
+              {(isDaily || isCascade) ? (
+                <button onClick={() => { setView("menu"); setDifficulty("easy"); }}
+                  style={{
+                    backgroundColor: C.accent, color: C.bg, border: "none",
+                    padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
+                    textTransform: "uppercase", transition: "all 0.2s",
+                    boxShadow: `0 4px 20px ${C.accent}44`,
+                  }}
+                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
+                >
+                  Back to puzzles
+                </button>
+              ) : currentPuzzle < totalPuzzles - 1 ? (
                 <button onClick={() => startPuzzle(currentPuzzle + 1)}
                   style={{
                     backgroundColor: C.accent, color: C.bg, border: "none",
@@ -1213,7 +1575,7 @@ export default function Pattrn() {
                 >
                   Next &rarr;
                 </button>
-              )}
+              ) : null}
             </div>
           </div>
         )}
@@ -1221,26 +1583,35 @@ export default function Pattrn() {
         {gameState === "lost" && (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.incorrect, marginBottom: 4, animation: "fadeUp 0.4s ease" }}>
-              Not this time
+              {isCascade ? "Run over" : "Not this time"}
             </div>
             <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
-              The correct pattern is shown above
+              {isCascade
+                ? `Reached ${puzzle?.gridSize ?? 0}×${puzzle?.gridSize ?? 0}`
+                : "The correct pattern is shown above"}
             </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => startPuzzle(currentPuzzle)}
-                style={{
-                  backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                  padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase", transition: "all 0.15s",
+            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+              {isCascade && (
+                <button onClick={() => {
+                  const sz = puzzle?.gridSize ?? 0;
+                  navigator.clipboard.writeText(`PATTRN Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`).catch(() => {});
+                  setShareMsg("Copied!");
+                  setTimeout(() => setShareMsg(""), 2000);
                 }}
-                onMouseEnter={e => { e.target.style.borderColor = C.accent; e.target.style.color = C.accent; }}
-                onMouseLeave={e => { e.target.style.borderColor = C.border; e.target.style.color = C.text; }}
-              >
-                Retry
-              </button>
-              {currentPuzzle < totalPuzzles - 1 && (
-                <button onClick={() => startPuzzle(currentPuzzle + 1)}
+                  style={{
+                    backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
+                    padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    textTransform: "uppercase", transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { e.target.style.borderColor = C.accent; e.target.style.color = C.accent; }}
+                  onMouseLeave={e => { e.target.style.borderColor = C.border; e.target.style.color = C.text; }}
+                >
+                  {shareMsg || "Share"}
+                </button>
+              )}
+              {isCascade ? (
+                <button onClick={() => { setView("menu"); setDifficulty("easy"); }}
                   style={{
                     backgroundColor: C.accent, color: C.bg, border: "none",
                     padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
@@ -1251,8 +1622,38 @@ export default function Pattrn() {
                   onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
                   onMouseLeave={e => e.target.style.transform = "translateY(0)"}
                 >
-                  Next &rarr;
+                  Back to puzzles
                 </button>
+              ) : (
+                <>
+                  <button onClick={() => startPuzzle(currentPuzzle)}
+                    style={{
+                      backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
+                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.target.style.borderColor = C.accent; e.target.style.color = C.accent; }}
+                    onMouseLeave={e => { e.target.style.borderColor = C.border; e.target.style.color = C.text; }}
+                  >
+                    Retry
+                  </button>
+                  {currentPuzzle < totalPuzzles - 1 && (
+                    <button onClick={() => startPuzzle(currentPuzzle + 1)}
+                      style={{
+                        backgroundColor: C.accent, color: C.bg, border: "none",
+                        padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                        fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                        textTransform: "uppercase", transition: "all 0.15s",
+                        boxShadow: `0 4px 16px ${C.accent}44`,
+                      }}
+                      onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
+                      onMouseLeave={e => e.target.style.transform = "translateY(0)"}
+                    >
+                      Next &rarr;
+                    </button>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -1262,7 +1663,9 @@ export default function Pattrn() {
       {/* Hints */}
       {gameState === "playing" && Object.keys(fills).length === 0 && lockedCells.size === 0 && (
         <div style={{ marginTop: 28, color: C.textDim, fontSize: 12, textAlign: "center", maxWidth: 280, lineHeight: 1.6, animation: "pulse 2s infinite" }}>
-          {isBlind
+          {isCascade
+            ? "Solve each level to grow the grid. You have 3 lives for the whole run."
+            : isBlind
             ? "Fill the entire grid, then guess! Correct cells lock in green after each guess."
             : puzzle.mode === "easy"
             ? "Study the shapes to find the pattern, then fill in the blanks"
