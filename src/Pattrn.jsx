@@ -355,14 +355,16 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
           : isBlank && !isFilled && !isRevealed ? `2.5px dashed ${C.border}`
           : "2.5px solid transparent",
         cursor: isBlank && !isRevealed && !isLocked ? "pointer" : "default",
-        transition: "all 0.15s cubic-bezier(0.4,0,0.2,1)",
-        transform: isSelected ? "scale(1.08)" : isWrong ? "scale(0.95)" : "scale(1)",
+        transition: isWrong ? "none" : "all 0.15s cubic-bezier(0.4,0,0.2,1)",
+        transform: isSelected ? "scale(1.08)" : "scale(1)",
         opacity: isBlank && !isFilled && !isRevealed && !isLocked ? 0.45 : 1,
         boxShadow: isLocked ? `0 0 14px ${C.correct}55`
           : isCorrect ? `0 0 14px ${C.correct}55`
+          : isWrong ? `0 0 12px ${C.incorrect}66`
           : isSelected ? `0 0 14px ${C.accent}44` : "none",
         position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
         touchAction: "none", userSelect: "none",
+        animation: isWrong ? "wrongRemove 1s ease-out forwards" : "none",
       }}
     >
       {isBlank && !isFilled && !isRevealed && !isLocked && (
@@ -466,6 +468,7 @@ export default function Pattrn() {
   const [times, setTimes] = useState(() => loadTimes());
   const [elapsedTime, setElapsedTime] = useState(0);
   const [shareMsg, setShareMsg] = useState("");
+  const [showShareModal, setShowShareModal] = useState(false);
   const timerStart = useRef(null);
   const timerInterval = useRef(null);
   const isPainting = useRef(false);
@@ -627,7 +630,7 @@ export default function Pattrn() {
       if (isBlind) {
         setLockedCells(newLocked);
       }
-      // Clear wrong fills after brief red flash for all modes
+      // Clear wrong fills after wrongRemove animation completes (1s)
       setTimeout(() => {
         setFills(prev => {
           const next = { ...prev };
@@ -635,7 +638,7 @@ export default function Pattrn() {
           return next;
         });
         setWrongCells(new Set());
-      }, 600);
+      }, 1000);
     }
   };
 
@@ -650,137 +653,82 @@ export default function Pattrn() {
 
   const diffTimes = times[difficulty] || {};
 
-  const generateShareText = () => {
-    const allProgress = progress;
-    const allTimes = times;
+  const getShareData = () => {
+    const sections = [];
     let totalSolved = 0;
-    let totalAttemptedAll = 0;
-    let totalGold = 0;
-    let totalSilver = 0;
-    let totalBronze = 0;
-    let totalFailed = 0;
+    let totalGold = 0, totalSilver = 0, totalBronze = 0, totalFailed = 0;
     let bestTimeAll = null;
-    const lines = [];
 
     for (const d of DIFFICULTIES) {
-      const dp = allProgress[d.key] || {};
-      const dt = allTimes[d.key] || {};
-      let solved = 0, attempted = 0, gold = 0, silver = 0, bronze = 0, failed = 0;
-      let bestTime = null;
-      const row = [];
+      const dp = progress[d.key] || {};
+      const dt = times[d.key] || {};
+      let solved = 0, gold = 0, silver = 0, bronze = 0, failed = 0;
+      let bestTime = null, totalTime = 0, timedCount = 0;
+      const grid = [];
 
       for (let i = 0; i < 50; i++) {
         const result = dp[i];
-        if (result === undefined) {
-          row.push("\u2B1C"); // white square - not attempted
-        } else {
-          attempted++;
-          if (result === 0) {
-            failed++;
-            row.push("\uD83D\uDFE5"); // red square - failed
-          } else if (result <= 2) {
-            gold++;
-            solved++;
-            row.push("\uD83D\uDFE8"); // yellow square - gold
-          } else if (result <= 4) {
-            silver++;
-            solved++;
-            row.push("\u2B1C"); // we'll use specific emojis
-            // Actually let's use better emojis
-          } else {
-            bronze++;
-            solved++;
-          }
-          if (result > 0 && dt[i] != null) {
-            if (bestTime === null || dt[i] < bestTime) bestTime = dt[i];
-          }
+        if (result === undefined) grid.push("none");
+        else if (result === 0) { failed++; grid.push("failed"); }
+        else if (result <= 2) { gold++; solved++; grid.push("gold"); }
+        else if (result <= 4) { silver++; solved++; grid.push("silver"); }
+        else { bronze++; solved++; grid.push("bronze"); }
+        if (result > 0 && dt[i] != null) {
+          if (bestTime === null || dt[i] < bestTime) bestTime = dt[i];
+          totalTime += dt[i];
+          timedCount++;
         }
       }
 
       totalSolved += solved;
-      totalAttemptedAll += attempted;
-      totalGold += gold;
-      totalSilver += silver;
-      totalBronze += bronze;
-      totalFailed += failed;
+      totalGold += gold; totalSilver += silver; totalBronze += bronze; totalFailed += failed;
       if (bestTime != null && (bestTimeAll === null || bestTime < bestTimeAll)) bestTimeAll = bestTime;
+
+      sections.push({
+        ...d, solved, gold, silver, bronze, failed, bestTime, grid,
+        avgTime: timedCount > 0 ? Math.round(totalTime / timedCount) : null,
+      });
     }
 
-    // Build cleaner share text
+    return { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll };
+  };
+
+  const generateShareText = () => {
+    const { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll } = getShareData();
+    const emojis = { easy: "\u2B50", medium: "\u26A1", hard: "\uD83D\uDD25", blind: "\uD83D\uDE48" };
+    const blockChars = { none: "\u2591", failed: "\u2593", gold: "\u2588", silver: "\u2593", bronze: "\u2592" };
+
     let text = "PATTRN \uD83E\uDDE9\n\n";
-
-    for (const d of DIFFICULTIES) {
-      const dp = allProgress[d.key] || {};
-      const dt = allTimes[d.key] || {};
-      let solved = 0, gold = 0, silver = 0, bronze = 0, failed = 0;
-      let bestTime = null;
-      let totalTime = 0;
-      let timedCount = 0;
-
-      for (let i = 0; i < 50; i++) {
-        const result = dp[i];
-        if (result !== undefined) {
-          if (result === 0) failed++;
-          else {
-            solved++;
-            if (result <= 2) gold++;
-            else if (result <= 4) silver++;
-            else bronze++;
-            if (dt[i] != null) {
-              if (bestTime === null || dt[i] < bestTime) bestTime = dt[i];
-              totalTime += dt[i];
-              timedCount++;
-            }
-          }
-        }
-      }
-
-      const bar = [];
-      for (let i = 0; i < 50; i++) {
-        const result = dp[i];
-        if (result === undefined) bar.push("\u2591");
-        else if (result === 0) bar.push("\u2593");
-        else if (result <= 2) bar.push("\u2588");
-        else if (result <= 4) bar.push("\u2593");
-        else bar.push("\u2592");
-      }
-
-      const emoji = d.key === "blind" ? "\uD83D\uDE48" : d.key === "hard" ? "\uD83D\uDD25" : d.key === "medium" ? "\u26A1" : "\u2B50";
-      text += `${emoji} ${d.label}: ${solved}/50 solved`;
-      if (bestTime != null) text += ` \u2022 best ${formatTime(bestTime)}`;
-      if (timedCount > 0) text += ` \u2022 avg ${formatTime(Math.round(totalTime / timedCount))}`;
+    for (const s of sections) {
+      text += `${emojis[s.key]} ${s.label}: ${s.solved}/50 solved`;
+      if (s.bestTime != null) text += ` \u2022 best ${formatTime(s.bestTime)}`;
+      if (s.avgTime != null) text += ` \u2022 avg ${formatTime(s.avgTime)}`;
       text += "\n";
-      // Compact grid: 10 per row, 5 rows
       for (let row = 0; row < 5; row++) {
-        text += bar.slice(row * 10, (row + 1) * 10).join("") + "\n";
+        text += s.grid.slice(row * 10, (row + 1) * 10).map(g => blockChars[g]).join("") + "\n";
       }
       text += "\n";
     }
-
     text += `\u2605 ${totalGold} gold \u2022 \u25CF ${totalSilver} silver \u2022 \u25C6 ${totalBronze} bronze \u2022 \u2717 ${totalFailed} failed\n`;
     text += `Total: ${totalSolved}/200 solved`;
     if (bestTimeAll != null) text += ` \u2022 Fastest: ${formatTime(bestTimeAll)}`;
-
     return text;
   };
 
-  const handleShare = async () => {
+  const copyShareText = async () => {
     const text = generateShareText();
     try {
       await navigator.clipboard.writeText(text);
-      setShareMsg("Copied!");
-      setTimeout(() => setShareMsg(""), 2000);
     } catch {
-      // Fallback for older browsers
       const textarea = document.createElement("textarea");
       textarea.value = text;
       document.body.appendChild(textarea);
       textarea.select();
       document.execCommand("copy");
       document.body.removeChild(textarea);
-      setShareMsg("Copied!");
-      setTimeout(() => setShareMsg(""), 2000);
     }
+    setShareMsg("Copied!");
+    setTimeout(() => setShareMsg(""), 2000);
   };
 
   const gridSize = puzzle ? puzzle.gridSize : 5;
@@ -873,7 +821,7 @@ export default function Pattrn() {
         </div>
 
         {/* Share button */}
-        <button onClick={handleShare}
+        <button onClick={() => setShowShareModal(true)}
           style={{
             marginBottom: 20, padding: "10px 28px", borderRadius: 10,
             backgroundColor: "transparent", border: `1.5px solid ${C.accent}`,
@@ -884,7 +832,7 @@ export default function Pattrn() {
           onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.accent; e.currentTarget.style.color = C.bg; }}
           onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = C.accent; }}
         >
-          {shareMsg || "Share Stats"}
+          Share Stats
         </button>
 
         {/* Puzzle grid */}
@@ -937,6 +885,129 @@ export default function Pattrn() {
           <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
           <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
         </div>
+
+        {/* Share Modal */}
+        {showShareModal && (() => {
+          const { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll } = getShareData();
+          const gridColors = { none: C.border, failed: C.incorrect, gold: C.gold, silver: C.silver, bronze: C.bronze };
+          return (
+            <div onClick={() => setShowShareModal(false)} style={{
+              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
+              display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+              animation: "fadeUp 0.25s ease",
+            }}>
+              <div onClick={e => e.stopPropagation()} style={{
+                backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 20,
+                padding: "28px 24px", maxWidth: 380, width: "100%",
+                boxShadow: `0 24px 64px rgba(0,0,0,0.5)`, maxHeight: "90vh", overflowY: "auto",
+              }}>
+                {/* Modal header */}
+                <div style={{ textAlign: "center", marginBottom: 20 }}>
+                  <h2 style={{ fontFamily: "'Space Mono', monospace", fontSize: 24, fontWeight: 700, letterSpacing: 4, margin: 0, color: C.accent, textTransform: "uppercase" }}>
+                    pattrn
+                  </h2>
+                  <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>my stats</p>
+                </div>
+
+                {/* Overall stats */}
+                <div style={{
+                  display: "flex", justifyContent: "center", gap: 16, marginBottom: 20,
+                  padding: "10px 16px", borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                }}>
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.accent }}>{totalSolved}</div>
+                    <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>solved</div>
+                  </div>
+                  <div style={{ width: 1, backgroundColor: C.border }} />
+                  <div style={{ textAlign: "center" }}>
+                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700 }}>200</div>
+                    <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>total</div>
+                  </div>
+                  {bestTimeAll != null && <>
+                    <div style={{ width: 1, backgroundColor: C.border }} />
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.correct }}>{formatTime(bestTimeAll)}</div>
+                      <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>fastest</div>
+                    </div>
+                  </>}
+                </div>
+
+                {/* Per-difficulty sections */}
+                {sections.map(s => (
+                  <div key={s.key} style={{ marginBottom: 16 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: s.key === "blind" ? "#e06040" : C.text, letterSpacing: 1, textTransform: "uppercase" }}>
+                        {s.label}
+                      </span>
+                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, fontWeight: 700 }}>
+                        {s.solved}/50
+                      </span>
+                      {s.bestTime != null && (
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.textDim }}>
+                          best {formatTime(s.bestTime)}
+                        </span>
+                      )}
+                      {s.avgTime != null && (
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.textDim }}>
+                          avg {formatTime(s.avgTime)}
+                        </span>
+                      )}
+                    </div>
+                    {/* Visual grid - 10 columns x 5 rows */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(25, 1fr)", gap: 2 }}>
+                      {s.grid.map((g, i) => (
+                        <div key={i} style={{
+                          aspectRatio: "1", borderRadius: 2,
+                          backgroundColor: g === "none" ? C.surface : gridColors[g] + (g === "none" ? "" : "cc"),
+                          border: `1px solid ${g === "none" ? C.border : gridColors[g]}44`,
+                        }} />
+                      ))}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Medal summary */}
+                <div style={{
+                  display: "flex", justifyContent: "center", gap: 14, marginTop: 16, marginBottom: 18,
+                  fontSize: 11, fontFamily: "'Space Mono', monospace", color: C.textDim,
+                }}>
+                  <span><span style={{ color: C.gold }}>{"\u2605"}</span> {totalGold}</span>
+                  <span><span style={{ color: C.silver }}>{"\u25CF"}</span> {totalSilver}</span>
+                  <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> {totalBronze}</span>
+                  <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> {totalFailed}</span>
+                </div>
+
+                {/* Action buttons */}
+                <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                  <button onClick={copyShareText}
+                    style={{
+                      backgroundColor: C.accent, color: C.bg, border: "none",
+                      padding: "10px 28px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
+                    onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
+                  >
+                    {shareMsg || "Copy"}
+                  </button>
+                  <button onClick={() => setShowShareModal(false)}
+                    style={{
+                      backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                      padding: "10px 20px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   }
@@ -954,7 +1025,7 @@ export default function Pattrn() {
       display: "flex", flexDirection: "column", alignItems: "center",
       padding: "24px 16px", position: "relative", overflow: "hidden",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes wrongRemove { 0%{transform:scale(1);opacity:1} 8%{transform:translateX(-5px) scale(0.97);opacity:1} 16%{transform:translateX(5px) scale(0.97);opacity:1} 24%{transform:translateX(-3px) scale(0.97);opacity:1} 32%{transform:translateX(3px) scale(0.97);opacity:1} 40%{transform:scale(0.95);opacity:1} 60%{transform:scale(0.95);opacity:0.9} 100%{transform:scale(0);opacity:0} }`}</style>
 
       <Particles show={showParticles} />
 
