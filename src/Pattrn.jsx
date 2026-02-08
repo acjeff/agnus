@@ -1970,10 +1970,11 @@ export default function Pattrn() {
     <div
       ref={playViewScrollRef}
       style={{
-      height: "100vh", minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+      height: "100dvh", minHeight: "100dvh", backgroundColor: C.bg, color: C.text,
       fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
       display: "flex", flexDirection: "column", alignItems: "center",
-      padding: "0 16px", position: "relative", overflow: "hidden",
+      padding: "0 16px", position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+      overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; }`}</style>
@@ -2060,7 +2061,7 @@ export default function Pattrn() {
       </div>
 
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(80px + env(safe-area-inset-top, 0px))", paddingBottom: 140, width: "100%" }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(80px + env(safe-area-inset-top, 0px))", paddingBottom: 140, width: "100%", overflow: "hidden" }}>
       <div style={{ animation: "slideIn 0.3s ease", touchAction: "none" }}>
         <div style={{
           display: "flex", flexDirection: "column", gap: gridSize >= 7 ? 3 : 4, padding: gridSize >= 7 ? 10 : 14,

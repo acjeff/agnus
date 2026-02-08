@@ -17,13 +17,15 @@
     <title>Agnus</title>
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      body {
+      html, body {
         background: #0a0a0f;
-        padding-top: env(safe-area-inset-top);
-        padding-left: env(safe-area-inset-left);
-        padding-right: env(safe-area-inset-right);
-        padding-bottom: env(safe-area-inset-bottom);
+        overflow: hidden;
+        height: 100%;
+        position: fixed;
+        width: 100%;
+        overscroll-behavior: none;
       }
+      #root { height: 100%; }
     </style>
   </head>
   <body>
