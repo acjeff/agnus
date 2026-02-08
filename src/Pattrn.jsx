@@ -508,7 +508,7 @@ function parseToken(token) {
 
 // --- Components ---
 
-function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerEnter, cellSize, iconSize, mode }) {
+function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode }) {
   const showContent = isRevealed || isLocked || !isBlank || isFilled;
   const parsed = showContent && token ? parseToken(token) : null;
   const isEasy = mode === "easy";
@@ -517,6 +517,7 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
     <div
       onClick={onClick}
       onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
       onPointerEnter={onPointerEnter}
       style={{
         width: cellSize, height: cellSize, borderRadius: cellSize > 44 ? 10 : 8,
@@ -696,6 +697,8 @@ export default function Pattrn() {
   const cascadeAttemptsRef = useRef(0);
   const cascadeRunIndexRef = useRef(0);
   const isPainting = useRef(false);
+  const pendingCellRef = useRef(null);
+  const justHandledInPointerUpRef = useRef(null);
 
   const hasSyncedUrl = useRef(false);
 
@@ -920,46 +923,84 @@ export default function Pattrn() {
     if (!puzzle.blanks.has(key)) return;
     if (lockedCells.has(key)) return;
     if (selectedToken) {
-      if (isBlind && fills[key] !== selectedToken && (tokenRemaining[selectedToken] || 0) <= 0) return;
+      if (fills[key] === selectedToken) {
+        setFills(prev => { const next = { ...prev }; delete next[key]; return next; });
+        setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
+        return;
+      }
+      if (isBlind && (tokenRemaining[selectedToken] || 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
   }, [gameState, puzzle, lockedCells, selectedToken, isBlind, fills, tokenRemaining]);
 
-  const handleCellClick = (r, c) => {
-    if (gameState !== "playing") return;
+  const applyCellAction = useCallback((r, c) => {
     const key = `${r}-${c}`;
-    if (!puzzle.blanks.has(key)) return;
-    if (lockedCells.has(key)) return;
+    if (!puzzle.blanks.has(key) || lockedCells.has(key)) return;
     if (selectedToken) {
-      if (isBlind && fills[key] !== selectedToken && (tokenRemaining[selectedToken] || 0) <= 0) return;
+      if (fills[key] === selectedToken) {
+        setFills(prev => { const next = { ...prev }; delete next[key]; return next; });
+        setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
+        return;
+      }
+      if (isBlind && (tokenRemaining[selectedToken] || 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     } else {
       setSelectedCell(key);
     }
+  }, [gameState, puzzle, lockedCells, selectedToken, isBlind, fills, tokenRemaining]);
+
+  const handleCellPointerUp = useCallback((r, c) => {
+    if (gameState !== "playing") return;
+    const key = `${r}-${c}`;
+    const isSameCellAsPress = pendingCellRef.current === key;
+    if (isSameCellAsPress) {
+      applyCellAction(r, c);
+      justHandledInPointerUpRef.current = key;
+      pendingCellRef.current = null;
+    }
+  }, [gameState, applyCellAction]);
+
+  const handleCellClick = (r, c) => {
+    if (gameState !== "playing") return;
+    const key = `${r}-${c}`;
+    if (key === justHandledInPointerUpRef.current) {
+      justHandledInPointerUpRef.current = null;
+      return;
+    }
+    applyCellAction(r, c);
   };
 
   const handleCellPointerDown = (r, c) => {
     if (!selectedToken || gameState !== "playing") return;
     isPainting.current = true;
-    paintCell(r, c);
+    pendingCellRef.current = `${r}-${c}`;
   };
 
   const handleCellPointerEnter = (r, c) => {
     if (!isPainting.current || !selectedToken) return;
+    pendingCellRef.current = null;
     paintCell(r, c);
   };
 
   useEffect(() => {
-    const stopPaint = () => { isPainting.current = false; };
+    const stopPaint = () => {
+      isPainting.current = false;
+      if (pendingCellRef.current) {
+        const key = pendingCellRef.current;
+        pendingCellRef.current = null;
+        const [r, c] = key.split("-").map(Number);
+        paintCell(r, c);
+      }
+    };
     window.addEventListener("pointerup", stopPaint);
     window.addEventListener("pointercancel", stopPaint);
     return () => {
       window.removeEventListener("pointerup", stopPaint);
       window.removeEventListener("pointercancel", stopPaint);
     };
-  }, []);
+  }, [paintCell]);
 
   // Clean up timer on unmount
   useEffect(() => {
@@ -1749,6 +1790,7 @@ export default function Pattrn() {
                     isLocked={isLockedCell && gameState === "playing"}
                     onClick={() => handleCellClick(r, c)}
                     onPointerDown={() => handleCellPointerDown(r, c)}
+                    onPointerUp={() => handleCellPointerUp(r, c)}
                     onPointerEnter={() => handleCellPointerEnter(r, c)}
                     cellSize={cellSize} iconSize={iconSize}
                     mode={puzzle.mode}
