@@ -766,30 +766,49 @@ export default function Pattrn() {
       if (mode === "cascade") {
         setCascadeRunIndex(levelNum);
         cascadeRunIndexRef.current = levelNum;
-        const rs = runStateMap[levelNum];
-        if (rs?.lives > 0) {
-          restoreRun(levelNum);
+        const prog = loadProgress();
+        const tms = loadTimes();
+        const cascadeBest = (prog.cascade || {})[levelNum];
+        const cascadeTime = (tms.cascade || {})[levelNum];
+        const fullyCompleted = cascadeBest === 7 && cascadeTime != null;
+        if (fullyCompleted) {
+          const puz = buildCascadePuzzle(6, getCascadeRunSeed(levelNum));
+          setCascadeLevel(6);
+          setFills(solutionFillsFromPuzzle(puz));
+          setAttempts(0);
+          setElapsedTime(cascadeTime);
+          setGameState("won");
+          setLockedCells(new Set(puz.blanks));
+          setWrongCells(new Set());
+          setShowParticles(false);
+          setSelectedCell(null);
+          setSelectedToken(null);
         } else {
-          setElapsedTime(0);
-          timerStart.current = Date.now();
-          timerIsCascadeRun.current = true;
-          const initialRunState = { level: 0, lives: 3, elapsedSeconds: 0, fills: {}, attempts: 0 };
-          const p = loadProgress();
-          saveProgress({ ...p, cascadeRunState: { ...(p.cascadeRunState || {}), [levelNum]: initialRunState }, cascadeRunStateLastIndex: levelNum });
-          timerInterval.current = setInterval(() => {
-            setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
-            const p2 = loadProgress();
-            const ri = cascadeRunIndexRef.current;
-            const cur = p2.cascadeRunState?.[ri];
-            if (cur?.lives > 0) {
-              const elapsed = Math.floor((Date.now() - timerStart.current) / 1000);
-              saveProgress({
-                ...p2,
-                cascadeRunState: { ...p2.cascadeRunState, [ri]: { ...cur, elapsedSeconds: elapsed, fills: cascadeFillsRef.current, attempts: cascadeAttemptsRef.current } },
-                cascadeRunStateLastIndex: ri,
-              });
-            }
-          }, 1000);
+          const rs = runStateMap[levelNum];
+          if (rs?.lives > 0) {
+            restoreRun(levelNum);
+          } else {
+            setElapsedTime(0);
+            timerStart.current = Date.now();
+            timerIsCascadeRun.current = true;
+            const initialRunState = { level: 0, lives: 3, elapsedSeconds: 0, fills: {}, attempts: 0 };
+            const p = loadProgress();
+            saveProgress({ ...p, cascadeRunState: { ...(p.cascadeRunState || {}), [levelNum]: initialRunState }, cascadeRunStateLastIndex: levelNum });
+            timerInterval.current = setInterval(() => {
+              setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+              const p2 = loadProgress();
+              const ri = cascadeRunIndexRef.current;
+              const cur = p2.cascadeRunState?.[ri];
+              if (cur?.lives > 0) {
+                const elapsed = Math.floor((Date.now() - timerStart.current) / 1000);
+                saveProgress({
+                  ...p2,
+                  cascadeRunState: { ...p2.cascadeRunState, [ri]: { ...cur, elapsedSeconds: elapsed, fills: cascadeFillsRef.current, attempts: cascadeAttemptsRef.current } },
+                  cascadeRunStateLastIndex: ri,
+                });
+              }
+            }, 1000);
+          }
         }
       } else {
         setCurrentPuzzle(levelNum);
@@ -926,7 +945,29 @@ export default function Pattrn() {
     if (effectiveDiff === "cascade") {
       setCascadeRunIndex(idx);
       cascadeRunIndexRef.current = idx;
-      const runStateMap = loadProgress().cascadeRunState || {};
+      const prog = loadProgress();
+      const tms = loadTimes();
+      const cascadeBest = (prog.cascade || {})[idx];
+      const cascadeTime = (tms.cascade || {})[idx];
+      const fullyCompleted = !forceRestart && cascadeBest === 7 && cascadeTime != null;
+      if (fullyCompleted) {
+        const puz = buildCascadePuzzle(6, getCascadeRunSeed(idx));
+        setCascadeLevel(6);
+        setFills(solutionFillsFromPuzzle(puz));
+        setAttempts(0);
+        setElapsedTime(cascadeTime);
+        setGameState("won");
+        setLockedCells(new Set(puz.blanks));
+        setSelectedCell(null);
+        setSelectedToken(null);
+        setWrongCells(new Set());
+        setClearedBlanks(new Set());
+        setShowParticles(false);
+        stopTimer();
+        setView("play");
+        return;
+      }
+      const runStateMap = prog.cascadeRunState || {};
       const saved = runStateMap[idx];
       const resume = saved?.lives > 0;
       const startLevel = resume ? saved.level : 0;
@@ -1172,6 +1213,12 @@ export default function Pattrn() {
           const newProgress = { ...progress, cascade: { ...(progress.cascade || {}), [cascadeRunIndex]: newBest }, cascadeRunState: nextRunState, cascadeRunStateLastIndex: cascadeRunIndex };
           setProgress(newProgress);
           saveProgress(newProgress);
+          const finalTime = timerStart.current ? Math.round((Date.now() - timerStart.current) / 1000) : 0;
+          const tms = loadTimes();
+          const newCascadeTimes = { ...(tms.cascade || {}), [cascadeRunIndex]: finalTime };
+          const newTimes = { ...tms, cascade: newCascadeTimes };
+          setTimes(newTimes);
+          saveTimes(newTimes);
         }
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
@@ -1326,7 +1373,7 @@ export default function Pattrn() {
     return { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll };
   };
 
-  const tryNativeShare = async ({ title = "PATTRN", text, url }) => {
+  const tryNativeShare = async ({ title = "¡Yeet!", text, url }) => {
     if (typeof navigator !== "undefined" && navigator.share && (text || url)) {
       try {
         await navigator.share({ title, text: text || undefined, url: url || undefined });
@@ -1343,7 +1390,7 @@ export default function Pattrn() {
     const emojis = { easy: "\u2B50", medium: "\u26A1", hard: "\uD83D\uDD25", blind: "\uD83D\uDE48", daily: "\uD83D\uDCC5", cascade: "\uD83C\uDF00" };
     const blockChars = { none: "\u2591", failed: "\u2593", gold: "\u2588", silver: "\u2593", bronze: "\u2592" };
 
-    let text = "PATTRN \uD83E\uDDE9\n\n";
+    let text = "¡Yeet! \uD83E\uDDE9\n\n";
     for (const s of sections) {
       text += `${emojis[s.key]} ${s.label}: ${s.solved}/50 solved`;
       if (s.bestTime != null) text += ` \u2022 best ${formatTime(s.bestTime)}`;
@@ -1386,7 +1433,7 @@ export default function Pattrn() {
   const copyDailyShareText = async () => {
     const dailySolved = Object.keys(progress.daily || {}).filter(k => (progress.daily || {})[k] > 0).length;
     const cascadeSolved = Object.keys(progress.cascade || {}).filter(k => /^\d+$/.test(k) && (progress.cascade || {})[k] === 7).length;
-    const text = `PATTRN \uD83E\uDDE9\n\uD83D\uDCC5 Daily: ${dailySolved}/50\n\uD83C\uDF00 Cascade: ${cascadeSolved}/50`;
+    const text = `¡Yeet! \uD83E\uDDE9\n\uD83D\uDCC5 Daily: ${dailySolved}/50\n\uD83C\uDF00 Cascade: ${cascadeSolved}/50`;
     const result = await tryNativeShare({ text });
     if (result === "shared") {
       setShareMsg("Shared!");
@@ -1421,11 +1468,11 @@ export default function Pattrn() {
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 16px",
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease" }}>
-          <h1 style={{ fontFamily: "'Space Mono', monospace", fontSize: 36, fontWeight: 700, letterSpacing: 6, margin: 0, color: C.accent, textTransform: "uppercase" }}>
-            pattrn
+          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: 4, margin: 0, color: C.accent }}>
+            ¡Yeet!
           </h1>
           <p style={{ color: C.textDim, fontSize: 13, marginTop: 6, letterSpacing: 2 }}>
             find the pattern &middot; fill the gaps
@@ -1464,8 +1511,8 @@ export default function Pattrn() {
                       const medal = todayResult <= 2 ? "\u2605" : todayResult <= 4 ? "\u25CF" : "\u25C6";
                       const streakPart = streak > 0 ? ` 🔥 ${streak} day streak` : "";
                       const text = todayResult > 0
-                        ? `PATTRN Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
-                        : `PATTRN Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
+                        ? `¡Yeet! Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
+                        : `¡Yeet! Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
                       const result = await tryNativeShare({ text });
                       if (result === "shared") {
                         setDailyShareMsg("Shared!");
@@ -1493,7 +1540,7 @@ export default function Pattrn() {
                       background: C.accent, color: C.bg, border: "none", cursor: "pointer",
                     }}
                   >
-                    Play today
+                    {todayResult > 0 ? "View today's result" : "Play today"}
                   </button>
                 </div>
               </div>
@@ -1687,8 +1734,8 @@ export default function Pattrn() {
               }}>
                 {/* Modal header */}
                 <div style={{ textAlign: "center", marginBottom: 20 }}>
-                  <h2 style={{ fontFamily: "'Space Mono', monospace", fontSize: 24, fontWeight: 700, letterSpacing: 4, margin: 0, color: C.accent, textTransform: "uppercase" }}>
-                    pattrn
+                  <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
+                    ¡Yeet!
                   </h2>
                   <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>my stats</p>
                 </div>
@@ -1873,7 +1920,7 @@ export default function Pattrn() {
           <button
             onClick={async () => {
               const url = typeof window !== "undefined" ? window.location.href : "";
-              const result = await tryNativeShare({ title: "PATTRN", text: "Check out this puzzle", url: url || undefined });
+              const result = await tryNativeShare({ title: "¡Yeet!", text: "Check out this puzzle", url: url || undefined });
               if (result === "shared") {
                 setShareMsg("Shared!");
                 setTimeout(() => setShareMsg(""), 2000);
@@ -2022,13 +2069,13 @@ export default function Pattrn() {
               <button onClick={async () => {
                 let text;
                 if (isCascade) {
-                  text = `PATTRN Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
+                  text = `¡Yeet! Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
                 } else if (isDaily) {
                   const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-                  text = `PATTRN Daily ${getDailyDateLabel(currentPuzzle)} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+                  text = `¡Yeet! Daily ${getDailyDateLabel(currentPuzzle)} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
                 } else {
                   const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-                  text = `PATTRN \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+                  text = `¡Yeet! \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
                 }
                 const result = await tryNativeShare({ text });
                 if (result === "shared") {
@@ -2052,20 +2099,18 @@ export default function Pattrn() {
               >
                 {shareMsg || "Share"}
               </button>
-              {!isCascade && (
-                <button onClick={() => startPuzzle(currentPuzzle, undefined, true)}
-                  style={{
-                    backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                    padding: "12px 24px", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
-                >
-                  Retry
-                </button>
-              )}
+              <button onClick={() => startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true)}
+                style={{
+                  backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
+                  padding: "12px 24px", borderRadius: 12, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase", transition: "all 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
+              >
+                Retry
+              </button>
               {(isDaily || isCascade) ? (
                 <button onClick={() => { setView("menu"); }}
                   style={{
@@ -2116,7 +2161,7 @@ export default function Pattrn() {
               {isCascade && (
                 <button onClick={async () => {
                   const sz = puzzle?.gridSize ?? 0;
-                  const text = `PATTRN Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`;
+                  const text = `¡Yeet! Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`;
                   const result = await tryNativeShare({ text });
                   if (result === "shared") {
                     setShareMsg("Shared!");
