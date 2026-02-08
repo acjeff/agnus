@@ -701,8 +701,17 @@ export default function Pattrn() {
   const isPainting = useRef(false);
   const pendingCellRef = useRef(null);
   const justHandledInPointerUpRef = useRef(null);
+  const wrongCellClearTimeoutRef = useRef(null);
 
+  const [clearedBlanks, setClearedBlanks] = useState(() => new Set());
   const hasSyncedUrl = useRef(false);
+
+  const cancelWrongCellClear = useCallback(() => {
+    if (wrongCellClearTimeoutRef.current) {
+      clearTimeout(wrongCellClearTimeoutRef.current);
+      wrongCellClearTimeoutRef.current = null;
+    }
+  }, []);
 
   // Initial load: read URL or restore saved cascade run
   useEffect(() => {
@@ -882,6 +891,7 @@ export default function Pattrn() {
   }, []);
 
   const startPuzzle = (idx, diff) => {
+    cancelWrongCellClear();
     if (diff) setDifficulty(diff);
     setCurrentPuzzle(idx);
     let cascadeElapsed = 0;
@@ -915,6 +925,7 @@ export default function Pattrn() {
     setGameState("playing");
     setWrongCells(new Set());
     setLockedCells(new Set());
+    setClearedBlanks(new Set());
     setShowParticles(false);
     if (difficulty !== "cascade" && diff !== "cascade") setElapsedTime(0);
     stopTimer();
@@ -944,6 +955,7 @@ export default function Pattrn() {
     setAttempts(0);
     setGameState("playing");
     setWrongCells(new Set());
+    setClearedBlanks(new Set());
     setSelectedCell(null);
     setSelectedToken(null);
     // Timer is not reset — it persists across cascade stages for the whole run
@@ -956,32 +968,38 @@ export default function Pattrn() {
     if (lockedCells.has(key)) return;
     if (selectedToken) {
       if (fills[key] === selectedToken) {
+        cancelWrongCellClear();
+        setClearedBlanks(prev => new Set(prev).add(key));
         setFills(prev => { const next = { ...prev }; delete next[key]; return next; });
         setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
         return;
       }
+      cancelWrongCellClear();
       if (puzzle.mode !== "hard" && (tokenRemaining[selectedToken] ?? 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear]);
 
   const applyCellAction = useCallback((r, c) => {
     const key = `${r}-${c}`;
     if (!puzzle.blanks.has(key) || lockedCells.has(key)) return;
     if (selectedToken) {
       if (fills[key] === selectedToken) {
+        cancelWrongCellClear();
+        setClearedBlanks(prev => new Set(prev).add(key));
         setFills(prev => { const next = { ...prev }; delete next[key]; return next; });
         setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
         return;
       }
+      cancelWrongCellClear();
       if (puzzle.mode !== "hard" && (tokenRemaining[selectedToken] ?? 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     } else {
       setSelectedCell(key);
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear]);
 
   const handleCellPointerUp = useCallback((r, c) => {
     if (gameState !== "playing") return;
@@ -1043,6 +1061,7 @@ export default function Pattrn() {
     setSelectedToken(token);
     if (selectedCell && puzzle.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
       if (puzzle.mode !== "hard" && fills[selectedCell] !== token && (tokenRemaining[token] ?? 0) <= 0) return;
+      cancelWrongCellClear();
       setFills(prev => ({ ...prev, [selectedCell]: token }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(selectedCell); return n; });
       setSelectedCell(null);
@@ -1169,17 +1188,22 @@ export default function Pattrn() {
         setLockedCells(newLocked);
       }
       // Wait for all wrong-cell fall-off animations to finish (staggered delay + duration) before clearing
+      if (wrongCellClearTimeoutRef.current) {
+        clearTimeout(wrongCellClearTimeoutRef.current);
+        wrongCellClearTimeoutRef.current = null;
+      }
       const n = puzzle.gridSize * puzzle.gridSize;
       const maxStagger = (n - 1) * 0.015;
       const fallOffDuration = 0.32;
       const clearDelayMs = (maxStagger + fallOffDuration + 0.05) * 1000;
-      setTimeout(() => {
+      const wrongSet = wrong;
+      wrongCellClearTimeoutRef.current = setTimeout(() => {
+        wrongCellClearTimeoutRef.current = null;
+        setClearedBlanks(prev => { const next = new Set(prev); for (const k of wrongSet) next.add(k); return next; });
         // Clear fills first so cells lose content; then clear wrong state on next tick.
-        // Otherwise clearing wrongCells first removes the animation while the cell still
-        // has content, causing a one-frame flash of the tile back in place.
         setFills(prev => {
           const next = { ...prev };
-          for (const k of wrong) delete next[k];
+          for (const k of wrongSet) delete next[k];
           return next;
         });
         requestAnimationFrame(() => {
@@ -1250,6 +1274,18 @@ export default function Pattrn() {
     return { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll };
   };
 
+  const tryNativeShare = async ({ title = "PATTRN", text, url }) => {
+    if (typeof navigator !== "undefined" && navigator.share && (text || url)) {
+      try {
+        await navigator.share({ title, text: text || undefined, url: url || undefined });
+        return "shared";
+      } catch (e) {
+        if (e.name === "AbortError") return "cancelled";
+      }
+    }
+    return "unavailable";
+  };
+
   const generateShareText = () => {
     const { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll } = getShareData();
     const emojis = { easy: "\u2B50", medium: "\u26A1", hard: "\uD83D\uDD25", blind: "\uD83D\uDE48", daily: "\uD83D\uDCC5", cascade: "\uD83C\uDF00" };
@@ -1274,6 +1310,13 @@ export default function Pattrn() {
 
   const copyShareText = async () => {
     const text = generateShareText();
+    const result = await tryNativeShare({ text });
+    if (result === "shared") {
+      setShareMsg("Shared!");
+      setTimeout(() => setShareMsg(""), 2000);
+      return;
+    }
+    if (result === "cancelled") return;
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -1292,6 +1335,13 @@ export default function Pattrn() {
     const dailySolved = Object.keys(progress.daily || {}).filter(k => (progress.daily || {})[k] > 0).length;
     const cascadeSolved = Object.keys(progress.cascade || {}).filter(k => /^\d+$/.test(k) && (progress.cascade || {})[k] === 7).length;
     const text = `PATTRN \uD83E\uDDE9\n\uD83D\uDCC5 Daily: ${dailySolved}/50\n\uD83C\uDF00 Cascade: ${cascadeSolved}/50`;
+    const result = await tryNativeShare({ text });
+    if (result === "shared") {
+      setShareMsg("Shared!");
+      setTimeout(() => setShareMsg(""), 2000);
+      return;
+    }
+    if (result === "cancelled") return;
     try {
       await navigator.clipboard.writeText(text);
     } catch {
@@ -1364,6 +1414,13 @@ export default function Pattrn() {
                       const text = todayResult > 0
                         ? `PATTRN Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
                         : `PATTRN Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
+                      const result = await tryNativeShare({ text });
+                      if (result === "shared") {
+                        setDailyShareMsg("Shared!");
+                        setTimeout(() => setDailyShareMsg(""), 2000);
+                        return;
+                      }
+                      if (result === "cancelled") return;
                       try { await navigator.clipboard.writeText(text); } catch { /* fallback */ }
                       setDailyShareMsg("Copied!");
                       setTimeout(() => setDailyShareMsg(""), 2000);
@@ -1764,6 +1821,13 @@ export default function Pattrn() {
           <button
             onClick={async () => {
               const url = typeof window !== "undefined" ? window.location.href : "";
+              const result = await tryNativeShare({ title: "PATTRN", text: "Check out this puzzle", url: url || undefined });
+              if (result === "shared") {
+                setShareMsg("Shared!");
+                setTimeout(() => setShareMsg(""), 2000);
+                return;
+              }
+              if (result === "cancelled") return;
               try { await navigator.clipboard.writeText(url); } catch { /* fallback */ }
               setShareMsg("Copied!");
               setTimeout(() => setShareMsg(""), 2000);
@@ -1772,7 +1836,7 @@ export default function Pattrn() {
               background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px",
               color: C.textDim, cursor: "pointer", fontSize: 12, transition: "all 0.15s",
             }}
-            title="Copy link to this level"
+            title="Share link to this level"
             onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
           >
@@ -1826,7 +1890,8 @@ export default function Pattrn() {
                 const fallDelay = isBlankCell ? 0 : cellIndex * 0.032;
                 const wrongFallDelay = isWrongCell ? cellIndex * 0.015 : 0;
                 const totalCells = gridSize * gridSize;
-                const emptyCellDelay = (totalCells - 1) * 0.032 + 0.5;
+                const emptyCellDelayRaw = (totalCells - 1) * 0.032 + 0.5;
+                const emptyCellDelay = isBlankCell && clearedBlanks.has(key) ? null : emptyCellDelayRaw;
                 const isWon = gameState === "won";
                 const winCelebrateDelay = isWon ? cellIndex * 0.04 : 0;
                 return (
@@ -1902,17 +1967,24 @@ export default function Pattrn() {
               </div>
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              <button onClick={() => {
+              <button onClick={async () => {
                 let text;
                 if (isCascade) {
                   text = `PATTRN Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
-                } else                 if (isDaily) {
+                } else if (isDaily) {
                   const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
                   text = `PATTRN Daily ${getDailyDateLabel(currentPuzzle)} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
                 } else {
                   const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
                   text = `PATTRN \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
                 }
+                const result = await tryNativeShare({ text });
+                if (result === "shared") {
+                  setShareMsg("Shared!");
+                  setTimeout(() => setShareMsg(""), 2000);
+                  return;
+                }
+                if (result === "cancelled") return;
                 navigator.clipboard.writeText(text).catch(() => {});
                 setShareMsg("Copied!");
                 setTimeout(() => setShareMsg(""), 2000);
@@ -1976,9 +2048,17 @@ export default function Pattrn() {
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               {isCascade && (
-                <button onClick={() => {
+                <button onClick={async () => {
                   const sz = puzzle?.gridSize ?? 0;
-                  navigator.clipboard.writeText(`PATTRN Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`).catch(() => {});
+                  const text = `PATTRN Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`;
+                  const result = await tryNativeShare({ text });
+                  if (result === "shared") {
+                    setShareMsg("Shared!");
+                    setTimeout(() => setShareMsg(""), 2000);
+                    return;
+                  }
+                  if (result === "cancelled") return;
+                  navigator.clipboard.writeText(text).catch(() => {});
                   setShareMsg("Copied!");
                   setTimeout(() => setShareMsg(""), 2000);
                 }}
