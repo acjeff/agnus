@@ -568,13 +568,16 @@ export default function Pattrn() {
       setWrongCells(wrong);
       if (isBlind) {
         setLockedCells(newLocked);
-        // Clear wrong fills so player can re-fill them
+      }
+      // Brief highlight then remove incorrect tiles so player must re-fill them
+      setTimeout(() => {
         setFills(prev => {
           const next = { ...prev };
           for (const k of wrong) delete next[k];
           return next;
         });
-      }
+        setWrongCells(new Set());
+      }, 600);
     }
   };
 
