@@ -351,7 +351,7 @@ function getDailyStreak(progress) {
 }
 
 // --- CASCADE: 50 runs, each 3×3 → 9×9; attempts persist across levels; progress = how far you got per run ---
-const CASCADE_LEVELS = [3, 4, 5, 6, 7, 8, 9]; // gridSize per level 0..6
+const CASCADE_LEVELS = [3, 3, 4, 4, 5, 5, 6, 7, 8, 9]; // gridSize per level 0..9
 const CASCADE_RUN_SEED_BASE = 50000;
 
 function formatCascadeProgression(completedUpToLevel, failedAtLevel) {
@@ -1238,7 +1238,7 @@ export default function Pattrn() {
     }
   };
 
-  const maxAttempts = isBlind ? 6 : 5;
+  const maxAttempts = isCascade ? 10 : isBlind ? 6 : 5;
 
   const checkSolution = () => {
     if (!puzzle) return;
@@ -1278,7 +1278,7 @@ export default function Pattrn() {
         const prevBest = (progress.cascade || {})[cascadeRunIndex] ?? 0;
         const newBest = Math.max(prevBest, levelsCompleted);
         const nextLevel = cascadeLevel + 1;
-        if (cascadeLevel < 6) {
+        if (cascadeLevel < CASCADE_LEVELS.length - 1) {
           const runState = { level: nextLevel, elapsedSeconds: getElapsedSeconds(), fills: {}, attempts: newAttempts };
           const nextRunState = { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState };
           const newProgress = { ...progress, cascade: { ...(progress.cascade || {}), [cascadeRunIndex]: newBest }, cascadeRunState: nextRunState, cascadeRunStateLastIndex: cascadeRunIndex };
@@ -1299,7 +1299,7 @@ export default function Pattrn() {
         }
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
-        if (cascadeLevel < 6) {
+        if (cascadeLevel < CASCADE_LEVELS.length - 1) {
           // Don't stop timer — it continues across cascade levels
           setCascadeLevel((l) => l + 1);
           setTimeout(() => resetCascadeLevelState(), 400);
@@ -2168,7 +2168,7 @@ export default function Pattrn() {
             </div>
             {isCascade && (
               <div style={{ fontSize: 12, color: C.textDim, marginBottom: 12, fontFamily: "'Space Mono', monospace" }}>
-                {formatCascadeProgression(6, null)}
+                {formatCascadeProgression(CASCADE_LEVELS.length - 1, null)}
               </div>
             )}
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
