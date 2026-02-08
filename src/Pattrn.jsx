@@ -1077,6 +1077,51 @@ export default function Pattrn() {
     // Timer is not reset — it persists across cascade stages for the whole run
   }, []);
 
+  const resetBoard = () => {
+    cancelWrongCellClear();
+    setFills({});
+    setSelectedCell(null);
+    setSelectedToken(null);
+    setAttempts(0);
+    setWrongCells(new Set());
+    setLockedCells(new Set());
+    setClearedBlanks(new Set());
+    // Restart the timer
+    stopTimer();
+    setElapsedTime(0);
+    const isCasc = difficulty === "cascade";
+    timerStart.current = Date.now();
+    timerIsCascadeRun.current = isCasc;
+    timerInterval.current = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+      if (timerIsCascadeRun.current) {
+        const p = loadProgress();
+        const ri = cascadeRunIndexRef.current;
+        const cur = p.cascadeRunState?.[ri];
+        if (cur?.lives > 0) {
+          const elapsed = Math.floor((Date.now() - timerStart.current) / 1000);
+          saveProgress({
+            ...p,
+            cascadeRunState: { ...p.cascadeRunState, [ri]: { ...cur, elapsedSeconds: elapsed, fills: cascadeFillsRef.current, attempts: cascadeAttemptsRef.current } },
+            cascadeRunStateLastIndex: ri,
+          });
+        }
+      }
+    }, 1000);
+    // Update persisted cascade run state if applicable
+    if (isCasc) {
+      const p = loadProgress();
+      const ri = cascadeRunIndexRef.current;
+      const cur = p.cascadeRunState?.[ri];
+      if (cur) {
+        saveProgress({
+          ...p,
+          cascadeRunState: { ...p.cascadeRunState, [ri]: { ...cur, elapsedSeconds: 0, fills: {}, attempts: 0 } },
+        });
+      }
+    }
+  };
+
   const paintCell = useCallback((r, c) => {
     if (gameState !== "playing") return;
     const key = `${r}-${c}`;
@@ -2069,25 +2114,42 @@ export default function Pattrn() {
       {/* Actions */}
       <div style={{ marginTop: 20, animation: "fadeUp 0.4s 0.2s ease both", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
         {gameState === "playing" && (
-          <button
-            onClick={allFilled ? checkSolution : undefined}
-            disabled={!allFilled}
-            style={{
-              backgroundColor: allFilled ? (isBlind ? "#e06040" : C.accent) : C.surfaceLight,
-              color: allFilled ? (isBlind ? "#fff" : C.bg) : C.textDim,
-              border: "none",
-              padding: "14px 48px", borderRadius: 12, fontSize: 15, fontWeight: 700,
-              fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-              cursor: allFilled ? "pointer" : "not-allowed",
-              textTransform: "uppercase", transition: "all 0.2s",
-              boxShadow: allFilled ? (isBlind ? "0 4px 20px #e0604044" : `0 4px 20px ${C.accent}44`) : "none",
-              opacity: allFilled ? 1 : 0.7,
-            }}
-            onMouseEnter={e => { if (allFilled) e.target.style.transform = "translateY(-2px)"; }}
-            onMouseLeave={e => { e.target.style.transform = "translateY(0)"; }}
-          >
-            {isBlind ? "Guess" : "Check"}
-          </button>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <button
+              onClick={allFilled ? checkSolution : undefined}
+              disabled={!allFilled}
+              style={{
+                backgroundColor: allFilled ? (isBlind ? "#e06040" : C.accent) : C.surfaceLight,
+                color: allFilled ? (isBlind ? "#fff" : C.bg) : C.textDim,
+                border: "none",
+                padding: "14px 48px", borderRadius: 12, fontSize: 15, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+                cursor: allFilled ? "pointer" : "not-allowed",
+                textTransform: "uppercase", transition: "all 0.2s",
+                boxShadow: allFilled ? (isBlind ? "0 4px 20px #e0604044" : `0 4px 20px ${C.accent}44`) : "none",
+                opacity: allFilled ? 1 : 0.7,
+              }}
+              onMouseEnter={e => { if (allFilled) e.target.style.transform = "translateY(-2px)"; }}
+              onMouseLeave={e => { e.target.style.transform = "translateY(0)"; }}
+            >
+              {isBlind ? "Guess" : "Check"}
+            </button>
+            {(Object.keys(fills).length > 0 || attempts > 0) && (
+              <button
+                onClick={resetBoard}
+                style={{
+                  backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                  padding: "14px 20px", borderRadius: 12, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase", transition: "all 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+              >
+                Reset
+              </button>
+            )}
+          </div>
         )}
 
         {gameState === "won" && (
