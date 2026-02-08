@@ -406,6 +406,15 @@ const PUZZLE_SETS = {
 // --- Persistent storage using localStorage ---
 const STORAGE_KEY = "pattrn-progress-v3";
 const TIMES_KEY = "pattrn-times-v1";
+const HOMESCREEN_HINT_KEY = "pattrn-homescreen-hint-dismissed-v1";
+
+function isIOSSafariForHomescreenHint() {
+  if (typeof navigator === "undefined" || typeof window === "undefined") return false;
+  const ua = navigator.userAgent;
+  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  const isStandalone = !!navigator.standalone;
+  return isIOS && !isStandalone;
+}
 
 function normalizeCascadeRunState(entry) {
   if (!entry || entry.level == null || entry.lives == null) return null;
@@ -716,6 +725,9 @@ export default function Pattrn() {
 
   const [clearedBlanks, setClearedBlanks] = useState(() => new Set());
   const hasSyncedUrl = useRef(false);
+  const [homescreenHintDismissed, setHomescreenHintDismissed] = useState(() => {
+    try { return !!localStorage.getItem(HOMESCREEN_HINT_KEY); } catch { return false; }
+  });
 
   // Scroll play view to top when entering or changing puzzle
   useEffect(() => {
@@ -1502,6 +1514,36 @@ export default function Pattrn() {
           </p>
         </div>
 
+        {/* Add to Home Screen hint for iOS Safari */}
+        {isIOSSafariForHomescreenHint() && !homescreenHintDismissed && (
+          <div style={{
+            width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.01s ease both",
+            borderRadius: 12, border: `1px solid ${C.border}`, backgroundColor: C.surface,
+            padding: "12px 16px", display: "flex", alignItems: "flex-start", gap: 12,
+          }}>
+            <span style={{ fontSize: 20, flexShrink: 0 }}>📱</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.accent, marginBottom: 4 }}>Add to Home Screen</div>
+              <p style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5, margin: 0 }}>
+                Tap the Share button (square with arrow) at the bottom of Safari, then scroll down and tap &ldquo;Add to Home Screen&rdquo; for quick access.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                try { localStorage.setItem(HOMESCREEN_HINT_KEY, "1"); } catch { /* ignore */ }
+                setHomescreenHintDismissed(true);
+              }}
+              style={{
+                background: "none", border: "none", color: C.textDim, cursor: "pointer", padding: 4,
+                fontSize: 18, lineHeight: 1, flexShrink: 0,
+              }}
+              aria-label="Dismiss"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
         {/* Daily overview: streak, play today, share */}
         {(() => {
           const todayIdx = getTodayDailyIndex();
@@ -1915,6 +1957,7 @@ export default function Pattrn() {
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg,
         paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
         display: "flex", justifyContent: "center", boxSizing: "border-box",
+        touchAction: "manipulation",
       }}>
         <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridSize >= 7 ? 380 : 360, animation: "fadeUp 0.3s ease" }}>
         <button onClick={() => {
