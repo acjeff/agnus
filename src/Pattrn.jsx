@@ -1396,7 +1396,7 @@ export default function Pattrn() {
     return { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll };
   };
 
-  const tryNativeShare = async ({ title = "¡Yeet!", text, url }) => {
+  const tryNativeShare = async ({ title = "Agnus", text, url }) => {
     if (typeof navigator !== "undefined" && navigator.share && (text || url)) {
       try {
         await navigator.share({ title, text: text || undefined, url: url || undefined });
@@ -1413,7 +1413,7 @@ export default function Pattrn() {
     const emojis = { easy: "\u2B50", medium: "\u26A1", hard: "\uD83D\uDD25", blind: "\uD83D\uDE48", daily: "\uD83D\uDCC5", cascade: "\uD83C\uDF00" };
     const blockChars = { none: "\u2591", failed: "\u2593", gold: "\u2588", silver: "\u2593", bronze: "\u2592" };
 
-    let text = "¡Yeet! \uD83E\uDDE9\n\n";
+    let text = "Agnus \uD83E\uDDE9\n\n";
     for (const s of sections) {
       text += `${emojis[s.key]} ${s.label}: ${s.solved}/50 solved`;
       if (s.bestTime != null) text += ` \u2022 best ${formatTime(s.bestTime)}`;
@@ -1456,7 +1456,7 @@ export default function Pattrn() {
   const copyDailyShareText = async () => {
     const dailySolved = Object.keys(progress.daily || {}).filter(k => (progress.daily || {})[k] > 0).length;
     const cascadeSolved = Object.keys(progress.cascade || {}).filter(k => /^\d+$/.test(k) && (progress.cascade || {})[k] === 7).length;
-    const text = `¡Yeet! \uD83E\uDDE9\n\uD83D\uDCC5 Daily: ${dailySolved}/50\n\uD83C\uDF00 Cascade: ${cascadeSolved}/50`;
+    const text = `Agnus \uD83E\uDDE9\n\uD83D\uDCC5 Daily: ${dailySolved}/50\n\uD83C\uDF00 Cascade: ${cascadeSolved}/50`;
     const result = await tryNativeShare({ text });
     if (result === "shared") {
       setShareMsg("Shared!");
@@ -1495,7 +1495,7 @@ export default function Pattrn() {
 
         <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease" }}>
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: 4, margin: 0, color: C.accent }}>
-            ¡Yeet!
+            Agnus
           </h1>
           <p style={{ color: C.textDim, fontSize: 13, marginTop: 6, letterSpacing: 2 }}>
             find the pattern &middot; fill the gaps
@@ -1534,8 +1534,8 @@ export default function Pattrn() {
                       const medal = todayResult <= 2 ? "\u2605" : todayResult <= 4 ? "\u25CF" : "\u25C6";
                       const streakPart = streak > 0 ? ` 🔥 ${streak} day streak` : "";
                       const text = todayResult > 0
-                        ? `¡Yeet! Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
-                        : `¡Yeet! Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
+                        ? `Agnus Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
+                        : `Agnus Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
                       const result = await tryNativeShare({ text });
                       if (result === "shared") {
                         setDailyShareMsg("Shared!");
@@ -1758,7 +1758,7 @@ export default function Pattrn() {
                 {/* Modal header */}
                 <div style={{ textAlign: "center", marginBottom: 20 }}>
                   <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
-                    ¡Yeet!
+                    Agnus
                   </h2>
                   <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>my stats</p>
                 </div>
@@ -1951,7 +1951,7 @@ export default function Pattrn() {
           <button
             onClick={async () => {
               const url = typeof window !== "undefined" ? window.location.href : "";
-              const result = await tryNativeShare({ title: "¡Yeet!", text: "Check out this puzzle", url: url || undefined });
+              const result = await tryNativeShare({ title: "Agnus", text: "Check out this puzzle", url: url || undefined });
               if (result === "shared") {
                 setShareMsg("Shared!");
                 setTimeout(() => setShareMsg(""), 2000);
@@ -2104,13 +2104,13 @@ export default function Pattrn() {
               <button onClick={async () => {
                 let text;
                 if (isCascade) {
-                  text = `¡Yeet! Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
+                  text = `Agnus Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
                 } else if (isDaily) {
                   const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-                  text = `¡Yeet! Daily ${getDailyDateLabel(currentPuzzle)} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+                  text = `Agnus Daily ${getDailyDateLabel(currentPuzzle)} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
                 } else {
                   const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-                  text = `¡Yeet! \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+                  text = `Agnus \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
                 }
                 const result = await tryNativeShare({ text });
                 if (result === "shared") {
@@ -2196,7 +2196,7 @@ export default function Pattrn() {
               {isCascade && (
                 <button onClick={async () => {
                   const sz = puzzle?.gridSize ?? 0;
-                  const text = `¡Yeet! Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`;
+                  const text = `Agnus Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`;
                   const result = await tryNativeShare({ text });
                   if (result === "shared") {
                     setShareMsg("Shared!");
