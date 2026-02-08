@@ -1733,6 +1733,11 @@ export default function Pattrn() {
                 const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: freshState }, cascadeRunStateLastIndex: cascadeRunIndex };
                 setProgress(nextProgress);
                 saveProgress(nextProgress);
+                setAttempts(0);
+                setElapsedTime(0);
+                setCascadeLevel(0);
+                setCascadeLives(3);
+                cascadeAttemptsRef.current = 0;
                 startPuzzle(cascadeRunIndex, "cascade");
               }}
               style={{
