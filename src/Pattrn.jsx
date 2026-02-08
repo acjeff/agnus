@@ -14,6 +14,7 @@ const C = {
   gold: "#FFD700",
   silver: "#C0C0C0",
   bronze: "#CD7F32",
+  inProgress: "#eab308", // amber for cascade "started but not completed"
 };
 
 // --- Shape overlays ---
@@ -353,6 +354,17 @@ function getDailyStreak(progress) {
 const CASCADE_LEVELS = [3, 4, 5, 6, 7, 8, 9]; // gridSize per level 0..6
 const CASCADE_RUN_SEED_BASE = 50000;
 
+function formatCascadeProgression(completedUpToLevel, failedAtLevel) {
+  // completedUpToLevel: last level we cleared (0..6). failedAtLevel: level we failed (null if run complete).
+  const parts = CASCADE_LEVELS.map((sz, i) => {
+    const label = `${sz}×${sz}`;
+    if (failedAtLevel != null && i === failedAtLevel) return `${label} ✗`;
+    if (i <= completedUpToLevel) return `${label} ✓`;
+    return null;
+  }).filter(Boolean);
+  return parts.join(" ");
+}
+
 function getCascadeRunSeed(runIndex) {
   return CASCADE_RUN_SEED_BASE + runIndex * 9999;
 }
@@ -395,10 +407,44 @@ const PUZZLE_SETS = {
 const STORAGE_KEY = "pattrn-progress-v3";
 const TIMES_KEY = "pattrn-times-v1";
 
+function normalizeCascadeRunState(entry) {
+  if (!entry || entry.level == null || entry.lives == null) return null;
+  return {
+    level: entry.level,
+    lives: entry.lives,
+    elapsedSeconds: typeof entry.elapsedSeconds === "number" ? entry.elapsedSeconds : 0,
+    fills: entry.fills && typeof entry.fills === "object" ? entry.fills : {},
+    attempts: typeof entry.attempts === "number" ? entry.attempts : 0,
+  };
+}
+
 function loadProgress() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const base = raw ? JSON.parse(raw) : {};
+    const rawRun = base.cascadeRunState;
+    let cascadeRunState = {};
+    let cascadeRunStateLastIndex = base.cascadeRunStateLastIndex;
+    if (rawRun != null && typeof rawRun === "object") {
+      if (typeof rawRun.runIndex === "number") {
+        const one = normalizeCascadeRunState(rawRun);
+        if (one && rawRun.lives > 0) {
+          cascadeRunState[rawRun.runIndex] = one;
+          cascadeRunStateLastIndex = rawRun.runIndex;
+        }
+      } else {
+        for (const [k, v] of Object.entries(rawRun)) {
+          const num = parseInt(k, 10);
+          if (!Number.isNaN(num)) {
+            const one = normalizeCascadeRunState(v);
+            if (one && one.lives > 0) cascadeRunState[num] = one;
+          }
+        }
+        if (cascadeRunStateLastIndex == null && Object.keys(cascadeRunState).length > 0) {
+          cascadeRunStateLastIndex = Math.max(...Object.keys(cascadeRunState).map(Number));
+        }
+      }
+    }
     return {
       easy: base.easy ?? {},
       medium: base.medium ?? {},
@@ -406,9 +452,11 @@ function loadProgress() {
       blind: base.blind ?? {},
       daily: base.daily ?? {},
       cascade: base.cascade ?? {},
+      cascadeRunState,
+      cascadeRunStateLastIndex: typeof cascadeRunStateLastIndex === "number" ? cascadeRunStateLastIndex : undefined,
     };
   } catch {
-    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} };
+    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined };
   }
 }
 
@@ -626,18 +674,91 @@ export default function Pattrn() {
   const [cascadeRunIndex, setCascadeRunIndex] = useState(0);
   const timerStart = useRef(null);
   const timerInterval = useRef(null);
+  const timerIsCascadeRun = useRef(false);
+  const cascadeFillsRef = useRef({});
+  const cascadeAttemptsRef = useRef(0);
+  const cascadeRunIndexRef = useRef(0);
   const isPainting = useRef(false);
 
   const hasSyncedUrl = useRef(false);
 
-  // Initial load: read URL and optionally deep-link into a puzzle
+  // Initial load: read URL or restore saved cascade run
   useEffect(() => {
     const { mode, level } = getSearchParams();
-    if (mode) setDifficulty(mode);
-    if (level != null) {
-      if (mode === "cascade") setCascadeRunIndex(level);
-      else setCurrentPuzzle(level);
-      if (mode) setView("play");
+    const levelNum = level != null ? parseInt(level, 10) : null;
+    const hasDeepLink = mode && levelNum != null && !Number.isNaN(levelNum);
+    const runStateMap = progress.cascadeRunState || {};
+    const lastIndex = progress.cascadeRunStateLastIndex;
+
+    const restoreRun = (runIndex) => {
+      const rs = runStateMap[runIndex];
+      if (!rs || rs.lives <= 0) return;
+      setCascadeRunIndex(runIndex);
+      cascadeRunIndexRef.current = runIndex;
+      setCascadeLevel(rs.level);
+      setCascadeLives(rs.lives);
+      setFills(rs.fills ?? {});
+      setAttempts(rs.attempts ?? 0);
+      const secs = rs.elapsedSeconds ?? 0;
+      setElapsedTime(secs);
+      timerStart.current = Date.now() - secs * 1000;
+      timerIsCascadeRun.current = true;
+      cascadeRunIndexRef.current = runIndex;
+      timerInterval.current = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+        const p = loadProgress();
+        const ri = cascadeRunIndexRef.current;
+        const cur = p.cascadeRunState?.[ri];
+        if (cur?.lives > 0) {
+          const elapsed = Math.floor((Date.now() - timerStart.current) / 1000);
+          saveProgress({
+            ...p,
+            cascadeRunState: { ...p.cascadeRunState, [ri]: { ...cur, elapsedSeconds: elapsed, fills: cascadeFillsRef.current, attempts: cascadeAttemptsRef.current } },
+            cascadeRunStateLastIndex: ri,
+          });
+        }
+      }, 1000);
+    };
+
+    if (hasDeepLink) {
+      if (mode) setDifficulty(mode);
+      if (mode === "cascade") {
+        setCascadeRunIndex(levelNum);
+        cascadeRunIndexRef.current = levelNum;
+        const rs = runStateMap[levelNum];
+        if (rs?.lives > 0) {
+          restoreRun(levelNum);
+        } else {
+          setElapsedTime(0);
+          timerStart.current = Date.now();
+          timerIsCascadeRun.current = true;
+          const initialRunState = { level: 0, lives: 3, elapsedSeconds: 0, fills: {}, attempts: 0 };
+          const p = loadProgress();
+          saveProgress({ ...p, cascadeRunState: { ...(p.cascadeRunState || {}), [levelNum]: initialRunState }, cascadeRunStateLastIndex: levelNum });
+          timerInterval.current = setInterval(() => {
+            setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+            const p2 = loadProgress();
+            const ri = cascadeRunIndexRef.current;
+            const cur = p2.cascadeRunState?.[ri];
+            if (cur?.lives > 0) {
+              const elapsed = Math.floor((Date.now() - timerStart.current) / 1000);
+              saveProgress({
+                ...p2,
+                cascadeRunState: { ...p2.cascadeRunState, [ri]: { ...cur, elapsedSeconds: elapsed, fills: cascadeFillsRef.current, attempts: cascadeAttemptsRef.current } },
+                cascadeRunStateLastIndex: ri,
+              });
+            }
+          }, 1000);
+        }
+      } else setCurrentPuzzle(levelNum);
+      setView("play");
+      return;
+    }
+
+    if (lastIndex != null && runStateMap[lastIndex]?.lives > 0) {
+      setDifficulty("cascade");
+      restoreRun(lastIndex);
+      setView("play");
     }
   }, []);
 
@@ -658,6 +779,11 @@ export default function Pattrn() {
   const todayDateStr = getDateString();
   const isDaily = difficulty === "daily";
   const isCascade = difficulty === "cascade";
+  if (isCascade) {
+    cascadeFillsRef.current = fills;
+    cascadeAttemptsRef.current = attempts;
+    cascadeRunIndexRef.current = cascadeRunIndex;
+  }
   const dailyPuzzles = useMemo(() => buildDailyPuzzles(), [todayDateStr]);
   const puzzles = isCascade ? [] : isDaily ? dailyPuzzles : (PUZZLE_SETS[difficulty] || []);
   const cascadePuzzle = useMemo(
@@ -670,33 +796,72 @@ export default function Pattrn() {
   const progressKey = isCascade ? cascadeRunIndex : currentPuzzle;
 
   const stopTimer = useCallback(() => {
+    timerIsCascadeRun.current = false;
     if (timerInterval.current) {
       clearInterval(timerInterval.current);
       timerInterval.current = null;
     }
   }, []);
 
+  const getElapsedSeconds = useCallback(() => {
+    if (timerStart.current != null) return Math.floor((Date.now() - timerStart.current) / 1000);
+    return 0;
+  }, []);
+
   const startPuzzle = (idx, diff) => {
     if (diff) setDifficulty(diff);
     setCurrentPuzzle(idx);
+    let cascadeElapsed = 0;
     if (difficulty === "cascade" || diff === "cascade") {
       setCascadeRunIndex(idx);
-      setCascadeLevel(0);
-      setCascadeLives(3);
+      cascadeRunIndexRef.current = idx;
+      const runStateMap = loadProgress().cascadeRunState || {};
+      const saved = runStateMap[idx];
+      const resume = saved?.lives > 0;
+      const startLevel = resume ? saved.level : 0;
+      const startLives = resume ? saved.lives : 3;
+      cascadeElapsed = resume ? (saved.elapsedSeconds ?? 0) : 0;
+      const startFills = resume ? (saved.fills ?? {}) : {};
+      const startAttempts = resume ? (saved.attempts ?? 0) : 0;
+      setCascadeLevel(startLevel);
+      setCascadeLives(startLives);
+      setFills(startFills);
+      setAttempts(startAttempts);
+      setElapsedTime(cascadeElapsed);
+      const runState = { level: startLevel, lives: startLives, elapsedSeconds: cascadeElapsed, fills: startFills, attempts: startAttempts };
+      const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [idx]: runState }, cascadeRunStateLastIndex: idx };
+      setProgress(nextProgress);
+      saveProgress(nextProgress);
     }
-    setFills({});
+    if (!(difficulty === "cascade" || diff === "cascade")) {
+      setFills({});
+      setAttempts(0);
+    }
     setSelectedCell(null);
     setSelectedToken(null);
-    setAttempts(0);
     setGameState("playing");
     setWrongCells(new Set());
     setLockedCells(new Set());
     setShowParticles(false);
-    setElapsedTime(0);
+    if (difficulty !== "cascade" && diff !== "cascade") setElapsedTime(0);
     stopTimer();
-    timerStart.current = Date.now();
+    timerIsCascadeRun.current = difficulty === "cascade" || diff === "cascade";
+    timerStart.current = Date.now() - cascadeElapsed * 1000;
     timerInterval.current = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+      if (timerIsCascadeRun.current) {
+        const p = loadProgress();
+        const ri = cascadeRunIndexRef.current;
+        const cur = p.cascadeRunState?.[ri];
+        if (cur?.lives > 0) {
+          const elapsed = Math.floor((Date.now() - timerStart.current) / 1000);
+          saveProgress({
+            ...p,
+            cascadeRunState: { ...p.cascadeRunState, [ri]: { ...cur, elapsedSeconds: elapsed, fills: cascadeFillsRef.current, attempts: cascadeAttemptsRef.current } },
+            cascadeRunStateLastIndex: ri,
+          });
+        }
+      }
     }, 1000);
     setView("play");
   };
@@ -708,12 +873,7 @@ export default function Pattrn() {
     setWrongCells(new Set());
     setSelectedCell(null);
     setSelectedToken(null);
-    setElapsedTime(0);
-    stopTimer();
-    timerStart.current = Date.now();
-    timerInterval.current = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
-    }, 1000);
+    // Timer is not reset — it persists across cascade stages for the whole run
   }, []);
 
   const paintCell = useCallback((r, c) => {
@@ -814,13 +974,24 @@ export default function Pattrn() {
         const levelsCompleted = cascadeLevel + 1;
         const prevBest = (progress.cascade || {})[cascadeRunIndex] ?? 0;
         const newBest = Math.max(prevBest, levelsCompleted);
-        const newProgress = { ...progress, cascade: { ...(progress.cascade || {}), [cascadeRunIndex]: newBest } };
-        setProgress(newProgress);
-        saveProgress(newProgress);
+        const nextLevel = cascadeLevel + 1;
+        if (cascadeLevel < 6) {
+          const runState = { level: nextLevel, lives: cascadeLives, elapsedSeconds: getElapsedSeconds(), fills: {}, attempts: 0 };
+          const nextRunState = { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState };
+          const newProgress = { ...progress, cascade: { ...(progress.cascade || {}), [cascadeRunIndex]: newBest }, cascadeRunState: nextRunState, cascadeRunStateLastIndex: cascadeRunIndex };
+          setProgress(newProgress);
+          saveProgress(newProgress);
+        } else {
+          const nextRunState = { ...(progress.cascadeRunState || {}) };
+          delete nextRunState[cascadeRunIndex];
+          const newProgress = { ...progress, cascade: { ...(progress.cascade || {}), [cascadeRunIndex]: newBest }, cascadeRunState: nextRunState, cascadeRunStateLastIndex: cascadeRunIndex };
+          setProgress(newProgress);
+          saveProgress(newProgress);
+        }
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
         if (cascadeLevel < 6) {
-          stopTimer();
+          // Don't stop timer — it continues across cascade levels
           setCascadeLevel((l) => l + 1);
           setTimeout(() => resetCascadeLevelState(), 400);
         } else {
@@ -848,14 +1019,20 @@ export default function Pattrn() {
       if (isCascade) {
         const newLives = cascadeLives - 1;
         setCascadeLives(newLives);
-        const levelsReached = cascadeLevel; // failed this level, so completed 0..cascadeLevel-1 = cascadeLevel levels
+        const levelsReached = cascadeLevel;
         const prevBest = (progress.cascade || {})[cascadeRunIndex] ?? 0;
         const newBest = Math.max(prevBest, levelsReached);
-        const newProgress = { ...progress, cascade: { ...(progress.cascade || {}), [cascadeRunIndex]: newBest } };
+        const nextRunState = { ...(progress.cascadeRunState || {}) };
+        if (newLives > 0) {
+          nextRunState[cascadeRunIndex] = { level: cascadeLevel, lives: newLives, elapsedSeconds: getElapsedSeconds(), fills: {}, attempts: 0 };
+        } else {
+          delete nextRunState[cascadeRunIndex];
+        }
+        const newProgress = { ...progress, cascade: { ...(progress.cascade || {}), [cascadeRunIndex]: newBest }, cascadeRunState: nextRunState, cascadeRunStateLastIndex: cascadeRunIndex };
         setProgress(newProgress);
         saveProgress(newProgress);
         if (newLives > 0) {
-          stopTimer();
+          // Don't stop timer — it continues when retrying same level
           setTimeout(() => resetCascadeLevelState(), 800);
         } else {
           setGameState("lost");
@@ -1192,32 +1369,49 @@ export default function Pattrn() {
             const result = isCascade ? (diffProgress[idx] ?? -1) : diffProgress[idx];
             const solved = isCascade ? result === 7 : result > 0;
             const failed = isCascade ? (result >= 0 && result < 7) : result === 0;
+            const cascadeRunState = progress.cascadeRunState || {};
+            const cascadeInProgress = isCascade && result === -1 && cascadeRunState[idx] != null;
             const time = diffTimes[idx];
             const cascadeLevels = result >= 0 && result <= 7 ? result : null;
+            const cascadeInProgressLevel = cascadeInProgress && cascadeRunState[idx]?.level != null ? cascadeRunState[idx].level : null;
+            const cascadeLevelValid = (l) => typeof l === "number" && l >= 0 && l <= 6;
+            const cascadeSizeLabel = isCascade
+              ? cascadeLevels === 7
+                ? "9×9"
+                : cascadeLevelValid(cascadeLevels)
+                  ? `${CASCADE_LEVELS[cascadeLevels]}×${CASCADE_LEVELS[cascadeLevels]}`
+                  : cascadeLevelValid(cascadeInProgressLevel)
+                    ? `${CASCADE_LEVELS[cascadeInProgressLevel]}×${CASCADE_LEVELS[cascadeInProgressLevel]}`
+                    : (cascadeLevels !== null || cascadeInProgressLevel !== null) ? "…" : null
+              : null;
+            const borderColor = solved ? C.correct + "66" : failed ? C.incorrect + "44" : cascadeInProgress ? C.inProgress + "99" : C.border;
+            const bgColor = solved ? C.correct + "15" : failed ? C.incorrect + "10" : cascadeInProgress ? C.inProgress + "18" : C.surface;
+            const numColor = solved ? C.correct : failed ? C.incorrect : cascadeInProgress ? C.inProgress : C.text;
             return (
               <button key={i} onClick={() => startPuzzle(i, view === "menu" ? difficulty : undefined)}
                 style={{
-                  aspectRatio: "1", borderRadius: 10, border: `1.5px solid ${solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border}`,
-                  backgroundColor: solved ? C.correct + "15" : failed ? C.incorrect + "10" : C.surface,
+                  aspectRatio: "1", borderRadius: 10, border: `1.5px solid ${borderColor}`,
+                  backgroundColor: bgColor,
                   cursor: "pointer", display: "flex", flexDirection: "column",
                   alignItems: "center", justifyContent: "center", gap: 1,
-                  transition: "all 0.15s", position: "relative",
+                  transition: "all 0.15s", position: "relative", minWidth: 0,
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.borderColor = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; }}
               >
                 <span style={{
                   fontFamily: "'Space Mono', monospace", fontSize: isDaily ? 9 : 15, fontWeight: 700,
-                  color: solved ? C.correct : failed ? C.incorrect : C.text,
+                  color: numColor, lineHeight: 1,
                 }}>
                   {isDaily ? getDailyDateLabel(i) : i + 1}
                 </span>
                 {isCascade ? (
-                  cascadeLevels !== null && (
-                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: C.textDim }}>
-                      {cascadeLevels === 7 ? "9×9" : cascadeLevels >= 0 ? `${CASCADE_LEVELS[cascadeLevels]}×${CASCADE_LEVELS[cascadeLevels]}` : ""}
-                    </span>
-                  )
+                  <span style={{
+                    fontFamily: "'Space Mono', monospace", fontSize: 9, color: cascadeInProgress ? C.inProgress : C.textDim,
+                    minHeight: 12, display: "block", lineHeight: 1.2,
+                  }}>
+                    {cascadeSizeLabel ?? ""}
+                  </span>
                 ) : (
                   <>
                     {result !== undefined && <ScoreBadge attempts={result} />}
@@ -1414,7 +1608,16 @@ export default function Pattrn() {
 
       {/* Top bar */}
       <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridSize >= 7 ? 380 : 360, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-        <button onClick={() => { stopTimer(); setView("menu"); }}
+        <button onClick={() => {
+          if (difficulty === "cascade") {
+            const runState = { level: cascadeLevel, lives: cascadeLives, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
+            const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
+            setProgress(nextProgress);
+            saveProgress(nextProgress);
+          }
+          stopTimer();
+          setView("menu");
+        }}
           style={{
             background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
             color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
@@ -1435,7 +1638,7 @@ export default function Pattrn() {
             </span>
           )}
         </div>
-        <div style={{ width: 80, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6 }}>
+        <div style={{ width: 80, display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
           <button
             onClick={async () => {
               const url = typeof window !== "undefined" ? window.location.href : "";
@@ -1453,18 +1656,21 @@ export default function Pattrn() {
           >
             {shareMsg || "Share"}
           </button>
-          {isCascade && (
-            Array.from({ length: 3 }, (_, i) => (
-              <span key={i} style={{ fontSize: 18, color: i < cascadeLives ? C.incorrect : C.border }}>♥</span>
-            ))
-          )}
         </div>
       </div>
 
-      {/* Timer + Attempt dots */}
+      {/* Timer */}
       <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, marginBottom: 6, letterSpacing: 2 }}>
         {formatTime(elapsedTime)}
       </div>
+      {/* Cascade: life hearts below timer, above attempt dots */}
+      {isCascade && (
+        <div style={{ display: "flex", justifyContent: "center", gap: 4, marginBottom: 8 }}>
+          {Array.from({ length: 3 }, (_, i) => (
+            <span key={i} style={{ fontSize: 14, color: i < cascadeLives ? C.incorrect : C.border }}>♥</span>
+          ))}
+        </div>
+      )}
       <AttemptDots max={maxAttempts} used={attempts} won={gameState === "won"} />
       <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>
         {gameState === "playing" ? (
@@ -1515,11 +1721,31 @@ export default function Pattrn() {
 
       {/* Token picker */}
       {gameState === "playing" && (
-        <div style={{ marginTop: 20, animation: "fadeUp 0.4s 0.1s ease both" }}>
+        <div style={{ marginTop: 20, animation: "fadeUp 0.4s 0.1s ease both", textAlign: "center" }}>
           <div style={{ fontSize: 10, color: C.textDim, textAlign: "center", letterSpacing: 1, marginBottom: 2, textTransform: "uppercase" }}>
             {isBlind ? "Pick a tile" : puzzle.mode === "easy" ? "Pick a shape" : "Pick a tile"}
           </div>
           <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} />
+          {isCascade && (
+            <button
+              onClick={() => {
+                const freshState = { level: 0, lives: 3, elapsedSeconds: 0, fills: {}, attempts: 0 };
+                const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: freshState }, cascadeRunStateLastIndex: cascadeRunIndex };
+                setProgress(nextProgress);
+                saveProgress(nextProgress);
+                startPuzzle(cascadeRunIndex, "cascade");
+              }}
+              style={{
+                marginTop: 14, background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+                padding: "8px 16px", fontSize: 11, color: C.textDim, cursor: "pointer",
+                fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase", transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+            >
+              Start again
+            </button>
+          )}
         </div>
       )}
 
@@ -1548,6 +1774,11 @@ export default function Pattrn() {
             <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: 12, animation: "fadeUp 0.4s ease" }}>
               &#x2713; {isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : "Perfect"}
             </div>
+            {isCascade && (
+              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 12, fontFamily: "'Space Mono', monospace" }}>
+                {formatCascadeProgression(6, null)}
+              </div>
+            )}
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={() => {
                 let text;
@@ -1614,9 +1845,12 @@ export default function Pattrn() {
               {isCascade ? "Run over" : "Not this time"}
             </div>
             <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
-              {isCascade
-                ? `Reached ${puzzle?.gridSize ?? 0}×${puzzle?.gridSize ?? 0}`
-                : "The correct pattern is shown above"}
+              {isCascade ? (
+                <>
+                  <div style={{ marginBottom: 4 }}>Reached {puzzle?.gridSize ?? 0}×{puzzle?.gridSize ?? 0}</div>
+                  <div style={{ fontFamily: "'Space Mono', monospace" }}>{formatCascadeProgression(cascadeLevel - 1, cascadeLevel)}</div>
+                </>
+              ) : "The correct pattern is shown above"}
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               {isCascade && (
