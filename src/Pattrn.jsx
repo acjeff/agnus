@@ -635,7 +635,7 @@ function Particles({ show }) {
 
 function AttemptDots({ max, used, won }) {
   return (
-    <div style={{ display: "flex", gap: 6, justifyContent: "center", marginBottom: 8 }}>
+    <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
       {Array.from({ length: max }, (_, i) => (
         <div key={i} style={{
           width: 10, height: 10, borderRadius: "50%",
@@ -1987,7 +1987,7 @@ export default function Pattrn() {
       height: "100vh", minHeight: "100vh", backgroundColor: C.bg, color: C.text,
       fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
       display: "flex", flexDirection: "column", alignItems: "center",
-      padding: "24px 16px", position: "relative", overflowY: "auto", overflowX: "hidden",
+      padding: "12px 16px", paddingBottom: 80, position: "relative", overflowY: "auto", overflowX: "hidden",
       boxSizing: "border-box",
     }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} }`}</style>
@@ -2062,29 +2062,30 @@ export default function Pattrn() {
       </div>
 
       {/* Spacer so content starts below the fixed header */}
-      <div style={{ minHeight: "calc(56px + env(safe-area-inset-top, 0px))", flexShrink: 0 }} />
+      <div style={{ minHeight: "calc(48px + env(safe-area-inset-top, 0px))", flexShrink: 0 }} />
 
-      {/* Timer */}
-      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, marginBottom: 6, letterSpacing: 2 }}>
-        {formatTime(elapsedTime)}
-      </div>
-      {/* Cascade: life hearts below timer, above attempt dots */}
-      {isCascade && (
-        <div style={{ display: "flex", justifyContent: "center", gap: 4, marginBottom: 8 }}>
-          {Array.from({ length: 3 }, (_, i) => (
-            <span key={i} style={{ fontSize: 14, color: i < cascadeLives ? C.incorrect : C.border }}>♥</span>
-          ))}
+      {/* Info row: timer, hearts, attempts */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginBottom: 8, flexShrink: 0 }}>
+        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 18, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, letterSpacing: 2 }}>
+          {formatTime(elapsedTime)}
         </div>
-      )}
-      <AttemptDots max={maxAttempts} used={attempts} won={gameState === "won"} />
-      <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>
-        {gameState === "playing" ? (
-          isCascade
-            ? `${cascadeLives} live${cascadeLives !== 1 ? "s" : ""} \u2022 ${maxAttempts - attempts} attempt${maxAttempts - attempts !== 1 ? "s" : ""} left`
-            : isBlind && lockedCount > 0
-            ? `${lockedCount}/${totalBlanks} locked \u2022 ${maxAttempts - attempts} guess${maxAttempts - attempts !== 1 ? "es" : ""} left`
-            : `${maxAttempts - attempts} ${isBlind ? "guess" : "attempt"}${maxAttempts - attempts !== 1 ? "es" : ""} left`
-        ) : gameState === "won" ? (isCascade ? `Run complete!` : `Solved in ${attempts} \u2022 ${formatTime(elapsedTime)}`) : (isCascade ? `${cascadeLives === 0 ? "Run over" : "Out of attempts"}` : "Out of attempts")}
+        {isCascade && (
+          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+            {Array.from({ length: 3 }, (_, i) => (
+              <span key={i} style={{ fontSize: 14, color: i < cascadeLives ? C.incorrect : C.border }}>♥</span>
+            ))}
+          </div>
+        )}
+        <AttemptDots max={maxAttempts} used={attempts} won={gameState === "won"} />
+        <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", letterSpacing: 1 }}>
+          {gameState === "playing" ? (
+            isCascade
+              ? `${cascadeLives} live${cascadeLives !== 1 ? "s" : ""} \u2022 ${maxAttempts - attempts} left`
+              : isBlind && lockedCount > 0
+              ? `${lockedCount}/${totalBlanks} locked \u2022 ${maxAttempts - attempts} left`
+              : `${maxAttempts - attempts} left`
+          ) : gameState === "won" ? (isCascade ? `Run complete!` : `Solved in ${attempts} \u2022 ${formatTime(elapsedTime)}`) : (isCascade ? `${cascadeLives === 0 ? "Run over" : "Out of attempts"}` : "Out of attempts")}
+        </div>
       </div>
 
       {/* Grid */}
@@ -2143,7 +2144,7 @@ export default function Pattrn() {
 
       {/* Token picker */}
       {gameState === "playing" && (
-        <div style={{ marginTop: 20, animation: "fadeUp 0.4s 0.1s ease both", textAlign: "center" }}>
+        <div style={{ marginTop: 10, animation: "fadeUp 0.4s 0.1s ease both", textAlign: "center" }}>
           <div style={{ fontSize: 10, color: C.textDim, textAlign: "center", letterSpacing: 1, marginBottom: 2, textTransform: "uppercase" }}>
             {isBlind ? "Pick a tile" : puzzle.mode === "easy" ? "Pick a shape" : "Pick a tile"}
           </div>
@@ -2151,8 +2152,8 @@ export default function Pattrn() {
         </div>
       )}
 
-      {/* Actions */}
-      <div style={{ marginTop: 20, animation: "fadeUp 0.4s 0.2s ease both", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+      {/* Actions - fixed bottom bar */}
+      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 12, paddingBottom: "calc(16px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 12, borderTop: `1px solid ${C.border}` }}>
         {gameState === "playing" && (
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             <button
@@ -2372,26 +2373,6 @@ export default function Pattrn() {
         )}
       </div>
 
-      {/* Hints */}
-      {gameState === "playing" && Object.keys(fills).length === 0 && lockedCells.size === 0 && (
-        <div style={{ marginTop: 28, color: C.textDim, fontSize: 12, textAlign: "center", maxWidth: 280, lineHeight: 1.6, animation: "pulse 2s infinite" }}>
-          {isCascade
-            ? "Solve each level to grow the grid. You have 3 lives for the whole run."
-            : isBlind
-            ? "Fill the entire grid, then guess! Correct cells lock in green after each guess."
-            : puzzle.mode === "easy"
-            ? "Study the shapes to find the pattern, then fill in the blanks"
-            : "Colors and shapes may follow different patterns!"}
-        </div>
-      )}
-
-      {wrongCells.size > 0 && gameState === "playing" && (
-        <div style={{ marginTop: 14, color: C.incorrect, fontSize: 12, textAlign: "center", fontFamily: "'Space Mono', monospace", animation: "shake 0.4s ease" }}>
-          {isBlind
-            ? `${lockedCount} locked \u2022 ${totalBlanks - lockedCount} remaining`
-            : `${wrongCells.size} cell${wrongCells.size > 1 ? "s" : ""} wrong \u2014 ${maxAttempts - attempts} tr${maxAttempts - attempts !== 1 ? "ies" : "y"} left`}
-        </div>
-      )}
     </div>
   );
 }
