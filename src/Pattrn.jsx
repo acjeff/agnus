@@ -559,7 +559,7 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
         const { color, shapeIndex } = parseToken(token);
         const selected = selectedToken === token;
         const left = remaining && remaining[token] !== undefined ? remaining[token] : null;
-        const exhausted = left !== null && left <= 0;
+        const exhausted = left !== null && left <= 0 && mode !== "hard";
         return (
           <div key={i} onClick={() => onSelect(token)}
             style={{
@@ -573,7 +573,7 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
             }}
           >
             {SHAPES[shapeIndex % SHAPES.length](cellSize * 0.5, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
-            {left !== null && (
+            {left !== null && mode !== "hard" && (
               <div style={{
                 position: "absolute", top: -6, right: -6,
                 backgroundColor: exhausted ? C.textDim : C.text,
@@ -960,7 +960,7 @@ export default function Pattrn() {
         setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
         return;
       }
-      if ((tokenRemaining[selectedToken] ?? 0) <= 0) return;
+      if (puzzle.mode !== "hard" && (tokenRemaining[selectedToken] ?? 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
@@ -975,7 +975,7 @@ export default function Pattrn() {
         setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
         return;
       }
-      if ((tokenRemaining[selectedToken] ?? 0) <= 0) return;
+      if (puzzle.mode !== "hard" && (tokenRemaining[selectedToken] ?? 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     } else {
@@ -1042,7 +1042,7 @@ export default function Pattrn() {
   const handleTokenSelect = (token) => {
     setSelectedToken(token);
     if (selectedCell && puzzle.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
-      if (fills[selectedCell] !== token && (tokenRemaining[token] ?? 0) <= 0) return;
+      if (puzzle.mode !== "hard" && fills[selectedCell] !== token && (tokenRemaining[token] ?? 0) <= 0) return;
       setFills(prev => ({ ...prev, [selectedCell]: token }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(selectedCell); return n; });
       setSelectedCell(null);
