@@ -508,10 +508,11 @@ function parseToken(token) {
 
 // --- Components ---
 
-function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode }) {
+function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0 }) {
   const showContent = isRevealed || isLocked || !isBlank || isFilled;
   const parsed = showContent && token ? parseToken(token) : null;
   const isEasy = mode === "easy";
+  const fallAnimation = isPrefilled ? `fallIntoPlace 0.5s ${fallDelay}s cubic-bezier(0.34, 1.56, 0.64, 1) both` : "none";
 
   return (
     <div
@@ -537,7 +538,7 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
           : isSelected ? `0 0 14px ${C.accent}44` : "none",
         position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
         touchAction: "none", userSelect: "none",
-        animation: isWrong ? "shake 0.4s ease" : "none",
+        animation: isWrong ? "shake 0.4s ease" : fallAnimation,
       }}
     >
       {isBlank && !isFilled && !isRevealed && !isLocked && (
@@ -1684,7 +1685,7 @@ export default function Pattrn() {
       display: "flex", flexDirection: "column", alignItems: "center",
       padding: "24px 16px", position: "relative", overflow: "hidden",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} }`}</style>
 
       <Particles show={showParticles} />
 
@@ -1780,6 +1781,8 @@ export default function Pattrn() {
                 const fillToken = isBlankCell ? (isLockedCell ? token : fills[key]) : token;
                 const isRevealed = (gameState === "lost") && isBlankCell && !isLockedCell;
                 const displayToken = isRevealed ? token : fillToken;
+                const cellIndex = r * gridSize + c;
+                const fallDelay = isBlankCell ? 0 : cellIndex * 0.032;
                 return (
                   <Cell key={key} token={displayToken} isBlank={isBlankCell}
                     isSelected={selectedCell === key}
@@ -1788,6 +1791,8 @@ export default function Pattrn() {
                     isWrong={wrongCells.has(key) && gameState !== "lost"}
                     isRevealed={isRevealed}
                     isLocked={isLockedCell && gameState === "playing"}
+                    isPrefilled={!isBlankCell}
+                    fallDelay={fallDelay}
                     onClick={() => handleCellClick(r, c)}
                     onPointerDown={() => handleCellPointerDown(r, c)}
                     onPointerUp={() => handleCellPointerUp(r, c)}
