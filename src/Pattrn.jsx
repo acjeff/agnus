@@ -596,6 +596,28 @@ const DIFFICULTIES = [
 
 const ROW1_KEYS = ["easy", "medium", "hard"];
 const ROW2_KEYS = ["blind", "daily", "cascade"];
+const VALID_MODES = new Set(["easy", "medium", "hard", "blind", "daily", "cascade"]);
+
+function getSearchParams() {
+  const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
+  const mode = params.get("mode");
+  const level = params.get("level");
+  return {
+    mode: mode && VALID_MODES.has(mode) ? mode : null,
+    level: level != null ? Math.max(0, Math.min(49, parseInt(level, 10) || 0)) : null,
+  };
+}
+
+function updateUrl(mode, level, replace = true) {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams();
+  if (mode) params.set("mode", mode);
+  if (level != null) params.set("level", String(level));
+  const search = params.toString();
+  const url = search ? `${window.location.pathname}?${search}` : window.location.pathname;
+  if (replace) window.history.replaceState({}, "", url);
+  else window.history.pushState({}, "", url);
+}
 
 // --- Main App ---
 export default function Pattrn() {
@@ -622,6 +644,33 @@ export default function Pattrn() {
   const timerStart = useRef(null);
   const timerInterval = useRef(null);
   const isPainting = useRef(false);
+
+  const hasSyncedUrl = useRef(false);
+
+  // Initial load: read URL and optionally deep-link into a puzzle
+  useEffect(() => {
+    const { mode, level } = getSearchParams();
+    if (mode) setDifficulty(mode);
+    if (level != null) {
+      if (mode === "cascade") setCascadeRunIndex(level);
+      else setCurrentPuzzle(level);
+      if (mode) setView("play");
+    }
+  }, []);
+
+  // Keep URL in sync with view + mode + level (skip first mount so we don't overwrite incoming params)
+  useEffect(() => {
+    if (!hasSyncedUrl.current) {
+      hasSyncedUrl.current = true;
+      return;
+    }
+    if (view === "play") {
+      const level = difficulty === "cascade" ? cascadeRunIndex : currentPuzzle;
+      updateUrl(difficulty, level);
+    } else {
+      updateUrl(difficulty, null);
+    }
+  }, [view, difficulty, currentPuzzle, cascadeRunIndex]);
 
   const todayDateStr = getDateString();
   const isDaily = difficulty === "daily";
@@ -1406,7 +1455,7 @@ export default function Pattrn() {
 
       {/* Top bar */}
       <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridSize >= 7 ? 380 : 360, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-        <button onClick={() => { stopTimer(); setView("menu"); if (difficulty === "daily" || difficulty === "cascade") setDifficulty("easy"); }}
+        <button onClick={() => { stopTimer(); setView("menu"); }}
           style={{
             background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
             color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
@@ -1427,7 +1476,24 @@ export default function Pattrn() {
             </span>
           )}
         </div>
-        <div style={{ width: 80, display: "flex", justifyContent: "flex-end", gap: 4 }}>
+        <div style={{ width: 80, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6 }}>
+          <button
+            onClick={async () => {
+              const url = typeof window !== "undefined" ? window.location.href : "";
+              try { await navigator.clipboard.writeText(url); } catch { /* fallback */ }
+              setShareMsg("Copied!");
+              setTimeout(() => setShareMsg(""), 2000);
+            }}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px",
+              color: C.textDim, cursor: "pointer", fontSize: 12, transition: "all 0.15s",
+            }}
+            title="Copy link to this level"
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            {shareMsg || "Share"}
+          </button>
           {isCascade && (
             Array.from({ length: 3 }, (_, i) => (
               <span key={i} style={{ fontSize: 18, color: i < cascadeLives ? C.incorrect : C.border }}>♥</span>
@@ -1551,7 +1617,7 @@ export default function Pattrn() {
                 {shareMsg || "Share"}
               </button>
               {(isDaily || isCascade) ? (
-                <button onClick={() => { setView("menu"); setDifficulty("easy"); }}
+                <button onClick={() => { setView("menu"); }}
                   style={{
                     backgroundColor: C.accent, color: C.bg, border: "none",
                     padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
@@ -1614,7 +1680,7 @@ export default function Pattrn() {
                 </button>
               )}
               {isCascade ? (
-                <button onClick={() => { setView("menu"); setDifficulty("easy"); }}
+                <button onClick={() => { setView("menu"); }}
                   style={{
                     backgroundColor: C.accent, color: C.bg, border: "none",
                     padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
