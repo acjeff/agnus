@@ -723,6 +723,7 @@ export default function Pattrn() {
   const playViewScrollRef = useRef(null);
 
   const [clearedBlanks, setClearedBlanks] = useState(() => new Set());
+  const [gridEpoch, setGridEpoch] = useState(0);
   const hasSyncedUrl = useRef(false);
   const [homescreenHintDismissed, setHomescreenHintDismissed] = useState(() => {
     try { return !!localStorage.getItem(HOMESCREEN_HINT_KEY); } catch { return false; }
@@ -996,6 +997,7 @@ export default function Pattrn() {
         setWrongCells(new Set());
         setClearedBlanks(new Set());
         setShowParticles(false);
+        setGridEpoch((e) => e + 1);
         stopTimer();
         setView("play");
         return;
@@ -1038,6 +1040,7 @@ export default function Pattrn() {
         setWrongCells(new Set());
         setClearedBlanks(new Set());
         setShowParticles(false);
+        setGridEpoch((e) => e + 1);
         stopTimer();
         setView("play");
         return;
@@ -1052,6 +1055,7 @@ export default function Pattrn() {
     setLockedCells(new Set());
     setClearedBlanks(new Set());
     setShowParticles(false);
+    setGridEpoch((e) => e + 1);
     if (effectiveDiff !== "cascade") setElapsedTime(0);
     stopTimer();
     timerIsCascadeRun.current = effectiveDiff === "cascade";
@@ -1083,6 +1087,7 @@ export default function Pattrn() {
     setClearedBlanks(new Set());
     setSelectedCell(null);
     setSelectedToken(null);
+    setGridEpoch((e) => e + 1);
     // Timer is not reset — it persists across cascade stages for the whole run
   }, []);
 
@@ -1095,6 +1100,7 @@ export default function Pattrn() {
     setWrongCells(new Set());
     setLockedCells(new Set());
     setClearedBlanks(new Set());
+    setGridEpoch((e) => e + 1);
     // Restart the timer
     stopTimer();
     setElapsedTime(0);
@@ -1301,8 +1307,13 @@ export default function Pattrn() {
         setTimeout(() => setShowParticles(false), 1500);
         if (cascadeLevel < CASCADE_LEVELS.length - 1) {
           // Don't stop timer — it continues across cascade levels
-          setCascadeLevel((l) => l + 1);
-          setTimeout(() => resetCascadeLevelState(), 400);
+          // Batch level change with state reset so the new puzzle and
+          // cleared fills render in the same React commit — avoids a
+          // flash of stale cell colours from the previous level.
+          setTimeout(() => {
+            setCascadeLevel((l) => l + 1);
+            resetCascadeLevelState();
+          }, 400);
         } else {
           setGameState("won");
           stopTimer();
@@ -2062,7 +2073,7 @@ export default function Pattrn() {
 
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(80px + env(safe-area-inset-top, 0px))", paddingBottom: 140, width: "100%", overflow: "hidden" }}>
-      <div style={{ animation: "slideIn 0.3s ease", touchAction: "none" }}>
+      <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
         <div style={{
           display: "flex", flexDirection: "column", gap: gridSize >= 7 ? 3 : 4, padding: gridSize >= 7 ? 10 : 14,
           backgroundColor: C.surface, borderRadius: 16,
