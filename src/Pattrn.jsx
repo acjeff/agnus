@@ -2505,7 +2505,7 @@ export default function Pattrn() {
                         textTransform: "uppercase", transition: "all 0.15s",
                       }}
                     >
-                      {shareMsg || "Copy all"}
+                      {shareMsg || "Share all"}
                     </button>
                     <button onClick={copyDailyShareText}
                       style={{
@@ -2515,7 +2515,7 @@ export default function Pattrn() {
                         textTransform: "uppercase", transition: "all 0.15s",
                       }}
                     >
-                      Copy Daily
+                      Share Daily
                     </button>
                   </div>
                   <button onClick={() => setShowShareModal(false)}
