@@ -1371,7 +1371,7 @@ export default function Pattrn() {
     }
   };
 
-  const maxAttempts = isCascade ? 10 : isBlind ? 6 : 5;
+  const maxAttempts = isCascade ? 15 : isBlind ? 6 : 5;
 
   const checkSolution = () => {
     if (!puzzle) return;
