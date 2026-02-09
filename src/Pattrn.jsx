@@ -1371,7 +1371,7 @@ export default function Pattrn() {
     }
   };
 
-  const maxAttempts = isCascade ? 15 : isBlind ? 6 : 5;
+  const maxAttempts = isCascade ? 11 : isBlind ? 6 : 5;
 
   const checkSolution = () => {
     if (!puzzle) return;
@@ -2728,11 +2728,6 @@ export default function Pattrn() {
             <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: 12, animation: "fadeUp 0.4s ease" }}>
               &#x2713; {isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : "Perfect"}
             </div>
-            {isCascade && (
-              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 12, fontFamily: "'Space Mono', monospace" }}>
-                {formatCascadeProgression(CASCADE_LEVELS.length - 1, null)}
-              </div>
-            )}
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={async () => {
                 let text;
@@ -2820,10 +2815,7 @@ export default function Pattrn() {
             </div>
             <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
               {isCascade ? (
-                <>
-                  <div style={{ marginBottom: 4 }}>Reached {puzzle?.gridSize ?? 0}×{puzzle?.gridSize ?? 0}</div>
-                  <div style={{ fontFamily: "'Space Mono', monospace" }}>{formatCascadeProgression(cascadeLevel - 1, cascadeLevel)}</div>
-                </>
+                <div>Reached {puzzle?.gridSize ?? 0}×{puzzle?.gridSize ?? 0}</div>
               ) : "The correct pattern is shown above"}
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
