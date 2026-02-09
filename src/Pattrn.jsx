@@ -694,16 +694,15 @@ function ScoreBadge({ attempts }) {
 }
 
 const DIFFICULTIES = [
-  { key: "easy", label: "Easy", desc: "5\u00D75 \u2022 Paired" },
-  { key: "medium", label: "Medium", desc: "7\u00D77 \u2022 Paired" },
-  { key: "hard", label: "Hard", desc: "7\u00D77 \u2022 Mixed" },
-  { key: "blind", label: "Blind", desc: "5\u00D75 \u2022 No Clues" },
-  { key: "daily", label: "Daily", desc: "1 a day" },
-  { key: "cascade", label: "Cascade", desc: "Keep on" },
+  { key: "easy", label: "Easy", desc: "5\u00D75 \u2022 Paired", cat: "classic" },
+  { key: "medium", label: "Medium", desc: "7\u00D77 \u2022 Paired", cat: "classic" },
+  { key: "hard", label: "Hard", desc: "7\u00D77 \u2022 Mixed", cat: "classic" },
+  { key: "blind", label: "Blind", desc: "5\u00D75 \u2022 No Clues", cat: "special" },
+  { key: "daily", label: "Daily", desc: "1 a day", cat: "special" },
+  { key: "cascade", label: "Cascade", desc: "Keep on", cat: "special" },
 ];
 
-const ROW1_KEYS = ["easy", "medium", "hard"];
-const ROW2_KEYS = ["blind", "daily", "cascade"];
+const MODE_CATEGORIES = ["classic", "special"];
 const VALID_MODES = new Set(["easy", "medium", "hard", "blind", "daily", "cascade"]);
 
 function getSearchParams() {
@@ -1786,55 +1785,63 @@ export default function Pattrn() {
           );
         })()}
 
-        {/* Mode selector: two rows — Easy / Medium / Hard, then Blind / Daily / Cascade */}
+        {/* Mode selector: categorized auto-wrapping grid */}
         <div style={{
           marginBottom: 20, animation: "fadeUp 0.5s 0.05s ease both",
           width: "100%", maxWidth: 360,
-          display: "flex", flexDirection: "column", gap: 8,
+          display: "flex", flexDirection: "column", gap: 14,
         }}>
-          {[ROW1_KEYS, ROW2_KEYS].map((rowKeys, rowIdx) => (
-            <div key={rowIdx} style={{ display: "flex", gap: 8 }}>
-              {rowKeys.map((key) => {
-                const d = DIFFICULTIES.find((x) => x.key === key);
-                if (!d) return null;
-                const active = difficulty === d.key;
-                const dp = progress[d.key] || {};
-                const solved = d.key === "cascade"
-                  ? Object.keys(dp).filter((k) => /^\d+$/.test(k) && dp[k] === CASCADE_LEVELS.length).length
-                  : Object.keys(dp).filter((k) => dp[k] > 0).length;
-                return (
-                  <button
-                    key={d.key}
-                    onClick={() => setDifficulty(d.key)}
-                    style={{
-                      flex: 1,
-                      padding: "12px 8px",
-                      background: active ? (d.key === "blind" ? "#e06040" : C.accent) : C.surface,
-                      color: active ? (d.key === "blind" ? "#fff" : C.bg) : C.textDim,
-                      border: `1px solid ${active ? "transparent" : C.border}`,
-                      borderRadius: 10,
-                      cursor: "pointer",
-                      fontFamily: "'Space Mono', monospace",
-                      fontSize: 11,
-                      fontWeight: active ? 700 : 400,
-                      letterSpacing: 0.5,
-                      textTransform: "uppercase",
-                      transition: "background 0.2s, color 0.2s",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      gap: 2,
-                    }}
-                  >
-                    <span style={{ whiteSpace: "nowrap" }}>{d.label}</span>
-                    <span style={{
-                      fontSize: 8,
-                      color: active ? (d.key === "blind" ? "#fff9" : C.bg + "aa") : C.textDim,
-                    }}>{d.desc}</span>
-                    <span style={{ fontSize: 8, color: active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{d.key === "daily" ? `${solved} solved` : `${solved}/50`}</span>
-                  </button>
-                );
-              })}
+          {MODE_CATEGORIES.map((cat) => (
+            <div key={cat}>
+              <div style={{
+                fontSize: 9, color: C.textDim, textTransform: "uppercase",
+                letterSpacing: 1.5, marginBottom: 6,
+                fontFamily: "'Space Mono', monospace",
+              }}>{cat}</div>
+              <div style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
+                gap: 8,
+              }}>
+                {DIFFICULTIES.filter((d) => d.cat === cat).map((d) => {
+                  const active = difficulty === d.key;
+                  const dp = progress[d.key] || {};
+                  const solved = d.key === "cascade"
+                    ? Object.keys(dp).filter((k) => /^\d+$/.test(k) && dp[k] === CASCADE_LEVELS.length).length
+                    : Object.keys(dp).filter((k) => dp[k] > 0).length;
+                  return (
+                    <button
+                      key={d.key}
+                      onClick={() => setDifficulty(d.key)}
+                      style={{
+                        padding: "12px 8px",
+                        background: active ? (d.key === "blind" ? "#e06040" : C.accent) : C.surface,
+                        color: active ? (d.key === "blind" ? "#fff" : C.bg) : C.textDim,
+                        border: `1px solid ${active ? "transparent" : C.border}`,
+                        borderRadius: 10,
+                        cursor: "pointer",
+                        fontFamily: "'Space Mono', monospace",
+                        fontSize: 11,
+                        fontWeight: active ? 700 : 400,
+                        letterSpacing: 0.5,
+                        textTransform: "uppercase",
+                        transition: "background 0.2s, color 0.2s",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 2,
+                      }}
+                    >
+                      <span style={{ whiteSpace: "nowrap" }}>{d.label}</span>
+                      <span style={{
+                        fontSize: 8,
+                        color: active ? (d.key === "blind" ? "#fff9" : C.bg + "aa") : C.textDim,
+                      }}>{d.desc}</span>
+                      <span style={{ fontSize: 8, color: active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{d.key === "daily" ? `${solved} solved` : `${solved}/50`}</span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>
