@@ -970,11 +970,6 @@ export default function Pattrn() {
       return;
     }
 
-    if (lastIndex != null && runStateMap[lastIndex]) {
-      setDifficulty("cascade");
-      restoreRun(lastIndex);
-      setView("play");
-    }
   }, []);
 
   // Keep URL in sync with view + mode + level (skip first mount so we don't overwrite incoming params)
