@@ -2089,20 +2089,18 @@ export default function Pattrn() {
                     Today
                   </button>
                 )}
-                <div style={{ position: "relative" }}>
-                  <button
-                    onClick={() => goToDateRef.current?.showPicker?.() || goToDateRef.current?.click()}
-                    style={{
-                      background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 12px",
-                      color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 10,
-                      fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", transition: "all 0.15s",
-                      whiteSpace: "nowrap",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-                  >
-                    Jump to date
-                  </button>
+                <label
+                  style={{
+                    position: "relative", display: "inline-block",
+                    background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 12px",
+                    color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 10,
+                    fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", transition: "all 0.15s",
+                    whiteSpace: "nowrap",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                >
+                  Jump to date
                   <input
                     ref={goToDateRef}
                     type="date"
@@ -2113,7 +2111,7 @@ export default function Pattrn() {
                       opacity: 0, cursor: "pointer", colorScheme: "dark",
                     }}
                   />
-                </div>
+                </label>
               </div>
               {/* Day-of-week headers */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
@@ -2602,13 +2600,15 @@ export default function Pattrn() {
       {/* Info row: fixed below header */}
       <div style={{
         position: "fixed", top: "calc(48px + env(safe-area-inset-top, 0px))", left: 0, right: 0, zIndex: 10,
-        backgroundColor: C.bg, display: "flex", alignItems: "center", justifyContent: "space-between",
-        paddingTop: 4, paddingBottom: 8, paddingLeft: 20, paddingRight: 20, boxSizing: "border-box",
+        backgroundColor: C.bg, display: "flex", justifyContent: "center",
+        paddingTop: 4, paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
       }}>
-        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 18, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, letterSpacing: 2 }}>
-          {formatTime(elapsedTime)}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: gridSize >= 7 ? 380 : 360 }}>
+          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 18, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, letterSpacing: 2 }}>
+            {formatTime(elapsedTime)}
+          </div>
+          <AttemptDots max={maxAttempts} used={attempts} won={gameState === "won"} />
         </div>
-        <AttemptDots max={maxAttempts} used={attempts} won={gameState === "won"} />
       </div>
 
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
