@@ -339,12 +339,32 @@ function getTodayDailyIndex() {
   return 0;
 }
 
+function getDailyKey(i) {
+  return getDailySeedForIndex(i);
+}
+
+function getDailySeedForDate(dateStr) {
+  const [day, month, year] = dateStr.split("-").map(Number);
+  const midnightUtc = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+  return Math.floor(midnightUtc / 1000);
+}
+
+function getTodayDailyDateStr() {
+  const now = new Date();
+  const day = String(now.getUTCDate()).padStart(2, "0");
+  const month = String(now.getUTCMonth() + 1).padStart(2, "0");
+  const year = now.getUTCFullYear();
+  return `${day}-${month}-${year}`;
+}
+
+const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
 function getDailyStreak(progress) {
   const daily = progress.daily || {};
-  if ((daily[0] ?? 0) <= 0) return 0;
+  if ((daily[getDailyKey(0)] ?? 0) <= 0) return 0;
   let streak = 1;
   for (let i = 1; i < 50; i++) {
-    if ((daily[i] ?? 0) > 0) streak++;
+    if ((daily[getDailyKey(i)] ?? 0) > 0) streak++;
     else break;
   }
   return streak;
@@ -403,6 +423,23 @@ const PUZZLE_SETS = {
   blind: buildBlindPuzzles(),
 };
 
+// --- Migrate daily data from index-based keys (0-49) to date-based keys (UTC midnight timestamps) ---
+function migrateDailyData(daily) {
+  if (!daily || typeof daily !== "object") return daily;
+  const keys = Object.keys(daily);
+  if (keys.length === 0) return daily;
+  // If any key is a large number (timestamp), assume already migrated
+  if (keys.some(k => Number(k) > 1000000000)) return daily;
+  // Convert old index-based keys to date-based keys (assumes indices are relative to today)
+  const migrated = {};
+  for (const k of keys) {
+    const idx = parseInt(k, 10);
+    if (Number.isNaN(idx) || idx < 0 || idx > 49) continue;
+    migrated[getDailyKey(idx)] = daily[k];
+  }
+  return migrated;
+}
+
 // --- Persistent storage using localStorage ---
 const STORAGE_KEY = "pattrn-progress-v3";
 const TIMES_KEY = "pattrn-times-v1";
@@ -458,7 +495,7 @@ function loadProgress() {
       medium: base.medium ?? {},
       hard: base.hard ?? {},
       blind: base.blind ?? {},
-      daily: base.daily ?? {},
+      daily: migrateDailyData(base.daily ?? {}),
       cascade: base.cascade ?? {},
       cascadeRunState,
       cascadeRunStateLastIndex: typeof cascadeRunStateLastIndex === "number" ? cascadeRunStateLastIndex : undefined,
@@ -485,7 +522,7 @@ function loadTimes() {
       medium: base.medium ?? {},
       hard: base.hard ?? {},
       blind: base.blind ?? {},
-      daily: base.daily ?? {},
+      daily: migrateDailyData(base.daily ?? {}),
       cascade: base.cascade ?? {},
     };
   } catch {
@@ -671,17 +708,23 @@ function getSearchParams() {
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const mode = params.get("mode");
   const level = params.get("level");
+  const date = params.get("date");
   return {
     mode: mode && VALID_MODES.has(mode) ? mode : null,
     level: level != null ? Math.max(0, Math.min(49, parseInt(level, 10) || 0)) : null,
+    date: date && /^\d{2}-\d{2}-\d{4}$/.test(date) ? date : null,
   };
 }
 
-function updateUrl(mode, level, replace = true) {
+function updateUrl(mode, level, replace = true, date = null) {
   if (typeof window === "undefined") return;
   const params = new URLSearchParams();
   if (mode) params.set("mode", mode);
-  if (level != null) params.set("level", String(level));
+  if (mode === "daily" && date) {
+    params.set("date", date);
+  } else if (level != null) {
+    params.set("level", String(level));
+  }
   const search = params.toString();
   const url = search ? `${window.location.pathname}?${search}` : window.location.pathname;
   if (replace) window.history.replaceState({}, "", url);
@@ -722,6 +765,10 @@ export default function Pattrn() {
   const wrongCellClearTimeoutRef = useRef(null);
   const playViewScrollRef = useRef(null);
 
+  const [currentDailyDate, setCurrentDailyDate] = useState(null); // "dd-mm-yyyy"
+  const [calendarYear, setCalendarYear] = useState(() => new Date().getUTCFullYear());
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date().getUTCMonth());
+
   const [clearedBlanks, setClearedBlanks] = useState(() => new Set());
   const [gridEpoch, setGridEpoch] = useState(0);
   const hasSyncedUrl = useRef(false);
@@ -760,9 +807,10 @@ export default function Pattrn() {
 
   // Initial load: read URL or restore saved cascade run
   useEffect(() => {
-    const { mode, level } = getSearchParams();
+    const { mode, level, date } = getSearchParams();
     const levelNum = level != null ? parseInt(level, 10) : null;
-    const hasDeepLink = mode && levelNum != null && !Number.isNaN(levelNum);
+    const hasDailyDeepLink = mode === "daily" && date;
+    const hasDeepLink = hasDailyDeepLink || (mode && levelNum != null && !Number.isNaN(levelNum));
     const runStateMap = progress.cascadeRunState || {};
     const lastIndex = progress.cascadeRunStateLastIndex;
 
@@ -844,9 +892,46 @@ export default function Pattrn() {
             }, 1000);
           }
         }
+      } else if (hasDailyDeepLink) {
+        setCurrentDailyDate(date);
+        const seed = getDailySeedForDate(date);
+        const puz = buildDailyPuzzle(seed);
+        const prog = loadProgress();
+        const tms = loadTimes();
+        const dProg = prog.daily || {};
+        const dTimes = tms.daily || {};
+        const alreadyCompleted = (dProg[seed] ?? 0) > 0 && dTimes[seed] != null;
+        if (alreadyCompleted) {
+          setFills(solutionFillsFromPuzzle(puz));
+          setAttempts(dProg[seed]);
+          setElapsedTime(dTimes[seed]);
+          setGameState("won");
+          setLockedCells(new Set(puz.blanks));
+          setWrongCells(new Set());
+          setShowParticles(false);
+        } else {
+          const todaySeed = getDailySeedForIndex(0);
+          if (seed > todaySeed) {
+            setView("menu"); return; // future date — go to menu
+          }
+          setFills({});
+          setAttempts(0);
+          setElapsedTime(0);
+          setGameState("playing");
+          setWrongCells(new Set());
+          setLockedCells(new Set());
+          setShowParticles(false);
+          if (timerInterval.current) { clearInterval(timerInterval.current); timerInterval.current = null; }
+          timerStart.current = Date.now();
+          timerInterval.current = setInterval(() => {
+            setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+          }, 1000);
+        }
+        setSelectedCell(null);
+        setSelectedToken(null);
       } else {
         setCurrentPuzzle(levelNum);
-        const puzzleSet = mode === "daily" ? buildDailyPuzzles() : (PUZZLE_SETS[mode] || []);
+        const puzzleSet = PUZZLE_SETS[mode] || [];
         const puz = puzzleSet[levelNum];
         const prog = loadProgress();
         const tms = loadTimes();
@@ -899,12 +984,16 @@ export default function Pattrn() {
       return;
     }
     if (view === "play") {
-      const level = difficulty === "cascade" ? cascadeRunIndex : currentPuzzle;
-      updateUrl(difficulty, level);
+      if (difficulty === "daily") {
+        updateUrl("daily", null, true, currentDailyDate);
+      } else {
+        const level = difficulty === "cascade" ? cascadeRunIndex : currentPuzzle;
+        updateUrl(difficulty, level);
+      }
     } else {
       updateUrl(difficulty, null);
     }
-  }, [view, difficulty, currentPuzzle, cascadeRunIndex]);
+  }, [view, difficulty, currentPuzzle, cascadeRunIndex, currentDailyDate]);
 
   const todayDateStr = getDateString();
   const isDaily = difficulty === "daily";
@@ -914,16 +1003,20 @@ export default function Pattrn() {
     cascadeAttemptsRef.current = attempts;
     cascadeRunIndexRef.current = cascadeRunIndex;
   }
-  const dailyPuzzles = useMemo(() => buildDailyPuzzles(), [todayDateStr]);
-  const puzzles = isCascade ? [] : isDaily ? dailyPuzzles : (PUZZLE_SETS[difficulty] || []);
+  const puzzles = isCascade ? [] : isDaily ? [] : (PUZZLE_SETS[difficulty] || []);
   const cascadePuzzle = useMemo(
     () => (isCascade ? buildCascadePuzzle(cascadeLevel, getCascadeRunSeed(cascadeRunIndex)) : null),
     [isCascade, cascadeLevel, cascadeRunIndex]
   );
-  const puzzle = isCascade ? cascadePuzzle : puzzles[currentPuzzle];
+  const currentDailyPuzzle = useMemo(() => {
+    if (!isDaily || !currentDailyDate) return null;
+    const seed = getDailySeedForDate(currentDailyDate);
+    return buildDailyPuzzle(seed);
+  }, [isDaily, currentDailyDate]);
+  const puzzle = isCascade ? cascadePuzzle : isDaily ? currentDailyPuzzle : puzzles[currentPuzzle];
   const diffProgress = progress[difficulty] || {};
   const isBlind = difficulty === "blind" && !isDaily;
-  const progressKey = isCascade ? cascadeRunIndex : currentPuzzle;
+  const progressKey = isCascade ? cascadeRunIndex : isDaily ? (currentDailyDate ? getDailySeedForDate(currentDailyDate) : null) : currentPuzzle;
 
   // How many of each token still need to be placed (only counts blanks, not full grid)
   const tokenRemaining = useMemo(() => {
@@ -970,11 +1063,15 @@ export default function Pattrn() {
     return 0;
   }, []);
 
-  const startPuzzle = (idx, diff, forceRestart = false) => {
+  const startPuzzle = (idx, diff, forceRestart = false, dailyDate = null) => {
     cancelWrongCellClear();
     if (diff) setDifficulty(diff);
-    setCurrentPuzzle(idx);
     const effectiveDiff = diff ?? difficulty;
+    if (effectiveDiff === "daily" && dailyDate) {
+      setCurrentDailyDate(dailyDate);
+    } else {
+      setCurrentPuzzle(idx);
+    }
     let cascadeElapsed = 0;
     if (effectiveDiff === "cascade") {
       setCascadeRunIndex(idx);
@@ -1020,14 +1117,23 @@ export default function Pattrn() {
       saveProgress(nextProgress);
     } else {
       // Non-cascade: if level already completed (and not force restart), show completed state (filled grid + time)
-      const puzzleSet = effectiveDiff === "daily" ? buildDailyPuzzles() : (PUZZLE_SETS[effectiveDiff] || []);
-      const puz = puzzleSet[idx];
+      let puz;
+      let lookupKey;
+      if (effectiveDiff === "daily" && dailyDate) {
+        const seed = getDailySeedForDate(dailyDate);
+        puz = buildDailyPuzzle(seed);
+        lookupKey = seed;
+      } else {
+        const puzzleSet = PUZZLE_SETS[effectiveDiff] || [];
+        puz = puzzleSet[idx];
+        lookupKey = idx;
+      }
       const prog = loadProgress();
       const tms = loadTimes();
       const dProg = prog[effectiveDiff] || {};
       const dTimes = tms[effectiveDiff] || {};
-      const savedAttempts = dProg[idx] ?? 0;
-      const savedTime = dTimes[idx];
+      const savedAttempts = dProg[lookupKey] ?? 0;
+      const savedTime = dTimes[lookupKey];
       const alreadyCompleted = !forceRestart && savedAttempts > 0 && savedTime != null && puz;
       if (alreadyCompleted) {
         setFills(solutionFillsFromPuzzle(puz));
@@ -1394,7 +1500,9 @@ export default function Pattrn() {
 
   const completedCount = isCascade
     ? Object.keys(diffProgress).filter(k => /^\d+$/.test(k) && diffProgress[k] === 7).length
-    : Object.keys(diffProgress).filter(k => diffProgress[k] > 0).length;
+    : isDaily
+      ? Object.values(diffProgress).filter(v => v > 0).length
+      : Object.keys(diffProgress).filter(k => diffProgress[k] > 0).length;
   const totalAttempted = isCascade
     ? Object.keys(diffProgress).filter(k => /^\d+$/.test(k)).length
     : Object.keys(diffProgress).length;
@@ -1415,7 +1523,8 @@ export default function Pattrn() {
       const grid = [];
 
       for (let i = 0; i < 50; i++) {
-        const result = dp[i];
+        const key = d.key === "daily" ? getDailyKey(i) : i;
+        const result = dp[key];
         if (d.key === "cascade") {
           if (result === undefined) grid.push("none");
           else if (result === 7) { solved++; gold++; grid.push("gold"); }
@@ -1426,9 +1535,9 @@ export default function Pattrn() {
           else if (result <= 2) { gold++; solved++; grid.push("gold"); }
           else if (result <= 4) { silver++; solved++; grid.push("silver"); }
           else { bronze++; solved++; grid.push("bronze"); }
-          if (result > 0 && dt[i] != null) {
-            if (bestTime === null || dt[i] < bestTime) bestTime = dt[i];
-            totalTime += dt[i];
+          if (result > 0 && dt[key] != null) {
+            if (bestTime === null || dt[key] < bestTime) bestTime = dt[key];
+            totalTime += dt[key];
             timedCount++;
           }
         }
@@ -1505,9 +1614,10 @@ export default function Pattrn() {
   };
 
   const copyDailyShareText = async () => {
-    const dailySolved = Object.keys(progress.daily || {}).filter(k => (progress.daily || {})[k] > 0).length;
+    const dailyData = progress.daily || {};
+    const dailySolved = Object.values(dailyData).filter(v => v > 0).length;
     const cascadeSolved = Object.keys(progress.cascade || {}).filter(k => /^\d+$/.test(k) && (progress.cascade || {})[k] === 7).length;
-    const text = `Agnus \uD83E\uDDE9\n\uD83D\uDCC5 Daily: ${dailySolved}/50\n\uD83C\uDF00 Cascade: ${cascadeSolved}/50`;
+    const text = `Agnus \uD83E\uDDE9\n\uD83D\uDCC5 Daily: ${dailySolved} solved\n\uD83C\uDF00 Cascade: ${cascadeSolved}/50`;
     const result = await tryNativeShare({ text });
     if (result === "shared") {
       setShareMsg("Shared!");
@@ -1586,8 +1696,9 @@ export default function Pattrn() {
         {/* Daily overview: streak, play today, share */}
         {(() => {
           const todayIdx = getTodayDailyIndex();
-          const todayResult = (progress.daily || {})[todayIdx];
-          const todayTime = (times.daily || {})[todayIdx];
+          const todayKey = getDailyKey(todayIdx);
+          const todayResult = (progress.daily || {})[todayKey];
+          const todayTime = (times.daily || {})[todayKey];
           const streak = getDailyStreak(progress);
           const todayLabel = getDailyDateLabel(todayIdx);
           return (
@@ -1614,17 +1725,18 @@ export default function Pattrn() {
                     onClick={async () => {
                       const medal = todayResult <= 2 ? "\u2605" : todayResult <= 4 ? "\u25CF" : "\u25C6";
                       const streakPart = streak > 0 ? ` 🔥 ${streak} day streak` : "";
+                      const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${todayLabel}` : "";
                       const text = todayResult > 0
                         ? `Agnus Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
                         : `Agnus Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
-                      const result = await tryNativeShare({ text });
+                      const result = await tryNativeShare({ text, url: dailyUrl });
                       if (result === "shared") {
                         setDailyShareMsg("Shared!");
                         setTimeout(() => setDailyShareMsg(""), 2000);
                         return;
                       }
                       if (result === "cancelled") return;
-                      try { await navigator.clipboard.writeText(text); } catch { /* fallback */ }
+                      try { await navigator.clipboard.writeText(text + "\n" + dailyUrl); } catch { /* fallback */ }
                       setDailyShareMsg("Copied!");
                       setTimeout(() => setDailyShareMsg(""), 2000);
                     }}
@@ -1637,7 +1749,7 @@ export default function Pattrn() {
                     {dailyShareMsg || "Share"}
                   </button>
                   <button
-                    onClick={() => { setDifficulty("daily"); startPuzzle(todayIdx, "daily"); }}
+                    onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, todayLabel); }}
                     style={{
                       padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
                       fontFamily: "'Space Mono', monospace", letterSpacing: 1,
@@ -1697,7 +1809,7 @@ export default function Pattrn() {
                       fontSize: 8,
                       color: active ? (d.key === "blind" ? "#fff9" : C.bg + "aa") : C.textDim,
                     }}>{d.desc}</span>
-                    <span style={{ fontSize: 8, color: active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{solved}/50</span>
+                    <span style={{ fontSize: 8, color: active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{d.key === "daily" ? `${solved} solved` : `${solved}/50`}</span>
                   </button>
                 );
               })}
@@ -1706,25 +1818,42 @@ export default function Pattrn() {
         </div>
 
         {/* Stats summary */}
-        <div style={{
-          display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
-          padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
-        }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
+        {isDaily ? (
+          <div style={{
+            display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
+            padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+          }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
+            </div>
+            <div style={{ width: 1, backgroundColor: C.border }} />
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Streak</div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.gold }}>{getDailyStreak(progress)}</div>
+            </div>
           </div>
-          <div style={{ width: 1, backgroundColor: C.border }} />
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Attempted</div>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700 }}>{totalAttempted}</div>
+        ) : (
+          <div style={{
+            display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
+            padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+          }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
+            </div>
+            <div style={{ width: 1, backgroundColor: C.border }} />
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Attempted</div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700 }}>{totalAttempted}</div>
+            </div>
+            <div style={{ width: 1, backgroundColor: C.border }} />
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Total</div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700 }}>50</div>
+            </div>
           </div>
-          <div style={{ width: 1, backgroundColor: C.border }} />
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Total</div>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700 }}>50</div>
-          </div>
-        </div>
+        )}
 
         {/* Share button */}
         <button onClick={() => setShowShareModal(true)}
@@ -1741,7 +1870,124 @@ export default function Pattrn() {
           Share Stats
         </button>
 
-        {/* Puzzle grid: 50 for each mode */}
+        {/* Daily calendar picker */}
+        {isDaily && (() => {
+          const todaySeed = getDailySeedForIndex(0);
+          const now = new Date();
+          const todayUTCYear = now.getUTCFullYear();
+          const todayUTCMonth = now.getUTCMonth();
+          const todayUTCDate = now.getUTCDate();
+          const daysInMonth = new Date(Date.UTC(calendarYear, calendarMonth + 1, 0)).getUTCDate();
+          const firstDayOfWeek = new Date(Date.UTC(calendarYear, calendarMonth, 1)).getUTCDay();
+          const startOffset = (firstDayOfWeek + 6) % 7; // Monday = 0
+          const canGoForward = calendarYear < todayUTCYear || (calendarYear === todayUTCYear && calendarMonth < todayUTCMonth);
+          const cells = [];
+          for (let i = 0; i < startOffset; i++) cells.push(null);
+          for (let d = 1; d <= daysInMonth; d++) {
+            const dateStr = `${String(d).padStart(2, "0")}-${String(calendarMonth + 1).padStart(2, "0")}-${calendarYear}`;
+            const seed = getDailySeedForDate(dateStr);
+            const result = (progress.daily || {})[seed];
+            const time = (times.daily || {})[seed];
+            const isFuture = seed > todaySeed;
+            const isToday = calendarYear === todayUTCYear && calendarMonth === todayUTCMonth && d === todayUTCDate;
+            cells.push({ day: d, dateStr, seed, result, time, isFuture, isToday });
+          }
+          return (
+            <div style={{ maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both" }}>
+              {/* Month navigation */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12,
+              }}>
+                <button
+                  onClick={() => { if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(y => y - 1); } else setCalendarMonth(m => m - 1); }}
+                  style={{
+                    background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px",
+                    color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 14, transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                >&larr;</button>
+                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, letterSpacing: 1 }}>
+                  {MONTH_NAMES[calendarMonth]} {calendarYear}
+                </span>
+                <button
+                  onClick={() => { if (canGoForward) { if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(y => y + 1); } else setCalendarMonth(m => m + 1); } }}
+                  disabled={!canGoForward}
+                  style={{
+                    background: "none", border: `1px solid ${canGoForward ? C.border : C.border + "44"}`, borderRadius: 8, padding: "6px 12px",
+                    color: canGoForward ? C.textDim : C.textDim + "44", cursor: canGoForward ? "pointer" : "default",
+                    fontFamily: "'Space Mono', monospace", fontSize: 14, transition: "all 0.15s",
+                  }}
+                  onMouseEnter={e => { if (canGoForward) { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; } }}
+                  onMouseLeave={e => { if (canGoForward) { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; } }}
+                >&rarr;</button>
+              </div>
+              {/* Day-of-week headers */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+                {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
+                  <div key={d} style={{
+                    textAlign: "center", fontFamily: "'Space Mono', monospace", fontSize: 9,
+                    color: C.textDim, letterSpacing: 0.5, padding: "4px 0",
+                  }}>{d}</div>
+                ))}
+              </div>
+              {/* Day cells */}
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+                {cells.map((cell, i) => {
+                  if (!cell) return <div key={`empty-${i}`} />;
+                  const solved = cell.result > 0;
+                  const failed = cell.result === 0 && cell.result !== undefined;
+                  const borderColor = cell.isToday ? C.accent : solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border;
+                  const bgColor = solved ? C.correct + "15" : failed ? C.incorrect + "10" : C.surface;
+                  const numColor = cell.isFuture ? C.textDim + "44" : cell.isToday ? C.accent : solved ? C.correct : failed ? C.incorrect : C.text;
+                  return (
+                    <button
+                      key={cell.day}
+                      disabled={cell.isFuture}
+                      onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, cell.dateStr); }}
+                      style={{
+                        aspectRatio: "1", borderRadius: 8, border: `1.5px solid ${borderColor}`,
+                        backgroundColor: bgColor,
+                        cursor: cell.isFuture ? "default" : "pointer", display: "flex", flexDirection: "column",
+                        alignItems: "center", justifyContent: "center", gap: 1,
+                        transition: "all 0.15s", position: "relative", minWidth: 0,
+                        opacity: cell.isFuture ? 0.35 : 1,
+                      }}
+                      onMouseEnter={e => { if (!cell.isFuture) { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.borderColor = C.accent; } }}
+                      onMouseLeave={e => { if (!cell.isFuture) { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; } }}
+                    >
+                      <span style={{
+                        fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: cell.isToday ? 800 : 600,
+                        color: numColor, lineHeight: 1,
+                      }}>{cell.day}</span>
+                      {solved && <ScoreBadge attempts={cell.result} />}
+                      {solved && cell.time != null && (
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 7, color: C.textDim, lineHeight: 1 }}>
+                          {formatTime(cell.time)}
+                        </span>
+                      )}
+                      {failed && <span style={{ fontSize: 8, color: C.incorrect }}>{"\u2717"}</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Legend */}
+              <div style={{
+                marginTop: 16, display: "flex", gap: 16, fontSize: 11, color: C.textDim,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                flexWrap: "wrap", justifyContent: "center",
+              }}>
+                <span><span style={{ color: C.gold }}>{"\u2605"}</span> 1-2 tries</span>
+                <span><span style={{ color: C.silver }}>{"\u25CF"}</span> 3-4 tries</span>
+                <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
+                <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Puzzle grid: 50 for non-daily modes */}
+        {!isDaily && (<>
         <div style={{
           display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
           maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
@@ -1782,10 +2028,10 @@ export default function Pattrn() {
                 onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; }}
               >
                 <span style={{
-                  fontFamily: "'Space Mono', monospace", fontSize: isDaily ? 9 : 15, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700,
                   color: numColor, lineHeight: 1,
                 }}>
-                  {isDaily ? getDailyDateLabel(i) : i + 1}
+                  {i + 1}
                 </span>
                 {isCascade ? (
                   <span style={{
@@ -1820,6 +2066,7 @@ export default function Pattrn() {
           <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
           <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
         </div>
+        </>)}
 
         {/* Share Modal */}
         {showShareModal && (() => {
@@ -2022,7 +2269,7 @@ export default function Pattrn() {
         </button>
         <div style={{ flex: 1, textAlign: "center" }}>
           <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
-            {diffLabel}{isDaily ? ` ${getDailyDateLabel(currentPuzzle)}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
+            {diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
           </span>
           {!isDaily && !isCascade && (
             <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700, color: C.accent, letterSpacing: 3 }}>
@@ -2189,7 +2436,8 @@ export default function Pattrn() {
                   text = `Agnus Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
                 } else if (isDaily) {
                   const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-                  text = `Agnus Daily ${getDailyDateLabel(currentPuzzle)} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+                  const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${currentDailyDate}` : "";
+                  text = `Agnus Daily ${currentDailyDate}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}\n${dailyUrl}`;
                 } else {
                   const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
                   text = `Agnus \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
@@ -2216,7 +2464,7 @@ export default function Pattrn() {
               >
                 {shareMsg || "Share"}
               </button>
-              <button onClick={() => startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true)}
+              <button onClick={() => startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true, isDaily ? currentDailyDate : null)}
                 style={{
                   backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
                   padding: "12px 24px", borderRadius: 12, fontSize: 13, fontWeight: 700,
