@@ -1252,13 +1252,14 @@ export default function Pattrn() {
     }, 1000);
     // Update persisted cascade run state if applicable
     if (isCasc) {
+      setCascadeLevel(0);
       const p = loadProgress();
       const ri = cascadeRunIndexRef.current;
       const cur = p.cascadeRunState?.[ri];
       if (cur) {
         saveProgress({
           ...p,
-          cascadeRunState: { ...p.cascadeRunState, [ri]: { ...cur, elapsedSeconds: 0, fills: {}, attempts: 0 } },
+          cascadeRunState: { ...p.cascadeRunState, [ri]: { ...cur, level: 0, elapsedSeconds: 0, fills: {}, attempts: 0 } },
         });
       }
     }
