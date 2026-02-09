@@ -997,6 +997,7 @@ export default function Pattrn() {
         setWrongCells(new Set());
         setClearedBlanks(new Set());
         setShowParticles(false);
+        setGridEpoch((e) => e + 1);
         stopTimer();
         setView("play");
         return;
@@ -1039,6 +1040,7 @@ export default function Pattrn() {
         setWrongCells(new Set());
         setClearedBlanks(new Set());
         setShowParticles(false);
+        setGridEpoch((e) => e + 1);
         stopTimer();
         setView("play");
         return;
@@ -1053,6 +1055,7 @@ export default function Pattrn() {
     setLockedCells(new Set());
     setClearedBlanks(new Set());
     setShowParticles(false);
+    setGridEpoch((e) => e + 1);
     if (effectiveDiff !== "cascade") setElapsedTime(0);
     stopTimer();
     timerIsCascadeRun.current = effectiveDiff === "cascade";
@@ -2070,7 +2073,7 @@ export default function Pattrn() {
 
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(80px + env(safe-area-inset-top, 0px))", paddingBottom: 140, width: "100%", overflow: "hidden" }}>
-      <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease", touchAction: "none" }}>
+      <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
         <div style={{
           display: "flex", flexDirection: "column", gap: gridSize >= 7 ? 3 : 4, padding: gridSize >= 7 ? 10 : 14,
           backgroundColor: C.surface, borderRadius: 16,
