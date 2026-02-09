@@ -2378,143 +2378,153 @@ export default function Pattrn() {
         </div>
         </>)}
 
-        {/* Share Modal */}
+        {/* Stats drawer */}
         {showShareModal && (() => {
           const { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll } = getShareData();
           const gridColors = { none: C.border, failed: C.incorrect, gold: C.gold, silver: C.silver, bronze: C.bronze };
           return (
             <div onClick={() => setShowShareModal(false)} style={{
               position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
-              display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-              animation: "fadeUp 0.25s ease",
+              display: "flex", alignItems: "flex-end", justifyContent: "center",
             }}>
+              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } } @keyframes drawerOverlayFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
               <div onClick={e => e.stopPropagation()} style={{
-                backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 20,
-                padding: "28px 24px", maxWidth: 380, width: "100%",
-                boxShadow: `0 24px 64px rgba(0,0,0,0.5)`, maxHeight: "90vh", overflowY: "auto",
+                backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
+                padding: "0", maxWidth: 480, width: "100%",
+                boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`, maxHeight: "85vh",
+                display: "flex", flexDirection: "column",
+                animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
               }}>
-                {/* Modal header */}
-                <div style={{ textAlign: "center", marginBottom: 20 }}>
-                  <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
-                    Agnus
-                  </h2>
-                  <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>my stats</p>
+                {/* Drag handle */}
+                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
+                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
                 </div>
 
-                {/* Overall stats */}
-                <div style={{
-                  display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginBottom: 20,
-                  padding: "10px 16px", borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                }}>
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.accent }}>{totalSolved}</div>
-                    <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>solved</div>
+                {/* Scrollable content */}
+                <div style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
+                  {/* Drawer header */}
+                  <div style={{ textAlign: "center", marginBottom: 20 }}>
+                    <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
+                      Agnus
+                    </h2>
+                    <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>my stats</p>
                   </div>
-                  <div style={{ width: 1, backgroundColor: C.border }} />
-                  <div style={{ textAlign: "center" }}>
-                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700 }}>300</div>
-                    <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>total</div>
-                  </div>
-                  {getDailyStreak(progress) > 0 && (
-                    <>
-                      <div style={{ width: 1, backgroundColor: C.border }} />
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.gold }}>🔥 {getDailyStreak(progress)}</div>
-                        <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>day streak</div>
-                      </div>
-                    </>
-                  )}
-                  {bestTimeAll != null && (
-                    <>
-                      <div style={{ width: 1, backgroundColor: C.border }} />
-                      <div style={{ textAlign: "center" }}>
-                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.correct }}>{formatTime(bestTimeAll)}</div>
-                        <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>fastest</div>
-                      </div>
-                    </>
-                  )}
-                </div>
 
-                {/* Per-difficulty sections */}
-                {sections.map(s => (
-                  <div key={s.key} style={{ marginBottom: 16 }}>
-                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: s.key === "blind" ? "#e06040" : C.text, letterSpacing: 1, textTransform: "uppercase" }}>
-                        {s.label}
-                      </span>
-                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, fontWeight: 700 }}>
-                        {s.solved}/50
-                      </span>
-                      {s.bestTime != null && (
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.textDim }}>
-                          best {formatTime(s.bestTime)}
-                        </span>
-                      )}
-                      {s.avgTime != null && (
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.textDim }}>
-                          avg {formatTime(s.avgTime)}
-                        </span>
-                      )}
+                  {/* Overall stats */}
+                  <div style={{
+                    display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginBottom: 20,
+                    padding: "10px 16px", borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                  }}>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.accent }}>{totalSolved}</div>
+                      <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>solved</div>
                     </div>
-                    {/* Visual grid - 10 columns x 5 rows */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(25, 1fr)", gap: 2 }}>
-                      {s.grid.map((g, i) => (
-                        <div key={i} style={{
-                          aspectRatio: "1", borderRadius: 2,
-                          backgroundColor: g === "none" ? C.surface : gridColors[g] + (g === "none" ? "" : "cc"),
-                          border: `1px solid ${g === "none" ? C.border : gridColors[g]}44`,
-                        }} />
-                      ))}
+                    <div style={{ width: 1, backgroundColor: C.border }} />
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700 }}>300</div>
+                      <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>total</div>
                     </div>
+                    {getDailyStreak(progress) > 0 && (
+                      <>
+                        <div style={{ width: 1, backgroundColor: C.border }} />
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.gold }}>🔥 {getDailyStreak(progress)}</div>
+                          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>day streak</div>
+                        </div>
+                      </>
+                    )}
+                    {bestTimeAll != null && (
+                      <>
+                        <div style={{ width: 1, backgroundColor: C.border }} />
+                        <div style={{ textAlign: "center" }}>
+                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.correct }}>{formatTime(bestTimeAll)}</div>
+                          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>fastest</div>
+                        </div>
+                      </>
+                    )}
                   </div>
-                ))}
 
-                {/* Medal summary */}
-                <div style={{
-                  display: "flex", justifyContent: "center", gap: 14, marginTop: 16, marginBottom: 18,
-                  fontSize: 11, fontFamily: "'Space Mono', monospace", color: C.textDim,
-                }}>
-                  <span><span style={{ color: C.gold }}>{"\u2605"}</span> {totalGold}</span>
-                  <span><span style={{ color: C.silver }}>{"\u25CF"}</span> {totalSilver}</span>
-                  <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> {totalBronze}</span>
-                  <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> {totalFailed}</span>
+                  {/* Per-difficulty sections */}
+                  {sections.map(s => (
+                    <div key={s.key} style={{ marginBottom: 16 }}>
+                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: s.key === "blind" ? "#e06040" : C.text, letterSpacing: 1, textTransform: "uppercase" }}>
+                          {s.label}
+                        </span>
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, fontWeight: 700 }}>
+                          {s.solved}/50
+                        </span>
+                        {s.bestTime != null && (
+                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.textDim }}>
+                            best {formatTime(s.bestTime)}
+                          </span>
+                        )}
+                        {s.avgTime != null && (
+                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.textDim }}>
+                            avg {formatTime(s.avgTime)}
+                          </span>
+                        )}
+                      </div>
+                      {/* Visual grid - 25 columns */}
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(25, 1fr)", gap: 2 }}>
+                        {s.grid.map((g, i) => (
+                          <div key={i} style={{
+                            aspectRatio: "1", borderRadius: 2,
+                            backgroundColor: g === "none" ? C.surface : gridColors[g] + (g === "none" ? "" : "cc"),
+                            border: `1px solid ${g === "none" ? C.border : gridColors[g]}44`,
+                          }} />
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Medal summary */}
+                  <div style={{
+                    display: "flex", justifyContent: "center", gap: 14, marginTop: 16, marginBottom: 8,
+                    fontSize: 11, fontFamily: "'Space Mono', monospace", color: C.textDim,
+                  }}>
+                    <span><span style={{ color: C.gold }}>{"\u2605"}</span> {totalGold}</span>
+                    <span><span style={{ color: C.silver }}>{"\u25CF"}</span> {totalSilver}</span>
+                    <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> {totalBronze}</span>
+                    <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> {totalFailed}</span>
+                  </div>
                 </div>
 
-                {/* Action buttons */}
-                <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-                  <button onClick={copyShareText}
-                    style={{
-                      backgroundColor: C.accent, color: C.bg, border: "none",
-                      padding: "10px 28px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
-                    onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
-                  >
-                    {shareMsg || "Copy all"}
-                  </button>
-                  <button onClick={copyDailyShareText}
-                    style={{
-                      backgroundColor: "transparent", color: C.accent, border: `1.5px solid ${C.accent}`,
-                      padding: "10px 28px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.accent; e.currentTarget.style.color = C.bg; }}
-                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = C.accent; }}
-                  >
-                    Copy Daily
-                  </button>
+                {/* Sticky footer buttons */}
+                <div style={{
+                  padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+                  borderTop: `1px solid ${C.border}`,
+                  display: "flex", flexDirection: "column", gap: 8, flexShrink: 0,
+                }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={copyShareText}
+                      style={{
+                        flex: 1, backgroundColor: C.accent, color: C.bg, border: "none",
+                        padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                        fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
+                        textTransform: "uppercase", transition: "all 0.15s",
+                      }}
+                    >
+                      {shareMsg || "Copy all"}
+                    </button>
+                    <button onClick={copyDailyShareText}
+                      style={{
+                        flex: 1, backgroundColor: "transparent", color: C.accent, border: `1.5px solid ${C.accent}`,
+                        padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                        fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
+                        textTransform: "uppercase", transition: "all 0.15s",
+                      }}
+                    >
+                      Copy Daily
+                    </button>
+                  </div>
                   <button onClick={() => setShowShareModal(false)}
                     style={{
-                      backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                      padding: "10px 20px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                      padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
                       fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
                       textTransform: "uppercase", transition: "all 0.15s",
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
                   >
                     Close
                   </button>
