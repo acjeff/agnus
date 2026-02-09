@@ -1822,58 +1822,183 @@ export default function Pattrn() {
           ))}
         </div>
 
-        {/* Stats summary */}
+        {/* Stats summary with inline share */}
         {isDaily ? (
           <div style={{
             display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
             padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+            alignItems: "center",
           }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
               <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
             </div>
-            <div style={{ width: 1, backgroundColor: C.border }} />
+            <div style={{ width: 1, alignSelf: "stretch", backgroundColor: C.border }} />
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Streak</div>
               <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.gold }}>{getDailyStreak(progress)}</div>
             </div>
+            <div style={{ flex: 1 }} />
+            <button onClick={() => setShowShareModal(true)}
+              style={{
+                padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 600,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+            >
+              Stats
+            </button>
           </div>
         ) : (
           <div style={{
             display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
             padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+            alignItems: "center",
           }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
               <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
             </div>
-            <div style={{ width: 1, backgroundColor: C.border }} />
+            <div style={{ width: 1, alignSelf: "stretch", backgroundColor: C.border }} />
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Attempted</div>
               <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700 }}>{totalAttempted}</div>
             </div>
-            <div style={{ width: 1, backgroundColor: C.border }} />
+            <div style={{ width: 1, alignSelf: "stretch", backgroundColor: C.border }} />
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Total</div>
               <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700 }}>50</div>
             </div>
+            <div style={{ flex: 1 }} />
+            <button onClick={() => setShowShareModal(true)}
+              style={{
+                padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 600,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+            >
+              Stats
+            </button>
           </div>
         )}
 
-        {/* Share button */}
-        <button onClick={() => setShowShareModal(true)}
-          style={{
-            marginBottom: 20, padding: "10px 28px", borderRadius: 10,
-            backgroundColor: "transparent", border: `1.5px solid ${C.accent}`,
-            color: C.accent, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-            fontSize: 12, fontWeight: 700, letterSpacing: 2, textTransform: "uppercase",
-            transition: "all 0.2s", animation: "fadeUp 0.5s 0.12s ease both",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.accent; e.currentTarget.style.color = C.bg; }}
-          onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = C.accent; }}
-        >
-          Share Stats
-        </button>
+        {/* Birthday panel — same layout as "play today" */}
+        {isDaily && (() => {
+          const todaySeed = getDailySeedForIndex(0);
+          if (!birthday) {
+            return (
+              <div style={{
+                width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
+                borderRadius: 12, overflow: "hidden", border: `1px solid #F472B633`,
+                backgroundColor: C.surface, padding: "12px 16px",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F472B6" }}>
+                    {"\uD83C\uDF82"} Birthday puzzle
+                  </span>
+                  <button
+                    onClick={() => setShowBirthdayPrompt(true)}
+                    style={{
+                      padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      background: "#F472B6", color: "#fff", border: "none", cursor: "pointer",
+                    }}
+                  >
+                    Set birthday
+                  </button>
+                </div>
+              </div>
+            );
+          }
+          const bdParts = birthday.split("-").map(Number);
+          const bdDay = bdParts[0], bdMonthNum = bdParts[1], bdYearNum = bdParts.length === 3 ? bdParts[2] : null;
+          const bdDateStr = birthday;
+          const bdSeed = getDailySeedForDate(bdDateStr);
+          const bdResult = (progress.daily || {})[bdSeed];
+          const bdTime = (times.daily || {})[bdSeed];
+          const bdSolved = bdResult > 0;
+          const bdIsFuture = bdSeed > todaySeed;
+          const bdUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${bdDateStr}` : "";
+          const bdLabel = `${String(bdDay).padStart(2, "0")}-${String(bdMonthNum).padStart(2, "0")}${bdYearNum ? `-${bdYearNum}` : ""}`;
+          return (
+            <div style={{
+              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
+              borderRadius: 12, overflow: "hidden", border: `1px solid #F472B633`,
+              backgroundColor: C.surface, padding: "12px 16px",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F472B6" }}>
+                    {"\uD83C\uDF82"} {bdLabel}
+                  </span>
+                  {bdSolved && (
+                    <span style={{ fontSize: 11, color: C.textDim }}>
+                      <ScoreBadge attempts={bdResult} />
+                      {bdTime != null && ` ${formatTime(bdTime)}`}
+                    </span>
+                  )}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {bdYearNum && !bdIsFuture && (
+                    <button
+                      onClick={async () => {
+                        const medal = bdSolved && bdResult <= 2 ? "\u2605" : bdResult <= 4 ? "\u25CF" : "\u25C6";
+                        const text = bdSolved
+                          ? `\uD83C\uDF82 My Agnus birthday puzzle (${bdDateStr})\n${medal} Solved in ${bdResult} attempt${bdResult !== 1 ? "s" : ""} \u2022 ${formatTime(bdTime)}\nCan you beat it?\n${bdUrl}`
+                          : `\uD83C\uDF82 Try my Agnus birthday puzzle!\n${bdDateStr}\n${bdUrl}`;
+                        const result = await tryNativeShare({ text, url: bdUrl });
+                        if (result === "shared") { setDailyShareMsg("Shared!"); setTimeout(() => setDailyShareMsg(""), 2000); return; }
+                        if (result === "cancelled") return;
+                        try { await navigator.clipboard.writeText(text); } catch { /* fallback */ }
+                        setDailyShareMsg("Copied!");
+                        setTimeout(() => setDailyShareMsg(""), 2000);
+                      }}
+                      style={{
+                        padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                        fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                        background: "none", border: `1px solid #F472B644`, color: "#F472B6", cursor: "pointer",
+                      }}
+                    >
+                      {dailyShareMsg || "Share"}
+                    </button>
+                  )}
+                  {bdYearNum && !bdIsFuture ? (
+                    <button
+                      onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, bdDateStr); }}
+                      style={{
+                        padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                        fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                        background: "#F472B6", color: "#fff", border: "none", cursor: "pointer",
+                      }}
+                    >
+                      {bdSolved ? "View" : "Play"}
+                    </button>
+                  ) : bdIsFuture ? (
+                    <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                      Not yet available
+                    </span>
+                  ) : null}
+                  <button
+                    onClick={() => setShowBirthdayPrompt(true)}
+                    style={{
+                      padding: "6px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                      background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                    }}
+                  >
+                    Edit
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Daily calendar picker */}
         {isDaily && (() => {
@@ -2058,102 +2183,6 @@ export default function Pattrn() {
                 {birthday && <span><span style={{ color: "#F472B6" }}>{"\uD83C\uDF82"}</span> birthday</span>}
               </div>
 
-              {/* Birthday section */}
-              <div style={{
-                marginTop: 20, padding: "12px 16px", borderRadius: 12,
-                backgroundColor: C.surface, border: `1px solid ${C.border}`,
-              }}>
-                {birthday ? (() => {
-                  const bdParts = birthday.split("-").map(Number);
-                  const bdDay = bdParts[0], bdMonthNum = bdParts[1], bdYearNum = bdParts.length === 3 ? bdParts[2] : null;
-                  const bdDateStr = birthday;
-                  const bdSeed = getDailySeedForDate(bdDateStr);
-                  const bdResult = (progress.daily || {})[bdSeed];
-                  const bdTime = (times.daily || {})[bdSeed];
-                  const bdSolved = bdResult > 0;
-                  const bdIsFuture = bdSeed > todaySeed;
-                  const bdUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${bdDateStr}` : "";
-                  return (
-                    <div>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <span style={{ fontSize: 18 }}>{"\uD83C\uDF82"}</span>
-                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: "#F472B6" }}>
-                            Birthday: {String(bdDay).padStart(2, "0")}-{String(bdMonthNum).padStart(2, "0")}{bdYearNum ? `-${bdYearNum}` : ""}
-                          </span>
-                        </div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          {bdYearNum && !bdIsFuture && (
-                            <button
-                              onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, bdDateStr); }}
-                              style={{
-                                padding: "5px 10px", borderRadius: 8, fontSize: 10, fontWeight: 700,
-                                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                                background: "#F472B6", color: "#fff", border: "none", cursor: "pointer",
-                              }}
-                            >
-                              {bdSolved ? "View" : "Play"} birthday puzzle
-                            </button>
-                          )}
-                          {bdYearNum && !bdIsFuture && (
-                            <button
-                              onClick={async () => {
-                                const medal = bdSolved && bdResult <= 2 ? "\u2605" : bdResult <= 4 ? "\u25CF" : "\u25C6";
-                                const text = bdSolved
-                                  ? `\uD83C\uDF82 My Agnus birthday puzzle (${bdDateStr})\n${medal} Solved in ${bdResult} attempt${bdResult !== 1 ? "s" : ""} \u2022 ${formatTime(bdTime)}\nCan you beat it?\n${bdUrl}`
-                                  : `\uD83C\uDF82 Try my Agnus birthday puzzle!\n${bdDateStr}\n${bdUrl}`;
-                                const result = await tryNativeShare({ text, url: bdUrl });
-                                if (result === "shared") { setDailyShareMsg("Shared!"); setTimeout(() => setDailyShareMsg(""), 2000); return; }
-                                if (result === "cancelled") return;
-                                try { await navigator.clipboard.writeText(text); } catch { /* fallback */ }
-                                setDailyShareMsg("Copied!");
-                                setTimeout(() => setDailyShareMsg(""), 2000);
-                              }}
-                              style={{
-                                padding: "5px 10px", borderRadius: 8, fontSize: 10, fontWeight: 700,
-                                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                                background: "none", border: `1px solid #F472B6`, color: "#F472B6", cursor: "pointer",
-                              }}
-                            >
-                              {dailyShareMsg || "Share"}
-                            </button>
-                          )}
-                          <button
-                            onClick={() => setShowBirthdayPrompt(true)}
-                            style={{
-                              padding: "5px 8px", borderRadius: 8, fontSize: 10,
-                              fontFamily: "'Space Mono', monospace",
-                              background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                            }}
-                          >
-                            Edit
-                          </button>
-                        </div>
-                      </div>
-                      {bdYearNum && bdIsFuture && (
-                        <div style={{ marginTop: 8, fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
-                          Your birthday puzzle isn't available yet - it's in the future!
-                        </div>
-                      )}
-                    </div>
-                  );
-                })() : (
-                  <button
-                    onClick={() => setShowBirthdayPrompt(true)}
-                    style={{
-                      width: "100%", padding: "8px 0", background: "none", border: "none", cursor: "pointer",
-                      color: C.textDim, fontFamily: "'Space Mono', monospace", fontSize: 11,
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                      transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.color = "#F472B6"}
-                    onMouseLeave={e => e.currentTarget.style.color = C.textDim}
-                  >
-                    <span style={{ fontSize: 16 }}>{"\uD83C\uDF82"}</span>
-                    Set your birthday for a special puzzle
-                  </button>
-                )}
-              </div>
             </div>
           );
         })()}
