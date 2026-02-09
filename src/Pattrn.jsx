@@ -1055,6 +1055,22 @@ export default function Pattrn() {
     }
   }, [view, puzzle, selectedToken]);
 
+  // Auto-advance to next available token when current selection is exhausted
+  useEffect(() => {
+    if (!puzzle || puzzle.mode === "hard" || !selectedToken) return;
+    if ((tokenRemaining[selectedToken] ?? 0) > 0) return;
+    const tokens = puzzle.usedTokens;
+    const currentIdx = tokens.indexOf(selectedToken);
+    if (currentIdx === -1) return;
+    for (let i = 1; i < tokens.length; i++) {
+      const nextToken = tokens[(currentIdx + i) % tokens.length];
+      if ((tokenRemaining[nextToken] ?? 0) > 0) {
+        setSelectedToken(nextToken);
+        return;
+      }
+    }
+  }, [tokenRemaining, selectedToken, puzzle]);
+
   const stopTimer = useCallback(() => {
     timerIsCascadeRun.current = false;
     if (timerInterval.current) {
