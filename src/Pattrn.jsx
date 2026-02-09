@@ -346,7 +346,8 @@ function getDailyKey(i) {
 function getDailySeedForDate(dateStr) {
   const [day, month, year] = dateStr.split("-").map(Number);
   const midnightUtc = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
-  return Math.floor(midnightUtc / 1000);
+  // Use Math.abs so pre-1970 dates (negative timestamps) still produce valid seeds
+  return Math.abs(Math.floor(midnightUtc / 1000)) || 1;
 }
 
 function getTodayDailyDateStr() {
@@ -428,9 +429,9 @@ function migrateDailyData(daily) {
   if (!daily || typeof daily !== "object") return daily;
   const keys = Object.keys(daily);
   if (keys.length === 0) return daily;
-  // If any key is a large number (timestamp), assume already migrated
-  if (keys.some(k => Number(k) > 1000000000)) return daily;
-  // Convert old index-based keys to date-based keys (assumes indices are relative to today)
+  // Old index-based keys were always 0-49; any key > 49 is a timestamp (even 1970s dates are > 80000)
+  if (keys.some(k => Number(k) > 49)) return daily;
+  // All keys are 0-49, convert old index-based keys to date-based keys (assumes indices are relative to today)
   const migrated = {};
   for (const k of keys) {
     const idx = parseInt(k, 10);
