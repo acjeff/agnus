@@ -230,7 +230,7 @@ function buildHardPuzzles() {
 
     const solution = colorGrid.map((row, ri) => row.map((color, ci) => `${color}|${shapeGrid[ri][ci]}`));
 
-    const numBlanks = Math.min(6 + Math.floor(i / 4), 16);
+    const numBlanks = Math.min(20 + Math.floor(i / 4), 28);
     const allCells = [];
     for (let row = 0; row < 7; row++) for (let col = 0; col < 7; col++) allCells.push(`${row}-${col}`);
     const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
