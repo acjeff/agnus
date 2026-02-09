@@ -2344,12 +2344,12 @@ export default function Pattrn() {
                   {i + 1}
                 </span>
                 {isCascade ? (
-                  <span style={{
+                  cascadeSizeLabel ? <span style={{
                     fontFamily: "'Space Mono', monospace", fontSize: 9, color: cascadeInProgress ? C.inProgress : C.textDim,
-                    minHeight: 12, display: "block", lineHeight: 1.2,
+                    lineHeight: 1.2,
                   }}>
-                    {cascadeSizeLabel ?? ""}
-                  </span>
+                    {cascadeSizeLabel}
+                  </span> : null
                 ) : (
                   <>
                     {result !== undefined && <ScoreBadge attempts={result} />}
