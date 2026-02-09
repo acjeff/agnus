@@ -444,6 +444,7 @@ function migrateDailyData(daily) {
 const STORAGE_KEY = "pattrn-progress-v3";
 const TIMES_KEY = "pattrn-times-v1";
 const HOMESCREEN_HINT_KEY = "pattrn-homescreen-hint-dismissed-v1";
+const BIRTHDAY_KEY = "pattrn-birthday-v1";
 
 function isIOSSafariForHomescreenHint() {
   if (typeof navigator === "undefined" || typeof window === "undefined") return false;
@@ -775,6 +776,15 @@ export default function Pattrn() {
   const [homescreenHintDismissed, setHomescreenHintDismissed] = useState(() => {
     try { return !!localStorage.getItem(HOMESCREEN_HINT_KEY); } catch { return false; }
   });
+
+  // Birthday: stored as "dd-mm-yyyy" (or "dd-mm" if no year), null if not set
+  const [birthday, setBirthday] = useState(() => {
+    try { return localStorage.getItem(BIRTHDAY_KEY) || null; } catch { return null; }
+  });
+  const [showBirthdayPrompt, setShowBirthdayPrompt] = useState(false);
+  const [birthdayInput, setBirthdayInput] = useState("");
+  const [goToDateInput, setGoToDateInput] = useState("");
+  const [goToDateError, setGoToDateError] = useState("");
 
   // Scroll play view to top when entering or changing puzzle
   useEffect(() => {
@@ -1876,6 +1886,13 @@ export default function Pattrn() {
           const firstDayOfWeek = new Date(Date.UTC(calendarYear, calendarMonth, 1)).getUTCDay();
           const startOffset = (firstDayOfWeek + 6) % 7; // Monday = 0
           const canGoForward = calendarYear < todayUTCYear || (calendarYear === todayUTCYear && calendarMonth < todayUTCMonth);
+          const isViewingCurrentMonth = calendarYear === todayUTCYear && calendarMonth === todayUTCMonth;
+          // Parse birthday for calendar highlighting
+          const bdParts = birthday ? birthday.split("-").map(Number) : null;
+          const bdDay = bdParts ? bdParts[0] : null;
+          const bdMonth = bdParts ? bdParts[1] : null;
+          const bdYear = bdParts && bdParts.length === 3 ? bdParts[2] : null;
+          const isBirthdayMonth = bdMonth != null && (calendarMonth + 1) === bdMonth;
           const cells = [];
           for (let i = 0; i < startOffset; i++) cells.push(null);
           for (let d = 1; d <= daysInMonth; d++) {
@@ -1885,13 +1902,37 @@ export default function Pattrn() {
             const time = (times.daily || {})[seed];
             const isFuture = seed > todaySeed;
             const isToday = calendarYear === todayUTCYear && calendarMonth === todayUTCMonth && d === todayUTCDate;
-            cells.push({ day: d, dateStr, seed, result, time, isFuture, isToday });
+            const isBirthday = isBirthdayMonth && d === bdDay;
+            const isExactBirthday = isBirthday && bdYear != null && calendarYear === bdYear;
+            cells.push({ day: d, dateStr, seed, result, time, isFuture, isToday, isBirthday, isExactBirthday });
           }
+          const handleGoToDate = () => {
+            setGoToDateError("");
+            const val = goToDateInput.trim();
+            if (!val) return;
+            // Accept dd-mm-yyyy or dd/mm/yyyy or yyyy-mm-dd
+            let day, month, year;
+            const dashMatch = val.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+            const slashMatch = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+            const isoMatch = val.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (dashMatch) { day = parseInt(dashMatch[1], 10); month = parseInt(dashMatch[2], 10); year = parseInt(dashMatch[3], 10); }
+            else if (slashMatch) { day = parseInt(slashMatch[1], 10); month = parseInt(slashMatch[2], 10); year = parseInt(slashMatch[3], 10); }
+            else if (isoMatch) { year = parseInt(isoMatch[1], 10); month = parseInt(isoMatch[2], 10); day = parseInt(isoMatch[3], 10); }
+            else { setGoToDateError("Use dd-mm-yyyy"); return; }
+            if (month < 1 || month > 12 || day < 1 || day > 31) { setGoToDateError("Invalid date"); return; }
+            const maxDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+            if (day > maxDay) { setGoToDateError("Invalid date"); return; }
+            const targetSeed = getDailySeedForDate(`${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}-${year}`);
+            if (targetSeed > todaySeed) { setGoToDateError("Future date"); return; }
+            setCalendarYear(year);
+            setCalendarMonth(month - 1);
+            setGoToDateInput("");
+          };
           return (
             <div style={{ maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both" }}>
-              {/* Month navigation */}
+              {/* Month navigation with Today button */}
               <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12,
+                display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8,
               }}>
                 <button
                   onClick={() => { if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(y => y - 1); } else setCalendarMonth(m => m - 1); }}
@@ -1917,6 +1958,53 @@ export default function Pattrn() {
                   onMouseLeave={e => { if (canGoForward) { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; } }}
                 >&rarr;</button>
               </div>
+              {/* Today button + Go to date */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+                {!isViewingCurrentMonth && (
+                  <button
+                    onClick={() => { setCalendarYear(todayUTCYear); setCalendarMonth(todayUTCMonth); }}
+                    style={{
+                      background: "none", border: `1px solid ${C.accent}`, borderRadius: 8, padding: "5px 12px",
+                      color: C.accent, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 10,
+                      fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", transition: "all 0.15s",
+                      whiteSpace: "nowrap",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.accent; e.currentTarget.style.color = C.bg; }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = C.accent; }}
+                  >
+                    Today
+                  </button>
+                )}
+                <div style={{ flex: 1, display: "flex", gap: 4, alignItems: "center" }}>
+                  <input
+                    type="text"
+                    placeholder="Go to date (dd-mm-yyyy)"
+                    value={goToDateInput}
+                    onChange={e => { setGoToDateInput(e.target.value); setGoToDateError(""); }}
+                    onKeyDown={e => { if (e.key === "Enter") handleGoToDate(); }}
+                    style={{
+                      flex: 1, padding: "5px 10px", borderRadius: 8, border: `1px solid ${goToDateError ? C.incorrect : C.border}`,
+                      backgroundColor: C.surface, color: C.text, fontFamily: "'Space Mono', monospace", fontSize: 10,
+                      outline: "none", minWidth: 0,
+                    }}
+                  />
+                  <button
+                    onClick={handleGoToDate}
+                    style={{
+                      background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 10px",
+                      color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 10,
+                      fontWeight: 700, transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                  >
+                    Go
+                  </button>
+                </div>
+                {goToDateError && (
+                  <span style={{ fontSize: 9, color: C.incorrect, fontFamily: "'Space Mono', monospace", whiteSpace: "nowrap" }}>{goToDateError}</span>
+                )}
+              </div>
               {/* Day-of-week headers */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
                 {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
@@ -1932,9 +2020,10 @@ export default function Pattrn() {
                   if (!cell) return <div key={`empty-${i}`} />;
                   const solved = cell.result > 0;
                   const failed = cell.result === 0 && cell.result !== undefined;
-                  const borderColor = cell.isToday ? C.accent : solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border;
-                  const bgColor = solved ? C.correct + "15" : failed ? C.incorrect + "10" : C.surface;
-                  const numColor = cell.isFuture ? C.textDim + "44" : cell.isToday ? C.accent : solved ? C.correct : failed ? C.incorrect : C.text;
+                  const isBd = cell.isBirthday || cell.isExactBirthday;
+                  const borderColor = cell.isToday ? C.accent : isBd ? "#F472B6" : solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border;
+                  const bgColor = isBd ? "#F472B620" : solved ? C.correct + "15" : failed ? C.incorrect + "10" : C.surface;
+                  const numColor = cell.isFuture ? C.textDim + "44" : cell.isToday ? C.accent : isBd ? "#F472B6" : solved ? C.correct : failed ? C.incorrect : C.text;
                   return (
                     <button
                       key={cell.day}
@@ -1951,8 +2040,13 @@ export default function Pattrn() {
                       onMouseEnter={e => { if (!cell.isFuture) { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.borderColor = C.accent; } }}
                       onMouseLeave={e => { if (!cell.isFuture) { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; } }}
                     >
+                      {isBd && (
+                        <span style={{ position: "absolute", top: -2, right: -2, fontSize: 9, lineHeight: 1 }}>
+                          {cell.isExactBirthday ? "\uD83C\uDF82" : "\uD83C\uDF70"}
+                        </span>
+                      )}
                       <span style={{
-                        fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: cell.isToday ? 800 : 600,
+                        fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: cell.isToday ? 800 : isBd ? 800 : 600,
                         color: numColor, lineHeight: 1,
                       }}>{cell.day}</span>
                       {solved && <ScoreBadge attempts={cell.result} />}
@@ -1976,10 +2070,200 @@ export default function Pattrn() {
                 <span><span style={{ color: C.silver }}>{"\u25CF"}</span> 3-4 tries</span>
                 <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
                 <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
+                {birthday && <span><span style={{ color: "#F472B6" }}>{"\uD83C\uDF82"}</span> birthday</span>}
+              </div>
+
+              {/* Birthday section */}
+              <div style={{
+                marginTop: 20, padding: "12px 16px", borderRadius: 12,
+                backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              }}>
+                {birthday ? (() => {
+                  const bdParts = birthday.split("-").map(Number);
+                  const bdDay = bdParts[0], bdMonthNum = bdParts[1], bdYearNum = bdParts.length === 3 ? bdParts[2] : null;
+                  const bdDateStr = birthday;
+                  const bdSeed = getDailySeedForDate(bdDateStr);
+                  const bdResult = (progress.daily || {})[bdSeed];
+                  const bdTime = (times.daily || {})[bdSeed];
+                  const bdSolved = bdResult > 0;
+                  const bdIsFuture = bdSeed > todaySeed;
+                  const bdUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${bdDateStr}` : "";
+                  return (
+                    <div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap" }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ fontSize: 18 }}>{"\uD83C\uDF82"}</span>
+                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: "#F472B6" }}>
+                            Birthday: {String(bdDay).padStart(2, "0")}-{String(bdMonthNum).padStart(2, "0")}{bdYearNum ? `-${bdYearNum}` : ""}
+                          </span>
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          {bdYearNum && !bdIsFuture && (
+                            <button
+                              onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, bdDateStr); }}
+                              style={{
+                                padding: "5px 10px", borderRadius: 8, fontSize: 10, fontWeight: 700,
+                                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                                background: "#F472B6", color: "#fff", border: "none", cursor: "pointer",
+                              }}
+                            >
+                              {bdSolved ? "View" : "Play"} birthday puzzle
+                            </button>
+                          )}
+                          {bdYearNum && !bdIsFuture && (
+                            <button
+                              onClick={async () => {
+                                const medal = bdSolved && bdResult <= 2 ? "\u2605" : bdResult <= 4 ? "\u25CF" : "\u25C6";
+                                const text = bdSolved
+                                  ? `\uD83C\uDF82 My Agnus birthday puzzle (${bdDateStr})\n${medal} Solved in ${bdResult} attempt${bdResult !== 1 ? "s" : ""} \u2022 ${formatTime(bdTime)}\nCan you beat it?\n${bdUrl}`
+                                  : `\uD83C\uDF82 Try my Agnus birthday puzzle!\n${bdDateStr}\n${bdUrl}`;
+                                const result = await tryNativeShare({ text, url: bdUrl });
+                                if (result === "shared") { setDailyShareMsg("Shared!"); setTimeout(() => setDailyShareMsg(""), 2000); return; }
+                                if (result === "cancelled") return;
+                                try { await navigator.clipboard.writeText(text); } catch { /* fallback */ }
+                                setDailyShareMsg("Copied!");
+                                setTimeout(() => setDailyShareMsg(""), 2000);
+                              }}
+                              style={{
+                                padding: "5px 10px", borderRadius: 8, fontSize: 10, fontWeight: 700,
+                                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                                background: "none", border: `1px solid #F472B6`, color: "#F472B6", cursor: "pointer",
+                              }}
+                            >
+                              {dailyShareMsg || "Share"}
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setShowBirthdayPrompt(true)}
+                            style={{
+                              padding: "5px 8px", borderRadius: 8, fontSize: 10,
+                              fontFamily: "'Space Mono', monospace",
+                              background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                            }}
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+                      {bdYearNum && bdIsFuture && (
+                        <div style={{ marginTop: 8, fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                          Your birthday puzzle isn't available yet - it's in the future!
+                        </div>
+                      )}
+                    </div>
+                  );
+                })() : (
+                  <button
+                    onClick={() => setShowBirthdayPrompt(true)}
+                    style={{
+                      width: "100%", padding: "8px 0", background: "none", border: "none", cursor: "pointer",
+                      color: C.textDim, fontFamily: "'Space Mono', monospace", fontSize: 11,
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.color = "#F472B6"}
+                    onMouseLeave={e => e.currentTarget.style.color = C.textDim}
+                  >
+                    <span style={{ fontSize: 16 }}>{"\uD83C\uDF82"}</span>
+                    Set your birthday for a special puzzle
+                  </button>
+                )}
               </div>
             </div>
           );
         })()}
+
+        {/* Birthday prompt modal */}
+        {showBirthdayPrompt && (
+          <div onClick={() => setShowBirthdayPrompt(false)} style={{
+            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+            animation: "fadeUp 0.25s ease",
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 20,
+              padding: "28px 24px", maxWidth: 340, width: "100%",
+              boxShadow: `0 24px 64px rgba(0,0,0,0.5)`,
+            }}>
+              <div style={{ textAlign: "center", marginBottom: 16 }}>
+                <span style={{ fontSize: 32 }}>{"\uD83C\uDF82"}</span>
+                <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#F472B6", margin: "8px 0 4px" }}>
+                  Set your birthday
+                </h3>
+                <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
+                  We'll highlight it on the calendar and let you play &amp; share the puzzle from your birth date.
+                </p>
+              </div>
+              <input
+                type="date"
+                value={birthdayInput}
+                onChange={e => setBirthdayInput(e.target.value)}
+                max={(() => { const n = new Date(); return `${n.getUTCFullYear()}-${String(n.getUTCMonth()+1).padStart(2,"0")}-${String(n.getUTCDate()).padStart(2,"0")}`; })()}
+                style={{
+                  width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`,
+                  backgroundColor: C.surface, color: C.text, fontFamily: "'Space Mono', monospace", fontSize: 14,
+                  outline: "none", boxSizing: "border-box", marginBottom: 16,
+                  colorScheme: "dark",
+                }}
+              />
+              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+                <button
+                  onClick={() => {
+                    if (!birthdayInput) return;
+                    const [y, m, d] = birthdayInput.split("-").map(Number);
+                    const bdStr = `${String(d).padStart(2, "0")}-${String(m).padStart(2, "0")}-${y}`;
+                    setBirthday(bdStr);
+                    try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
+                    setShowBirthdayPrompt(false);
+                    setBirthdayInput("");
+                    // Navigate calendar to birthday month/year
+                    setCalendarYear(y);
+                    setCalendarMonth(m - 1);
+                  }}
+                  disabled={!birthdayInput}
+                  style={{
+                    padding: "10px 28px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+                    background: birthdayInput ? "#F472B6" : C.surfaceLight, color: birthdayInput ? "#fff" : C.textDim,
+                    border: "none", cursor: birthdayInput ? "pointer" : "not-allowed",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Save
+                </button>
+                {birthday && (
+                  <button
+                    onClick={() => {
+                      setBirthday(null);
+                      try { localStorage.removeItem(BIRTHDAY_KEY); } catch { /* ignore */ }
+                      setShowBirthdayPrompt(false);
+                      setBirthdayInput("");
+                    }}
+                    style={{
+                      padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      background: "none", border: `1px solid ${C.incorrect}`, color: C.incorrect,
+                      cursor: "pointer", textTransform: "uppercase",
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+                <button
+                  onClick={() => { setShowBirthdayPrompt(false); setBirthdayInput(""); }}
+                  style={{
+                    padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    background: "none", border: `1px solid ${C.border}`, color: C.textDim,
+                    cursor: "pointer", textTransform: "uppercase",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Puzzle grid: 50 for non-daily modes */}
         {!isDaily && (<>
