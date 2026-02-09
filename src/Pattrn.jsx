@@ -1867,11 +1867,6 @@ export default function Pattrn() {
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Attempted</div>
               <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700 }}>{totalAttempted}</div>
             </div>
-            <div style={{ width: 1, alignSelf: "stretch", backgroundColor: C.border }} />
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Total</div>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700 }}>50</div>
-            </div>
             <div style={{ flex: 1 }} />
             <button onClick={() => setShowShareModal(true)}
               style={{
