@@ -339,12 +339,16 @@ function getTodayDailyIndex() {
   return 0;
 }
 
+function getDailyKey(i) {
+  return getDailySeedForIndex(i);
+}
+
 function getDailyStreak(progress) {
   const daily = progress.daily || {};
-  if ((daily[0] ?? 0) <= 0) return 0;
+  if ((daily[getDailyKey(0)] ?? 0) <= 0) return 0;
   let streak = 1;
   for (let i = 1; i < 50; i++) {
-    if ((daily[i] ?? 0) > 0) streak++;
+    if ((daily[getDailyKey(i)] ?? 0) > 0) streak++;
     else break;
   }
   return streak;
@@ -403,6 +407,23 @@ const PUZZLE_SETS = {
   blind: buildBlindPuzzles(),
 };
 
+// --- Migrate daily data from index-based keys (0-49) to date-based keys (UTC midnight timestamps) ---
+function migrateDailyData(daily) {
+  if (!daily || typeof daily !== "object") return daily;
+  const keys = Object.keys(daily);
+  if (keys.length === 0) return daily;
+  // If any key is a large number (timestamp), assume already migrated
+  if (keys.some(k => Number(k) > 1000000000)) return daily;
+  // Convert old index-based keys to date-based keys (assumes indices are relative to today)
+  const migrated = {};
+  for (const k of keys) {
+    const idx = parseInt(k, 10);
+    if (Number.isNaN(idx) || idx < 0 || idx > 49) continue;
+    migrated[getDailyKey(idx)] = daily[k];
+  }
+  return migrated;
+}
+
 // --- Persistent storage using localStorage ---
 const STORAGE_KEY = "pattrn-progress-v3";
 const TIMES_KEY = "pattrn-times-v1";
@@ -458,7 +479,7 @@ function loadProgress() {
       medium: base.medium ?? {},
       hard: base.hard ?? {},
       blind: base.blind ?? {},
-      daily: base.daily ?? {},
+      daily: migrateDailyData(base.daily ?? {}),
       cascade: base.cascade ?? {},
       cascadeRunState,
       cascadeRunStateLastIndex: typeof cascadeRunStateLastIndex === "number" ? cascadeRunStateLastIndex : undefined,
@@ -485,7 +506,7 @@ function loadTimes() {
       medium: base.medium ?? {},
       hard: base.hard ?? {},
       blind: base.blind ?? {},
-      daily: base.daily ?? {},
+      daily: migrateDailyData(base.daily ?? {}),
       cascade: base.cascade ?? {},
     };
   } catch {
@@ -923,7 +944,7 @@ export default function Pattrn() {
   const puzzle = isCascade ? cascadePuzzle : puzzles[currentPuzzle];
   const diffProgress = progress[difficulty] || {};
   const isBlind = difficulty === "blind" && !isDaily;
-  const progressKey = isCascade ? cascadeRunIndex : currentPuzzle;
+  const progressKey = isCascade ? cascadeRunIndex : isDaily ? getDailyKey(currentPuzzle) : currentPuzzle;
 
   // How many of each token still need to be placed (only counts blanks, not full grid)
   const tokenRemaining = useMemo(() => {
@@ -1026,8 +1047,9 @@ export default function Pattrn() {
       const tms = loadTimes();
       const dProg = prog[effectiveDiff] || {};
       const dTimes = tms[effectiveDiff] || {};
-      const savedAttempts = dProg[idx] ?? 0;
-      const savedTime = dTimes[idx];
+      const lookupKey = effectiveDiff === "daily" ? getDailyKey(idx) : idx;
+      const savedAttempts = dProg[lookupKey] ?? 0;
+      const savedTime = dTimes[lookupKey];
       const alreadyCompleted = !forceRestart && savedAttempts > 0 && savedTime != null && puz;
       if (alreadyCompleted) {
         setFills(solutionFillsFromPuzzle(puz));
@@ -1394,10 +1416,14 @@ export default function Pattrn() {
 
   const completedCount = isCascade
     ? Object.keys(diffProgress).filter(k => /^\d+$/.test(k) && diffProgress[k] === 7).length
-    : Object.keys(diffProgress).filter(k => diffProgress[k] > 0).length;
+    : isDaily
+      ? Array.from({ length: 50 }, (_, i) => getDailyKey(i)).filter(k => diffProgress[k] > 0).length
+      : Object.keys(diffProgress).filter(k => diffProgress[k] > 0).length;
   const totalAttempted = isCascade
     ? Object.keys(diffProgress).filter(k => /^\d+$/.test(k)).length
-    : Object.keys(diffProgress).length;
+    : isDaily
+      ? Array.from({ length: 50 }, (_, i) => getDailyKey(i)).filter(k => diffProgress[k] !== undefined).length
+      : Object.keys(diffProgress).length;
 
   const diffTimes = times[difficulty] || {};
 
@@ -1415,7 +1441,8 @@ export default function Pattrn() {
       const grid = [];
 
       for (let i = 0; i < 50; i++) {
-        const result = dp[i];
+        const key = d.key === "daily" ? getDailyKey(i) : i;
+        const result = dp[key];
         if (d.key === "cascade") {
           if (result === undefined) grid.push("none");
           else if (result === 7) { solved++; gold++; grid.push("gold"); }
@@ -1426,9 +1453,9 @@ export default function Pattrn() {
           else if (result <= 2) { gold++; solved++; grid.push("gold"); }
           else if (result <= 4) { silver++; solved++; grid.push("silver"); }
           else { bronze++; solved++; grid.push("bronze"); }
-          if (result > 0 && dt[i] != null) {
-            if (bestTime === null || dt[i] < bestTime) bestTime = dt[i];
-            totalTime += dt[i];
+          if (result > 0 && dt[key] != null) {
+            if (bestTime === null || dt[key] < bestTime) bestTime = dt[key];
+            totalTime += dt[key];
             timedCount++;
           }
         }
@@ -1505,7 +1532,8 @@ export default function Pattrn() {
   };
 
   const copyDailyShareText = async () => {
-    const dailySolved = Object.keys(progress.daily || {}).filter(k => (progress.daily || {})[k] > 0).length;
+    const dailyData = progress.daily || {};
+    const dailySolved = Array.from({ length: 50 }, (_, i) => getDailyKey(i)).filter(k => dailyData[k] > 0).length;
     const cascadeSolved = Object.keys(progress.cascade || {}).filter(k => /^\d+$/.test(k) && (progress.cascade || {})[k] === 7).length;
     const text = `Agnus \uD83E\uDDE9\n\uD83D\uDCC5 Daily: ${dailySolved}/50\n\uD83C\uDF00 Cascade: ${cascadeSolved}/50`;
     const result = await tryNativeShare({ text });
@@ -1586,8 +1614,9 @@ export default function Pattrn() {
         {/* Daily overview: streak, play today, share */}
         {(() => {
           const todayIdx = getTodayDailyIndex();
-          const todayResult = (progress.daily || {})[todayIdx];
-          const todayTime = (times.daily || {})[todayIdx];
+          const todayKey = getDailyKey(todayIdx);
+          const todayResult = (progress.daily || {})[todayKey];
+          const todayTime = (times.daily || {})[todayKey];
           const streak = getDailyStreak(progress);
           const todayLabel = getDailyDateLabel(todayIdx);
           return (
@@ -1748,12 +1777,13 @@ export default function Pattrn() {
         }}>
           {(isCascade ? Array.from({ length: 50 }, (_, i) => i) : puzzles).map((p, i) => {
             const idx = isCascade ? i : p?.id ?? i;
-            const result = isCascade ? (diffProgress[idx] ?? -1) : diffProgress[idx];
+            const dailyKey = isDaily ? getDailyKey(idx) : idx;
+            const result = isCascade ? (diffProgress[idx] ?? -1) : diffProgress[dailyKey];
             const solved = isCascade ? result === 7 : result > 0;
             const failed = isCascade ? (result >= 0 && result < 7) : result === 0;
             const cascadeRunState = progress.cascadeRunState || {};
             const cascadeInProgress = isCascade && result === -1 && cascadeRunState[idx] != null;
-            const time = diffTimes[idx];
+            const time = diffTimes[dailyKey];
             const cascadeLevels = result >= 0 && result <= 7 ? result : null;
             const cascadeInProgressLevel = cascadeInProgress && cascadeRunState[idx]?.level != null ? cascadeRunState[idx].level : null;
             const cascadeLevelValid = (l) => typeof l === "number" && l >= 0 && l <= 6;
