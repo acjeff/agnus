@@ -862,10 +862,10 @@ export default function Pattrn() {
         const tms = loadTimes();
         const cascadeBest = (prog.cascade || {})[levelNum];
         const cascadeTime = (tms.cascade || {})[levelNum];
-        const fullyCompleted = cascadeBest === 7 && cascadeTime != null;
+        const fullyCompleted = cascadeBest === CASCADE_LEVELS.length && cascadeTime != null;
         if (fullyCompleted) {
-          const puz = buildCascadePuzzle(6, getCascadeRunSeed(levelNum));
-          setCascadeLevel(6);
+          const puz = buildCascadePuzzle(CASCADE_LEVELS.length - 1, getCascadeRunSeed(levelNum));
+          setCascadeLevel(CASCADE_LEVELS.length - 1);
           setFills(solutionFillsFromPuzzle(puz));
           setAttempts(0);
           setElapsedTime(cascadeTime);
@@ -1101,10 +1101,10 @@ export default function Pattrn() {
       const tms = loadTimes();
       const cascadeBest = (prog.cascade || {})[idx];
       const cascadeTime = (tms.cascade || {})[idx];
-      const fullyCompleted = !forceRestart && cascadeBest === 7 && cascadeTime != null;
+      const fullyCompleted = !forceRestart && cascadeBest === CASCADE_LEVELS.length && cascadeTime != null;
       if (fullyCompleted) {
-        const puz = buildCascadePuzzle(6, getCascadeRunSeed(idx));
-        setCascadeLevel(6);
+        const puz = buildCascadePuzzle(CASCADE_LEVELS.length - 1, getCascadeRunSeed(idx));
+        setCascadeLevel(CASCADE_LEVELS.length - 1);
         setFills(solutionFillsFromPuzzle(puz));
         setAttempts(0);
         setElapsedTime(cascadeTime);
@@ -1371,7 +1371,7 @@ export default function Pattrn() {
     }
   };
 
-  const maxAttempts = isCascade ? 10 : isBlind ? 6 : 5;
+  const maxAttempts = isCascade ? 15 : isBlind ? 6 : 5;
 
   const checkSolution = () => {
     if (!puzzle) return;
@@ -1520,7 +1520,7 @@ export default function Pattrn() {
     : puzzle ? [...puzzle.blanks].every(k => fills[k]) : false;
 
   const completedCount = isCascade
-    ? Object.keys(diffProgress).filter(k => /^\d+$/.test(k) && diffProgress[k] === 7).length
+    ? Object.keys(diffProgress).filter(k => /^\d+$/.test(k) && diffProgress[k] === CASCADE_LEVELS.length).length
     : isDaily
       ? Object.values(diffProgress).filter(v => v > 0).length
       : Object.keys(diffProgress).filter(k => diffProgress[k] > 0).length;
@@ -1548,7 +1548,7 @@ export default function Pattrn() {
         const result = dp[key];
         if (d.key === "cascade") {
           if (result === undefined) grid.push("none");
-          else if (result === 7) { solved++; gold++; grid.push("gold"); }
+          else if (result === CASCADE_LEVELS.length) { solved++; gold++; grid.push("gold"); }
           else { failed++; grid.push("failed"); }
         } else {
           if (result === undefined) grid.push("none");
@@ -1637,7 +1637,7 @@ export default function Pattrn() {
   const copyDailyShareText = async () => {
     const dailyData = progress.daily || {};
     const dailySolved = Object.values(dailyData).filter(v => v > 0).length;
-    const cascadeSolved = Object.keys(progress.cascade || {}).filter(k => /^\d+$/.test(k) && (progress.cascade || {})[k] === 7).length;
+    const cascadeSolved = Object.keys(progress.cascade || {}).filter(k => /^\d+$/.test(k) && (progress.cascade || {})[k] === CASCADE_LEVELS.length).length;
     const text = `Agnus \uD83E\uDDE9\n\uD83D\uDCC5 Daily: ${dailySolved} solved\n\uD83C\uDF00 Cascade: ${cascadeSolved}/50`;
     const result = await tryNativeShare({ text });
     if (result === "shared") {
@@ -1799,7 +1799,7 @@ export default function Pattrn() {
                 const active = difficulty === d.key;
                 const dp = progress[d.key] || {};
                 const solved = d.key === "cascade"
-                  ? Object.keys(dp).filter((k) => /^\d+$/.test(k) && dp[k] === 7).length
+                  ? Object.keys(dp).filter((k) => /^\d+$/.test(k) && dp[k] === CASCADE_LEVELS.length).length
                   : Object.keys(dp).filter((k) => dp[k] > 0).length;
                 return (
                   <button
@@ -2297,17 +2297,17 @@ export default function Pattrn() {
           {(isCascade ? Array.from({ length: 50 }, (_, i) => i) : puzzles).map((p, i) => {
             const idx = isCascade ? i : p?.id ?? i;
             const result = isCascade ? (diffProgress[idx] ?? -1) : diffProgress[idx];
-            const solved = isCascade ? result === 7 : result > 0;
-            const failed = isCascade ? (result >= 0 && result < 7) : result === 0;
+            const solved = isCascade ? result === CASCADE_LEVELS.length : result > 0;
+            const failed = isCascade ? (result >= 0 && result < CASCADE_LEVELS.length) : result === 0;
             const cascadeRunState = progress.cascadeRunState || {};
             const cascadeInProgress = isCascade && result === -1 && cascadeRunState[idx] != null;
             const time = diffTimes[idx];
-            const cascadeLevels = result >= 0 && result <= 7 ? result : null;
+            const cascadeLevels = result >= 0 && result <= CASCADE_LEVELS.length ? result : null;
             const cascadeInProgressLevel = cascadeInProgress && cascadeRunState[idx]?.level != null ? cascadeRunState[idx].level : null;
-            const cascadeLevelValid = (l) => typeof l === "number" && l >= 0 && l <= 6;
+            const cascadeLevelValid = (l) => typeof l === "number" && l >= 0 && l < CASCADE_LEVELS.length;
             const cascadeSizeLabel = isCascade
-              ? cascadeLevels === 7
-                ? "9×9"
+              ? cascadeLevels === CASCADE_LEVELS.length
+                ? `${CASCADE_LEVELS[CASCADE_LEVELS.length - 1]}×${CASCADE_LEVELS[CASCADE_LEVELS.length - 1]}`
                 : cascadeLevelValid(cascadeLevels)
                   ? `${CASCADE_LEVELS[cascadeLevels]}×${CASCADE_LEVELS[cascadeLevels]}`
                   : cascadeLevelValid(cascadeInProgressLevel)
