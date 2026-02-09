@@ -2204,40 +2204,52 @@ export default function Pattrn() {
           );
         })()}
 
-        {/* Birthday prompt modal */}
+        {/* Birthday prompt drawer */}
         {showBirthdayPrompt && (
           <div onClick={() => setShowBirthdayPrompt(false)} style={{
             position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-            animation: "fadeUp 0.25s ease",
+            display: "flex", alignItems: "flex-end", justifyContent: "center",
           }}>
             <div onClick={e => e.stopPropagation()} style={{
-              backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 20,
-              padding: "28px 24px", maxWidth: 340, width: "100%",
-              boxShadow: `0 24px 64px rgba(0,0,0,0.5)`,
+              backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
+              maxWidth: 480, width: "100%",
+              boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`,
+              animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
             }}>
-              <div style={{ textAlign: "center", marginBottom: 16 }}>
-                <span style={{ fontSize: 32 }}>{"\uD83C\uDF82"}</span>
-                <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#F472B6", margin: "8px 0 4px" }}>
-                  Set your birthday
-                </h3>
-                <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
-                  We'll highlight it on the calendar and let you play &amp; share the puzzle from your birth date.
-                </p>
+              {/* Drag handle */}
+              <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
+                <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
               </div>
-              <input
-                type="date"
-                value={birthdayInput}
-                onChange={e => setBirthdayInput(e.target.value)}
-                max={(() => { const n = new Date(); return `${n.getUTCFullYear()}-${String(n.getUTCMonth()+1).padStart(2,"0")}-${String(n.getUTCDate()).padStart(2,"0")}`; })()}
-                style={{
-                  width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`,
-                  backgroundColor: C.surface, color: C.text, fontFamily: "'Space Mono', monospace", fontSize: 14,
-                  outline: "none", boxSizing: "border-box", marginBottom: 16,
-                  colorScheme: "dark",
-                }}
-              />
-              <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+
+              <div style={{ padding: "8px 24px 0" }}>
+                <div style={{ textAlign: "center", marginBottom: 16 }}>
+                  <span style={{ fontSize: 32 }}>{"\uD83C\uDF82"}</span>
+                  <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#F472B6", margin: "8px 0 4px" }}>
+                    Set your birthday
+                  </h3>
+                  <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
+                    We'll highlight it on the calendar and let you play &amp; share the puzzle from your birth date.
+                  </p>
+                </div>
+                <input
+                  type="date"
+                  value={birthdayInput}
+                  onChange={e => setBirthdayInput(e.target.value)}
+                  max={(() => { const n = new Date(); return `${n.getUTCFullYear()}-${String(n.getUTCMonth()+1).padStart(2,"0")}-${String(n.getUTCDate()).padStart(2,"0")}`; })()}
+                  style={{
+                    width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`,
+                    backgroundColor: C.surface, color: C.text, fontFamily: "'Space Mono', monospace", fontSize: 14,
+                    outline: "none", boxSizing: "border-box",
+                    colorScheme: "dark",
+                  }}
+                />
+              </div>
+
+              {/* Sticky footer buttons */}
+              <div style={{
+                padding: "16px 24px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+                display: "flex", flexDirection: "column", gap: 8,
+              }}>
                 <button
                   onClick={() => {
                     if (!birthdayInput) return;
@@ -2247,13 +2259,12 @@ export default function Pattrn() {
                     try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
                     setShowBirthdayPrompt(false);
                     setBirthdayInput("");
-                    // Navigate calendar to birthday month/year
                     setCalendarYear(y);
                     setCalendarMonth(m - 1);
                   }}
                   disabled={!birthdayInput}
                   style={{
-                    padding: "10px 28px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
                     fontFamily: "'Space Mono', monospace", letterSpacing: 2,
                     background: birthdayInput ? "#F472B6" : C.surfaceLight, color: birthdayInput ? "#fff" : C.textDim,
                     border: "none", cursor: birthdayInput ? "pointer" : "not-allowed",
@@ -2271,7 +2282,7 @@ export default function Pattrn() {
                       setBirthdayInput("");
                     }}
                     style={{
-                      padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
                       fontFamily: "'Space Mono', monospace", letterSpacing: 1,
                       background: "none", border: `1px solid ${C.incorrect}`, color: C.incorrect,
                       cursor: "pointer", textTransform: "uppercase",
@@ -2283,7 +2294,7 @@ export default function Pattrn() {
                 <button
                   onClick={() => { setShowBirthdayPrompt(false); setBirthdayInput(""); }}
                   style={{
-                    padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
                     fontFamily: "'Space Mono', monospace", letterSpacing: 1,
                     background: "none", border: `1px solid ${C.border}`, color: C.textDim,
                     cursor: "pointer", textTransform: "uppercase",
