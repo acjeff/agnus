@@ -783,8 +783,7 @@ export default function Pattrn() {
   });
   const [showBirthdayPrompt, setShowBirthdayPrompt] = useState(false);
   const [birthdayInput, setBirthdayInput] = useState("");
-  const [goToDateInput, setGoToDateInput] = useState("");
-  const [goToDateError, setGoToDateError] = useState("");
+  const goToDateRef = useRef(null);
 
   // Scroll play view to top when entering or changing puzzle
   useEffect(() => {
@@ -1906,28 +1905,17 @@ export default function Pattrn() {
             const isExactBirthday = isBirthday && bdYear != null && calendarYear === bdYear;
             cells.push({ day: d, dateStr, seed, result, time, isFuture, isToday, isBirthday, isExactBirthday });
           }
-          const handleGoToDate = () => {
-            setGoToDateError("");
-            const val = goToDateInput.trim();
+          const handleGoToDate = (e) => {
+            const val = e.target.value;
             if (!val) return;
-            // Accept dd-mm-yyyy or dd/mm/yyyy or yyyy-mm-dd
-            let day, month, year;
-            const dashMatch = val.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
-            const slashMatch = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-            const isoMatch = val.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
-            if (dashMatch) { day = parseInt(dashMatch[1], 10); month = parseInt(dashMatch[2], 10); year = parseInt(dashMatch[3], 10); }
-            else if (slashMatch) { day = parseInt(slashMatch[1], 10); month = parseInt(slashMatch[2], 10); year = parseInt(slashMatch[3], 10); }
-            else if (isoMatch) { year = parseInt(isoMatch[1], 10); month = parseInt(isoMatch[2], 10); day = parseInt(isoMatch[3], 10); }
-            else { setGoToDateError("Use dd-mm-yyyy"); return; }
-            if (month < 1 || month > 12 || day < 1 || day > 31) { setGoToDateError("Invalid date"); return; }
-            const maxDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
-            if (day > maxDay) { setGoToDateError("Invalid date"); return; }
-            const targetSeed = getDailySeedForDate(`${String(day).padStart(2, "0")}-${String(month).padStart(2, "0")}-${year}`);
-            if (targetSeed > todaySeed) { setGoToDateError("Future date"); return; }
+            const [year, month, day] = val.split("-").map(Number);
+            if (!year || !month || !day) return;
             setCalendarYear(year);
             setCalendarMonth(month - 1);
-            setGoToDateInput("");
+            // Reset the input so the same date can be re-selected
+            e.target.value = "";
           };
+          const todayISO = `${todayUTCYear}-${String(todayUTCMonth + 1).padStart(2, "0")}-${String(todayUTCDate).padStart(2, "0")}`;
           return (
             <div style={{ maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both" }}>
               {/* Month navigation with Today button */}
@@ -1959,7 +1947,7 @@ export default function Pattrn() {
                 >&rarr;</button>
               </div>
               {/* Today button + Go to date */}
-              <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center" }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12, alignItems: "center", justifyContent: "center" }}>
                 {!isViewingCurrentMonth && (
                   <button
                     onClick={() => { setCalendarYear(todayUTCYear); setCalendarMonth(todayUTCMonth); }}
@@ -1975,35 +1963,31 @@ export default function Pattrn() {
                     Today
                   </button>
                 )}
-                <div style={{ flex: 1, display: "flex", gap: 4, alignItems: "center" }}>
-                  <input
-                    type="text"
-                    placeholder="Go to date (dd-mm-yyyy)"
-                    value={goToDateInput}
-                    onChange={e => { setGoToDateInput(e.target.value); setGoToDateError(""); }}
-                    onKeyDown={e => { if (e.key === "Enter") handleGoToDate(); }}
-                    style={{
-                      flex: 1, padding: "5px 10px", borderRadius: 8, border: `1px solid ${goToDateError ? C.incorrect : C.border}`,
-                      backgroundColor: C.surface, color: C.text, fontFamily: "'Space Mono', monospace", fontSize: 10,
-                      outline: "none", minWidth: 0,
-                    }}
-                  />
+                <div style={{ position: "relative" }}>
                   <button
-                    onClick={handleGoToDate}
+                    onClick={() => goToDateRef.current?.showPicker?.() || goToDateRef.current?.click()}
                     style={{
-                      background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 10px",
+                      background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 12px",
                       color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 10,
-                      fontWeight: 700, transition: "all 0.15s",
+                      fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", transition: "all 0.15s",
+                      whiteSpace: "nowrap",
                     }}
                     onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
                   >
-                    Go
+                    Jump to date
                   </button>
+                  <input
+                    ref={goToDateRef}
+                    type="date"
+                    max={todayISO}
+                    onChange={handleGoToDate}
+                    style={{
+                      position: "absolute", top: 0, left: 0, width: "100%", height: "100%",
+                      opacity: 0, cursor: "pointer", colorScheme: "dark",
+                    }}
+                  />
                 </div>
-                {goToDateError && (
-                  <span style={{ fontSize: 9, color: C.incorrect, fontFamily: "'Space Mono', monospace", whiteSpace: "nowrap" }}>{goToDateError}</span>
-                )}
               </div>
               {/* Day-of-week headers */}
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
