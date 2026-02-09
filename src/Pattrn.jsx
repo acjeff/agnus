@@ -2847,19 +2847,33 @@ export default function Pattrn() {
                 </button>
               )}
               {isCascade ? (
-                <button onClick={() => { setView("menu"); }}
-                  style={{
-                    backgroundColor: C.accent, color: C.bg, border: "none",
-                    padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.15s",
-                    boxShadow: `0 4px 16px ${C.accent}44`,
-                  }}
-                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                >
-                  Back to puzzles
-                </button>
+                <>
+                  <button onClick={() => startPuzzle(cascadeRunIndex, "cascade", true)}
+                    style={{
+                      backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
+                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.target.style.borderColor = C.accent; e.target.style.color = C.accent; }}
+                    onMouseLeave={e => { e.target.style.borderColor = C.border; e.target.style.color = C.text; }}
+                  >
+                    Retry
+                  </button>
+                  <button onClick={() => { setView("menu"); }}
+                    style={{
+                      backgroundColor: C.accent, color: C.bg, border: "none",
+                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                      boxShadow: `0 4px 16px ${C.accent}44`,
+                    }}
+                    onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
+                    onMouseLeave={e => e.target.style.transform = "translateY(0)"}
+                  >
+                    Back to puzzles
+                  </button>
+                </>
               ) : (
                 <>
                   <button onClick={() => startPuzzle(currentPuzzle)}
