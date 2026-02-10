@@ -67,6 +67,292 @@ const PALETTES = [
   ["#6C5CE7", "#A29BFE", "#FD79A8", "#FDCB6E", "#00CEC9"],
 ];
 
+// --- Themed shape sets ---
+const CHRISTMAS_SHAPES = [
+  // Snowflake
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <line x1="12" y1="4" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="5.1" y1="8" x2="18.9" y2="16" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="5.1" y1="16" x2="18.9" y2="8" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Tree
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <polygon points="12,4 19,17 5,17" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <line x1="12" y1="17" x2="12" y2="21" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // 4-pointed star
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <polygon points="12,3 14,10 21,12 14,14 12,21 10,14 3,12 10,10" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Bell
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M9,14 L9,9 C9,6.2 10.3,4 12,4 C13.7,4 15,6.2 15,9 L15,14 L17,17 L7,17 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <line x1="10.5" y1="17" x2="13.5" y2="17" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Gift box
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="5" y="10" width="14" height="10" rx="1" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12" y1="10" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="5" y1="13" x2="19" y2="13" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M9,10 C9,7 12,6 12,8 C12,6 15,7 15,10" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Candy cane
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M14,20 L14,8 C14,5.2 11,4 9,6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Ornament
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="14" r="6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12" y1="4" x2="12" y2="8" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  ),
+];
+
+const HALLOWEEN_SHAPES = [
+  // Pumpkin
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <ellipse cx="12" cy="14" rx="7" ry="6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12" y1="8" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+      <path d="M12,8 C12,5 10,4 9,5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Bat
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M3,8 L7,14 L10,10 L12,14 L14,10 L17,14 L21,8 C19,12 17,14 12,14 C7,14 5,12 3,8 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Ghost
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M7,20 L7,11 C7,7.1 9.2,4 12,4 C14.8,4 17,7.1 17,11 L17,20 L15,18 L13,20 L11,18 L9,20 L7,20 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Spider
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="3.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="9" y1="9" x2="4" y2="4" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="15" y1="9" x2="20" y2="4" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="9" y1="15" x2="4" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="15" y1="15" x2="20" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Skull
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M7,13 C7,8 9,5 12,5 C15,5 17,8 17,13 L17,15 L14,17 L10,17 L7,15 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <circle cx="10" cy="11" r="1.2" fill={stroke || "rgba(255,255,255,0.8)"}/>
+      <circle cx="14" cy="11" r="1.2" fill={stroke || "rgba(255,255,255,0.8)"}/>
+    </svg>
+  ),
+  // Cat
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="14" r="6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <polygon points="7,10 5,3 10,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <polygon points="17,10 19,3 14,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Crescent moon
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M15,4 C11,5 8,8.5 8,12.5 C8,16.5 11,20 15,21 C11,21 6,17 6,12.5 C6,8 11,4 15,4 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+];
+
+const OCEAN_SHAPES = [
+  // Fish
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <ellipse cx="13" cy="12" rx="6" ry="4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <polygon points="7,12 3,7 3,17" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <circle cx="16" cy="11" r="1" fill={stroke || "rgba(255,255,255,0.8)"}/>
+    </svg>
+  ),
+  // Shell
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,4 C18,10 18,18 12,20 C6,18 6,10 12,4 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <line x1="12" y1="6" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+    </svg>
+  ),
+  // Wave
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M3,12 C5,8 8,8 10,12 C12,16 15,16 17,12 C19,8 21,8 21,12" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Anchor
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="6" r="2.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12" y1="8.5" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="7" y1="12" x2="17" y2="12" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M6,17 C6,20 12,21 12,20 C12,21 18,20 18,17" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Starfish
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <polygon points="12,3 13.8,9.5 20.5,9.5 15.2,13.5 17,20 12,16.2 7,20 8.8,13.5 3.5,9.5 10.2,9.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Seahorse
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M14,4 C16,4 17,6 15,8 C13,10 11,12 11,14 C11,17 13,19 15,18 C17,17 16,15 14,15" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="14" cy="5.5" r="0.8" fill={stroke || "rgba(255,255,255,0.8)"}/>
+    </svg>
+  ),
+  // Trident
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <line x1="12" y1="4" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M7,9 L7,4" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M17,9 L17,4" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M7,9 C7,13 12,13 12,9" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M17,9 C17,13 12,13 12,9" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+    </svg>
+  ),
+];
+
+// --- Themed color palettes ---
+const CHRISTMAS_PALETTES = [
+  ["#C62828", "#2E7D32", "#FFD700", "#ECEFF1", "#880E4F"],
+  ["#D32F2F", "#1B5E20", "#FFC107", "#B71C1C", "#4CAF50"],
+  ["#EF5350", "#66BB6A", "#FFEE58", "#CE93D8", "#26A69A"],
+  ["#F44336", "#43A047", "#8E24AA", "#00838F", "#E91E63"],
+  ["#B71C1C", "#81C784", "#F06292", "#FFD54F", "#00695C"],
+];
+
+const HALLOWEEN_PALETTES = [
+  ["#FF6D00", "#7B1FA2", "#FFAB00", "#1B5E20", "#BF360C"],
+  ["#E65100", "#4A148C", "#00C853", "#FFD600", "#880E4F"],
+  ["#FF9800", "#9C27B0", "#76FF03", "#FF1744", "#311B92"],
+  ["#EF6C00", "#6A1B9A", "#00E676", "#FF3D00", "#4527A0"],
+  ["#F57C00", "#8E24AA", "#AEEA00", "#D50000", "#283593"],
+];
+
+const NEON_PALETTES = [
+  ["#FF0080", "#00FF80", "#FFFF00", "#8000FF", "#FF4040"],
+  ["#FF6EC7", "#39FF14", "#00BFFF", "#FFD300", "#FF073A"],
+  ["#F900FF", "#00FFFF", "#FF3131", "#BFFF00", "#7B68EE"],
+  ["#FF1493", "#00FF7F", "#FF4500", "#1E90FF", "#ADFF2F"],
+  ["#FF00FF", "#00FFCC", "#FFA500", "#7FFF00", "#4169E1"],
+];
+
+const OCEAN_PALETTES = [
+  ["#0277BD", "#00897B", "#FF7043", "#FDD835", "#0097A7"],
+  ["#01579B", "#00695C", "#1565C0", "#F4511E", "#00ACC1"],
+  ["#4FC3F7", "#80DEEA", "#FFAB91", "#FFF176", "#26C6DA"],
+  ["#039BE5", "#00796B", "#7C4DFF", "#FF6E40", "#00BFA5"],
+  ["#0288D1", "#4DB6AC", "#EC407A", "#FFD740", "#006064"],
+];
+
+// --- Build color map from original palettes to themed palettes ---
+function buildColorMap(themePalettes) {
+  if (!themePalettes) return null;
+  const map = {};
+  for (let i = 0; i < PALETTES.length; i++) {
+    for (let j = 0; j < PALETTES[i].length; j++) {
+      const orig = PALETTES[i][j];
+      if (!map[orig]) map[orig] = themePalettes[i][j];
+    }
+  }
+  return map;
+}
+
+// --- Puzzle theme definitions ---
+const PUZZLE_THEMES = [
+  {
+    id: "classic",
+    name: "Classic",
+    desc: "The original Agnus look",
+    icon: null,
+    palettes: null,
+    shapes: null,
+    decoration: null,
+    gridBg: null,
+    gridBorder: null,
+    unlock: null,
+  },
+  {
+    id: "christmas",
+    name: "Christmas",
+    desc: "Festive reds, greens & gold",
+    icon: "\uD83C\uDF84",
+    palettes: CHRISTMAS_PALETTES,
+    shapes: CHRISTMAS_SHAPES,
+    decoration: "snow",
+    gridBg: "#0d1a12",
+    gridBorder: "#2E7D3266",
+    unlock: { seasonal: 12, achievement: "streak_7" },
+  },
+  {
+    id: "halloween",
+    name: "Halloween",
+    desc: "Spooky oranges & purples",
+    icon: "\uD83C\uDF83",
+    palettes: HALLOWEEN_PALETTES,
+    shapes: HALLOWEEN_SHAPES,
+    decoration: "bats",
+    gridBg: "#14080a",
+    gridBorder: "#7B1FA266",
+    unlock: { seasonal: 10, achievement: "total_100" },
+  },
+  {
+    id: "neon",
+    name: "Neon",
+    desc: "Electric glow in the dark",
+    icon: "\u26A1",
+    palettes: NEON_PALETTES,
+    shapes: null,
+    decoration: "glow",
+    gridBg: "#050510",
+    gridBorder: "#FF008066",
+    unlock: { achievement: "gold_25" },
+  },
+  {
+    id: "ocean",
+    name: "Ocean",
+    desc: "Deep sea blues & corals",
+    icon: "\uD83C\uDF0A",
+    palettes: OCEAN_PALETTES,
+    shapes: OCEAN_SHAPES,
+    decoration: "bubbles",
+    gridBg: "#071318",
+    gridBorder: "#0277BD44",
+    unlock: { achievement: "med_50" },
+  },
+];
+
+function isThemeUnlocked(theme, achievementsList) {
+  if (!theme.unlock) return true;
+  const now = new Date();
+  if (theme.unlock.seasonal && now.getMonth() + 1 === theme.unlock.seasonal) return true;
+  if (theme.unlock.achievement && achievementsList) {
+    const ach = achievementsList.find(a => a.id === theme.unlock.achievement);
+    if (ach && ach.unlocked) return true;
+  }
+  return false;
+}
+
 // --- Seeded RNG ---
 function rng(seed) {
   let s = seed;
@@ -446,6 +732,16 @@ const STORAGE_KEY = "pattrn-progress-v3";
 const TIMES_KEY = "pattrn-times-v1";
 const HOMESCREEN_HINT_KEY = "pattrn-homescreen-hint-dismissed-v1";
 const BIRTHDAY_KEY = "pattrn-birthday-v1";
+const THEME_KEY = "pattrn-theme-v1";
+
+function loadTheme() {
+  try {
+    return localStorage.getItem(THEME_KEY) || "classic";
+  } catch { return "classic"; }
+}
+function saveTheme(id) {
+  try { localStorage.setItem(THEME_KEY, id); } catch { /* ignore */ }
+}
 
 function isIOSSafariForHomescreenHint() {
   if (typeof navigator === "undefined" || typeof window === "undefined") return false;
@@ -638,9 +934,11 @@ function computeAchievements(progress, times) {
 
 // --- Components ---
 
-function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0 }) {
+function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0, colorMap, shapesArr }) {
   const showContent = isRevealed || isLocked || !isBlank || isFilled;
   const parsed = showContent && token ? parseToken(token) : null;
+  const displayColor = parsed ? (colorMap ? (colorMap[parsed.color] || parsed.color) : parsed.color) : null;
+  const shapes = shapesArr || SHAPES;
   const isEasy = mode === "easy";
   const fallAnimation = isPrefilled ? `fallIntoPlace 0.5s ${fallDelay}s cubic-bezier(0.34, 1.56, 0.64, 1) both` : "none";
   const wrongAnimation = isWrong ? `fallOff 0.32s ${wrongFallDelay}s cubic-bezier(0.55, 0.09, 0.68, 0.53) forwards` : "none";
@@ -656,7 +954,7 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
       onPointerEnter={onPointerEnter}
       style={{
         width: cellSize, height: cellSize, borderRadius: cellSize > 44 ? 10 : 8,
-        backgroundColor: showContent && parsed ? parsed.color : C.surfaceLight,
+        backgroundColor: showContent && displayColor ? displayColor : C.surfaceLight,
         border: isLocked ? `2.5px solid ${C.correct}`
           : isSelected ? `2.5px solid ${C.accent}`
           : isWrong ? `2.5px solid ${C.incorrect}`
@@ -676,33 +974,35 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
         animation: winAnimation !== "none" ? winAnimation : wrongAnimation !== "none" ? wrongAnimation : emptyCellAnimation !== "none" ? emptyCellAnimation : fallAnimation,
       }}
     >
-      {showContent && parsed && SHAPES[parsed.shapeIndex % SHAPES.length](iconSize, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
+      {showContent && parsed && shapes[parsed.shapeIndex % shapes.length](iconSize, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
     </div>
   );
 }
 
-function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remaining }) {
+function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remaining, colorMap, shapesArr }) {
   const isEasy = mode === "easy" || mode === "blind";
+  const shapes = shapesArr || SHAPES;
   return (
     <div className="token-picker-scroll" style={{ display: "flex", gap: 10, justifyContent: "center", padding: "8px 16px", flexWrap: "nowrap", overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
       {tokens.map((token, i) => {
         const { color, shapeIndex } = parseToken(token);
+        const displayColor = colorMap ? (colorMap[color] || color) : color;
         const selected = selectedToken === token;
         const left = remaining && remaining[token] !== undefined ? remaining[token] : null;
         const exhausted = left !== null && left <= 0 && mode !== "hard";
         return (
           <div key={i} onClick={() => onSelect(token)}
             style={{
-              width: cellSize, height: cellSize, borderRadius: 12, backgroundColor: color,
+              width: cellSize, height: cellSize, borderRadius: 12, backgroundColor: displayColor,
               border: selected ? `3px solid ${C.text}` : "3px solid transparent",
               cursor: exhausted ? "not-allowed" : "pointer", transition: "all 0.2s cubic-bezier(0.4,0,0.2,1)",
               transform: selected ? "scale(1.15)" : "scale(1)",
               opacity: exhausted ? 0.35 : 1,
-              boxShadow: selected ? `0 0 20px ${color}66` : `0 2px 8px ${color}33`,
+              boxShadow: selected ? `0 0 20px ${displayColor}66` : `0 2px 8px ${displayColor}33`,
               position: "relative", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
             }}
           >
-            {SHAPES[shapeIndex % SHAPES.length](cellSize * 0.5, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
+            {shapes[shapeIndex % shapes.length](cellSize * 0.5, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
             {left !== null && mode !== "hard" && (
               <div style={{
                 position: "absolute", top: -6, right: -6,
@@ -742,6 +1042,122 @@ function Particles({ show }) {
       ))}
     </div>
   );
+}
+
+// --- Grid decoration overlays ---
+const SNOW_PARTICLES = Array.from({ length: 28 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  size: 2 + Math.random() * 4,
+  delay: Math.random() * 6,
+  duration: 3 + Math.random() * 4,
+  drift: -15 + Math.random() * 30,
+  opacity: 0.3 + Math.random() * 0.5,
+}));
+
+const BAT_PARTICLES = Array.from({ length: 6 }, (_, i) => ({
+  id: i,
+  x: 10 + Math.random() * 80,
+  y: 5 + Math.random() * 30,
+  size: 10 + Math.random() * 8,
+  delay: Math.random() * 4,
+  duration: 3 + Math.random() * 2,
+}));
+
+const BUBBLE_PARTICLES = Array.from({ length: 14 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  size: 3 + Math.random() * 6,
+  delay: Math.random() * 5,
+  duration: 4 + Math.random() * 3,
+  opacity: 0.15 + Math.random() * 0.3,
+}));
+
+function GridDecoration({ decoration }) {
+  if (!decoration) return null;
+
+  if (decoration === "snow") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {SNOW_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, top: -8,
+            width: p.size, height: p.size, borderRadius: "50%",
+            backgroundColor: "#fff", opacity: p.opacity,
+            animation: `snowFall ${p.duration}s ${p.delay}s linear infinite`,
+            "--drift": `${p.drift}px`,
+          }} />
+        ))}
+        {/* Tinsel top border */}
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 3,
+          background: "repeating-linear-gradient(90deg, #C6282800, #C62828 4px, #2E7D32 8px, #FFD700 12px, #2E7D3200 16px)",
+          opacity: 0.6, borderRadius: "16px 16px 0 0",
+        }} />
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, height: 3,
+          background: "repeating-linear-gradient(90deg, #2E7D3200, #FFD700 4px, #C62828 8px, #2E7D32 12px, #C6282800 16px)",
+          opacity: 0.6, borderRadius: "0 0 16px 16px",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "bats") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {BAT_PARTICLES.map(p => (
+          <svg key={p.id} width={p.size} height={p.size * 0.6} viewBox="0 0 24 14" style={{
+            position: "absolute", left: `${p.x}%`, top: `${p.y}%`,
+            opacity: 0.25,
+            animation: `batFloat ${p.duration}s ${p.delay}s ease-in-out infinite`,
+          }}>
+            <path d="M3,2 L7,8 L10,5 L12,8 L14,5 L17,8 L21,2 C19,6 17,8 12,8 C7,8 5,6 3,2 Z" fill="rgba(255,255,255,0.6)"/>
+          </svg>
+        ))}
+        {/* Web corners */}
+        <svg style={{ position: "absolute", top: 0, left: 0, opacity: 0.12 }} width="40" height="40" viewBox="0 0 40 40">
+          <path d="M0,0 Q20,5 40,0 M0,0 Q5,20 0,40 M0,0 Q15,15 30,30 M0,0 Q8,20 16,40 M0,0 Q20,8 40,16" fill="none" stroke="white" strokeWidth="0.8"/>
+        </svg>
+        <svg style={{ position: "absolute", top: 0, right: 0, opacity: 0.12, transform: "scaleX(-1)" }} width="40" height="40" viewBox="0 0 40 40">
+          <path d="M0,0 Q20,5 40,0 M0,0 Q5,20 0,40 M0,0 Q15,15 30,30 M0,0 Q8,20 16,40 M0,0 Q20,8 40,16" fill="none" stroke="white" strokeWidth="0.8"/>
+        </svg>
+      </div>
+    );
+  }
+
+  if (decoration === "glow") {
+    return (
+      <div style={{
+        position: "absolute", inset: -2, pointerEvents: "none", borderRadius: 18,
+        animation: "neonPulse 3s ease-in-out infinite",
+        boxShadow: "0 0 15px #FF008044, 0 0 30px #00FF8022, inset 0 0 15px #FF008011",
+      }} />
+    );
+  }
+
+  if (decoration === "bubbles") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {BUBBLE_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, bottom: -10,
+            width: p.size, height: p.size, borderRadius: "50%",
+            border: "1px solid rgba(100,200,255,0.4)",
+            backgroundColor: "rgba(100,200,255,0.08)",
+            opacity: p.opacity,
+            animation: `bubbleRise ${p.duration}s ${p.delay}s ease-in infinite`,
+          }} />
+        ))}
+        {/* Wave bottom border */}
+        <svg style={{ position: "absolute", bottom: 0, left: 0, right: 0, opacity: 0.15 }} viewBox="0 0 200 12" preserveAspectRatio="none" height="8">
+          <path d="M0,8 C25,2 50,2 75,8 C100,14 125,14 150,8 C175,2 190,2 200,8 L200,12 L0,12 Z" fill="#4FC3F7"/>
+        </svg>
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function AttemptDots({ max, used, won }) {
@@ -866,6 +1282,14 @@ export default function Pattrn() {
   const prevUnlockedRef = useRef(null);
   const [birthdayInput, setBirthdayInput] = useState("");
   const goToDateRef = useRef(null);
+
+  // Theme state
+  const [activeThemeId, setActiveThemeId] = useState(() => loadTheme());
+  const [showThemePicker, setShowThemePicker] = useState(false);
+
+  const activeTheme = useMemo(() => PUZZLE_THEMES.find(t => t.id === activeThemeId) || PUZZLE_THEMES[0], [activeThemeId]);
+  const themeColorMap = useMemo(() => buildColorMap(activeTheme.palettes), [activeTheme]);
+  const themedShapes = activeTheme.shapes || SHAPES;
 
   // Scroll play view to top when entering or changing puzzle
   useEffect(() => {
@@ -2869,6 +3293,38 @@ export default function Pattrn() {
                       <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
                     </button>
 
+                    {/* Themes */}
+                    <button onClick={() => { setShowGameMenu(false); setShowThemePicker(true); }} style={{
+                      width: "100%", padding: "14px 16px", borderRadius: 12,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                      transition: "all 0.15s",
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#A78BFA"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        backgroundColor: "#A78BFA22", display: "flex", alignItems: "center", justifyContent: "center",
+                        border: "1.5px solid #A78BFA44", flexShrink: 0,
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <circle cx="5" cy="5" r="3" fill="#FF6B6B" opacity="0.8"/>
+                          <circle cx="11" cy="5" r="3" fill="#4ECDC4" opacity="0.8"/>
+                          <circle cx="8" cy="11" r="3" fill="#FFE66D" opacity="0.8"/>
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                          Themes
+                        </div>
+                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                          {activeTheme.id === "classic" ? "Classic" : `${activeTheme.icon || ""} ${activeTheme.name}`}
+                        </div>
+                      </div>
+                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                    </button>
+
                     {/* Divider */}
                     <div style={{ height: 1, backgroundColor: C.border, margin: "4px 0" }} />
 
@@ -2909,6 +3365,149 @@ export default function Pattrn() {
                   borderTop: `1px solid ${C.border}`, marginTop: 16, flexShrink: 0,
                 }}>
                   <button onClick={() => setShowGameMenu(false)}
+                    style={{
+                      width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                      padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Theme Picker */}
+        {showThemePicker && (() => {
+          const achList = computeAchievements(progress, times);
+          return (
+            <div onClick={() => setShowThemePicker(false)} style={{
+              position: "fixed", inset: 0, zIndex: 1100,
+              display: "flex", flexDirection: "column", justifyContent: "flex-end",
+              animation: "drawerOverlayFade 0.25s ease both",
+            }}>
+              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } } @keyframes drawerOverlayFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
+              <div style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)" }} />
+              <div onClick={e => e.stopPropagation()} style={{
+                backgroundColor: C.bg, borderRadius: "20px 20px 0 0",
+                border: `1px solid ${C.border}`, borderBottom: "none",
+                maxHeight: "75vh", display: "flex", flexDirection: "column",
+                animation: "drawerSlideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both",
+              }}>
+                <div style={{ padding: "20px 24px 0", flexShrink: 0 }}>
+                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border, margin: "0 auto 16px" }} />
+                  <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, margin: "0 0 4px", letterSpacing: 1 }}>
+                    Themes
+                  </h2>
+                  <p style={{ fontSize: 11, color: C.textDim, margin: "0 0 16px", lineHeight: 1.5 }}>
+                    Unlock themes through achievements or play on themed days
+                  </p>
+                </div>
+
+                <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {PUZZLE_THEMES.map(theme => {
+                    const unlocked = isThemeUnlocked(theme, achList);
+                    const isActive = activeThemeId === theme.id;
+                    const seasonalMonth = theme.unlock?.seasonal;
+                    const achId = theme.unlock?.achievement;
+                    const ach = achId ? ACHIEVEMENTS.find(a => a.id === achId) : null;
+                    let unlockHint = "";
+                    if (theme.unlock) {
+                      const parts = [];
+                      if (seasonalMonth) {
+                        const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                        parts.push(`Play in ${monthNames[seasonalMonth]}`);
+                      }
+                      if (ach) parts.push(`"${ach.label}" achievement`);
+                      unlockHint = parts.join(" or ");
+                    }
+
+                    return (
+                      <button
+                        key={theme.id}
+                        onClick={() => {
+                          if (unlocked) {
+                            setActiveThemeId(theme.id);
+                            saveTheme(theme.id);
+                          }
+                        }}
+                        style={{
+                          width: "100%", padding: "14px 16px", borderRadius: 12,
+                          backgroundColor: isActive ? (theme.gridBg || C.surface) : C.surface,
+                          border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
+                          cursor: unlocked ? "pointer" : "default",
+                          display: "flex", alignItems: "center", gap: 12,
+                          transition: "all 0.15s",
+                          opacity: unlocked ? 1 : 0.5,
+                        }}
+                        onMouseEnter={e => { if (unlocked && !isActive) e.currentTarget.style.borderColor = C.accent + "88"; }}
+                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.borderColor = C.border; }}
+                      >
+                        {/* Theme preview: 3 color dots */}
+                        <div style={{
+                          width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                          backgroundColor: theme.gridBg || C.surfaceLight,
+                          border: `1.5px solid ${theme.gridBorder || C.border}`,
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 2,
+                          flexWrap: "wrap", padding: 4, position: "relative", overflow: "hidden",
+                        }}>
+                          {theme.icon ? (
+                            <span style={{ fontSize: 18, lineHeight: 1 }}>{theme.icon}</span>
+                          ) : (
+                            <>
+                              {(theme.palettes || PALETTES)[0].slice(0, 4).map((col, ci) => (
+                                <div key={ci} style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: col }} />
+                              ))}
+                            </>
+                          )}
+                          {!unlocked && (
+                            <div style={{
+                              position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                <rect x="2" y="6" width="10" height="7" rx="1.5" fill="none" stroke={C.textDim} strokeWidth="1.5"/>
+                                <path d="M4.5,6 V4 C4.5,2.3 5.6,1 7,1 C8.4,1 9.5,2.3 9.5,4 V6" fill="none" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round"/>
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+
+                        <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+                          <div style={{
+                            fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
+                            color: isActive ? C.accent : C.text, letterSpacing: 0.5,
+                            display: "flex", alignItems: "center", gap: 6,
+                          }}>
+                            {theme.name}
+                            {isActive && <span style={{ fontSize: 9, color: C.accent, fontWeight: 400 }}>(active)</span>}
+                          </div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                            {!unlocked ? unlockHint : theme.desc}
+                          </div>
+                        </div>
+
+                        {unlocked && !isActive && (
+                          <span style={{ color: C.textDim, fontSize: 11, fontFamily: "'Space Mono', monospace", flexShrink: 0 }}>Select</span>
+                        )}
+                        {isActive && (
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                            <path d="M3 8.5L6.5 12L13 4" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div style={{
+                  padding: "16px 24px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+                  borderTop: `1px solid ${C.border}`, marginTop: 8, flexShrink: 0,
+                }}>
+                  <button onClick={() => setShowThemePicker(false)}
                     style={{
                       width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
                       padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
@@ -2965,10 +3564,12 @@ export default function Pattrn() {
                       localStorage.removeItem(TIMES_KEY);
                       localStorage.removeItem(HOMESCREEN_HINT_KEY);
                       localStorage.removeItem(BIRTHDAY_KEY);
+                      localStorage.removeItem(THEME_KEY);
                     } catch { /* ignore */ }
                     setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
                     setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
                     setBirthday(null);
+                    setActiveThemeId("classic");
                     setHomescreenHintDismissed(false);
                     setShowClearConfirm(false);
                     setShowGameMenu(false);
@@ -3138,7 +3739,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateY(6px) scale(1.05)} 60%{transform:translateY(-3px) scale(0.98)} 80%{transform:translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-30px) scale(0.85)} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateY(6px) scale(1.05)} 60%{transform:translateY(-3px) scale(0.98)} 80%{transform:translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} }`}</style>
 
       <Particles show={showParticles} />
 
@@ -3300,12 +3901,13 @@ export default function Pattrn() {
       <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
         <div style={{
           display: "flex", flexDirection: "column", gap: gridSize >= 7 ? 3 : 4, padding: gridSize >= 7 ? 10 : 14,
-          backgroundColor: C.surface, borderRadius: 16,
-          border: `1px solid ${C.border}`, boxShadow: `0 8px 32px ${C.bg}88`,
-          overflow: "visible",
+          backgroundColor: activeTheme.gridBg || C.surface, borderRadius: 16,
+          border: `1px solid ${activeTheme.gridBorder || C.border}`, boxShadow: `0 8px 32px ${C.bg}88`,
+          overflow: "visible", position: "relative",
         }}>
+          <GridDecoration decoration={activeTheme.decoration} />
           {puzzle.solution.map((row, r) => (
-            <div key={r} style={{ display: "flex", gap: gridSize >= 7 ? 3 : 4 }}>
+            <div key={r} style={{ display: "flex", gap: gridSize >= 7 ? 3 : 4, position: "relative", zIndex: 1 }}>
               {row.map((token, c) => {
                 const key = `${r}-${c}`;
                 const isBlankCell = puzzle.blanks.has(key);
@@ -3342,6 +3944,8 @@ export default function Pattrn() {
                     onPointerEnter={() => handleCellPointerEnter(r, c)}
                     cellSize={cellSize} iconSize={iconSize}
                     mode={puzzle.mode}
+                    colorMap={themeColorMap}
+                    shapesArr={themedShapes}
                   />
                 );
               })}
@@ -3355,7 +3959,7 @@ export default function Pattrn() {
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
         {/* Token picker row */}
         {gameState === "playing" && (
-          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} />
+          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} />
         )}
         {gameState === "playing" && (
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
