@@ -939,6 +939,26 @@ function makeGenerators(sz) {
     (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[(r % 2 === 0 ? c : last - c) % n])),
     // 19: corner gradient
     (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[Math.floor((r + c) * n / (sz * 2 - 2)) % n])),
+    // 20: chevron (V-bands pointing down from top center)
+    (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[(Math.abs(c - mid) + r) % n])),
+    // 21: brick stagger (offset every other row like a brick wall)
+    (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[(c + (r % 2) * Math.ceil(sz / 2)) % n])),
+    // 22: sine wave (wavy vertical bands via sinusoidal row offset)
+    (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[((c + Math.round(Math.sin(r / sz * Math.PI * 2) * mid / 2)) % n + n) % n])),
+    // 23: diagonal blocks (chunky 2x2 block diagonal)
+    (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[(Math.floor(r / 2) + Math.floor(c / 2)) % n])),
+    // 24: XOR fractal (Sierpinski-like irregular pattern)
+    (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[(r ^ c) % n])),
+    // 25: corner layers (L-shaped layers from top-left corner)
+    (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[Math.min(r, c) % n])),
+    // 26: wide staircase (thick diagonal step bands)
+    (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[Math.floor((r + c) / 2) % n])),
+    // 27: steep diagonal (steeper angle than regular diagonal)
+    (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[(r * 2 + c) % n])),
+    // 28: horizontal chevron (sideways V-bands from left center)
+    (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[(Math.abs(r - mid) + c) % n])),
+    // 29: wave rows (wavy horizontal bands via sinusoidal column offset)
+    (p, n) => Array.from({ length: sz }, (_, r) => Array.from({ length: sz }, (_, c) => p[((r + Math.round(Math.sin(c / sz * Math.PI * 2) * mid / 2)) % n + n) % n])),
   ];
 }
 
@@ -952,6 +972,7 @@ const STRIPE_GENS = new Set([0, 1, 2, 3]);
 // Weighted generator selection (stripes get low weight)
 const GEN_WEIGHTS = [
   1, 1, 1, 1, 2, 3, 3, 4, 4, 3, 3, 3, 3, 2, 1, 4, 4, 4, 3, 3,
+  4, 3, 4, 3, 4, 3, 3, 3, 4, 4,
 ];
 
 function weightedGenIndex(r) {
