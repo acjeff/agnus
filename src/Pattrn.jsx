@@ -2400,7 +2400,7 @@ export default function Pattrn() {
           }}>
             <div onClick={e => e.stopPropagation()} style={{
               backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
-              maxWidth: 480, width: "100%",
+              maxWidth: 480, width: "100%", overflow: "hidden",
               boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`,
               animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
             }}>
@@ -2409,7 +2409,7 @@ export default function Pattrn() {
                 <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
               </div>
 
-              <div style={{ padding: "8px 24px 0" }}>
+              <div style={{ padding: "8px 24px 0", overflow: "hidden" }}>
                 <div style={{ textAlign: "center", marginBottom: 16 }}>
                   <span style={{ fontSize: 32 }}>{"\uD83C\uDF82"}</span>
                   <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#F472B6", margin: "8px 0 4px" }}>
@@ -2427,7 +2427,7 @@ export default function Pattrn() {
                   style={{
                     width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`,
                     backgroundColor: C.surface, color: C.text, fontFamily: "'Space Mono', monospace", fontSize: 14,
-                    outline: "none", boxSizing: "border-box",
+                    outline: "none", boxSizing: "border-box", minWidth: 0,
                     colorScheme: "dark",
                   }}
                 />
