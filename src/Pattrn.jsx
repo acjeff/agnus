@@ -4507,11 +4507,16 @@ export default function Pattrn() {
         );
       })()}
 
-      {/* Theme unlock toast — positioned at bottom to avoid overlap with achievement toast */}
+      {/* Theme unlock toast — positioned at top, below achievement toast if visible */}
       {themeToast && (
         <div key={themeToast.key} style={{
-          position: "fixed", bottom: "calc(160px + env(safe-area-inset-bottom, 0px))", left: "50%",
+          position: "fixed",
+          top: achievementToast
+            ? "calc(170px + env(safe-area-inset-top, 0px))"
+            : "calc(100px + env(safe-area-inset-top, 0px))",
+          left: "50%",
           transform: "translateX(-50%)", zIndex: 100,
+          maxWidth: "calc(100vw - 32px)", boxSizing: "border-box",
           animation: themeToastDismissing
             ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
             : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
