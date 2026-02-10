@@ -4678,7 +4678,7 @@ export default function Pattrn() {
       </div>
 
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", marginTop: "calc(88px + env(safe-area-inset-top, 0px))", marginBottom: "calc(140px + env(safe-area-inset-bottom, 0px))", width: "100%", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, border: `1px solid ${activeTheme.gridBorder || C.border}`, borderRadius: 16, boxShadow: `0 8px 32px ${C.bg}88`, position: "relative", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(88px + env(safe-area-inset-top, 0px))", paddingBottom: "calc(140px + env(safe-area-inset-bottom, 0px))", width: "calc(100% + 32px)", margin: "0 -16px", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, position: "relative", boxSizing: "border-box" }}>
         <GridDecoration decoration={activeTheme.decoration} />
       <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
         <div style={{
