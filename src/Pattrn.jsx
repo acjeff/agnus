@@ -67,6 +67,718 @@ const PALETTES = [
   ["#6C5CE7", "#A29BFE", "#FD79A8", "#FDCB6E", "#00CEC9"],
 ];
 
+// --- Themed shape sets ---
+const CHRISTMAS_SHAPES = [
+  // Snowflake
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <line x1="12" y1="4" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="5.1" y1="8" x2="18.9" y2="16" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="5.1" y1="16" x2="18.9" y2="8" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Tree
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <polygon points="12,4 19,17 5,17" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <line x1="12" y1="17" x2="12" y2="21" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // 4-pointed star
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <polygon points="12,3 14,10 21,12 14,14 12,21 10,14 3,12 10,10" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Bell
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M9,14 L9,9 C9,6.2 10.3,4 12,4 C13.7,4 15,6.2 15,9 L15,14 L17,17 L7,17 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <line x1="10.5" y1="17" x2="13.5" y2="17" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Gift box
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="5" y="10" width="14" height="10" rx="1" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12" y1="10" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="5" y1="13" x2="19" y2="13" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M9,10 C9,7 12,6 12,8 C12,6 15,7 15,10" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Candy cane
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M14,20 L14,8 C14,5.2 11,4 9,6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Ornament
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="14" r="6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12" y1="4" x2="12" y2="8" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  ),
+];
+
+const HALLOWEEN_SHAPES = [
+  // Pumpkin
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <ellipse cx="12" cy="14" rx="7" ry="6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12" y1="8" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+      <path d="M12,8 C12,5 10,4 9,5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Bat
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M3,8 L7,14 L10,10 L12,14 L14,10 L17,14 L21,8 C19,12 17,14 12,14 C7,14 5,12 3,8 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Ghost
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M7,20 L7,11 C7,7.1 9.2,4 12,4 C14.8,4 17,7.1 17,11 L17,20 L15,18 L13,20 L11,18 L9,20 L7,20 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Spider
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="3.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="9" y1="9" x2="4" y2="4" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="15" y1="9" x2="20" y2="4" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="9" y1="15" x2="4" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="15" y1="15" x2="20" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Skull
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M7,13 C7,8 9,5 12,5 C15,5 17,8 17,13 L17,15 L14,17 L10,17 L7,15 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <circle cx="10" cy="11" r="1.2" fill={stroke || "rgba(255,255,255,0.8)"}/>
+      <circle cx="14" cy="11" r="1.2" fill={stroke || "rgba(255,255,255,0.8)"}/>
+    </svg>
+  ),
+  // Cat
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="14" r="6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <polygon points="7,10 5,3 10,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <polygon points="17,10 19,3 14,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Crescent moon
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M15,4 C11,5 8,8.5 8,12.5 C8,16.5 11,20 15,21 C11,21 6,17 6,12.5 C6,8 11,4 15,4 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+];
+
+const OCEAN_SHAPES = [
+  // Fish
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <ellipse cx="13" cy="12" rx="6" ry="4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <polygon points="7,12 3,7 3,17" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <circle cx="16" cy="11" r="1" fill={stroke || "rgba(255,255,255,0.8)"}/>
+    </svg>
+  ),
+  // Shell
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,4 C18,10 18,18 12,20 C6,18 6,10 12,4 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <line x1="12" y1="6" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+    </svg>
+  ),
+  // Wave
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M3,12 C5,8 8,8 10,12 C12,16 15,16 17,12 C19,8 21,8 21,12" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Anchor
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="6" r="2.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12" y1="8.5" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="7" y1="12" x2="17" y2="12" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M6,17 C6,20 12,21 12,20 C12,21 18,20 18,17" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Starfish
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <polygon points="12,3 13.8,9.5 20.5,9.5 15.2,13.5 17,20 12,16.2 7,20 8.8,13.5 3.5,9.5 10.2,9.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Seahorse
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M14,4 C16,4 17,6 15,8 C13,10 11,12 11,14 C11,17 13,19 15,18 C17,17 16,15 14,15" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <circle cx="14" cy="5.5" r="0.8" fill={stroke || "rgba(255,255,255,0.8)"}/>
+    </svg>
+  ),
+  // Trident
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <line x1="12" y1="4" x2="12" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M7,9 L7,4" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M17,9 L17,4" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M7,9 C7,13 12,13 12,9" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M17,9 C17,13 12,13 12,9" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+    </svg>
+  ),
+];
+
+const PASTEL_SHAPES = [
+  // Flower (5 petals)
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="7" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="16.5" cy="10.5" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="14.8" cy="15.5" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="9.2" cy="15.5" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="7.5" cy="10.5" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+    </svg>
+  ),
+  // Heart
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,20 C12,20 4,14 4,9 C4,6 6.5,4 9,4 C10.5,4 11.5,5 12,6 C12.5,5 13.5,4 15,4 C17.5,4 20,6 20,9 C20,14 12,20 12,20 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Butterfly
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <ellipse cx="8" cy="10" rx="4" ry="5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" transform="rotate(-15 8 10)"/>
+      <ellipse cx="16" cy="10" rx="4" ry="5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" transform="rotate(15 16 10)"/>
+      <line x1="12" y1="6" x2="12" y2="19" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+    </svg>
+  ),
+  // Cloud
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M7,16 C4.5,16 3,14.5 3,12.5 C3,10.5 4.5,9 6.5,9 C6.5,6.5 8.5,5 11,5 C13.5,5 15.5,6.5 16,8.5 C18.5,8.5 20.5,10 20.5,12.5 C20.5,14.5 19,16 17,16 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Sun
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12" y1="3" x2="12" y2="6" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="12" y1="18" x2="12" y2="21" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="3" y1="12" x2="6" y2="12" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="18" y1="12" x2="21" y2="12" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Leaf
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,4 C17,6 20,12 17,18 C14,22 8,20 6,16 C4,12 7,6 12,4 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <path d="M12,4 C10,10 8,14 6,16" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Raindrop
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,3 C12,3 5,12 5,16 C5,19.3 8.1,21 12,21 C15.9,21 19,19.3 19,16 C19,12 12,3 12,3 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+];
+
+const RETRO_SHAPES = [
+  // Pixel heart (stepped)
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M6,8 L6,6 L8,6 L8,4 L11,4 L11,6 L13,6 L13,4 L16,4 L16,6 L18,6 L18,8 L20,8 L20,12 L18,12 L18,14 L16,14 L16,16 L14,16 L14,18 L12,18 L12,20 L12,20 L12,18 L10,18 L10,16 L8,16 L8,14 L6,14 L6,12 L4,12 L4,8 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinejoin="miter"/>
+    </svg>
+  ),
+  // Arrow
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M4,10 L14,10 L14,6 L21,12 L14,18 L14,14 L4,14 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="miter"/>
+    </svg>
+  ),
+  // Shield
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,3 L20,7 L20,13 C20,17 16,20 12,21 C8,20 4,17 4,13 L4,7 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Lightning bolt
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <polygon points="13,3 7,13 11,13 11,21 17,11 13,11" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Sword
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <line x1="12" y1="3" x2="12" y2="17" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="7" y1="14" x2="17" y2="14" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="10" y1="17" x2="14" y2="17" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+      <polygon points="12,3 10,7 14,7" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+    </svg>
+  ),
+  // Coin
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <circle cx="12" cy="12" r="5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+    </svg>
+  ),
+  // Key
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="9" cy="8" r="4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12.5" y1="10.5" x2="19" y2="17" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="16" y1="17" x2="19" y2="14" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+];
+
+const CANDY_SHAPES = [
+  // Lollipop
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="9" r="5.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M12,9 C12,6 15,6 15,9 C15,12 12,12 12,9" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <line x1="12" y1="14.5" x2="12" y2="21" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Wrapped candy
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="7" y="8" width="10" height="8" rx="4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M7,10 L4,7 M7,14 L4,17 M17,10 L20,7 M17,14 L20,17" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Cupcake
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M6,13 C6,10 8,8 12,8 C16,8 18,10 18,13" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M6,13 L7.5,20 L16.5,20 L18,13" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <path d="M9,8 C9,5 12,3 12,5 C12,3 15,5 15,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Ice cream
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="8" r="5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <polygon points="7.5,12 12,21 16.5,12" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Donut
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="7" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <circle cx="12" cy="12" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+    </svg>
+  ),
+  // Cookie
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="7" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <circle cx="10" cy="9" r="1" fill={stroke || "rgba(255,255,255,0.8)"}/>
+      <circle cx="15" cy="10" r="1" fill={stroke || "rgba(255,255,255,0.8)"}/>
+      <circle cx="11" cy="14" r="1" fill={stroke || "rgba(255,255,255,0.8)"}/>
+      <circle cx="15" cy="15" r="1" fill={stroke || "rgba(255,255,255,0.8)"}/>
+    </svg>
+  ),
+  // Cherry
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="9" cy="16" r="4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <circle cx="16" cy="14" r="3.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M9,12 C9,7 12,4 14,4 M16,10.5 C16,7 14,4 14,4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  ),
+];
+
+const VALENTINE_SHAPES = [
+  // Heart
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,20 C12,20 4,14 4,9 C4,6 6.5,4 9,4 C10.5,4 11.5,5 12,6 C12.5,5 13.5,4 15,4 C17.5,4 20,6 20,9 C20,14 12,20 12,20 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Arrow through heart
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,19 C12,19 5.5,14 5.5,9.5 C5.5,7 7.5,5.5 9.5,5.5 C10.8,5.5 11.5,6 12,7 C12.5,6 13.2,5.5 14.5,5.5 C16.5,5.5 18.5,7 18.5,9.5 C18.5,14 12,19 12,19 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinejoin="round"/>
+      <line x1="3" y1="15" x2="21" y2="5" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round"/>
+      <polygon points="21,5 17,5.5 20.5,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Rose
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,4 C14,6 16,6 16,9 C16,12 14,13 12,13 C10,13 8,12 8,9 C8,6 10,6 12,4 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <path d="M10,9 C10,7 12,6 12,8 C12,6 14,7 14,9" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="12" y1="13" x2="12" y2="21" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M12,16 C10,15 8,16 8,16" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Envelope
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="4" y="7" width="16" height="11" rx="1.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M4,7 L12,13 L20,7" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Ring
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="14" r="6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5"/>
+      <polygon points="12,3 9,8 15,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Bow/ribbon
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,12 C9,9 4,8 5,12 C6,16 11,14 12,12 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <path d="M12,12 C15,9 20,8 19,12 C18,16 13,14 12,12 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <path d="M10,15 L12,21 L14,15" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Lips
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M4,12 C6,8 9,8 12,10 C15,8 18,8 20,12 C18,16 15,17 12,15 C9,17 6,16 4,12 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+];
+
+// --- Themed color palettes ---
+const CHRISTMAS_PALETTES = [
+  ["#C62828", "#2E7D32", "#FFD700", "#ECEFF1", "#880E4F"],
+  ["#D32F2F", "#1B5E20", "#FFC107", "#B71C1C", "#4CAF50"],
+  ["#EF5350", "#66BB6A", "#FFEE58", "#CE93D8", "#26A69A"],
+  ["#F44336", "#43A047", "#8E24AA", "#00838F", "#E91E63"],
+  ["#B71C1C", "#81C784", "#F06292", "#FFD54F", "#00695C"],
+];
+
+const HALLOWEEN_PALETTES = [
+  ["#FF6D00", "#7B1FA2", "#FFAB00", "#1B5E20", "#BF360C"],
+  ["#E65100", "#4A148C", "#00C853", "#FFD600", "#880E4F"],
+  ["#FF9800", "#9C27B0", "#76FF03", "#FF1744", "#311B92"],
+  ["#EF6C00", "#6A1B9A", "#00E676", "#FF3D00", "#4527A0"],
+  ["#F57C00", "#8E24AA", "#AEEA00", "#D50000", "#283593"],
+];
+
+const NEON_PALETTES = [
+  ["#FF0080", "#00FF80", "#FFFF00", "#8000FF", "#FF4040"],
+  ["#FF6EC7", "#39FF14", "#00BFFF", "#FFD300", "#FF073A"],
+  ["#F900FF", "#00FFFF", "#FF3131", "#BFFF00", "#7B68EE"],
+  ["#FF1493", "#00FF7F", "#FF4500", "#1E90FF", "#ADFF2F"],
+  ["#FF00FF", "#00FFCC", "#FFA500", "#7FFF00", "#4169E1"],
+];
+
+const OCEAN_PALETTES = [
+  ["#0277BD", "#00897B", "#FF7043", "#FDD835", "#0097A7"],
+  ["#01579B", "#00695C", "#1565C0", "#F4511E", "#00ACC1"],
+  ["#4FC3F7", "#80DEEA", "#FFAB91", "#FFF176", "#26C6DA"],
+  ["#039BE5", "#00796B", "#7C4DFF", "#FF6E40", "#00BFA5"],
+  ["#0288D1", "#4DB6AC", "#EC407A", "#FFD740", "#006064"],
+];
+
+const PASTEL_PALETTES = [
+  ["#FFB3BA", "#BAFFC9", "#BAE1FF", "#E8BAFF", "#FFFFBA"],
+  ["#FFC8DD", "#BDE0FE", "#A2D2FF", "#CDB4DB", "#CAFFBF"],
+  ["#FFADAD", "#FFC6FF", "#BDB2FF", "#A0C4FF", "#FDFFB6"],
+  ["#F0DBFF", "#B8F0DB", "#FFE0B8", "#B8D8F0", "#FFB8D8"],
+  ["#D4A5FF", "#A5FFD4", "#FFD4A5", "#A5D4FF", "#FFA5D4"],
+];
+
+const SUNSET_PALETTES = [
+  ["#FF6B35", "#F7931E", "#FFD166", "#C73E1D", "#EF476F"],
+  ["#FF7B54", "#FFB26B", "#FFD56F", "#939B62", "#D35400"],
+  ["#FCA311", "#E76F51", "#F4A261", "#264653", "#2A9D8F"],
+  ["#FF5733", "#FFC300", "#DAF7A6", "#C70039", "#900C3F"],
+  ["#E74C3C", "#F39C12", "#F1C40F", "#E67E22", "#D35400"],
+];
+
+const MONO_PALETTES = [
+  ["#D4D4D8", "#A1A1AA", "#71717A", "#52525B", "#3F3F46"],
+  ["#E4E4E7", "#A8A8B0", "#78788A", "#585868", "#404050"],
+  ["#C8C8D0", "#9898A8", "#686878", "#484858", "#383848"],
+  ["#B8B8C8", "#8888A0", "#606078", "#505068", "#404058"],
+  ["#DCDCE4", "#ACACBC", "#7C7C94", "#5C5C74", "#3C3C54"],
+];
+
+const RETRO_PALETTES = [
+  ["#FF0054", "#00FF9F", "#FF6700", "#00B8FF", "#FFE600"],
+  ["#FF2E63", "#08D9D6", "#FF9A3C", "#3D5AF1", "#F2FF49"],
+  ["#FF1E56", "#36EEE0", "#FF6B35", "#6979F8", "#FFFD82"],
+  ["#E80054", "#00DDC1", "#FF8700", "#4361EE", "#FCFF4B"],
+  ["#FF0066", "#00F0B5", "#FF7B00", "#2D7DD2", "#FFE93C"],
+];
+
+const FOREST_PALETTES = [
+  ["#2D6A4F", "#40916C", "#D4A373", "#8B5E3C", "#588157"],
+  ["#344E41", "#3A5A40", "#A3B18A", "#DAD7CD", "#6B4226"],
+  ["#1B4332", "#52796F", "#84A98C", "#BC6C25", "#DDA15E"],
+  ["#2D6A4F", "#74C69D", "#B07D62", "#264653", "#95D5B2"],
+  ["#3A5A40", "#558B6E", "#C9ADA7", "#6B705C", "#A68A64"],
+];
+
+const GALAXY_PALETTES = [
+  ["#7B2FF7", "#3B82F6", "#06B6D4", "#C084FC", "#F472B6"],
+  ["#8B5CF6", "#6366F1", "#0EA5E9", "#D946EF", "#EC4899"],
+  ["#A78BFA", "#818CF8", "#38BDF8", "#E879F9", "#F9A8D4"],
+  ["#7C3AED", "#4F46E5", "#0284C7", "#C026D3", "#DB2777"],
+  ["#6D28D9", "#3730A3", "#0369A1", "#A21CAF", "#BE185D"],
+];
+
+const CANDY_PALETTES = [
+  ["#FF6B9D", "#C660E8", "#55D6C2", "#FFBC42", "#FF4F7B"],
+  ["#FF85A1", "#B76CFD", "#00D4AA", "#FFD93D", "#FF6B6B"],
+  ["#FF99C8", "#CB8CFF", "#69D2E7", "#FFE66D", "#FF7EB3"],
+  ["#FF7096", "#A855F7", "#34D399", "#FBBF24", "#F87171"],
+  ["#FF5C8A", "#9333EA", "#2DD4BF", "#F59E0B", "#EF4444"],
+];
+
+const ARCTIC_PALETTES = [
+  ["#E0F2FE", "#7DD3FC", "#38BDF8", "#93C5FD", "#C7D2FE"],
+  ["#F0F9FF", "#BAE6FD", "#0EA5E9", "#A5B4FC", "#DDD6FE"],
+  ["#DBEAFE", "#60A5FA", "#2563EB", "#818CF8", "#E0E7FF"],
+  ["#E8F4FD", "#9ED8F7", "#4BA3D0", "#88A0D4", "#C8CCE8"],
+  ["#F1F5F9", "#94A3B8", "#0891B2", "#6366F1", "#CBD5E1"],
+];
+
+const VALENTINE_PALETTES = [
+  ["#FF2D55", "#FF6B8A", "#FFB3C1", "#C9184A", "#FF758F"],
+  ["#E11D48", "#FB7185", "#FECDD3", "#9F1239", "#FDA4AF"],
+  ["#F43F5E", "#FF8FAB", "#FFD6E0", "#BE123C", "#FF6B8A"],
+  ["#FF0A54", "#FF477E", "#FF85A1", "#FF0040", "#FF5C8A"],
+  ["#DB2777", "#F472B6", "#FBCFE8", "#9D174D", "#EC4899"],
+];
+
+const SPRING_PALETTES = [
+  ["#10B981", "#34D399", "#FBBF24", "#F472B6", "#A78BFA"],
+  ["#059669", "#6EE7B7", "#F59E0B", "#EC4899", "#8B5CF6"],
+  ["#047857", "#4ADE80", "#EAB308", "#D946EF", "#7C3AED"],
+  ["#15803D", "#86EFAC", "#FCD34D", "#F9A8D4", "#C4B5FD"],
+  ["#166534", "#A7F3D0", "#FDE68A", "#FBCFE8", "#DDD6FE"],
+];
+
+// --- Build color map from original palettes to themed palettes ---
+function buildColorMap(themePalettes) {
+  if (!themePalettes) return null;
+  const map = {};
+  for (let i = 0; i < PALETTES.length; i++) {
+    for (let j = 0; j < PALETTES[i].length; j++) {
+      const orig = PALETTES[i][j];
+      if (!map[orig]) map[orig] = themePalettes[i][j];
+    }
+  }
+  return map;
+}
+
+// --- Puzzle theme definitions ---
+const PUZZLE_THEMES = [
+  {
+    id: "classic",
+    name: "Classic",
+    desc: "The original Agnus look",
+    icon: null,
+    palettes: null,
+    shapes: null,
+    decoration: null,
+    gridBg: null,
+    gridBorder: null,
+    unlock: null,
+  },
+  {
+    id: "christmas",
+    name: "Christmas",
+    desc: "Festive reds, greens & gold",
+    icon: "\uD83C\uDF84",
+    palettes: CHRISTMAS_PALETTES,
+    shapes: CHRISTMAS_SHAPES,
+    decoration: "snow",
+    gridBg: "#0d1a12",
+    gridBorder: "#2E7D3266",
+    unlock: { seasonal: 12, achievement: "streak_7" },
+  },
+  {
+    id: "halloween",
+    name: "Halloween",
+    desc: "Spooky oranges & purples",
+    icon: "\uD83C\uDF83",
+    palettes: HALLOWEEN_PALETTES,
+    shapes: HALLOWEEN_SHAPES,
+    decoration: "bats",
+    gridBg: "#14080a",
+    gridBorder: "#7B1FA266",
+    unlock: { seasonal: 10, achievement: "total_100" },
+  },
+  {
+    id: "neon",
+    name: "Neon",
+    desc: "Electric glow in the dark",
+    icon: "\u26A1",
+    palettes: NEON_PALETTES,
+    shapes: null,
+    decoration: "glow",
+    gridBg: "#050510",
+    gridBorder: "#FF008066",
+    unlock: { achievement: "gold_25" },
+  },
+  {
+    id: "ocean",
+    name: "Ocean",
+    desc: "Deep sea blues & corals",
+    icon: "\uD83C\uDF0A",
+    palettes: OCEAN_PALETTES,
+    shapes: OCEAN_SHAPES,
+    decoration: "bubbles",
+    gridBg: "#071318",
+    gridBorder: "#0277BD44",
+    unlock: { achievement: "med_50" },
+  },
+  // --- Easy unlocks ---
+  {
+    id: "pastel",
+    name: "Pastel",
+    desc: "Soft & dreamy colours",
+    icon: "\uD83C\uDF38",
+    palettes: PASTEL_PALETTES,
+    shapes: PASTEL_SHAPES,
+    decoration: "petals",
+    gridBg: "#18141e",
+    gridBorder: "#E8BAFF44",
+    unlock: { achievement: "first_try" },
+  },
+  {
+    id: "sunset",
+    name: "Sunset",
+    desc: "Warm golden hour vibes",
+    icon: "\uD83C\uDF05",
+    palettes: SUNSET_PALETTES,
+    shapes: null,
+    decoration: "rays",
+    gridBg: "#1a120a",
+    gridBorder: "#FF6B3544",
+    unlock: { achievement: "easy_5" },
+  },
+  {
+    id: "mono",
+    name: "Monochrome",
+    desc: "Elegant shades of grey",
+    icon: "\u25D1",
+    palettes: MONO_PALETTES,
+    shapes: null,
+    decoration: null,
+    gridBg: "#111114",
+    gridBorder: "#52525B44",
+    unlock: { achievement: "under_30" },
+  },
+  // --- Medium unlocks ---
+  {
+    id: "retro",
+    name: "Retro Arcade",
+    desc: "80s pixel power",
+    icon: "\uD83D\uDD79\uFE0F",
+    palettes: RETRO_PALETTES,
+    shapes: RETRO_SHAPES,
+    decoration: "scanlines",
+    gridBg: "#0a0a14",
+    gridBorder: "#FF005444",
+    unlock: { achievement: "med_5" },
+  },
+  {
+    id: "forest",
+    name: "Forest",
+    desc: "Deep woodland greens",
+    icon: "\uD83C\uDF32",
+    palettes: FOREST_PALETTES,
+    shapes: null,
+    decoration: "leaves",
+    gridBg: "#0c140e",
+    gridBorder: "#2D6A4F44",
+    unlock: { achievement: "streak_3" },
+  },
+  {
+    id: "galaxy",
+    name: "Galaxy",
+    desc: "Cosmic purples & stardust",
+    icon: "\uD83C\uDF0C",
+    palettes: GALAXY_PALETTES,
+    shapes: null,
+    decoration: "stars",
+    gridBg: "#080810",
+    gridBorder: "#7B2FF744",
+    unlock: { achievement: "gold_10" },
+  },
+  {
+    id: "candy",
+    name: "Candy Shop",
+    desc: "Sweet treats & bright pinks",
+    icon: "\uD83C\uDF6C",
+    palettes: CANDY_PALETTES,
+    shapes: CANDY_SHAPES,
+    decoration: "sprinkles",
+    gridBg: "#1a0e16",
+    gridBorder: "#FF6B9D44",
+    unlock: { achievement: "cascade_1" },
+  },
+  // --- Harder / Seasonal unlocks ---
+  {
+    id: "arctic",
+    name: "Arctic",
+    desc: "Icy blues & northern lights",
+    icon: "\u2744\uFE0F",
+    palettes: ARCTIC_PALETTES,
+    shapes: null,
+    decoration: "aurora",
+    gridBg: "#060d14",
+    gridBorder: "#38BDF844",
+    unlock: { seasonal: 1, achievement: "hard_5" },
+  },
+  {
+    id: "valentine",
+    name: "Valentine",
+    desc: "Hearts, roses & love",
+    icon: "\u2764\uFE0F",
+    palettes: VALENTINE_PALETTES,
+    shapes: VALENTINE_SHAPES,
+    decoration: "hearts",
+    gridBg: "#1a0a10",
+    gridBorder: "#FF2D5544",
+    unlock: { seasonal: 2, achievement: "daily_7" },
+  },
+  {
+    id: "spring",
+    name: "Spring",
+    desc: "Fresh blossoms & sunshine",
+    icon: "\uD83C\uDF3C",
+    palettes: SPRING_PALETTES,
+    shapes: PASTEL_SHAPES,
+    decoration: "springPetals",
+    gridBg: "#0a1410",
+    gridBorder: "#10B98144",
+    unlock: { seasonal: [3, 4, 5], achievement: "all_modes" },
+  },
+];
+
+function isThemeUnlocked(theme, achievementsList) {
+  if (!theme.unlock) return true;
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  if (theme.unlock.seasonal) {
+    const months = Array.isArray(theme.unlock.seasonal) ? theme.unlock.seasonal : [theme.unlock.seasonal];
+    if (months.includes(currentMonth)) return true;
+  }
+  if (theme.unlock.achievement && achievementsList) {
+    const ach = achievementsList.find(a => a.id === theme.unlock.achievement);
+    if (ach && ach.unlocked) return true;
+  }
+  return false;
+}
+
 // --- Seeded RNG ---
 function rng(seed) {
   let s = seed;
@@ -446,6 +1158,16 @@ const STORAGE_KEY = "pattrn-progress-v3";
 const TIMES_KEY = "pattrn-times-v1";
 const HOMESCREEN_HINT_KEY = "pattrn-homescreen-hint-dismissed-v1";
 const BIRTHDAY_KEY = "pattrn-birthday-v1";
+const THEME_KEY = "pattrn-theme-v1";
+
+function loadTheme() {
+  try {
+    return localStorage.getItem(THEME_KEY) || "classic";
+  } catch { return "classic"; }
+}
+function saveTheme(id) {
+  try { localStorage.setItem(THEME_KEY, id); } catch { /* ignore */ }
+}
 
 function isIOSSafariForHomescreenHint() {
   if (typeof navigator === "undefined" || typeof window === "undefined") return false;
@@ -563,6 +1285,26 @@ function parseToken(token) {
   return { color: token.slice(0, idx), shapeIndex: parseInt(token.slice(idx + 1), 10) };
 }
 
+// --- Helper: relative luminance & adaptive shape stroke ---
+function hexToLuminance(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const lin = (c) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+const _lumCache = {};
+function getShapeStroke(bgColor, isEasy) {
+  if (!bgColor || bgColor.length !== 7 || bgColor[0] !== "#") {
+    return isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)";
+  }
+  let lum = _lumCache[bgColor];
+  if (lum === undefined) { lum = hexToLuminance(bgColor); _lumCache[bgColor] = lum; }
+  if (lum > 0.45) return isEasy ? "rgba(30,30,40,0.82)" : "rgba(30,30,40,0.72)";
+  return isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)";
+}
+
 // --- Achievements ---
 function countModeSolved(mp) { return Object.values(mp || {}).filter(v => v > 0).length; }
 function countModeGold(mp) { return Object.values(mp || {}).filter(v => v >= 1 && v <= 2).length; }
@@ -638,9 +1380,11 @@ function computeAchievements(progress, times) {
 
 // --- Components ---
 
-function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0 }) {
+function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0, colorMap, shapesArr }) {
   const showContent = isRevealed || isLocked || !isBlank || isFilled;
   const parsed = showContent && token ? parseToken(token) : null;
+  const displayColor = parsed ? (colorMap ? (colorMap[parsed.color] || parsed.color) : parsed.color) : null;
+  const shapes = shapesArr || SHAPES;
   const isEasy = mode === "easy";
   const fallAnimation = isPrefilled ? `fallIntoPlace 0.5s ${fallDelay}s cubic-bezier(0.34, 1.56, 0.64, 1) both` : "none";
   const wrongAnimation = isWrong ? `fallOff 0.32s ${wrongFallDelay}s cubic-bezier(0.55, 0.09, 0.68, 0.53) forwards` : "none";
@@ -656,7 +1400,7 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
       onPointerEnter={onPointerEnter}
       style={{
         width: cellSize, height: cellSize, borderRadius: cellSize > 44 ? 10 : 8,
-        backgroundColor: showContent && parsed ? parsed.color : C.surfaceLight,
+        backgroundColor: showContent && displayColor ? displayColor : C.surfaceLight,
         border: isLocked ? `2.5px solid ${C.correct}`
           : isSelected ? `2.5px solid ${C.accent}`
           : isWrong ? `2.5px solid ${C.incorrect}`
@@ -676,33 +1420,35 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
         animation: winAnimation !== "none" ? winAnimation : wrongAnimation !== "none" ? wrongAnimation : emptyCellAnimation !== "none" ? emptyCellAnimation : fallAnimation,
       }}
     >
-      {showContent && parsed && SHAPES[parsed.shapeIndex % SHAPES.length](iconSize, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
+      {showContent && parsed && shapes[parsed.shapeIndex % shapes.length](iconSize, getShapeStroke(displayColor, isEasy))}
     </div>
   );
 }
 
-function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remaining }) {
+function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remaining, colorMap, shapesArr }) {
   const isEasy = mode === "easy" || mode === "blind";
+  const shapes = shapesArr || SHAPES;
   return (
     <div className="token-picker-scroll" style={{ display: "flex", gap: 10, justifyContent: "center", padding: "8px 16px", flexWrap: "nowrap", overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
       {tokens.map((token, i) => {
         const { color, shapeIndex } = parseToken(token);
+        const displayColor = colorMap ? (colorMap[color] || color) : color;
         const selected = selectedToken === token;
         const left = remaining && remaining[token] !== undefined ? remaining[token] : null;
         const exhausted = left !== null && left <= 0 && mode !== "hard";
         return (
           <div key={i} onClick={() => onSelect(token)}
             style={{
-              width: cellSize, height: cellSize, borderRadius: 12, backgroundColor: color,
+              width: cellSize, height: cellSize, borderRadius: 12, backgroundColor: displayColor,
               border: selected ? `3px solid ${C.text}` : "3px solid transparent",
               cursor: exhausted ? "not-allowed" : "pointer", transition: "all 0.2s cubic-bezier(0.4,0,0.2,1)",
               transform: selected ? "scale(1.15)" : "scale(1)",
               opacity: exhausted ? 0.35 : 1,
-              boxShadow: selected ? `0 0 20px ${color}66` : `0 2px 8px ${color}33`,
+              boxShadow: selected ? `0 0 20px ${displayColor}66` : `0 2px 8px ${displayColor}33`,
               position: "relative", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
             }}
           >
-            {SHAPES[shapeIndex % SHAPES.length](cellSize * 0.5, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
+            {shapes[shapeIndex % shapes.length](cellSize * 0.5, getShapeStroke(displayColor, isEasy))}
             {left !== null && mode !== "hard" && (
               <div style={{
                 position: "absolute", top: -6, right: -6,
@@ -742,6 +1488,335 @@ function Particles({ show }) {
       ))}
     </div>
   );
+}
+
+// --- Grid decoration overlays ---
+const SNOW_PARTICLES = Array.from({ length: 28 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  size: 2 + Math.random() * 4,
+  delay: Math.random() * 6,
+  duration: 3 + Math.random() * 4,
+  drift: -15 + Math.random() * 30,
+  opacity: 0.3 + Math.random() * 0.5,
+}));
+
+const BAT_PARTICLES = Array.from({ length: 6 }, (_, i) => ({
+  id: i,
+  x: 10 + Math.random() * 80,
+  y: 5 + Math.random() * 30,
+  size: 10 + Math.random() * 8,
+  delay: Math.random() * 4,
+  duration: 3 + Math.random() * 2,
+}));
+
+const BUBBLE_PARTICLES = Array.from({ length: 14 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  size: 3 + Math.random() * 6,
+  delay: Math.random() * 5,
+  duration: 4 + Math.random() * 3,
+  opacity: 0.15 + Math.random() * 0.3,
+}));
+
+const PETAL_PARTICLES = Array.from({ length: 18 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  size: 4 + Math.random() * 5,
+  delay: Math.random() * 7,
+  duration: 4 + Math.random() * 4,
+  drift: -20 + Math.random() * 40,
+  rotation: Math.random() * 360,
+  opacity: 0.25 + Math.random() * 0.35,
+}));
+
+const LEAF_PARTICLES = Array.from({ length: 12 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  size: 6 + Math.random() * 5,
+  delay: Math.random() * 6,
+  duration: 4 + Math.random() * 3,
+  drift: -25 + Math.random() * 50,
+  opacity: 0.2 + Math.random() * 0.25,
+}));
+
+const STAR_PARTICLES = Array.from({ length: 20 }, (_, i) => ({
+  id: i,
+  x: 5 + Math.random() * 90,
+  y: 5 + Math.random() * 90,
+  size: 1.5 + Math.random() * 2.5,
+  delay: Math.random() * 4,
+  duration: 1.5 + Math.random() * 2.5,
+  opacity: 0.2 + Math.random() * 0.5,
+}));
+
+const SPRINKLE_PARTICLES = Array.from({ length: 24 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  y: Math.random() * 100,
+  size: 2 + Math.random() * 3,
+  width: 6 + Math.random() * 6,
+  rotation: Math.random() * 180,
+  color: ["#FF6B9D", "#C660E8", "#55D6C2", "#FFBC42", "#FF4F7B", "#00D4AA"][Math.floor(Math.random() * 6)],
+  opacity: 0.15 + Math.random() * 0.2,
+}));
+
+const HEART_PARTICLES = Array.from({ length: 10 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  size: 6 + Math.random() * 6,
+  delay: Math.random() * 6,
+  duration: 5 + Math.random() * 3,
+  drift: -10 + Math.random() * 20,
+  opacity: 0.12 + Math.random() * 0.18,
+}));
+
+function GridDecoration({ decoration }) {
+  if (!decoration) return null;
+
+  if (decoration === "snow") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {SNOW_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, top: -8,
+            width: p.size, height: p.size, borderRadius: "50%",
+            backgroundColor: "#fff", opacity: p.opacity,
+            animation: `snowFall ${p.duration}s ${p.delay}s linear infinite`,
+            "--drift": `${p.drift}px`,
+          }} />
+        ))}
+        {/* Tinsel top border */}
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 3,
+          background: "repeating-linear-gradient(90deg, #C6282800, #C62828 4px, #2E7D32 8px, #FFD700 12px, #2E7D3200 16px)",
+          opacity: 0.6, borderRadius: "16px 16px 0 0",
+        }} />
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, height: 3,
+          background: "repeating-linear-gradient(90deg, #2E7D3200, #FFD700 4px, #C62828 8px, #2E7D32 12px, #C6282800 16px)",
+          opacity: 0.6, borderRadius: "0 0 16px 16px",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "bats") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {BAT_PARTICLES.map(p => (
+          <svg key={p.id} width={p.size} height={p.size * 0.6} viewBox="0 0 24 14" style={{
+            position: "absolute", left: `${p.x}%`, top: `${p.y}%`,
+            opacity: 0.25,
+            animation: `batFloat ${p.duration}s ${p.delay}s ease-in-out infinite`,
+          }}>
+            <path d="M3,2 L7,8 L10,5 L12,8 L14,5 L17,8 L21,2 C19,6 17,8 12,8 C7,8 5,6 3,2 Z" fill="rgba(255,255,255,0.6)"/>
+          </svg>
+        ))}
+        {/* Web corners */}
+        <svg style={{ position: "absolute", top: 0, left: 0, opacity: 0.12 }} width="40" height="40" viewBox="0 0 40 40">
+          <path d="M0,0 Q20,5 40,0 M0,0 Q5,20 0,40 M0,0 Q15,15 30,30 M0,0 Q8,20 16,40 M0,0 Q20,8 40,16" fill="none" stroke="white" strokeWidth="0.8"/>
+        </svg>
+        <svg style={{ position: "absolute", top: 0, right: 0, opacity: 0.12, transform: "scaleX(-1)" }} width="40" height="40" viewBox="0 0 40 40">
+          <path d="M0,0 Q20,5 40,0 M0,0 Q5,20 0,40 M0,0 Q15,15 30,30 M0,0 Q8,20 16,40 M0,0 Q20,8 40,16" fill="none" stroke="white" strokeWidth="0.8"/>
+        </svg>
+      </div>
+    );
+  }
+
+  if (decoration === "glow") {
+    return (
+      <div style={{
+        position: "absolute", inset: -2, pointerEvents: "none", borderRadius: 18,
+        animation: "neonPulse 3s ease-in-out infinite",
+        boxShadow: "0 0 15px #FF008044, 0 0 30px #00FF8022, inset 0 0 15px #FF008011",
+      }} />
+    );
+  }
+
+  if (decoration === "bubbles") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {BUBBLE_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, bottom: -10,
+            width: p.size, height: p.size, borderRadius: "50%",
+            border: "1px solid rgba(100,200,255,0.4)",
+            backgroundColor: "rgba(100,200,255,0.08)",
+            opacity: p.opacity,
+            animation: `bubbleRise ${p.duration}s ${p.delay}s ease-in infinite`,
+          }} />
+        ))}
+        {/* Wave bottom border */}
+        <svg style={{ position: "absolute", bottom: 0, left: 0, right: 0, opacity: 0.15 }} viewBox="0 0 200 12" preserveAspectRatio="none" height="8">
+          <path d="M0,8 C25,2 50,2 75,8 C100,14 125,14 150,8 C175,2 190,2 200,8 L200,12 L0,12 Z" fill="#4FC3F7"/>
+        </svg>
+      </div>
+    );
+  }
+
+  if (decoration === "petals") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {PETAL_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, top: -10,
+            width: p.size, height: p.size * 0.6, borderRadius: "50% 0 50% 0",
+            backgroundColor: "rgba(255,183,197,0.7)",
+            opacity: p.opacity,
+            transform: `rotate(${p.rotation}deg)`,
+            animation: `petalFall ${p.duration}s ${p.delay}s linear infinite`,
+            "--drift": `${p.drift}px`,
+          }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (decoration === "rays") {
+    return (
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "radial-gradient(ellipse at 50% 0%, rgba(255,150,50,0.12) 0%, transparent 70%)",
+        }} />
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, height: "40%",
+          background: "linear-gradient(to top, rgba(200,50,50,0.08), transparent)",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "scanlines") {
+    return (
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.06,
+          backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.5) 2px, rgba(255,255,255,0.5) 4px)",
+        }} />
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.08,
+          animation: "scanlineMove 8s linear infinite",
+          background: "linear-gradient(to bottom, transparent 0%, rgba(0,255,150,0.1) 50%, transparent 100%)",
+          backgroundSize: "100% 30%",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "leaves") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {LEAF_PARTICLES.map(p => (
+          <svg key={p.id} width={p.size} height={p.size} viewBox="0 0 12 12" style={{
+            position: "absolute", left: `${p.x}%`, top: -12,
+            opacity: p.opacity,
+            animation: `leafFall ${p.duration}s ${p.delay}s linear infinite`,
+            "--drift": `${p.drift}px`,
+          }}>
+            <path d="M6,1 C9,3 10,7 8,10 C6,12 3,10 2,7 C1,4 3,1 6,1 Z" fill={["#588157", "#A3B18A", "#D4A373", "#40916C"][p.id % 4]} opacity="0.7"/>
+          </svg>
+        ))}
+      </div>
+    );
+  }
+
+  if (decoration === "stars") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {STAR_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, top: `${p.y}%`,
+            width: p.size, height: p.size, borderRadius: "50%",
+            backgroundColor: "#fff",
+            animation: `starTwinkle ${p.duration}s ${p.delay}s ease-in-out infinite`,
+            opacity: 0,
+          }} />
+        ))}
+        {/* Nebula tint */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "radial-gradient(ellipse at 30% 40%, rgba(123,47,247,0.08) 0%, transparent 60%), radial-gradient(ellipse at 70% 70%, rgba(244,114,182,0.06) 0%, transparent 60%)",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "sprinkles") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {SPRINKLE_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, top: `${p.y}%`,
+            width: p.width, height: p.size, borderRadius: p.size,
+            backgroundColor: p.color, opacity: p.opacity,
+            transform: `rotate(${p.rotation}deg)`,
+          }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (decoration === "aurora") {
+    return (
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: "60%",
+          background: "linear-gradient(135deg, rgba(56,189,248,0.08) 0%, rgba(99,102,241,0.1) 30%, rgba(14,165,233,0.06) 60%, rgba(192,132,252,0.08) 100%)",
+          animation: "auroraShift 6s ease-in-out infinite alternate",
+        }} />
+        <div style={{
+          position: "absolute", top: "10%", left: 0, right: 0, height: "40%",
+          background: "linear-gradient(45deg, rgba(52,211,153,0.06) 0%, transparent 50%, rgba(56,189,248,0.06) 100%)",
+          animation: "auroraShift 8s 2s ease-in-out infinite alternate-reverse",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "hearts") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {HEART_PARTICLES.map(p => (
+          <svg key={p.id} width={p.size} height={p.size} viewBox="0 0 12 12" style={{
+            position: "absolute", left: `${p.x}%`, bottom: -12,
+            opacity: p.opacity,
+            animation: `heartFloat ${p.duration}s ${p.delay}s ease-in infinite`,
+            "--drift": `${p.drift}px`,
+          }}>
+            <path d="M6,10 C6,10 2,7 2,4.5 C2,3 3.2,2 4.5,2 C5.3,2 5.7,2.5 6,3 C6.3,2.5 6.7,2 7.5,2 C8.8,2 10,3 10,4.5 C10,7 6,10 6,10 Z" fill={["#FF2D55", "#FF6B8A", "#FFB3C1", "#C9184A"][p.id % 4]} opacity="0.6"/>
+          </svg>
+        ))}
+      </div>
+    );
+  }
+
+  if (decoration === "springPetals") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {PETAL_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, top: -10,
+            width: p.size, height: p.size * 0.6, borderRadius: "50% 0 50% 0",
+            backgroundColor: ["rgba(52,211,153,0.6)", "rgba(251,191,36,0.5)", "rgba(244,114,182,0.5)", "rgba(167,139,250,0.5)"][p.id % 4],
+            opacity: p.opacity,
+            transform: `rotate(${p.rotation}deg)`,
+            animation: `petalFall ${p.duration}s ${p.delay}s linear infinite`,
+            "--drift": `${p.drift}px`,
+          }} />
+        ))}
+      </div>
+    );
+  }
+
+  return null;
 }
 
 function AttemptDots({ max, used, won }) {
@@ -866,6 +1941,18 @@ export default function Pattrn() {
   const prevUnlockedRef = useRef(null);
   const [birthdayInput, setBirthdayInput] = useState("");
   const goToDateRef = useRef(null);
+
+  // Theme state
+  const [activeThemeId, setActiveThemeId] = useState(() => loadTheme());
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const [themeToast, setThemeToast] = useState(null); // { id, name, icon, key }
+  const [themeToastDismissing, setThemeToastDismissing] = useState(false);
+  const themeToastTimer = useRef(null);
+  const prevUnlockedThemesRef = useRef(null);
+
+  const activeTheme = useMemo(() => PUZZLE_THEMES.find(t => t.id === activeThemeId) || PUZZLE_THEMES[0], [activeThemeId]);
+  const themeColorMap = useMemo(() => buildColorMap(activeTheme.palettes), [activeTheme]);
+  const themedShapes = activeTheme.shapes || SHAPES;
 
   // Scroll play view to top when entering or changing puzzle
   useEffect(() => {
@@ -1186,6 +2273,16 @@ export default function Pattrn() {
   // Keep old name for compatibility with showNewAchievements
   const advanceAchievementQueue = showNextToast;
 
+  const showThemeToast = useCallback((theme) => {
+    setThemeToastDismissing(false);
+    setThemeToast({ id: theme.id, name: theme.name, icon: theme.icon, key: theme.id + "-" + Date.now() });
+    if (themeToastTimer.current) clearTimeout(themeToastTimer.current);
+    themeToastTimer.current = setTimeout(() => {
+      setThemeToastDismissing(true);
+      setTimeout(() => { setThemeToast(null); setThemeToastDismissing(false); themeToastTimer.current = null; }, 400);
+    }, 4500);
+  }, []);
+
   const showNewAchievements = useCallback((newProgress, newTimes) => {
     const beforeSet = prevUnlockedRef.current;
     const after = computeAchievements(newProgress, newTimes);
@@ -1198,13 +2295,30 @@ export default function Pattrn() {
         advanceAchievementQueue();
       }
     }
-  }, [advanceAchievementQueue]);
 
-  // Snapshot current achievements on puzzle start so we can diff on win
+    // Check for newly unlocked themes
+    const beforeThemes = prevUnlockedThemesRef.current;
+    const nowUnlockedThemes = PUZZLE_THEMES.filter(t => isThemeUnlocked(t, after));
+    prevUnlockedThemesRef.current = new Set(nowUnlockedThemes.map(t => t.id));
+    if (beforeThemes) {
+      const newThemes = nowUnlockedThemes.filter(t => !beforeThemes.has(t.id));
+      if (newThemes.length > 0) {
+        // Delay theme toast so it appears after achievement toasts finish
+        const achDelay = newlyUnlocked.length * 3600; // ~3.2s per achievement toast + buffer
+        setTimeout(() => showThemeToast(newThemes[0]), achDelay + 400);
+      }
+    }
+  }, [advanceAchievementQueue, showThemeToast]);
+
+  // Snapshot current achievements & unlocked themes on puzzle start so we can diff on win
   useEffect(() => {
     if (view === "play" && gameState === "playing") {
       const current = computeAchievements(progress, times);
       prevUnlockedRef.current = new Set(current.filter(a => a.unlocked).map(a => a.id));
+      // Snapshot currently unlocked themes
+      prevUnlockedThemesRef.current = new Set(
+        PUZZLE_THEMES.filter(t => isThemeUnlocked(t, current)).map(t => t.id)
+      );
     }
   }, [view, gameState === "playing"]);
 
@@ -1486,6 +2600,7 @@ export default function Pattrn() {
       stopTimer();
       if (achievementToastTimer.current) { clearTimeout(achievementToastTimer.current); achievementToastTimer.current = null; }
       if (toastDismissTimer.current) { clearTimeout(toastDismissTimer.current); toastDismissTimer.current = null; }
+      if (themeToastTimer.current) { clearTimeout(themeToastTimer.current); themeToastTimer.current = null; }
     };
   }, [stopTimer]);
 
@@ -1795,6 +2910,148 @@ export default function Pattrn() {
   const cellSize = gridSize <= 5 ? 56 : gridSize === 6 ? 48 : gridSize === 7 ? 42 : gridSize === 8 ? 38 : 34;
   const iconSize = gridSize <= 5 ? 28 : gridSize === 6 ? 24 : gridSize === 7 ? 22 : gridSize === 8 ? 18 : 16;
   const pickerSize = 48;
+
+  // --- Theme Picker (shared across views) ---
+  const themePickerEl = showThemePicker ? (() => {
+    const achList = computeAchievements(progress, times);
+    return (
+      <div onClick={() => setShowThemePicker(false)} style={{
+        position: "fixed", inset: 0, zIndex: 1100,
+        display: "flex", flexDirection: "column", justifyContent: "flex-end",
+        animation: "drawerOverlayFade 0.25s ease both",
+      }}>
+        <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } } @keyframes drawerOverlayFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
+        <div style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)" }} />
+        <div onClick={e => e.stopPropagation()} style={{
+          backgroundColor: C.bg, borderRadius: "20px 20px 0 0",
+          border: `1px solid ${C.border}`, borderBottom: "none",
+          maxHeight: "75vh", display: "flex", flexDirection: "column",
+          animation: "drawerSlideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both",
+        }}>
+          <div style={{ padding: "20px 24px 0", flexShrink: 0 }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border, margin: "0 auto 16px" }} />
+            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, margin: "0 0 4px", letterSpacing: 1 }}>
+              Themes
+            </h2>
+            <p style={{ fontSize: 11, color: C.textDim, margin: "0 0 16px", lineHeight: 1.5 }}>
+              Unlock themes through achievements or play on themed days
+            </p>
+          </div>
+
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
+            {PUZZLE_THEMES.map(theme => {
+              const unlocked = isThemeUnlocked(theme, achList);
+              const isActive = activeThemeId === theme.id;
+              const seasonalMonth = theme.unlock?.seasonal;
+              const achId = theme.unlock?.achievement;
+              const ach = achId ? ACHIEVEMENTS.find(a => a.id === achId) : null;
+              let unlockHint = "";
+              if (theme.unlock) {
+                const parts = [];
+                if (seasonalMonth) {
+                  const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                  parts.push(`Play in ${monthNames[seasonalMonth]}`);
+                }
+                if (ach) parts.push(`"${ach.label}" achievement`);
+                unlockHint = parts.join(" or ");
+              }
+
+              return (
+                <button
+                  key={theme.id}
+                  onClick={() => {
+                    if (unlocked) {
+                      setActiveThemeId(theme.id);
+                      saveTheme(theme.id);
+                    }
+                  }}
+                  style={{
+                    width: "100%", padding: "14px 16px", borderRadius: 12,
+                    backgroundColor: isActive ? (theme.gridBg || C.surface) : C.surface,
+                    border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
+                    cursor: unlocked ? "pointer" : "default",
+                    display: "flex", alignItems: "center", gap: 12,
+                    transition: "all 0.15s",
+                    opacity: unlocked ? 1 : 0.5,
+                  }}
+                  onMouseEnter={e => { if (unlocked && !isActive) e.currentTarget.style.borderColor = C.accent + "88"; }}
+                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.borderColor = C.border; }}
+                >
+                  <div style={{
+                    width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                    backgroundColor: theme.gridBg || C.surfaceLight,
+                    border: `1.5px solid ${theme.gridBorder || C.border}`,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 2,
+                    flexWrap: "wrap", padding: 4, position: "relative", overflow: "hidden",
+                  }}>
+                    {theme.icon ? (
+                      <span style={{ fontSize: 18, lineHeight: 1 }}>{theme.icon}</span>
+                    ) : (
+                      <>
+                        {(theme.palettes || PALETTES)[0].slice(0, 4).map((col, ci) => (
+                          <div key={ci} style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: col }} />
+                        ))}
+                      </>
+                    )}
+                    {!unlocked && (
+                      <div style={{
+                        position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <rect x="2" y="6" width="10" height="7" rx="1.5" fill="none" stroke={C.textDim} strokeWidth="1.5"/>
+                          <path d="M4.5,6 V4 C4.5,2.3 5.6,1 7,1 C8.4,1 9.5,2.3 9.5,4 V6" fill="none" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+                    <div style={{
+                      fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
+                      color: isActive ? C.accent : C.text, letterSpacing: 0.5,
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}>
+                      {theme.name}
+                      {isActive && <span style={{ fontSize: 9, color: C.accent, fontWeight: 400 }}>(active)</span>}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                      {!unlocked ? unlockHint : theme.desc}
+                    </div>
+                  </div>
+
+                  {unlocked && !isActive && (
+                    <span style={{ color: C.textDim, fontSize: 11, fontFamily: "'Space Mono', monospace", flexShrink: 0 }}>Select</span>
+                  )}
+                  {isActive && (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                      <path d="M3 8.5L6.5 12L13 4" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{
+            padding: "16px 24px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+            borderTop: `1px solid ${C.border}`, marginTop: 8, flexShrink: 0,
+          }}>
+            <button onClick={() => setShowThemePicker(false)}
+              style={{
+                width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                textTransform: "uppercase", transition: "all 0.15s",
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  })() : null;
 
   // --- MENU VIEW ---
   if (view === "menu") {
@@ -2869,6 +4126,38 @@ export default function Pattrn() {
                       <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
                     </button>
 
+                    {/* Themes */}
+                    <button onClick={() => { setShowGameMenu(false); setShowThemePicker(true); }} style={{
+                      width: "100%", padding: "14px 16px", borderRadius: 12,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                      transition: "all 0.15s",
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#A78BFA"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        backgroundColor: "#A78BFA22", display: "flex", alignItems: "center", justifyContent: "center",
+                        border: "1.5px solid #A78BFA44", flexShrink: 0,
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <circle cx="5" cy="5" r="3" fill="#FF6B6B" opacity="0.8"/>
+                          <circle cx="11" cy="5" r="3" fill="#4ECDC4" opacity="0.8"/>
+                          <circle cx="8" cy="11" r="3" fill="#FFE66D" opacity="0.8"/>
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                          Themes
+                        </div>
+                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                          {activeTheme.id === "classic" ? "Classic" : `${activeTheme.icon || ""} ${activeTheme.name}`}
+                        </div>
+                      </div>
+                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                    </button>
+
                     {/* Divider */}
                     <div style={{ height: 1, backgroundColor: C.border, margin: "4px 0" }} />
 
@@ -2924,6 +4213,8 @@ export default function Pattrn() {
           );
         })()}
 
+        {themePickerEl}
+
         {/* Clear All Data confirmation dialog */}
         {showClearConfirm && (
           <div onClick={() => setShowClearConfirm(false)} style={{
@@ -2965,10 +4256,12 @@ export default function Pattrn() {
                       localStorage.removeItem(TIMES_KEY);
                       localStorage.removeItem(HOMESCREEN_HINT_KEY);
                       localStorage.removeItem(BIRTHDAY_KEY);
+                      localStorage.removeItem(THEME_KEY);
                     } catch { /* ignore */ }
                     setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
                     setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
                     setBirthday(null);
+                    setActiveThemeId("classic");
                     setHomescreenHintDismissed(false);
                     setShowClearConfirm(false);
                     setShowGameMenu(false);
@@ -3138,7 +4431,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateY(6px) scale(1.05)} 60%{transform:translateY(-3px) scale(0.98)} 80%{transform:translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-30px) scale(0.85)} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateY(6px) scale(1.05)} 60%{transform:translateY(-3px) scale(0.98)} 80%{transform:translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} }`}</style>
 
       <Particles show={showParticles} />
 
@@ -3214,6 +4507,62 @@ export default function Pattrn() {
         );
       })()}
 
+      {/* Theme unlock toast — positioned at bottom to avoid overlap with achievement toast */}
+      {themeToast && (
+        <div key={themeToast.key} style={{
+          position: "fixed", bottom: "calc(160px + env(safe-area-inset-bottom, 0px))", left: "50%",
+          transform: "translateX(-50%)", zIndex: 100,
+          animation: themeToastDismissing
+            ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
+            : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+          pointerEvents: "auto",
+        }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "10px 14px", borderRadius: 14,
+            backgroundColor: C.surface, border: `1.5px solid ${C.accent}`,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 20px ${C.accent}33`,
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 9,
+              backgroundColor: C.accent + "18", display: "flex", alignItems: "center", justifyContent: "center",
+              border: `2px solid ${C.accent}66`, fontSize: 18, flexShrink: 0,
+            }}>
+              {themeToast.icon || "\uD83C\uDFA8"}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{
+                fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700,
+                color: C.accent, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2,
+              }}>Theme unlocked</div>
+              <div style={{
+                fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                color: C.text, letterSpacing: 0.5,
+              }}>{themeToast.name}</div>
+            </div>
+            <button
+              onClick={() => {
+                setActiveThemeId(themeToast.id);
+                saveTheme(themeToast.id);
+                setThemeToastDismissing(true);
+                setTimeout(() => { setThemeToast(null); setThemeToastDismissing(false); }, 350);
+                if (themeToastTimer.current) { clearTimeout(themeToastTimer.current); themeToastTimer.current = null; }
+              }}
+              style={{
+                background: C.accent, border: "none", borderRadius: 8, padding: "6px 12px",
+                color: C.bg, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                fontSize: 11, fontWeight: 700, letterSpacing: 0.5, whiteSpace: "nowrap",
+                transition: "opacity 0.15s", flexShrink: 0,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+            >
+              Use it
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top bar - fixed at top so it always stays visible */}
       <div style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg,
@@ -3252,7 +4601,22 @@ export default function Pattrn() {
             </span>
           )}
         </div>
-        <div style={{ width: 80, display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
+        <div style={{ width: 110, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6 }}>
+          <button
+            onClick={() => setShowThemePicker(true)}
+            style={{
+              background: "none", border: `1px solid ${activeThemeId !== "classic" ? (activeTheme.gridBorder || C.border).replace(/44$/, "88") : C.border}`,
+              borderRadius: 8, padding: "5px 8px", cursor: "pointer", fontSize: 14, lineHeight: 1,
+              transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
+              color: activeThemeId !== "classic" ? C.text : C.textDim,
+              minWidth: 32, height: 30,
+            }}
+            title="Change theme"
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = activeThemeId !== "classic" ? (activeTheme.gridBorder || C.border).replace(/44$/, "88") : C.border; e.currentTarget.style.color = activeThemeId !== "classic" ? C.text : C.textDim; }}
+          >
+            {activeTheme.icon || <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>}
+          </button>
           <button
             onClick={async () => {
               const url = typeof window !== "undefined" ? window.location.href : "";
@@ -3300,12 +4664,13 @@ export default function Pattrn() {
       <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
         <div style={{
           display: "flex", flexDirection: "column", gap: gridSize >= 7 ? 3 : 4, padding: gridSize >= 7 ? 10 : 14,
-          backgroundColor: C.surface, borderRadius: 16,
-          border: `1px solid ${C.border}`, boxShadow: `0 8px 32px ${C.bg}88`,
-          overflow: "visible",
+          backgroundColor: activeTheme.gridBg || C.surface, borderRadius: 16,
+          border: `1px solid ${activeTheme.gridBorder || C.border}`, boxShadow: `0 8px 32px ${C.bg}88`,
+          overflow: "visible", position: "relative",
         }}>
+          <GridDecoration decoration={activeTheme.decoration} />
           {puzzle.solution.map((row, r) => (
-            <div key={r} style={{ display: "flex", gap: gridSize >= 7 ? 3 : 4 }}>
+            <div key={r} style={{ display: "flex", gap: gridSize >= 7 ? 3 : 4, position: "relative", zIndex: 1 }}>
               {row.map((token, c) => {
                 const key = `${r}-${c}`;
                 const isBlankCell = puzzle.blanks.has(key);
@@ -3342,6 +4707,8 @@ export default function Pattrn() {
                     onPointerEnter={() => handleCellPointerEnter(r, c)}
                     cellSize={cellSize} iconSize={iconSize}
                     mode={puzzle.mode}
+                    colorMap={themeColorMap}
+                    shapesArr={themedShapes}
                   />
                 );
               })}
@@ -3355,7 +4722,7 @@ export default function Pattrn() {
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
         {/* Token picker row */}
         {gameState === "playing" && (
-          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} />
+          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} />
         )}
         {gameState === "playing" && (
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -3583,6 +4950,7 @@ export default function Pattrn() {
         )}
       </div>
 
+      {themePickerEl}
     </div>
   );
 }
