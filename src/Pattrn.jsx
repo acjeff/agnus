@@ -563,6 +563,79 @@ function parseToken(token) {
   return { color: token.slice(0, idx), shapeIndex: parseInt(token.slice(idx + 1), 10) };
 }
 
+// --- Achievements ---
+function countModeSolved(mp) { return Object.values(mp || {}).filter(v => v > 0).length; }
+function countModeGold(mp) { return Object.values(mp || {}).filter(v => v >= 1 && v <= 2).length; }
+function countModeFirstTry(mp) { return Object.values(mp || {}).filter(v => v === 1).length; }
+function countCascadeClears(cp) { return Object.values(cp || {}).filter(v => v === CASCADE_LEVELS.length).length; }
+function countTimesUnder(mt, mp, maxSec) {
+  let c = 0;
+  for (const [k, t] of Object.entries(mt || {})) { if ((mp || {})[k] > 0 && t < maxSec) c++; }
+  return c;
+}
+function getMaxDailyStreak(progress) {
+  const daily = progress.daily || {};
+  const seeds = Object.keys(daily).filter(k => daily[k] > 0).map(Number).sort((a, b) => b - a);
+  if (seeds.length === 0) return 0;
+  let max = 1, run = 1;
+  for (let i = 1; i < seeds.length; i++) {
+    if (seeds[i - 1] - seeds[i] === 86400) { run++; if (run > max) max = run; }
+    else run = 1;
+  }
+  return max;
+}
+
+const ACHIEVEMENT_CATS = [
+  { key: "progress", label: "Progress" },
+  { key: "mastery", label: "Mastery" },
+  { key: "speed", label: "Speed" },
+  { key: "special", label: "Special" },
+];
+
+const SOLVE_MODES = ["easy", "medium", "hard", "blind"];
+
+const ACHIEVEMENTS = [
+  // Progress — per mode
+  { id: "easy_5", cat: "progress", label: "Easy Going", desc: "Solve 5 Easy puzzles", tier: 1, check: (p) => countModeSolved(p.easy) >= 5 },
+  { id: "easy_25", cat: "progress", label: "Easy Street", desc: "Solve 25 Easy puzzles", tier: 2, check: (p) => countModeSolved(p.easy) >= 25 },
+  { id: "easy_50", cat: "progress", label: "Easy Master", desc: "Solve all 50 Easy", tier: 3, check: (p) => countModeSolved(p.easy) >= 50 },
+  { id: "med_5", cat: "progress", label: "Intermediate", desc: "Solve 5 Medium puzzles", tier: 1, check: (p) => countModeSolved(p.medium) >= 5 },
+  { id: "med_25", cat: "progress", label: "Seasoned", desc: "Solve 25 Medium puzzles", tier: 2, check: (p) => countModeSolved(p.medium) >= 25 },
+  { id: "med_50", cat: "progress", label: "Medium Master", desc: "Solve all 50 Medium", tier: 3, check: (p) => countModeSolved(p.medium) >= 50 },
+  { id: "hard_5", cat: "progress", label: "Hardened", desc: "Solve 5 Hard puzzles", tier: 1, check: (p) => countModeSolved(p.hard) >= 5 },
+  { id: "hard_25", cat: "progress", label: "Tough Cookie", desc: "Solve 25 Hard puzzles", tier: 2, check: (p) => countModeSolved(p.hard) >= 25 },
+  { id: "hard_50", cat: "progress", label: "Hard Master", desc: "Solve all 50 Hard", tier: 3, check: (p) => countModeSolved(p.hard) >= 50 },
+  { id: "blind_5", cat: "progress", label: "Blind Faith", desc: "Solve 5 Blind puzzles", tier: 1, check: (p) => countModeSolved(p.blind) >= 5 },
+  { id: "blind_25", cat: "progress", label: "Sixth Sense", desc: "Solve 25 Blind puzzles", tier: 2, check: (p) => countModeSolved(p.blind) >= 25 },
+  { id: "blind_50", cat: "progress", label: "Blind Master", desc: "Solve all 50 Blind", tier: 3, check: (p) => countModeSolved(p.blind) >= 50 },
+  { id: "daily_7", cat: "progress", label: "Regular", desc: "Solve 7 Daily puzzles", tier: 1, check: (p) => countModeSolved(p.daily) >= 7 },
+  { id: "daily_25", cat: "progress", label: "Devoted", desc: "Solve 25 Daily puzzles", tier: 2, check: (p) => countModeSolved(p.daily) >= 25 },
+  { id: "cascade_1", cat: "progress", label: "Cascade Clear", desc: "Complete a Cascade run", tier: 1, check: (p) => countCascadeClears(p.cascade) >= 1 },
+  { id: "cascade_5", cat: "progress", label: "Cascade Crusher", desc: "Complete 5 Cascade runs", tier: 2, check: (p) => countCascadeClears(p.cascade) >= 5 },
+  // Mastery
+  { id: "first_try", cat: "mastery", label: "First Try", desc: "Solve a puzzle on the first attempt", tier: 1, check: (p) => SOLVE_MODES.some(m => countModeFirstTry(p[m]) >= 1) },
+  { id: "sharp_10", cat: "mastery", label: "Sharpshooter", desc: "First-attempt 10 puzzles", tier: 2, check: (p) => SOLVE_MODES.reduce((s, m) => s + countModeFirstTry(p[m]), 0) >= 10 },
+  { id: "sharp_25", cat: "mastery", label: "Sniper", desc: "First-attempt 25 puzzles", tier: 3, check: (p) => SOLVE_MODES.reduce((s, m) => s + countModeFirstTry(p[m]), 0) >= 25 },
+  { id: "gold_10", cat: "mastery", label: "Gold Rush", desc: "Earn 10 gold medals", tier: 1, check: (p) => SOLVE_MODES.reduce((s, m) => s + countModeGold(p[m]), 0) >= 10 },
+  { id: "gold_25", cat: "mastery", label: "Gold Hoard", desc: "Earn 25 gold medals", tier: 2, check: (p) => SOLVE_MODES.reduce((s, m) => s + countModeGold(p[m]), 0) >= 25 },
+  { id: "gold_50", cat: "mastery", label: "Golden Age", desc: "Earn 50 gold medals", tier: 3, check: (p) => SOLVE_MODES.reduce((s, m) => s + countModeGold(p[m]), 0) >= 50 },
+  // Speed
+  { id: "under_30", cat: "speed", label: "Quick Solve", desc: "Solve a puzzle under 30 seconds", tier: 1, check: (p, t) => SOLVE_MODES.some(m => countTimesUnder(t[m], p[m], 30) >= 1) },
+  { id: "under_10", cat: "speed", label: "Lightning", desc: "Solve a puzzle under 10 seconds", tier: 2, check: (p, t) => SOLVE_MODES.some(m => countTimesUnder(t[m], p[m], 10) >= 1) },
+  { id: "hard_u60", cat: "speed", label: "Hard & Fast", desc: "Solve a Hard puzzle under 60s", tier: 1, check: (p, t) => countTimesUnder(t.hard, p.hard, 60) >= 1 },
+  { id: "speed_5", cat: "speed", label: "Speed Demon", desc: "Solve 5 puzzles under 30s", tier: 2, check: (p, t) => SOLVE_MODES.reduce((s, m) => s + countTimesUnder(t[m], p[m], 30), 0) >= 5 },
+  { id: "blitz_5", cat: "speed", label: "Blitz", desc: "Solve 5 puzzles under 10s", tier: 3, check: (p, t) => SOLVE_MODES.reduce((s, m) => s + countTimesUnder(t[m], p[m], 10), 0) >= 5 },
+  // Special
+  { id: "streak_3", cat: "special", label: "On a Roll", desc: "3-day daily streak", tier: 1, check: (p) => getMaxDailyStreak(p) >= 3 },
+  { id: "streak_7", cat: "special", label: "Week Warrior", desc: "7-day daily streak", tier: 2, check: (p) => getMaxDailyStreak(p) >= 7 },
+  { id: "all_modes", cat: "special", label: "Well Rounded", desc: "Solve a puzzle in every mode", tier: 2, check: (p) => SOLVE_MODES.every(m => countModeSolved(p[m]) >= 1) && countModeSolved(p.daily) >= 1 && countCascadeClears(p.cascade) >= 1 },
+  { id: "total_100", cat: "special", label: "Centurion", desc: "Solve 100 puzzles total", tier: 3, check: (p) => [...SOLVE_MODES, "daily"].reduce((s, m) => s + countModeSolved(p[m]), 0) + countCascadeClears(p.cascade) >= 100 },
+];
+
+function computeAchievements(progress, times) {
+  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: a.check(progress, times) }));
+}
+
 // --- Components ---
 
 function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0 }) {
@@ -782,6 +855,11 @@ export default function Pattrn() {
     try { return localStorage.getItem(BIRTHDAY_KEY) || null; } catch { return null; }
   });
   const [showBirthdayPrompt, setShowBirthdayPrompt] = useState(false);
+  const [showAchievements, setShowAchievements] = useState(false);
+  const [achievementToast, setAchievementToast] = useState(null); // { label, tier, key }
+  const achievementQueueRef = useRef([]);
+  const achievementToastTimer = useRef(null);
+  const prevUnlockedRef = useRef(null);
   const [birthdayInput, setBirthdayInput] = useState("");
   const goToDateRef = useRef(null);
 
@@ -1083,6 +1161,39 @@ export default function Pattrn() {
     return 0;
   }, []);
 
+  const advanceAchievementQueue = useCallback(() => {
+    if (achievementQueueRef.current.length === 0) {
+      setAchievementToast(null);
+      achievementToastTimer.current = null;
+      return;
+    }
+    const next = achievementQueueRef.current.shift();
+    setAchievementToast({ label: next.label, desc: next.desc, tier: next.tier, key: next.id + "-" + Date.now() });
+    achievementToastTimer.current = setTimeout(() => advanceAchievementQueue(), 3200);
+  }, []);
+
+  const showNewAchievements = useCallback((newProgress, newTimes) => {
+    const beforeSet = prevUnlockedRef.current;
+    const after = computeAchievements(newProgress, newTimes);
+    const newlyUnlocked = after.filter(a => a.unlocked && (!beforeSet || !beforeSet.has(a.id)));
+    prevUnlockedRef.current = new Set(after.filter(a => a.unlocked).map(a => a.id));
+    if (newlyUnlocked.length > 0) {
+      achievementQueueRef.current.push(...newlyUnlocked);
+      // Only kick off the queue if not already showing
+      if (!achievementToastTimer.current) {
+        advanceAchievementQueue();
+      }
+    }
+  }, [advanceAchievementQueue]);
+
+  // Snapshot current achievements on puzzle start so we can diff on win
+  useEffect(() => {
+    if (view === "play" && gameState === "playing") {
+      const current = computeAchievements(progress, times);
+      prevUnlockedRef.current = new Set(current.filter(a => a.unlocked).map(a => a.id));
+    }
+  }, [view, gameState === "playing"]);
+
   const startPuzzle = (idx, diff, forceRestart = false, dailyDate = null) => {
     cancelWrongCellClear();
     if (diff) setDifficulty(diff);
@@ -1355,9 +1466,12 @@ export default function Pattrn() {
     };
   }, [paintCell]);
 
-  // Clean up timer on unmount
+  // Clean up timers on unmount
   useEffect(() => {
-    return () => stopTimer();
+    return () => {
+      stopTimer();
+      if (achievementToastTimer.current) { clearTimeout(achievementToastTimer.current); achievementToastTimer.current = null; }
+    };
   }, [stopTimer]);
 
   const handleTokenSelect = (token) => {
@@ -1429,6 +1543,7 @@ export default function Pattrn() {
           const newTimes = { ...tms, cascade: newCascadeTimes };
           setTimes(newTimes);
           saveTimes(newTimes);
+          showNewAchievements(newProgress, newTimes);
         }
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
@@ -1461,6 +1576,7 @@ export default function Pattrn() {
         const newTimes = { ...times, [difficulty]: newDiffTimes };
         setTimes(newTimes);
         saveTimes(newTimes);
+        showNewAchievements(newProgress, newTimes);
       }
       } else if (newAttempts >= maxAttempts) {
       if (isCascade) {
@@ -1849,9 +1965,10 @@ export default function Pattrn() {
         {/* Stats summary with inline share */}
         {isDaily ? (
           <div style={{
+            width: "100%", maxWidth: 360,
             display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
             padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
-            alignItems: "center",
+            alignItems: "center", boxSizing: "border-box",
           }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
@@ -1878,9 +1995,10 @@ export default function Pattrn() {
           </div>
         ) : (
           <div style={{
+            width: "100%", maxWidth: 360,
             display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
             padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
-            alignItems: "center",
+            alignItems: "center", boxSizing: "border-box",
           }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
@@ -1906,6 +2024,54 @@ export default function Pattrn() {
             </button>
           </div>
         )}
+
+        {/* Achievements button */}
+        {(() => {
+          const achs = computeAchievements(progress, times);
+          const unlocked = achs.filter(a => a.unlocked).length;
+          const total = achs.length;
+          return (
+            <div style={{
+              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.12s ease both",
+            }}>
+              <button onClick={() => setShowAchievements(true)} style={{
+                width: "100%", padding: "12px 16px", borderRadius: 12,
+                backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                transition: "all 0.15s",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+              >
+                <div style={{
+                  width: 28, height: 28, borderRadius: 7,
+                  backgroundColor: C.accent + "22", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `1.5px solid ${C.accent}44`,
+                }}>
+                  <span style={{ fontSize: 14, color: C.accent, lineHeight: 1 }}>{"\u2605"}</span>
+                </div>
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                    Achievements
+                  </span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, fontWeight: 700 }}>
+                    {unlocked}/{total}
+                  </span>
+                  <div style={{
+                    height: 4, width: 40, borderRadius: 2, backgroundColor: C.surfaceLight, overflow: "hidden",
+                  }}>
+                    <div style={{
+                      height: "100%", borderRadius: 2, backgroundColor: C.accent,
+                      width: `${(unlocked / total) * 100}%`,
+                    }} />
+                  </div>
+                </div>
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Birthday panel — same layout as "play today" */}
         {isDaily && (() => {
@@ -2544,6 +2710,125 @@ export default function Pattrn() {
             </div>
           );
         })()}
+
+        {/* Achievements drawer */}
+        {showAchievements && (() => {
+          const achievements = computeAchievements(progress, times);
+          const unlocked = achievements.filter(a => a.unlocked).length;
+          const total = achievements.length;
+          const tierColors = { 1: C.bronze, 2: C.silver, 3: C.gold };
+          const tierSymbols = { 1: "\u25C6", 2: "\u25CF", 3: "\u2605" };
+          return (
+            <div onClick={() => setShowAchievements(false)} style={{
+              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
+              display: "flex", alignItems: "flex-end", justifyContent: "center",
+            }}>
+              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
+              <div onClick={e => e.stopPropagation()} style={{
+                backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
+                padding: "0", maxWidth: 480, width: "100%",
+                boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`, maxHeight: "85vh",
+                display: "flex", flexDirection: "column",
+                animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+              }}>
+                {/* Drag handle */}
+                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
+                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
+                </div>
+
+                {/* Scrollable content */}
+                <div style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
+                  {/* Header */}
+                  <div style={{ textAlign: "center", marginBottom: 20 }}>
+                    <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
+                      Achievements
+                    </h2>
+                    <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>{unlocked}/{total} unlocked</p>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div style={{
+                    height: 6, borderRadius: 3, backgroundColor: C.surfaceLight, marginBottom: 20, overflow: "hidden",
+                  }}>
+                    <div style={{
+                      height: "100%", borderRadius: 3, backgroundColor: C.accent,
+                      width: `${(unlocked / total) * 100}%`, transition: "width 0.5s ease",
+                    }} />
+                  </div>
+
+                  {/* Achievement categories */}
+                  {ACHIEVEMENT_CATS.map(cat => {
+                    const catAchs = achievements.filter(a => a.cat === cat.key);
+                    return (
+                      <div key={cat.key} style={{ marginBottom: 16 }}>
+                        <div style={{
+                          fontSize: 10, color: C.textDim, textTransform: "uppercase",
+                          letterSpacing: 1.5, marginBottom: 8,
+                          fontFamily: "'Space Mono', monospace",
+                        }}>{cat.label}</div>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {catAchs.map(a => (
+                            <div key={a.id} style={{
+                              display: "flex", alignItems: "center", gap: 12,
+                              padding: "10px 12px", borderRadius: 10,
+                              backgroundColor: C.surface,
+                              border: `1px solid ${a.unlocked ? tierColors[a.tier] + "44" : C.border}`,
+                              opacity: a.unlocked ? 1 : 0.4,
+                              transition: "all 0.2s",
+                            }}>
+                              <div style={{
+                                width: 32, height: 32, borderRadius: 8,
+                                backgroundColor: a.unlocked ? tierColors[a.tier] + "22" : C.surfaceLight,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                border: `1.5px solid ${a.unlocked ? tierColors[a.tier] : C.border}`,
+                                flexShrink: 0,
+                              }}>
+                                <span style={{
+                                  fontSize: 16, color: a.unlocked ? tierColors[a.tier] : C.textDim,
+                                  lineHeight: 1,
+                                }}>{tierSymbols[a.tier]}</span>
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{
+                                  fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
+                                  color: a.unlocked ? C.text : C.textDim,
+                                  letterSpacing: 0.5,
+                                }}>{a.label}</div>
+                                <div style={{
+                                  fontSize: 10, color: C.textDim, lineHeight: 1.3, marginTop: 2,
+                                }}>{a.desc}</div>
+                              </div>
+                              {a.unlocked && (
+                                <span style={{ color: C.correct, fontSize: 14, flexShrink: 0 }}>{"\u2713"}</span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Sticky footer */}
+                <div style={{
+                  padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+                  borderTop: `1px solid ${C.border}`, flexShrink: 0,
+                }}>
+                  <button onClick={() => setShowAchievements(false)}
+                    style={{
+                      width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                      padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     );
   }
@@ -2566,9 +2851,79 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateY(6px) scale(1.05)} 60%{transform:translateY(-3px) scale(0.98)} 80%{transform:translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} }`}</style>
 
       <Particles show={showParticles} />
+
+      {/* Achievement toast */}
+      {achievementToast && (() => {
+        const tierColors = { 1: C.bronze, 2: C.silver, 3: C.gold };
+        const tierSymbols = { 1: "\u25C6", 2: "\u25CF", 3: "\u2605" };
+        const tc = tierColors[achievementToast.tier] || C.accent;
+        const sparkles = Array.from({ length: 8 }, (_, i) => {
+          const angle = (i / 8) * Math.PI * 2;
+          const dist = 18 + Math.random() * 10;
+          return { id: i, x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, delay: i * 0.06, size: 3 + Math.random() * 3 };
+        });
+        return (
+          <div key={achievementToast.key} style={{
+            position: "fixed", top: "calc(100px + env(safe-area-inset-top, 0px))", left: "50%",
+            transform: "translateX(-50%)", zIndex: 100,
+            animation: "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+            pointerEvents: "none",
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "12px 20px 12px 14px", borderRadius: 14,
+              backgroundColor: C.surface, border: `1.5px solid ${tc}`,
+              boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 30px ${tc}44, inset 0 1px 0 rgba(255,255,255,0.06)`,
+              backgroundImage: `linear-gradient(90deg, transparent 0%, ${tc}11 50%, transparent 100%)`,
+              backgroundSize: "200% 100%",
+              animation: "achievementShimmer 2s 0.6s ease-in-out",
+            }}>
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                {sparkles.map(s => (
+                  <div key={s.id} style={{
+                    position: "absolute", left: "50%", top: "50%",
+                    width: s.size, height: s.size, borderRadius: "50%",
+                    backgroundColor: tc,
+                    transform: `translate(calc(-50% + ${s.x}px), calc(-50% + ${s.y}px))`,
+                    animation: `achievementSparkle 0.6s ${0.3 + s.delay}s ease-out both`,
+                    opacity: 0,
+                  }} />
+                ))}
+                <div style={{
+                  width: 36, height: 36, borderRadius: 9,
+                  backgroundColor: tc + "22", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `2px solid ${tc}`,
+                  color: tc,
+                  animation: "achievementBadgeSpin 0.8s 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both, achievementGlow 1.2s 0.3s ease-out both",
+                  perspective: 200,
+                }}>
+                  <span style={{ fontSize: 18, color: tc, lineHeight: 1 }}>
+                    {tierSymbols[achievementToast.tier]}
+                  </span>
+                </div>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{
+                  fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700,
+                  color: tc, letterSpacing: 1.5, textTransform: "uppercase",
+                  marginBottom: 3,
+                }}>Achievement unlocked</div>
+                <div style={{
+                  fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                  color: C.text, letterSpacing: 0.5,
+                }}>{achievementToast.label}</div>
+                <div style={{
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: C.textDim,
+                  marginTop: 2, lineHeight: 1.3,
+                }}>{achievementToast.desc}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Top bar - fixed at top so it always stays visible */}
       <div style={{
