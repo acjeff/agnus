@@ -3057,28 +3057,29 @@ export default function Pattrn() {
   if (view === "menu") {
     return (
       <div style={{
-        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        minHeight: "100dvh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
-        display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 16px",
+        display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 20px 100px",
       }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
-        <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease", position: "relative", width: "100%", maxWidth: 360 }}>
+        <div style={{ textAlign: "center", marginBottom: 20, animation: "fadeUp 0.5s ease", position: "relative", width: "100%", maxWidth: 420 }}>
           {/* Menu button */}
           <button
             onClick={() => setShowGameMenu(true)}
             style={{
-              position: "absolute", top: 2, right: 0,
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 10,
-              width: 38, height: 38, cursor: "pointer",
+              position: "absolute", top: 0, right: 0,
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 12,
+              width: 44, height: 44, cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center",
               transition: "all 0.15s",
+              touchAction: "manipulation",
             }}
             onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
             aria-label="Menu"
           >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+            <svg width="20" height="20" viewBox="0 0 18 18" fill="none">
               <rect x="2" y="3" width="14" height="2" rx="1" fill={C.textDim} />
               <rect x="2" y="8" width="14" height="2" rx="1" fill={C.textDim} />
               <rect x="2" y="13" width="14" height="2" rx="1" fill={C.textDim} />
@@ -3087,7 +3088,7 @@ export default function Pattrn() {
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: 4, margin: 0, color: C.accent }}>
             Agnus
           </h1>
-          <p style={{ color: C.textDim, fontSize: 13, marginTop: 6, letterSpacing: 2 }}>
+          <p style={{ color: C.textDim, fontSize: 14, marginTop: 8, letterSpacing: 2 }}>
             find the pattern &middot; fill the gaps
           </p>
         </div>
@@ -3095,14 +3096,14 @@ export default function Pattrn() {
         {/* Add to Home Screen hint for iOS Safari */}
         {isIOSSafariForHomescreenHint() && !homescreenHintDismissed && (
           <div style={{
-            width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.01s ease both",
-            borderRadius: 12, border: `1px solid ${C.border}`, backgroundColor: C.surface,
-            padding: "12px 16px", display: "flex", alignItems: "flex-start", gap: 12,
+            width: "100%", maxWidth: 420, marginBottom: 16, animation: "fadeUp 0.5s 0.01s ease both",
+            borderRadius: 14, border: `1px solid ${C.border}`, backgroundColor: C.surface,
+            padding: "14px 16px", display: "flex", alignItems: "flex-start", gap: 12,
           }}>
-            <span style={{ fontSize: 20, flexShrink: 0 }}>📱</span>
+            <span style={{ fontSize: 22, flexShrink: 0 }}>📱</span>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.accent, marginBottom: 4 }}>Add to Home Screen</div>
-              <p style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5, margin: 0 }}>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 600, color: C.accent, marginBottom: 4 }}>Add to Home Screen</div>
+              <p style={{ fontSize: 13, color: C.textDim, lineHeight: 1.5, margin: 0 }}>
                 Tap the Share button (square with arrow) at the bottom of Safari, then scroll down and tap &ldquo;Add to Home Screen&rdquo; for quick access.
               </p>
             </div>
@@ -3112,8 +3113,10 @@ export default function Pattrn() {
                 setHomescreenHintDismissed(true);
               }}
               style={{
-                background: "none", border: "none", color: C.textDim, cursor: "pointer", padding: 4,
-                fontSize: 18, lineHeight: 1, flexShrink: 0,
+                background: "none", border: "none", color: C.textDim, cursor: "pointer",
+                padding: 8, fontSize: 20, lineHeight: 1, flexShrink: 0,
+                minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center",
+                touchAction: "manipulation",
               }}
               aria-label="Dismiss"
             >
@@ -3132,62 +3135,62 @@ export default function Pattrn() {
           const todayLabel = getDailyDateLabel(todayIdx);
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.02s ease both",
-              borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`,
-              backgroundColor: C.surface, padding: "12px 16px",
+              width: "100%", maxWidth: 420, marginBottom: 16, animation: "fadeUp 0.5s 0.02s ease both",
+              borderRadius: 14, overflow: "hidden", border: `1px solid ${C.border}`,
+              backgroundColor: C.surface, padding: "16px 18px",
             }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.accent }}>Today: {todayLabel}</span>
-                  {streak > 0 && (
-                    <span style={{ fontSize: 12, color: C.textDim }}>🔥 {streak} day streak</span>
-                  )}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {todayResult > 0 && (
-                    <span style={{ fontSize: 11, color: C.textDim }}>
-                      <ScoreBadge attempts={todayResult} />
-                      {todayTime != null && ` ${formatTime(todayTime)}`}
-                    </span>
-                  )}
-                  <button
-                    onClick={async () => {
-                      const medal = todayResult <= 2 ? "\u2605" : todayResult <= 4 ? "\u25CF" : "\u25C6";
-                      const streakPart = streak > 0 ? ` 🔥 ${streak} day streak` : "";
-                      const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${todayLabel}` : "";
-                      const text = todayResult > 0
-                        ? `Agnus Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
-                        : `Agnus Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
-                      const result = await tryNativeShare({ text, url: dailyUrl });
-                      if (result === "shared") {
-                        setDailyShareMsg("Shared!");
-                        setTimeout(() => setDailyShareMsg(""), 2000);
-                        return;
-                      }
-                      if (result === "cancelled") return;
-                      try { await navigator.clipboard.writeText(text + "\n" + dailyUrl); } catch { /* fallback */ }
-                      setDailyShareMsg("Copied!");
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
+                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.accent }}>Today: {todayLabel}</span>
+                {streak > 0 && (
+                  <span style={{ fontSize: 13, color: C.textDim }}>🔥 {streak} day streak</span>
+                )}
+                {todayResult > 0 && (
+                  <span style={{ fontSize: 12, color: C.textDim, marginLeft: "auto" }}>
+                    <ScoreBadge attempts={todayResult} />
+                    {todayTime != null && ` ${formatTime(todayTime)}`}
+                  </span>
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <button
+                  onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, todayLabel); }}
+                  style={{
+                    flex: 1, padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    background: C.accent, color: C.bg, border: "none", cursor: "pointer",
+                    minHeight: 44, touchAction: "manipulation",
+                  }}
+                >
+                  {todayResult > 0 ? "View today's result" : "Play today"}
+                </button>
+                <button
+                  onClick={async () => {
+                    const medal = todayResult <= 2 ? "\u2605" : todayResult <= 4 ? "\u25CF" : "\u25C6";
+                    const streakPart = streak > 0 ? ` 🔥 ${streak} day streak` : "";
+                    const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${todayLabel}` : "";
+                    const text = todayResult > 0
+                      ? `Agnus Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
+                      : `Agnus Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
+                    const result = await tryNativeShare({ text, url: dailyUrl });
+                    if (result === "shared") {
+                      setDailyShareMsg("Shared!");
                       setTimeout(() => setDailyShareMsg(""), 2000);
-                    }}
-                    style={{
-                      padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                      background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                    }}
-                  >
-                    {dailyShareMsg || "Share"}
-                  </button>
-                  <button
-                    onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, todayLabel); }}
-                    style={{
-                      padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                      background: C.accent, color: C.bg, border: "none", cursor: "pointer",
-                    }}
-                  >
-                    {todayResult > 0 ? "View today's result" : "Play today"}
-                  </button>
-                </div>
+                      return;
+                    }
+                    if (result === "cancelled") return;
+                    try { await navigator.clipboard.writeText(text + "\n" + dailyUrl); } catch { /* fallback */ }
+                    setDailyShareMsg("Copied!");
+                    setTimeout(() => setDailyShareMsg(""), 2000);
+                  }}
+                  style={{
+                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                    background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                    minHeight: 44, touchAction: "manipulation",
+                  }}
+                >
+                  {dailyShareMsg || "Share"}
+                </button>
               </div>
             </div>
           );
@@ -3196,20 +3199,20 @@ export default function Pattrn() {
         {/* Mode selector: categorized auto-wrapping grid */}
         <div style={{
           marginBottom: 20, animation: "fadeUp 0.5s 0.05s ease both",
-          width: "100%", maxWidth: 360,
-          display: "flex", flexDirection: "column", gap: 14,
+          width: "100%", maxWidth: 420,
+          display: "flex", flexDirection: "column", gap: 16,
         }}>
           {MODE_CATEGORIES.map((cat) => (
             <div key={cat}>
               <div style={{
-                fontSize: 9, color: C.textDim, textTransform: "uppercase",
-                letterSpacing: 1.5, marginBottom: 6,
-                fontFamily: "'Space Mono', monospace",
+                fontSize: 11, color: C.textDim, textTransform: "uppercase",
+                letterSpacing: 1.5, marginBottom: 8,
+                fontFamily: "'Space Mono', monospace", fontWeight: 600,
               }}>{cat}</div>
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
-                gap: 8,
+                gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+                gap: 10,
               }}>
                 {DIFFICULTIES.filter((d) => d.cat === cat).map((d) => {
                   const active = difficulty === d.key;
@@ -3222,30 +3225,32 @@ export default function Pattrn() {
                       key={d.key}
                       onClick={() => setDifficulty(d.key)}
                       style={{
-                        padding: "12px 8px",
+                        padding: "14px 10px",
                         background: active ? (d.key === "blind" ? "#e06040" : C.accent) : C.surface,
                         color: active ? (d.key === "blind" ? "#fff" : C.bg) : C.textDim,
-                        border: `1px solid ${active ? "transparent" : C.border}`,
-                        borderRadius: 10,
+                        border: `1.5px solid ${active ? "transparent" : C.border}`,
+                        borderRadius: 12,
                         cursor: "pointer",
                         fontFamily: "'Space Mono', monospace",
-                        fontSize: 11,
-                        fontWeight: active ? 700 : 400,
+                        fontSize: 12,
+                        fontWeight: active ? 700 : 500,
                         letterSpacing: 0.5,
                         textTransform: "uppercase",
-                        transition: "background 0.2s, color 0.2s",
+                        transition: "background 0.2s, color 0.2s, border-color 0.2s",
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
-                        gap: 2,
+                        gap: 3,
+                        minHeight: 48,
+                        touchAction: "manipulation",
                       }}
                     >
                       <span style={{ whiteSpace: "nowrap" }}>{d.label}</span>
                       <span style={{
-                        fontSize: 8,
+                        fontSize: 10,
                         color: active ? (d.key === "blind" ? "#fff9" : C.bg + "aa") : C.textDim,
                       }}>{d.desc}</span>
-                      <span style={{ fontSize: 8, color: active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{d.key === "daily" ? `${solved} solved` : `${solved}/50`}</span>
+                      <span style={{ fontSize: 10, color: active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{d.key === "daily" ? `${solved} solved` : `${solved}/50`}</span>
                     </button>
                   );
                 })}
@@ -3257,27 +3262,27 @@ export default function Pattrn() {
         {/* Stats summary with inline share */}
         {isDaily ? (
           <div style={{
-            width: "100%", maxWidth: 360,
-            display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
-            padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+            width: "100%", maxWidth: 420,
+            display: "flex", gap: 20, marginBottom: 20, animation: "fadeUp 0.5s 0.1s ease both",
+            padding: "14px 20px", borderRadius: 14, backgroundColor: C.surface, border: `1px solid ${C.border}`,
             alignItems: "center", boxSizing: "border-box",
           }}>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
+              <div style={{ fontSize: 11, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.accent }}>{completedCount}</div>
             </div>
             <div style={{ width: 1, alignSelf: "stretch", backgroundColor: C.border }} />
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Streak</div>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.gold }}>{getDailyStreak(progress)}</div>
+              <div style={{ fontSize: 11, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Streak</div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.gold }}>{getDailyStreak(progress)}</div>
             </div>
             <div style={{ flex: 1 }} />
             <button onClick={() => setShowShareModal(true)}
               style={{
-                padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 600,
+                padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 600,
                 fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
                 background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                transition: "all 0.15s",
+                transition: "all 0.15s", minHeight: 44, touchAction: "manipulation",
               }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
@@ -3287,27 +3292,27 @@ export default function Pattrn() {
           </div>
         ) : (
           <div style={{
-            width: "100%", maxWidth: 360,
-            display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
-            padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+            width: "100%", maxWidth: 420,
+            display: "flex", gap: 20, marginBottom: 20, animation: "fadeUp 0.5s 0.1s ease both",
+            padding: "14px 20px", borderRadius: 14, backgroundColor: C.surface, border: `1px solid ${C.border}`,
             alignItems: "center", boxSizing: "border-box",
           }}>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
+              <div style={{ fontSize: 11, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.accent }}>{completedCount}</div>
             </div>
             <div style={{ width: 1, alignSelf: "stretch", backgroundColor: C.border }} />
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Attempted</div>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700 }}>{totalAttempted}</div>
+              <div style={{ fontSize: 11, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Attempted</div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700 }}>{totalAttempted}</div>
             </div>
             <div style={{ flex: 1 }} />
             <button onClick={() => setShowShareModal(true)}
               style={{
-                padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 600,
+                padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 600,
                 fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
                 background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                transition: "all 0.15s",
+                transition: "all 0.15s", minHeight: 44, touchAction: "manipulation",
               }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
@@ -3324,38 +3329,38 @@ export default function Pattrn() {
           const total = achs.length;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.12s ease both",
+              width: "100%", maxWidth: 420, marginBottom: 16, animation: "fadeUp 0.5s 0.12s ease both",
             }}>
               <button onClick={() => setShowAchievements(true)} style={{
-                width: "100%", padding: "12px 16px", borderRadius: 12,
+                width: "100%", padding: "14px 18px", borderRadius: 14,
                 backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                transition: "all 0.15s",
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 14,
+                transition: "all 0.15s", minHeight: 52, touchAction: "manipulation",
               }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
               >
                 <div style={{
-                  width: 28, height: 28, borderRadius: 7,
+                  width: 32, height: 32, borderRadius: 8,
                   backgroundColor: C.accent + "22", display: "flex", alignItems: "center", justifyContent: "center",
                   border: `1.5px solid ${C.accent}44`,
                 }}>
-                  <span style={{ fontSize: 14, color: C.accent, lineHeight: 1 }}>{"\u2605"}</span>
+                  <span style={{ fontSize: 16, color: C.accent, lineHeight: 1 }}>{"\u2605"}</span>
                 </div>
                 <div style={{ flex: 1, textAlign: "left" }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
                     Achievements
                   </span>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, fontWeight: 700 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, color: C.accent, fontWeight: 700 }}>
                     {unlocked}/{total}
                   </span>
                   <div style={{
-                    height: 4, width: 40, borderRadius: 2, backgroundColor: C.surfaceLight, overflow: "hidden",
+                    height: 5, width: 48, borderRadius: 3, backgroundColor: C.surfaceLight, overflow: "hidden",
                   }}>
                     <div style={{
-                      height: "100%", borderRadius: 2, backgroundColor: C.accent,
+                      height: "100%", borderRadius: 3, backgroundColor: C.accent,
                       width: `${(unlocked / total) * 100}%`,
                     }} />
                   </div>
@@ -3371,20 +3376,21 @@ export default function Pattrn() {
           if (!birthday) {
             return (
               <div style={{
-                width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
-                borderRadius: 12, overflow: "hidden", border: `1px solid #F472B633`,
-                backgroundColor: C.surface, padding: "12px 16px",
+                width: "100%", maxWidth: 420, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
+                borderRadius: 14, overflow: "hidden", border: `1px solid #F472B633`,
+                backgroundColor: C.surface, padding: "14px 18px",
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F472B6" }}>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: "#F472B6" }}>
                     {"\uD83C\uDF82"} Birthday puzzle
                   </span>
                   <button
                     onClick={() => setShowBirthdayPrompt(true)}
                     style={{
-                      padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      padding: "10px 18px", borderRadius: 10, fontSize: 13, fontWeight: 700,
                       fontFamily: "'Space Mono', monospace", letterSpacing: 1,
                       background: "#F472B6", color: "#fff", border: "none", cursor: "pointer",
+                      minHeight: 44, touchAction: "manipulation",
                     }}
                   >
                     Set birthday
@@ -3405,73 +3411,74 @@ export default function Pattrn() {
           const bdLabel = `${String(bdDay).padStart(2, "0")}-${String(bdMonthNum).padStart(2, "0")}${bdYearNum ? `-${bdYearNum}` : ""}`;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
-              borderRadius: 12, overflow: "hidden", border: `1px solid #F472B633`,
-              backgroundColor: C.surface, padding: "12px 16px",
+              width: "100%", maxWidth: 420, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
+              borderRadius: 14, overflow: "hidden", border: `1px solid #F472B633`,
+              backgroundColor: C.surface, padding: "14px 18px",
             }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F472B6" }}>
-                    {"\uD83C\uDF82"} {bdLabel}
+              <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 10 }}>
+                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: "#F472B6" }}>
+                  {"\uD83C\uDF82"} {bdLabel}
+                </span>
+                {bdSolved && (
+                  <span style={{ fontSize: 12, color: C.textDim }}>
+                    <ScoreBadge attempts={bdResult} />
+                    {bdTime != null && ` ${formatTime(bdTime)}`}
                   </span>
-                  {bdSolved && (
-                    <span style={{ fontSize: 11, color: C.textDim }}>
-                      <ScoreBadge attempts={bdResult} />
-                      {bdTime != null && ` ${formatTime(bdTime)}`}
-                    </span>
-                  )}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {bdYearNum && !bdIsFuture && (
-                    <button
-                      onClick={async () => {
-                        const medal = bdSolved && bdResult <= 2 ? "\u2605" : bdResult <= 4 ? "\u25CF" : "\u25C6";
-                        const text = bdSolved
-                          ? `\uD83C\uDF82 My Agnus birthday puzzle (${bdDateStr})\n${medal} Solved in ${bdResult} attempt${bdResult !== 1 ? "s" : ""} \u2022 ${formatTime(bdTime)}\nCan you beat it?\n${bdUrl}`
-                          : `\uD83C\uDF82 Try my Agnus birthday puzzle!\n${bdDateStr}\n${bdUrl}`;
-                        const result = await tryNativeShare({ text, url: bdUrl });
-                        if (result === "shared") { setDailyShareMsg("Shared!"); setTimeout(() => setDailyShareMsg(""), 2000); return; }
-                        if (result === "cancelled") return;
-                        try { await navigator.clipboard.writeText(text); } catch { /* fallback */ }
-                        setDailyShareMsg("Copied!");
-                        setTimeout(() => setDailyShareMsg(""), 2000);
-                      }}
-                      style={{
-                        padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                        background: "none", border: `1px solid #F472B644`, color: "#F472B6", cursor: "pointer",
-                      }}
-                    >
-                      {dailyShareMsg || "Share"}
-                    </button>
-                  )}
-                  {bdYearNum && !bdIsFuture ? (
-                    <button
-                      onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, bdDateStr); }}
-                      style={{
-                        padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                        background: "#F472B6", color: "#fff", border: "none", cursor: "pointer",
-                      }}
-                    >
-                      {bdSolved ? "View" : "Play"}
-                    </button>
-                  ) : bdIsFuture ? (
-                    <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
-                      Not yet available
-                    </span>
-                  ) : null}
+                )}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                {bdYearNum && !bdIsFuture ? (
                   <button
-                    onClick={() => setShowBirthdayPrompt(true)}
+                    onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, bdDateStr); }}
                     style={{
-                      padding: "6px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                      background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                      flex: 1, padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      background: "#F472B6", color: "#fff", border: "none", cursor: "pointer",
+                      minHeight: 44, touchAction: "manipulation",
                     }}
                   >
-                    Edit
+                    {bdSolved ? "View" : "Play"}
                   </button>
-                </div>
+                ) : bdIsFuture ? (
+                  <span style={{ flex: 1, fontSize: 12, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                    Not yet available
+                  </span>
+                ) : null}
+                {bdYearNum && !bdIsFuture && (
+                  <button
+                    onClick={async () => {
+                      const medal = bdSolved && bdResult <= 2 ? "\u2605" : bdResult <= 4 ? "\u25CF" : "\u25C6";
+                      const text = bdSolved
+                        ? `\uD83C\uDF82 My Agnus birthday puzzle (${bdDateStr})\n${medal} Solved in ${bdResult} attempt${bdResult !== 1 ? "s" : ""} \u2022 ${formatTime(bdTime)}\nCan you beat it?\n${bdUrl}`
+                        : `\uD83C\uDF82 Try my Agnus birthday puzzle!\n${bdDateStr}\n${bdUrl}`;
+                      const result = await tryNativeShare({ text, url: bdUrl });
+                      if (result === "shared") { setDailyShareMsg("Shared!"); setTimeout(() => setDailyShareMsg(""), 2000); return; }
+                      if (result === "cancelled") return;
+                      try { await navigator.clipboard.writeText(text); } catch { /* fallback */ }
+                      setDailyShareMsg("Copied!");
+                      setTimeout(() => setDailyShareMsg(""), 2000);
+                    }}
+                    style={{
+                      padding: "10px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                      background: "none", border: `1px solid #F472B644`, color: "#F472B6", cursor: "pointer",
+                      minHeight: 44, touchAction: "manipulation",
+                    }}
+                  >
+                    {dailyShareMsg || "Share"}
+                  </button>
+                )}
+                <button
+                  onClick={() => setShowBirthdayPrompt(true)}
+                  style={{
+                    padding: "10px 14px", borderRadius: 10, fontSize: 12, fontWeight: 600,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                    background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                    minHeight: 44, touchAction: "manipulation",
+                  }}
+                >
+                  Edit
+                </button>
               </div>
             </div>
           );
@@ -3520,30 +3527,34 @@ export default function Pattrn() {
           };
           const todayISO = `${todayUTCYear}-${String(todayUTCMonth + 1).padStart(2, "0")}-${String(todayUTCDate).padStart(2, "0")}`;
           return (
-            <div style={{ maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both" }}>
+            <div style={{ maxWidth: 420, width: "100%", animation: "fadeUp 0.5s 0.15s ease both" }}>
               {/* Month navigation with Today button */}
               <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8,
+                display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10,
               }}>
                 <button
                   onClick={() => { if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(y => y - 1); } else setCalendarMonth(m => m - 1); }}
                   style={{
-                    background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px",
-                    color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 14, transition: "all 0.15s",
+                    background: "none", border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 14px",
+                    color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 16, transition: "all 0.15s",
+                    minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center",
+                    touchAction: "manipulation",
                   }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
                 >&larr;</button>
-                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, letterSpacing: 1 }}>
+                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700, color: C.text, letterSpacing: 1 }}>
                   {MONTH_NAMES[calendarMonth]} {calendarYear}
                 </span>
                 <button
                   onClick={() => { if (canGoForward) { if (calendarMonth === 11) { setCalendarMonth(0); setCalendarYear(y => y + 1); } else setCalendarMonth(m => m + 1); } }}
                   disabled={!canGoForward}
                   style={{
-                    background: "none", border: `1px solid ${canGoForward ? C.border : C.border + "44"}`, borderRadius: 8, padding: "6px 12px",
+                    background: "none", border: `1px solid ${canGoForward ? C.border : C.border + "44"}`, borderRadius: 10, padding: "8px 14px",
                     color: canGoForward ? C.textDim : C.textDim + "44", cursor: canGoForward ? "pointer" : "default",
-                    fontFamily: "'Space Mono', monospace", fontSize: 14, transition: "all 0.15s",
+                    fontFamily: "'Space Mono', monospace", fontSize: 16, transition: "all 0.15s",
+                    minWidth: 44, minHeight: 44, display: "flex", alignItems: "center", justifyContent: "center",
+                    touchAction: "manipulation",
                   }}
                   onMouseEnter={e => { if (canGoForward) { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; } }}
                   onMouseLeave={e => { if (canGoForward) { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; } }}
@@ -3555,10 +3566,10 @@ export default function Pattrn() {
                   <button
                     onClick={() => { setCalendarYear(todayUTCYear); setCalendarMonth(todayUTCMonth); }}
                     style={{
-                      background: "none", border: `1px solid ${C.accent}`, borderRadius: 8, padding: "5px 12px",
-                      color: C.accent, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 10,
+                      background: "none", border: `1px solid ${C.accent}`, borderRadius: 10, padding: "8px 16px",
+                      color: C.accent, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 11,
                       fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", transition: "all 0.15s",
-                      whiteSpace: "nowrap",
+                      whiteSpace: "nowrap", minHeight: 40, touchAction: "manipulation",
                     }}
                     onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.accent; e.currentTarget.style.color = C.bg; }}
                     onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = C.accent; }}
@@ -3568,11 +3579,11 @@ export default function Pattrn() {
                 )}
                 <label
                   style={{
-                    position: "relative", display: "inline-block",
-                    background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 12px",
-                    color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 10,
+                    position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center",
+                    background: "none", border: `1px solid ${C.border}`, borderRadius: 10, padding: "8px 16px",
+                    color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 11,
                     fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", transition: "all 0.15s",
-                    whiteSpace: "nowrap",
+                    whiteSpace: "nowrap", minHeight: 40, touchAction: "manipulation",
                   }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
@@ -3591,16 +3602,16 @@ export default function Pattrn() {
                 </label>
               </div>
               {/* Day-of-week headers */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5, marginBottom: 5 }}>
                 {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
                   <div key={d} style={{
-                    textAlign: "center", fontFamily: "'Space Mono', monospace", fontSize: 9,
-                    color: C.textDim, letterSpacing: 0.5, padding: "4px 0",
+                    textAlign: "center", fontFamily: "'Space Mono', monospace", fontSize: 11,
+                    color: C.textDim, letterSpacing: 0.5, padding: "4px 0", fontWeight: 600,
                   }}>{d}</div>
                 ))}
               </div>
               {/* Day cells */}
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 5 }}>
                 {cells.map((cell, i) => {
                   if (!cell) return <div key={`empty-${i}`} />;
                   const solved = cell.result > 0;
@@ -3631,23 +3642,23 @@ export default function Pattrn() {
                         </span>
                       )}
                       <span style={{
-                        fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: cell.isToday ? 800 : isBd ? 800 : 600,
+                        fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: cell.isToday ? 800 : isBd ? 800 : 600,
                         color: numColor, lineHeight: 1,
                       }}>{cell.day}</span>
                       {solved && <ScoreBadge attempts={cell.result} />}
                       {solved && cell.time != null && (
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 7, color: C.textDim, lineHeight: 1 }}>
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 8, color: C.textDim, lineHeight: 1 }}>
                           {formatTime(cell.time)}
                         </span>
                       )}
-                      {failed && <span style={{ fontSize: 8, color: C.incorrect }}>{"\u2717"}</span>}
+                      {failed && <span style={{ fontSize: 9, color: C.incorrect }}>{"\u2717"}</span>}
                     </button>
                   );
                 })}
               </div>
               {/* Legend */}
               <div style={{
-                marginTop: 16, display: "flex", gap: 16, fontSize: 11, color: C.textDim,
+                marginTop: 16, display: "flex", gap: 14, fontSize: 12, color: C.textDim,
                 fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
                 flexWrap: "wrap", justifyContent: "center",
               }}>
@@ -3768,8 +3779,8 @@ export default function Pattrn() {
         {/* Puzzle grid: 50 for non-daily modes */}
         {!isDaily && (<>
         <div style={{
-          display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
-          maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
+          display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10,
+          maxWidth: 420, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
         }}>
           {(isCascade ? Array.from({ length: 50 }, (_, i) => i) : puzzles).map((p, i) => {
             const idx = isCascade ? i : p?.id ?? i;
@@ -3807,14 +3818,14 @@ export default function Pattrn() {
                 onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; }}
               >
                 <span style={{
-                  fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700,
                   color: numColor, lineHeight: 1,
                 }}>
                   {i + 1}
                 </span>
                 {isCascade ? (
                   cascadeSizeLabel ? <span style={{
-                    fontFamily: "'Space Mono', monospace", fontSize: 9, color: cascadeInProgress ? C.inProgress : C.textDim,
+                    fontFamily: "'Space Mono', monospace", fontSize: 10, color: cascadeInProgress ? C.inProgress : C.textDim,
                     lineHeight: 1.2,
                   }}>
                     {cascadeSizeLabel}
@@ -3823,7 +3834,7 @@ export default function Pattrn() {
                   <>
                     {result !== undefined && <ScoreBadge attempts={result} />}
                     {solved && time != null && (
-                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 8, color: C.textDim, lineHeight: 1 }}>
+                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, color: C.textDim, lineHeight: 1 }}>
                         {formatTime(time)}
                       </span>
                     )}
@@ -3836,7 +3847,7 @@ export default function Pattrn() {
 
         {/* Legend */}
         <div style={{
-          marginTop: 24, display: "flex", gap: 16, fontSize: 11, color: C.textDim,
+          marginTop: 24, display: "flex", gap: 14, fontSize: 12, color: C.textDim,
           fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, animation: "fadeUp 0.5s 0.25s ease both",
           flexWrap: "wrap", justifyContent: "center",
         }}>
@@ -4409,6 +4420,42 @@ export default function Pattrn() {
             </div>
           );
         })()}
+
+        {/* Sticky bottom CTA - always-visible primary action in thumb zone */}
+        {!isDaily && !showShareModal && !showGameMenu && !showAchievements && !showBirthdayPrompt && !showClearConfirm && !showThemePicker && (
+          <div style={{
+            position: "fixed", bottom: 0, left: 0, right: 0,
+            padding: "12px 20px", paddingBottom: "max(12px, env(safe-area-inset-bottom))",
+            background: `linear-gradient(transparent, ${C.bg} 20%)`,
+            display: "flex", justifyContent: "center",
+            zIndex: 50, pointerEvents: "none",
+          }}>
+            <button
+              onClick={() => {
+                const dp = progress[difficulty] || {};
+                const firstUnsolved = Array.from({ length: 50 }, (_, i) => i).find(i => {
+                  if (difficulty === "cascade") return (dp[i] ?? -1) < CASCADE_LEVELS.length;
+                  return !dp[i] || dp[i] <= 0;
+                });
+                startPuzzle(firstUnsolved != null ? firstUnsolved : 0, difficulty);
+              }}
+              style={{
+                padding: "14px 32px", borderRadius: 14, fontSize: 14, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 1.5,
+                background: C.accent, color: C.bg, border: "none", cursor: "pointer",
+                minHeight: 52, minWidth: 200,
+                boxShadow: `0 4px 24px ${C.accent}44`,
+                textTransform: "uppercase", touchAction: "manipulation",
+                pointerEvents: "auto",
+                transition: "transform 0.15s, box-shadow 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.03)"; e.currentTarget.style.boxShadow = `0 6px 32px ${C.accent}66`; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = `0 4px 24px ${C.accent}44`; }}
+            >
+              Play {DIFFICULTIES.find(d => d.key === difficulty)?.label || difficulty}
+            </button>
+          </div>
+        )}
       </div>
     );
   }
