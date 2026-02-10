@@ -1954,6 +1954,14 @@ export default function Pattrn() {
   const themeColorMap = useMemo(() => buildColorMap(activeTheme.palettes), [activeTheme]);
   const themedShapes = activeTheme.shapes || SHAPES;
 
+  // Viewport size tracking for dynamic grid sizing
+  const [viewportSize, setViewportSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  useEffect(() => {
+    const onResize = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   // Scroll play view to top when entering or changing puzzle
   useEffect(() => {
     if (view !== "play") return;
@@ -2907,8 +2915,13 @@ export default function Pattrn() {
   };
 
   const gridSize = puzzle ? puzzle.gridSize : 5;
-  const cellSize = gridSize <= 5 ? 56 : gridSize === 6 ? 48 : gridSize === 7 ? 42 : gridSize === 8 ? 38 : 34;
-  const iconSize = gridSize <= 5 ? 28 : gridSize === 6 ? 24 : gridSize === 7 ? 22 : gridSize === 8 ? 18 : 16;
+  const gridGap = gridSize >= 7 ? 3 : 4;
+  const gridPad = gridSize >= 7 ? 10 : 14;
+  const availW = viewportSize.w - 50 - (gridSize - 1) * gridGap - 2 * gridPad;
+  const availH = viewportSize.h - 320 - (gridSize - 1) * gridGap - 2 * gridPad;
+  const dynamicCell = Math.min(Math.floor(availW / gridSize), Math.floor(availH / gridSize));
+  const cellSize = Math.max(28, Math.min(dynamicCell, 80));
+  const iconSize = Math.max(14, Math.round(cellSize * 0.5));
   const pickerSize = 48;
 
   // --- Theme Picker (shared across views) ---
@@ -4665,17 +4678,15 @@ export default function Pattrn() {
       </div>
 
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(80px + env(safe-area-inset-top, 0px))", paddingBottom: 140, width: "100%", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", marginTop: "calc(88px + env(safe-area-inset-top, 0px))", marginBottom: "calc(140px + env(safe-area-inset-bottom, 0px))", width: "100%", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, border: `1px solid ${activeTheme.gridBorder || C.border}`, borderRadius: 16, boxShadow: `0 8px 32px ${C.bg}88`, position: "relative", boxSizing: "border-box" }}>
+        <GridDecoration decoration={activeTheme.decoration} />
       <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
         <div style={{
-          display: "flex", flexDirection: "column", gap: gridSize >= 7 ? 3 : 4, padding: gridSize >= 7 ? 10 : 14,
-          backgroundColor: activeTheme.gridBg || C.surface, borderRadius: 16,
-          border: `1px solid ${activeTheme.gridBorder || C.border}`, boxShadow: `0 8px 32px ${C.bg}88`,
-          overflow: "visible", position: "relative",
+          display: "flex", flexDirection: "column", gap: gridGap, padding: gridPad,
+          position: "relative", zIndex: 1,
         }}>
-          <GridDecoration decoration={activeTheme.decoration} />
           {puzzle.solution.map((row, r) => (
-            <div key={r} style={{ display: "flex", gap: gridSize >= 7 ? 3 : 4, position: "relative", zIndex: 1 }}>
+            <div key={r} style={{ display: "flex", gap: gridGap, position: "relative", zIndex: 1 }}>
               {row.map((token, c) => {
                 const key = `${r}-${c}`;
                 const isBlankCell = puzzle.blanks.has(key);
