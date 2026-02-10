@@ -856,9 +856,13 @@ export default function Pattrn() {
   });
   const [showBirthdayPrompt, setShowBirthdayPrompt] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
+  const [showGameMenu, setShowGameMenu] = useState(false);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null); // { label, tier, key }
+  const [toastDismissing, setToastDismissing] = useState(false);
   const achievementQueueRef = useRef([]);
   const achievementToastTimer = useRef(null);
+  const toastDismissTimer = useRef(null);
   const prevUnlockedRef = useRef(null);
   const [birthdayInput, setBirthdayInput] = useState("");
   const goToDateRef = useRef(null);
@@ -1161,16 +1165,26 @@ export default function Pattrn() {
     return 0;
   }, []);
 
-  const advanceAchievementQueue = useCallback(() => {
+  const showNextToast = useCallback(() => {
     if (achievementQueueRef.current.length === 0) {
       setAchievementToast(null);
+      setToastDismissing(false);
       achievementToastTimer.current = null;
       return;
     }
     const next = achievementQueueRef.current.shift();
+    setToastDismissing(false);
     setAchievementToast({ label: next.label, desc: next.desc, tier: next.tier, key: next.id + "-" + Date.now() });
-    achievementToastTimer.current = setTimeout(() => advanceAchievementQueue(), 3200);
+    // After display duration, start dismiss animation
+    achievementToastTimer.current = setTimeout(() => {
+      setToastDismissing(true);
+      // After exit animation completes, show next or clear
+      toastDismissTimer.current = setTimeout(() => showNextToast(), 400);
+    }, 2800);
   }, []);
+
+  // Keep old name for compatibility with showNewAchievements
+  const advanceAchievementQueue = showNextToast;
 
   const showNewAchievements = useCallback((newProgress, newTimes) => {
     const beforeSet = prevUnlockedRef.current;
@@ -1471,6 +1485,7 @@ export default function Pattrn() {
     return () => {
       stopTimer();
       if (achievementToastTimer.current) { clearTimeout(achievementToastTimer.current); achievementToastTimer.current = null; }
+      if (toastDismissTimer.current) { clearTimeout(toastDismissTimer.current); toastDismissTimer.current = null; }
     };
   }, [stopTimer]);
 
@@ -1791,7 +1806,27 @@ export default function Pattrn() {
       }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
-        <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease" }}>
+        <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease", position: "relative", width: "100%", maxWidth: 360 }}>
+          {/* Menu button */}
+          <button
+            onClick={() => setShowGameMenu(true)}
+            style={{
+              position: "absolute", top: 2, right: 0,
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 10,
+              width: 38, height: 38, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+            aria-label="Menu"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+              <rect x="2" y="3" width="14" height="2" rx="1" fill={C.textDim} />
+              <rect x="2" y="8" width="14" height="2" rx="1" fill={C.textDim} />
+              <rect x="2" y="13" width="14" height="2" rx="1" fill={C.textDim} />
+            </svg>
+          </button>
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: 4, margin: 0, color: C.accent }}>
             Agnus
           </h1>
@@ -2025,7 +2060,7 @@ export default function Pattrn() {
           </div>
         )}
 
-        {/* Achievements button */}
+        {/* Achievements button — now also accessible from game menu */}
         {(() => {
           const achs = computeAchievements(progress, times);
           const unlocked = achs.filter(a => a.unlocked).length;
@@ -2378,7 +2413,7 @@ export default function Pattrn() {
           }}>
             <div onClick={e => e.stopPropagation()} style={{
               backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
-              maxWidth: 480, width: "100%",
+              maxWidth: 480, width: "100%", overflow: "hidden",
               boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`,
               animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
             }}>
@@ -2387,7 +2422,7 @@ export default function Pattrn() {
                 <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
               </div>
 
-              <div style={{ padding: "8px 24px 0" }}>
+              <div style={{ padding: "8px 24px 0", overflow: "hidden" }}>
                 <div style={{ textAlign: "center", marginBottom: 16 }}>
                   <span style={{ fontSize: 32 }}>{"\uD83C\uDF82"}</span>
                   <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#F472B6", margin: "8px 0 4px" }}>
@@ -2405,7 +2440,7 @@ export default function Pattrn() {
                   style={{
                     width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`,
                     backgroundColor: C.surface, color: C.text, fontFamily: "'Space Mono', monospace", fontSize: 14,
-                    outline: "none", boxSizing: "border-box",
+                    outline: "none", boxSizing: "border-box", minWidth: 0,
                     colorScheme: "dark",
                   }}
                 />
@@ -2711,6 +2746,258 @@ export default function Pattrn() {
           );
         })()}
 
+        {/* Game Menu drawer */}
+        {showGameMenu && (() => {
+          const achs = computeAchievements(progress, times);
+          const achUnlocked = achs.filter(a => a.unlocked).length;
+          const achTotal = achs.length;
+          const totalSolvedAll = [...SOLVE_MODES, "daily"].reduce((s, m) => s + countModeSolved(progress[m]), 0)
+            + Object.values(progress.cascade || {}).filter(v => v === CASCADE_LEVELS.length).length;
+          return (
+            <div onClick={() => setShowGameMenu(false)} style={{
+              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
+              display: "flex", alignItems: "flex-end", justifyContent: "center",
+            }}>
+              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
+              <div onClick={e => e.stopPropagation()} style={{
+                backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
+                padding: "0", maxWidth: 480, width: "100%",
+                boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`,
+                display: "flex", flexDirection: "column",
+                animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+              }}>
+                {/* Drag handle */}
+                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
+                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
+                </div>
+
+                <div style={{ padding: "8px 24px 0" }}>
+                  {/* Header */}
+                  <div style={{ textAlign: "center", marginBottom: 20 }}>
+                    <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
+                      Menu
+                    </h2>
+                  </div>
+
+                  {/* Menu items */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {/* Achievements */}
+                    <button onClick={() => { setShowGameMenu(false); setShowAchievements(true); }} style={{
+                      width: "100%", padding: "14px 16px", borderRadius: 12,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                      transition: "all 0.15s",
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        backgroundColor: C.accent + "22", display: "flex", alignItems: "center", justifyContent: "center",
+                        border: `1.5px solid ${C.accent}44`, flexShrink: 0,
+                      }}>
+                        <span style={{ fontSize: 16, color: C.accent, lineHeight: 1 }}>{"\u2605"}</span>
+                      </div>
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                          Achievements
+                        </div>
+                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                          {achUnlocked}/{achTotal} unlocked
+                        </div>
+                      </div>
+                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                    </button>
+
+                    {/* Stats */}
+                    <button onClick={() => { setShowGameMenu(false); setShowShareModal(true); }} style={{
+                      width: "100%", padding: "14px 16px", borderRadius: 12,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                      transition: "all 0.15s",
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        backgroundColor: "#4ECDC422", display: "flex", alignItems: "center", justifyContent: "center",
+                        border: "1.5px solid #4ECDC444", flexShrink: 0,
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <rect x="1" y="9" width="3" height="6" rx="0.5" fill="#4ECDC4" />
+                          <rect x="6" y="5" width="3" height="10" rx="0.5" fill="#4ECDC4" />
+                          <rect x="11" y="1" width="3" height="14" rx="0.5" fill="#4ECDC4" />
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                          Statistics
+                        </div>
+                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                          {totalSolvedAll} puzzles solved
+                        </div>
+                      </div>
+                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                    </button>
+
+                    {/* Birthday */}
+                    <button onClick={() => { setShowGameMenu(false); setShowBirthdayPrompt(true); }} style={{
+                      width: "100%", padding: "14px 16px", borderRadius: 12,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                      transition: "all 0.15s",
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#F472B6"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        backgroundColor: "#F472B622", display: "flex", alignItems: "center", justifyContent: "center",
+                        border: "1.5px solid #F472B644", flexShrink: 0,
+                      }}>
+                        <span style={{ fontSize: 16, lineHeight: 1 }}>{"\uD83C\uDF82"}</span>
+                      </div>
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                          Birthday Puzzle
+                        </div>
+                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                          {birthday ? `Set: ${birthday}` : "Set your birthday"}
+                        </div>
+                      </div>
+                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                    </button>
+
+                    {/* Divider */}
+                    <div style={{ height: 1, backgroundColor: C.border, margin: "4px 0" }} />
+
+                    {/* Clear All Data */}
+                    <button onClick={() => setShowClearConfirm(true)} style={{
+                      width: "100%", padding: "14px 16px", borderRadius: 12,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                      transition: "all 0.15s",
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        backgroundColor: C.incorrect + "22", display: "flex", alignItems: "center", justifyContent: "center",
+                        border: `1.5px solid ${C.incorrect}44`, flexShrink: 0,
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <path d="M4 4L12 12M12 4L4 12" stroke={C.incorrect} strokeWidth="2" strokeLinecap="round" />
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.incorrect, letterSpacing: 0.5 }}>
+                          Clear All Data
+                        </div>
+                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                          Reset all progress and start fresh
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Footer */}
+                <div style={{
+                  padding: "16px 24px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+                  borderTop: `1px solid ${C.border}`, marginTop: 16, flexShrink: 0,
+                }}>
+                  <button onClick={() => setShowGameMenu(false)}
+                    style={{
+                      width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                      padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                    }}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Clear All Data confirmation dialog */}
+        {showClearConfirm && (
+          <div onClick={() => setShowClearConfirm(false)} style={{
+            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 24,
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              backgroundColor: C.bg, border: `1px solid ${C.incorrect}44`, borderRadius: 16,
+              padding: "24px", maxWidth: 340, width: "100%",
+              boxShadow: `0 16px 48px rgba(0,0,0,0.6), 0 0 40px ${C.incorrect}22`,
+              animation: "fadeUp 0.25s ease",
+            }}>
+              <div style={{ textAlign: "center", marginBottom: 20 }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
+                  backgroundColor: C.incorrect + "22", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `2px solid ${C.incorrect}44`,
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 9v4m0 4h.01M12 3L2 21h20L12 3z" stroke={C.incorrect} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <h3 style={{
+                  fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.incorrect, margin: "0 0 8px",
+                }}>
+                  Clear All Data?
+                </h3>
+                <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+                  This will permanently delete <strong style={{ color: C.text }}>all your progress</strong>, solve times, achievements, streak, birthday, and saved data. This cannot be undone.
+                </p>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button
+                  onClick={() => {
+                    try {
+                      localStorage.removeItem(STORAGE_KEY);
+                      localStorage.removeItem(TIMES_KEY);
+                      localStorage.removeItem(HOMESCREEN_HINT_KEY);
+                      localStorage.removeItem(BIRTHDAY_KEY);
+                    } catch { /* ignore */ }
+                    setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
+                    setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
+                    setBirthday(null);
+                    setHomescreenHintDismissed(false);
+                    setShowClearConfirm(false);
+                    setShowGameMenu(false);
+                  }}
+                  style={{
+                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+                    background: C.incorrect, color: "#fff", border: "none", cursor: "pointer",
+                    textTransform: "uppercase", transition: "all 0.15s",
+                  }}
+                >
+                  Clear everything
+                </button>
+                <button
+                  onClick={() => setShowClearConfirm(false)}
+                  style={{
+                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                    textTransform: "uppercase", transition: "all 0.15s",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Achievements drawer */}
         {showAchievements && (() => {
           const achievements = computeAchievements(progress, times);
@@ -2851,7 +3138,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateY(6px) scale(1.05)} 60%{transform:translateY(-3px) scale(0.98)} 80%{transform:translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateY(6px) scale(1.05)} 60%{transform:translateY(-3px) scale(0.98)} 80%{transform:translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-30px) scale(0.85)} }`}</style>
 
       <Particles show={showParticles} />
 
@@ -2869,7 +3156,9 @@ export default function Pattrn() {
           <div key={achievementToast.key} style={{
             position: "fixed", top: "calc(100px + env(safe-area-inset-top, 0px))", left: "50%",
             transform: "translateX(-50%)", zIndex: 100,
-            animation: "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+            animation: toastDismissing
+              ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
+              : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
             pointerEvents: "none",
           }}>
             <div style={{
