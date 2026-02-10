@@ -1156,7 +1156,6 @@ function migrateDailyData(daily) {
 // --- Persistent storage using localStorage ---
 const STORAGE_KEY = "pattrn-progress-v3";
 const TIMES_KEY = "pattrn-times-v1";
-const HOMESCREEN_HINT_KEY = "pattrn-homescreen-hint-dismissed-v1";
 const BIRTHDAY_KEY = "pattrn-birthday-v1";
 const THEME_KEY = "pattrn-theme-v1";
 
@@ -1167,14 +1166,6 @@ function loadTheme() {
 }
 function saveTheme(id) {
   try { localStorage.setItem(THEME_KEY, id); } catch { /* ignore */ }
-}
-
-function isIOSSafariForHomescreenHint() {
-  if (typeof navigator === "undefined" || typeof window === "undefined") return false;
-  const ua = navigator.userAgent;
-  const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
-  const isStandalone = !!navigator.standalone;
-  return isIOS && !isStandalone;
 }
 
 function normalizeCascadeRunState(entry) {
@@ -1921,10 +1912,6 @@ export default function Pattrn() {
   const [clearedBlanks, setClearedBlanks] = useState(() => new Set());
   const [gridEpoch, setGridEpoch] = useState(0);
   const hasSyncedUrl = useRef(false);
-  const [homescreenHintDismissed, setHomescreenHintDismissed] = useState(() => {
-    try { return !!localStorage.getItem(HOMESCREEN_HINT_KEY); } catch { return false; }
-  });
-
   // Birthday: stored as "dd-mm-yyyy" (or "dd-mm" if no year), null if not set
   const [birthday, setBirthday] = useState(() => {
     try { return localStorage.getItem(BIRTHDAY_KEY) || null; } catch { return null; }
@@ -1953,6 +1940,14 @@ export default function Pattrn() {
   const activeTheme = useMemo(() => PUZZLE_THEMES.find(t => t.id === activeThemeId) || PUZZLE_THEMES[0], [activeThemeId]);
   const themeColorMap = useMemo(() => buildColorMap(activeTheme.palettes), [activeTheme]);
   const themedShapes = activeTheme.shapes || SHAPES;
+
+  // Viewport size tracking for dynamic grid sizing
+  const [viewportSize, setViewportSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  useEffect(() => {
+    const onResize = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   // Scroll play view to top when entering or changing puzzle
   useEffect(() => {
@@ -2907,8 +2902,13 @@ export default function Pattrn() {
   };
 
   const gridSize = puzzle ? puzzle.gridSize : 5;
-  const cellSize = gridSize <= 5 ? 56 : gridSize === 6 ? 48 : gridSize === 7 ? 42 : gridSize === 8 ? 38 : 34;
-  const iconSize = gridSize <= 5 ? 28 : gridSize === 6 ? 24 : gridSize === 7 ? 22 : gridSize === 8 ? 18 : 16;
+  const gridGap = gridSize >= 7 ? 3 : 4;
+  const gridPad = gridSize >= 7 ? 10 : 14;
+  const availW = viewportSize.w - 50 - (gridSize - 1) * gridGap - 2 * gridPad;
+  const availH = viewportSize.h - 320 - (gridSize - 1) * gridGap - 2 * gridPad;
+  const dynamicCell = Math.min(Math.floor(availW / gridSize), Math.floor(availH / gridSize));
+  const cellSize = Math.max(28, Math.min(dynamicCell, 80));
+  const iconSize = Math.max(14, Math.round(cellSize * 0.5));
   const pickerSize = 48;
 
   // --- Theme Picker (shared across views) ---
@@ -3091,36 +3091,6 @@ export default function Pattrn() {
             find the pattern &middot; fill the gaps
           </p>
         </div>
-
-        {/* Add to Home Screen hint for iOS Safari */}
-        {isIOSSafariForHomescreenHint() && !homescreenHintDismissed && (
-          <div style={{
-            width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.01s ease both",
-            borderRadius: 12, border: `1px solid ${C.border}`, backgroundColor: C.surface,
-            padding: "12px 16px", display: "flex", alignItems: "flex-start", gap: 12,
-          }}>
-            <span style={{ fontSize: 20, flexShrink: 0 }}>📱</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.accent, marginBottom: 4 }}>Add to Home Screen</div>
-              <p style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5, margin: 0 }}>
-                Tap the Share button (square with arrow) at the bottom of Safari, then scroll down and tap &ldquo;Add to Home Screen&rdquo; for quick access.
-              </p>
-            </div>
-            <button
-              onClick={() => {
-                try { localStorage.setItem(HOMESCREEN_HINT_KEY, "1"); } catch { /* ignore */ }
-                setHomescreenHintDismissed(true);
-              }}
-              style={{
-                background: "none", border: "none", color: C.textDim, cursor: "pointer", padding: 4,
-                fontSize: 18, lineHeight: 1, flexShrink: 0,
-              }}
-              aria-label="Dismiss"
-            >
-              ×
-            </button>
-          </div>
-        )}
 
         {/* Daily overview: streak, play today, share */}
         {(() => {
@@ -4254,7 +4224,6 @@ export default function Pattrn() {
                     try {
                       localStorage.removeItem(STORAGE_KEY);
                       localStorage.removeItem(TIMES_KEY);
-                      localStorage.removeItem(HOMESCREEN_HINT_KEY);
                       localStorage.removeItem(BIRTHDAY_KEY);
                       localStorage.removeItem(THEME_KEY);
                     } catch { /* ignore */ }
@@ -4262,7 +4231,6 @@ export default function Pattrn() {
                     setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
                     setBirthday(null);
                     setActiveThemeId("classic");
-                    setHomescreenHintDismissed(false);
                     setShowClearConfirm(false);
                     setShowGameMenu(false);
                   }}
@@ -4665,17 +4633,15 @@ export default function Pattrn() {
       </div>
 
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(80px + env(safe-area-inset-top, 0px))", paddingBottom: 140, width: "100%", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(88px + env(safe-area-inset-top, 0px))", paddingBottom: "calc(140px + env(safe-area-inset-bottom, 0px))", width: "calc(100% + 32px)", margin: "0 -16px", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, position: "relative", boxSizing: "border-box" }}>
+        <GridDecoration decoration={activeTheme.decoration} />
       <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
         <div style={{
-          display: "flex", flexDirection: "column", gap: gridSize >= 7 ? 3 : 4, padding: gridSize >= 7 ? 10 : 14,
-          backgroundColor: activeTheme.gridBg || C.surface, borderRadius: 16,
-          border: `1px solid ${activeTheme.gridBorder || C.border}`, boxShadow: `0 8px 32px ${C.bg}88`,
-          overflow: "visible", position: "relative",
+          display: "flex", flexDirection: "column", gap: gridGap, padding: gridPad,
+          position: "relative", zIndex: 1,
         }}>
-          <GridDecoration decoration={activeTheme.decoration} />
           {puzzle.solution.map((row, r) => (
-            <div key={r} style={{ display: "flex", gap: gridSize >= 7 ? 3 : 4, position: "relative", zIndex: 1 }}>
+            <div key={r} style={{ display: "flex", gap: gridGap, position: "relative", zIndex: 1 }}>
               {row.map((token, c) => {
                 const key = `${r}-${c}`;
                 const isBlankCell = puzzle.blanks.has(key);
