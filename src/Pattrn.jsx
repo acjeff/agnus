@@ -856,8 +856,9 @@ export default function Pattrn() {
   });
   const [showBirthdayPrompt, setShowBirthdayPrompt] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
-  const [achievementToast, setAchievementToast] = useState(null); // { label, tier }
-  const achievementToastTimeout = useRef(null);
+  const [achievementToast, setAchievementToast] = useState(null); // { label, tier, key }
+  const achievementQueueRef = useRef([]);
+  const achievementToastTimer = useRef(null);
   const prevUnlockedRef = useRef(null);
   const [birthdayInput, setBirthdayInput] = useState("");
   const goToDateRef = useRef(null);
@@ -1160,24 +1161,30 @@ export default function Pattrn() {
     return 0;
   }, []);
 
+  const advanceAchievementQueue = useCallback(() => {
+    if (achievementQueueRef.current.length === 0) {
+      setAchievementToast(null);
+      achievementToastTimer.current = null;
+      return;
+    }
+    const next = achievementQueueRef.current.shift();
+    setAchievementToast({ label: next.label, desc: next.desc, tier: next.tier, key: next.id + "-" + Date.now() });
+    achievementToastTimer.current = setTimeout(() => advanceAchievementQueue(), 3200);
+  }, []);
+
   const showNewAchievements = useCallback((newProgress, newTimes) => {
     const beforeSet = prevUnlockedRef.current;
     const after = computeAchievements(newProgress, newTimes);
     const newlyUnlocked = after.filter(a => a.unlocked && (!beforeSet || !beforeSet.has(a.id)));
     prevUnlockedRef.current = new Set(after.filter(a => a.unlocked).map(a => a.id));
     if (newlyUnlocked.length > 0) {
-      // Show first new achievement, queue rest
-      let delay = 0;
-      for (const a of newlyUnlocked) {
-        setTimeout(() => {
-          setAchievementToast({ label: a.label, desc: a.desc, tier: a.tier });
-          if (achievementToastTimeout.current) clearTimeout(achievementToastTimeout.current);
-          achievementToastTimeout.current = setTimeout(() => setAchievementToast(null), 3000);
-        }, delay);
-        delay += 3200;
+      achievementQueueRef.current.push(...newlyUnlocked);
+      // Only kick off the queue if not already showing
+      if (!achievementToastTimer.current) {
+        advanceAchievementQueue();
       }
     }
-  }, []);
+  }, [advanceAchievementQueue]);
 
   // Snapshot current achievements on puzzle start so we can diff on win
   useEffect(() => {
@@ -1459,9 +1466,12 @@ export default function Pattrn() {
     };
   }, [paintCell]);
 
-  // Clean up timer on unmount
+  // Clean up timers on unmount
   useEffect(() => {
-    return () => stopTimer();
+    return () => {
+      stopTimer();
+      if (achievementToastTimer.current) { clearTimeout(achievementToastTimer.current); achievementToastTimer.current = null; }
+    };
   }, [stopTimer]);
 
   const handleTokenSelect = (token) => {
@@ -2851,7 +2861,7 @@ export default function Pattrn() {
         const tierSymbols = { 1: "\u25C6", 2: "\u25CF", 3: "\u2605" };
         const tc = tierColors[achievementToast.tier] || C.accent;
         return (
-          <div style={{
+          <div key={achievementToast.key} style={{
             position: "fixed", top: "calc(100px + env(safe-area-inset-top, 0px))", left: "50%",
             transform: "translateX(-50%)", zIndex: 100,
             animation: "achievementToastIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both",
