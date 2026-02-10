@@ -3351,7 +3351,8 @@ export default function Pattrn() {
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
-        display: "flex", flexDirection: "column", alignItems: "center", padding: "32px 16px",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "calc(32px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
       }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
