@@ -636,6 +636,14 @@ const BIRTHDAY_PALETTES = [
   ["#FF1493", "#FFB300", "#7C3AED", "#06B6D4", "#DC2626"],
 ];
 
+const GLITCH_PALETTES = [
+  ["#FF0040", "#00FFDD", "#FF00FF", "#80FF00", "#FFE000"],
+  ["#FF2050", "#00E5CC", "#DD00FF", "#90EE00", "#FF8800"],
+  ["#FF3366", "#00CCBB", "#CC00EE", "#AAFF33", "#FF6600"],
+  ["#E80060", "#00FFB3", "#AA00FF", "#66FF22", "#FFCC00"],
+  ["#FF004D", "#00DDAA", "#BB00DD", "#77FF44", "#FF9900"],
+];
+
 // --- Build color map from original palettes to themed palettes ---
 function buildColorMap(themePalettes) {
   if (!themePalettes) return null;
@@ -845,6 +853,18 @@ const PUZZLE_THEMES = [
     gridBg: "#1a0e18",
     gridBorder: "#FF6B9D44",
     unlock: { achievement: "birthday_puzzle" },
+  },
+  {
+    id: "glitch",
+    name: "Glitch",
+    desc: "Embrace the beautiful errors",
+    icon: "\uD83D\uDC80",
+    palettes: GLITCH_PALETTES,
+    shapes: null,
+    decoration: "static",
+    gridBg: "#080008",
+    gridBorder: "#FF004044",
+    unlock: { achievement: "first_fail" },
   },
 ];
 
@@ -1382,6 +1402,7 @@ function getShapeStroke(bgColor, isEasy) {
 
 // --- Achievements ---
 function countModeSolved(mp) { return Object.values(mp || {}).filter(v => v > 0).length; }
+function countModeFailed(mp) { return Object.values(mp || {}).filter(v => v === 0).length; }
 function countModeGold(mp) { return Object.values(mp || {}).filter(v => v >= 1 && v <= 2).length; }
 function countModeFirstTry(mp) { return Object.values(mp || {}).filter(v => v === 1).length; }
 function countCascadeClears(cp) { return Object.values(cp || {}).filter(v => v === CASCADE_LEVELS.length).length; }
@@ -1448,6 +1469,7 @@ const ACHIEVEMENTS = [
   { id: "all_modes", cat: "special", label: "Well Rounded", desc: "Solve a puzzle in every mode", tier: 2, check: (p) => SOLVE_MODES.every(m => countModeSolved(p[m]) >= 1) && countModeSolved(p.daily) >= 1 && countCascadeClears(p.cascade) >= 1 },
   { id: "total_100", cat: "special", label: "Centurion", desc: "Solve 100 puzzles total", tier: 3, check: (p) => [...SOLVE_MODES, "daily"].reduce((s, m) => s + countModeSolved(p[m]), 0) + countCascadeClears(p.cascade) >= 100 },
   { id: "birthday_puzzle", cat: "special", label: "Birthday Bash", desc: "Solve your birthday puzzle", tier: 2, check: (p) => { try { const bd = localStorage.getItem(BIRTHDAY_KEY); if (!bd) return false; const seed = getDailySeedForDate(bd); return (p.daily || {})[seed] > 0; } catch { return false; } } },
+  { id: "first_fail", cat: "special", label: "Trial & Error", desc: "Fail a puzzle for the first time", tier: 1, check: (p) => SOLVE_MODES.some(m => countModeFailed(p[m]) >= 1) },
 ];
 
 function computeAchievements(progress, times) {
@@ -1938,6 +1960,33 @@ function GridDecoration({ decoration }) {
           position: "absolute", bottom: 0, left: 0, right: 0, height: 3,
           background: "repeating-linear-gradient(90deg, #7B68EE00, #00CED1 4px, #FF8C00 8px, #FF6B9D 12px, #FFD70000 16px)",
           opacity: 0.5, borderRadius: "0 0 16px 16px",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "static") {
+    return (
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, overflow: "hidden",
+      }}>
+        {/* TV static noise overlay */}
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.06,
+          backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.4) 2px, rgba(255,255,255,0.4) 4px)",
+        }} />
+        {/* Glitch scan band */}
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.1,
+          animation: "glitchScan 4s linear infinite",
+          background: "linear-gradient(to bottom, transparent 0%, rgba(255,0,64,0.15) 48%, rgba(0,255,221,0.15) 52%, transparent 100%)",
+          backgroundSize: "100% 20%",
+        }} />
+        {/* RGB offset border effect */}
+        <div style={{
+          position: "absolute", inset: -1, borderRadius: 17,
+          boxShadow: "inset 2px 0 0 rgba(255,0,64,0.15), inset -2px 0 0 rgba(0,255,221,0.15)",
+          animation: "glitchBorder 3s ease-in-out infinite",
         }} />
       </div>
     );
@@ -2881,6 +2930,7 @@ export default function Pattrn() {
         setGameState("lost");
         stopTimer();
         setWrongCells(wrong);
+        showNewAchievements(newProgress, times);
       } else {
         setGameState("lost");
         stopTimer();
@@ -2890,6 +2940,7 @@ export default function Pattrn() {
         const newProgress = { ...progress, [difficulty]: newDiffProgress };
         setProgress(newProgress);
         saveProgress(newProgress);
+        showNewAchievements(newProgress, times);
       }
     } else {
       setWrongCells(wrong);
@@ -4564,7 +4615,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes glitchBorder { 0%,100%{box-shadow:inset 2px 0 0 rgba(255,0,64,0.15),inset -2px 0 0 rgba(0,255,221,0.15)} 50%{box-shadow:inset -2px 0 0 rgba(255,0,64,0.2),inset 2px 0 0 rgba(0,255,221,0.2)} }`}</style>
 
       <Particles show={showParticles} />
 
