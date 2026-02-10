@@ -232,6 +232,225 @@ const OCEAN_SHAPES = [
   ),
 ];
 
+const PASTEL_SHAPES = [
+  // Flower (5 petals)
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="7" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="16.5" cy="10.5" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="14.8" cy="15.5" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="9.2" cy="15.5" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="7.5" cy="10.5" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+    </svg>
+  ),
+  // Heart
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,20 C12,20 4,14 4,9 C4,6 6.5,4 9,4 C10.5,4 11.5,5 12,6 C12.5,5 13.5,4 15,4 C17.5,4 20,6 20,9 C20,14 12,20 12,20 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Butterfly
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <ellipse cx="8" cy="10" rx="4" ry="5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" transform="rotate(-15 8 10)"/>
+      <ellipse cx="16" cy="10" rx="4" ry="5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" transform="rotate(15 16 10)"/>
+      <line x1="12" y1="6" x2="12" y2="19" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+    </svg>
+  ),
+  // Cloud
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M7,16 C4.5,16 3,14.5 3,12.5 C3,10.5 4.5,9 6.5,9 C6.5,6.5 8.5,5 11,5 C13.5,5 15.5,6.5 16,8.5 C18.5,8.5 20.5,10 20.5,12.5 C20.5,14.5 19,16 17,16 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Sun
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12" y1="3" x2="12" y2="6" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="12" y1="18" x2="12" y2="21" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="3" y1="12" x2="6" y2="12" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="18" y1="12" x2="21" y2="12" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Leaf
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,4 C17,6 20,12 17,18 C14,22 8,20 6,16 C4,12 7,6 12,4 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <path d="M12,4 C10,10 8,14 6,16" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Raindrop
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,3 C12,3 5,12 5,16 C5,19.3 8.1,21 12,21 C15.9,21 19,19.3 19,16 C19,12 12,3 12,3 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+];
+
+const RETRO_SHAPES = [
+  // Pixel heart (stepped)
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M6,8 L6,6 L8,6 L8,4 L11,4 L11,6 L13,6 L13,4 L16,4 L16,6 L18,6 L18,8 L20,8 L20,12 L18,12 L18,14 L16,14 L16,16 L14,16 L14,18 L12,18 L12,20 L12,20 L12,18 L10,18 L10,16 L8,16 L8,14 L6,14 L6,12 L4,12 L4,8 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinejoin="miter"/>
+    </svg>
+  ),
+  // Arrow
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M4,10 L14,10 L14,6 L21,12 L14,18 L14,14 L4,14 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="miter"/>
+    </svg>
+  ),
+  // Shield
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,3 L20,7 L20,13 C20,17 16,20 12,21 C8,20 4,17 4,13 L4,7 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Lightning bolt
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <polygon points="13,3 7,13 11,13 11,21 17,11 13,11" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Sword
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <line x1="12" y1="3" x2="12" y2="17" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="7" y1="14" x2="17" y2="14" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+      <line x1="10" y1="17" x2="14" y2="17" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5" strokeLinecap="round"/>
+      <polygon points="12,3 10,7 14,7" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+    </svg>
+  ),
+  // Coin
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <circle cx="12" cy="12" r="5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+    </svg>
+  ),
+  // Key
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="9" cy="8" r="4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <line x1="12.5" y1="10.5" x2="19" y2="17" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <line x1="16" y1="17" x2="19" y2="14" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+];
+
+const CANDY_SHAPES = [
+  // Lollipop
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="9" r="5.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M12,9 C12,6 15,6 15,9 C15,12 12,12 12,9" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <line x1="12" y1="14.5" x2="12" y2="21" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Wrapped candy
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="7" y="8" width="10" height="8" rx="4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M7,10 L4,7 M7,14 L4,17 M17,10 L20,7 M17,14 L20,17" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Cupcake
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M6,13 C6,10 8,8 12,8 C16,8 18,10 18,13" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M6,13 L7.5,20 L16.5,20 L18,13" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <path d="M9,8 C9,5 12,3 12,5 C12,3 15,5 15,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Ice cream
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="8" r="5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <polygon points="7.5,12 12,21 16.5,12" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Donut
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="7" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <circle cx="12" cy="12" r="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+    </svg>
+  ),
+  // Cookie
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="7" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <circle cx="10" cy="9" r="1" fill={stroke || "rgba(255,255,255,0.8)"}/>
+      <circle cx="15" cy="10" r="1" fill={stroke || "rgba(255,255,255,0.8)"}/>
+      <circle cx="11" cy="14" r="1" fill={stroke || "rgba(255,255,255,0.8)"}/>
+      <circle cx="15" cy="15" r="1" fill={stroke || "rgba(255,255,255,0.8)"}/>
+    </svg>
+  ),
+  // Cherry
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="9" cy="16" r="4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <circle cx="16" cy="14" r="3.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M9,12 C9,7 12,4 14,4 M16,10.5 C16,7 14,4 14,4" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  ),
+];
+
+const VALENTINE_SHAPES = [
+  // Heart
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,20 C12,20 4,14 4,9 C4,6 6.5,4 9,4 C10.5,4 11.5,5 12,6 C12.5,5 13.5,4 15,4 C17.5,4 20,6 20,9 C20,14 12,20 12,20 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Arrow through heart
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,19 C12,19 5.5,14 5.5,9.5 C5.5,7 7.5,5.5 9.5,5.5 C10.8,5.5 11.5,6 12,7 C12.5,6 13.2,5.5 14.5,5.5 C16.5,5.5 18.5,7 18.5,9.5 C18.5,14 12,19 12,19 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinejoin="round"/>
+      <line x1="3" y1="15" x2="21" y2="5" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round"/>
+      <polygon points="21,5 17,5.5 20.5,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Rose
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,4 C14,6 16,6 16,9 C16,12 14,13 12,13 C10,13 8,12 8,9 C8,6 10,6 12,4 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <path d="M10,9 C10,7 12,6 12,8 C12,6 14,7 14,9" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="12" y1="13" x2="12" y2="21" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinecap="round"/>
+      <path d="M12,16 C10,15 8,16 8,16" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Envelope
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="4" y="7" width="16" height="11" rx="1.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2"/>
+      <path d="M4,7 L12,13 L20,7" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Ring
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="14" r="6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2.5"/>
+      <polygon points="12,3 9,8 15,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Bow/ribbon
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M12,12 C9,9 4,8 5,12 C6,16 11,14 12,12 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <path d="M12,12 C15,9 20,8 19,12 C18,16 13,14 12,12 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+      <path d="M10,15 L12,21 L14,15" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Lips
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <path d="M4,12 C6,8 9,8 12,10 C15,8 18,8 20,12 C18,16 15,17 12,15 C9,17 6,16 4,12 Z" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="2" strokeLinejoin="round"/>
+    </svg>
+  ),
+];
+
 // --- Themed color palettes ---
 const CHRISTMAS_PALETTES = [
   ["#C62828", "#2E7D32", "#FFD700", "#ECEFF1", "#880E4F"],
@@ -263,6 +482,86 @@ const OCEAN_PALETTES = [
   ["#4FC3F7", "#80DEEA", "#FFAB91", "#FFF176", "#26C6DA"],
   ["#039BE5", "#00796B", "#7C4DFF", "#FF6E40", "#00BFA5"],
   ["#0288D1", "#4DB6AC", "#EC407A", "#FFD740", "#006064"],
+];
+
+const PASTEL_PALETTES = [
+  ["#FFB3BA", "#BAFFC9", "#BAE1FF", "#E8BAFF", "#FFFFBA"],
+  ["#FFC8DD", "#BDE0FE", "#A2D2FF", "#CDB4DB", "#CAFFBF"],
+  ["#FFADAD", "#FFC6FF", "#BDB2FF", "#A0C4FF", "#FDFFB6"],
+  ["#F0DBFF", "#B8F0DB", "#FFE0B8", "#B8D8F0", "#FFB8D8"],
+  ["#D4A5FF", "#A5FFD4", "#FFD4A5", "#A5D4FF", "#FFA5D4"],
+];
+
+const SUNSET_PALETTES = [
+  ["#FF6B35", "#F7931E", "#FFD166", "#C73E1D", "#EF476F"],
+  ["#FF7B54", "#FFB26B", "#FFD56F", "#939B62", "#D35400"],
+  ["#FCA311", "#E76F51", "#F4A261", "#264653", "#2A9D8F"],
+  ["#FF5733", "#FFC300", "#DAF7A6", "#C70039", "#900C3F"],
+  ["#E74C3C", "#F39C12", "#F1C40F", "#E67E22", "#D35400"],
+];
+
+const MONO_PALETTES = [
+  ["#D4D4D8", "#A1A1AA", "#71717A", "#52525B", "#3F3F46"],
+  ["#E4E4E7", "#A8A8B0", "#78788A", "#585868", "#404050"],
+  ["#C8C8D0", "#9898A8", "#686878", "#484858", "#383848"],
+  ["#B8B8C8", "#8888A0", "#606078", "#505068", "#404058"],
+  ["#DCDCE4", "#ACACBC", "#7C7C94", "#5C5C74", "#3C3C54"],
+];
+
+const RETRO_PALETTES = [
+  ["#FF0054", "#00FF9F", "#FF6700", "#00B8FF", "#FFE600"],
+  ["#FF2E63", "#08D9D6", "#FF9A3C", "#3D5AF1", "#F2FF49"],
+  ["#FF1E56", "#36EEE0", "#FF6B35", "#6979F8", "#FFFD82"],
+  ["#E80054", "#00DDC1", "#FF8700", "#4361EE", "#FCFF4B"],
+  ["#FF0066", "#00F0B5", "#FF7B00", "#2D7DD2", "#FFE93C"],
+];
+
+const FOREST_PALETTES = [
+  ["#2D6A4F", "#40916C", "#D4A373", "#8B5E3C", "#588157"],
+  ["#344E41", "#3A5A40", "#A3B18A", "#DAD7CD", "#6B4226"],
+  ["#1B4332", "#52796F", "#84A98C", "#BC6C25", "#DDA15E"],
+  ["#2D6A4F", "#74C69D", "#B07D62", "#264653", "#95D5B2"],
+  ["#3A5A40", "#558B6E", "#C9ADA7", "#6B705C", "#A68A64"],
+];
+
+const GALAXY_PALETTES = [
+  ["#7B2FF7", "#3B82F6", "#06B6D4", "#C084FC", "#F472B6"],
+  ["#8B5CF6", "#6366F1", "#0EA5E9", "#D946EF", "#EC4899"],
+  ["#A78BFA", "#818CF8", "#38BDF8", "#E879F9", "#F9A8D4"],
+  ["#7C3AED", "#4F46E5", "#0284C7", "#C026D3", "#DB2777"],
+  ["#6D28D9", "#3730A3", "#0369A1", "#A21CAF", "#BE185D"],
+];
+
+const CANDY_PALETTES = [
+  ["#FF6B9D", "#C660E8", "#55D6C2", "#FFBC42", "#FF4F7B"],
+  ["#FF85A1", "#B76CFD", "#00D4AA", "#FFD93D", "#FF6B6B"],
+  ["#FF99C8", "#CB8CFF", "#69D2E7", "#FFE66D", "#FF7EB3"],
+  ["#FF7096", "#A855F7", "#34D399", "#FBBF24", "#F87171"],
+  ["#FF5C8A", "#9333EA", "#2DD4BF", "#F59E0B", "#EF4444"],
+];
+
+const ARCTIC_PALETTES = [
+  ["#E0F2FE", "#7DD3FC", "#38BDF8", "#93C5FD", "#C7D2FE"],
+  ["#F0F9FF", "#BAE6FD", "#0EA5E9", "#A5B4FC", "#DDD6FE"],
+  ["#DBEAFE", "#60A5FA", "#2563EB", "#818CF8", "#E0E7FF"],
+  ["#E8F4FD", "#9ED8F7", "#4BA3D0", "#88A0D4", "#C8CCE8"],
+  ["#F1F5F9", "#94A3B8", "#0891B2", "#6366F1", "#CBD5E1"],
+];
+
+const VALENTINE_PALETTES = [
+  ["#FF2D55", "#FF6B8A", "#FFB3C1", "#C9184A", "#FF758F"],
+  ["#E11D48", "#FB7185", "#FECDD3", "#9F1239", "#FDA4AF"],
+  ["#F43F5E", "#FF8FAB", "#FFD6E0", "#BE123C", "#FF6B8A"],
+  ["#FF0A54", "#FF477E", "#FF85A1", "#FF0040", "#FF5C8A"],
+  ["#DB2777", "#F472B6", "#FBCFE8", "#9D174D", "#EC4899"],
+];
+
+const SPRING_PALETTES = [
+  ["#10B981", "#34D399", "#FBBF24", "#F472B6", "#A78BFA"],
+  ["#059669", "#6EE7B7", "#F59E0B", "#EC4899", "#8B5CF6"],
+  ["#047857", "#4ADE80", "#EAB308", "#D946EF", "#7C3AED"],
+  ["#15803D", "#86EFAC", "#FCD34D", "#F9A8D4", "#C4B5FD"],
+  ["#166534", "#A7F3D0", "#FDE68A", "#FBCFE8", "#DDD6FE"],
 ];
 
 // --- Build color map from original palettes to themed palettes ---
@@ -340,12 +639,139 @@ const PUZZLE_THEMES = [
     gridBorder: "#0277BD44",
     unlock: { achievement: "med_50" },
   },
+  // --- Easy unlocks ---
+  {
+    id: "pastel",
+    name: "Pastel",
+    desc: "Soft & dreamy colours",
+    icon: "\uD83C\uDF38",
+    palettes: PASTEL_PALETTES,
+    shapes: PASTEL_SHAPES,
+    decoration: "petals",
+    gridBg: "#18141e",
+    gridBorder: "#E8BAFF44",
+    unlock: { achievement: "first_try" },
+  },
+  {
+    id: "sunset",
+    name: "Sunset",
+    desc: "Warm golden hour vibes",
+    icon: "\uD83C\uDF05",
+    palettes: SUNSET_PALETTES,
+    shapes: null,
+    decoration: "rays",
+    gridBg: "#1a120a",
+    gridBorder: "#FF6B3544",
+    unlock: { achievement: "easy_5" },
+  },
+  {
+    id: "mono",
+    name: "Monochrome",
+    desc: "Elegant shades of grey",
+    icon: "\u25D1",
+    palettes: MONO_PALETTES,
+    shapes: null,
+    decoration: null,
+    gridBg: "#111114",
+    gridBorder: "#52525B44",
+    unlock: { achievement: "under_30" },
+  },
+  // --- Medium unlocks ---
+  {
+    id: "retro",
+    name: "Retro Arcade",
+    desc: "80s pixel power",
+    icon: "\uD83D\uDD79\uFE0F",
+    palettes: RETRO_PALETTES,
+    shapes: RETRO_SHAPES,
+    decoration: "scanlines",
+    gridBg: "#0a0a14",
+    gridBorder: "#FF005444",
+    unlock: { achievement: "med_5" },
+  },
+  {
+    id: "forest",
+    name: "Forest",
+    desc: "Deep woodland greens",
+    icon: "\uD83C\uDF32",
+    palettes: FOREST_PALETTES,
+    shapes: null,
+    decoration: "leaves",
+    gridBg: "#0c140e",
+    gridBorder: "#2D6A4F44",
+    unlock: { achievement: "streak_3" },
+  },
+  {
+    id: "galaxy",
+    name: "Galaxy",
+    desc: "Cosmic purples & stardust",
+    icon: "\uD83C\uDF0C",
+    palettes: GALAXY_PALETTES,
+    shapes: null,
+    decoration: "stars",
+    gridBg: "#080810",
+    gridBorder: "#7B2FF744",
+    unlock: { achievement: "gold_10" },
+  },
+  {
+    id: "candy",
+    name: "Candy Shop",
+    desc: "Sweet treats & bright pinks",
+    icon: "\uD83C\uDF6C",
+    palettes: CANDY_PALETTES,
+    shapes: CANDY_SHAPES,
+    decoration: "sprinkles",
+    gridBg: "#1a0e16",
+    gridBorder: "#FF6B9D44",
+    unlock: { achievement: "cascade_1" },
+  },
+  // --- Harder / Seasonal unlocks ---
+  {
+    id: "arctic",
+    name: "Arctic",
+    desc: "Icy blues & northern lights",
+    icon: "\u2744\uFE0F",
+    palettes: ARCTIC_PALETTES,
+    shapes: null,
+    decoration: "aurora",
+    gridBg: "#060d14",
+    gridBorder: "#38BDF844",
+    unlock: { seasonal: 1, achievement: "hard_5" },
+  },
+  {
+    id: "valentine",
+    name: "Valentine",
+    desc: "Hearts, roses & love",
+    icon: "\u2764\uFE0F",
+    palettes: VALENTINE_PALETTES,
+    shapes: VALENTINE_SHAPES,
+    decoration: "hearts",
+    gridBg: "#1a0a10",
+    gridBorder: "#FF2D5544",
+    unlock: { seasonal: 2, achievement: "daily_7" },
+  },
+  {
+    id: "spring",
+    name: "Spring",
+    desc: "Fresh blossoms & sunshine",
+    icon: "\uD83C\uDF3C",
+    palettes: SPRING_PALETTES,
+    shapes: PASTEL_SHAPES,
+    decoration: "springPetals",
+    gridBg: "#0a1410",
+    gridBorder: "#10B98144",
+    unlock: { seasonal: [3, 4, 5], achievement: "all_modes" },
+  },
 ];
 
 function isThemeUnlocked(theme, achievementsList) {
   if (!theme.unlock) return true;
   const now = new Date();
-  if (theme.unlock.seasonal && now.getMonth() + 1 === theme.unlock.seasonal) return true;
+  const currentMonth = now.getMonth() + 1;
+  if (theme.unlock.seasonal) {
+    const months = Array.isArray(theme.unlock.seasonal) ? theme.unlock.seasonal : [theme.unlock.seasonal];
+    if (months.includes(currentMonth)) return true;
+  }
   if (theme.unlock.achievement && achievementsList) {
     const ach = achievementsList.find(a => a.id === theme.unlock.achievement);
     if (ach && ach.unlocked) return true;
@@ -1073,6 +1499,58 @@ const BUBBLE_PARTICLES = Array.from({ length: 14 }, (_, i) => ({
   opacity: 0.15 + Math.random() * 0.3,
 }));
 
+const PETAL_PARTICLES = Array.from({ length: 18 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  size: 4 + Math.random() * 5,
+  delay: Math.random() * 7,
+  duration: 4 + Math.random() * 4,
+  drift: -20 + Math.random() * 40,
+  rotation: Math.random() * 360,
+  opacity: 0.25 + Math.random() * 0.35,
+}));
+
+const LEAF_PARTICLES = Array.from({ length: 12 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  size: 6 + Math.random() * 5,
+  delay: Math.random() * 6,
+  duration: 4 + Math.random() * 3,
+  drift: -25 + Math.random() * 50,
+  opacity: 0.2 + Math.random() * 0.25,
+}));
+
+const STAR_PARTICLES = Array.from({ length: 20 }, (_, i) => ({
+  id: i,
+  x: 5 + Math.random() * 90,
+  y: 5 + Math.random() * 90,
+  size: 1.5 + Math.random() * 2.5,
+  delay: Math.random() * 4,
+  duration: 1.5 + Math.random() * 2.5,
+  opacity: 0.2 + Math.random() * 0.5,
+}));
+
+const SPRINKLE_PARTICLES = Array.from({ length: 24 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  y: Math.random() * 100,
+  size: 2 + Math.random() * 3,
+  width: 6 + Math.random() * 6,
+  rotation: Math.random() * 180,
+  color: ["#FF6B9D", "#C660E8", "#55D6C2", "#FFBC42", "#FF4F7B", "#00D4AA"][Math.floor(Math.random() * 6)],
+  opacity: 0.15 + Math.random() * 0.2,
+}));
+
+const HEART_PARTICLES = Array.from({ length: 10 }, (_, i) => ({
+  id: i,
+  x: Math.random() * 100,
+  size: 6 + Math.random() * 6,
+  delay: Math.random() * 6,
+  duration: 5 + Math.random() * 3,
+  drift: -10 + Math.random() * 20,
+  opacity: 0.12 + Math.random() * 0.18,
+}));
+
 function GridDecoration({ decoration }) {
   if (!decoration) return null;
 
@@ -1153,6 +1631,167 @@ function GridDecoration({ decoration }) {
         <svg style={{ position: "absolute", bottom: 0, left: 0, right: 0, opacity: 0.15 }} viewBox="0 0 200 12" preserveAspectRatio="none" height="8">
           <path d="M0,8 C25,2 50,2 75,8 C100,14 125,14 150,8 C175,2 190,2 200,8 L200,12 L0,12 Z" fill="#4FC3F7"/>
         </svg>
+      </div>
+    );
+  }
+
+  if (decoration === "petals") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {PETAL_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, top: -10,
+            width: p.size, height: p.size * 0.6, borderRadius: "50% 0 50% 0",
+            backgroundColor: "rgba(255,183,197,0.7)",
+            opacity: p.opacity,
+            transform: `rotate(${p.rotation}deg)`,
+            animation: `petalFall ${p.duration}s ${p.delay}s linear infinite`,
+            "--drift": `${p.drift}px`,
+          }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (decoration === "rays") {
+    return (
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "radial-gradient(ellipse at 50% 0%, rgba(255,150,50,0.12) 0%, transparent 70%)",
+        }} />
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, height: "40%",
+          background: "linear-gradient(to top, rgba(200,50,50,0.08), transparent)",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "scanlines") {
+    return (
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.06,
+          backgroundImage: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.5) 2px, rgba(255,255,255,0.5) 4px)",
+        }} />
+        <div style={{
+          position: "absolute", inset: 0, opacity: 0.08,
+          animation: "scanlineMove 8s linear infinite",
+          background: "linear-gradient(to bottom, transparent 0%, rgba(0,255,150,0.1) 50%, transparent 100%)",
+          backgroundSize: "100% 30%",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "leaves") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {LEAF_PARTICLES.map(p => (
+          <svg key={p.id} width={p.size} height={p.size} viewBox="0 0 12 12" style={{
+            position: "absolute", left: `${p.x}%`, top: -12,
+            opacity: p.opacity,
+            animation: `leafFall ${p.duration}s ${p.delay}s linear infinite`,
+            "--drift": `${p.drift}px`,
+          }}>
+            <path d="M6,1 C9,3 10,7 8,10 C6,12 3,10 2,7 C1,4 3,1 6,1 Z" fill={["#588157", "#A3B18A", "#D4A373", "#40916C"][p.id % 4]} opacity="0.7"/>
+          </svg>
+        ))}
+      </div>
+    );
+  }
+
+  if (decoration === "stars") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {STAR_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, top: `${p.y}%`,
+            width: p.size, height: p.size, borderRadius: "50%",
+            backgroundColor: "#fff",
+            animation: `starTwinkle ${p.duration}s ${p.delay}s ease-in-out infinite`,
+            opacity: 0,
+          }} />
+        ))}
+        {/* Nebula tint */}
+        <div style={{
+          position: "absolute", inset: 0,
+          background: "radial-gradient(ellipse at 30% 40%, rgba(123,47,247,0.08) 0%, transparent 60%), radial-gradient(ellipse at 70% 70%, rgba(244,114,182,0.06) 0%, transparent 60%)",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "sprinkles") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {SPRINKLE_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, top: `${p.y}%`,
+            width: p.width, height: p.size, borderRadius: p.size,
+            backgroundColor: p.color, opacity: p.opacity,
+            transform: `rotate(${p.rotation}deg)`,
+          }} />
+        ))}
+      </div>
+    );
+  }
+
+  if (decoration === "aurora") {
+    return (
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, overflow: "hidden",
+      }}>
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: "60%",
+          background: "linear-gradient(135deg, rgba(56,189,248,0.08) 0%, rgba(99,102,241,0.1) 30%, rgba(14,165,233,0.06) 60%, rgba(192,132,252,0.08) 100%)",
+          animation: "auroraShift 6s ease-in-out infinite alternate",
+        }} />
+        <div style={{
+          position: "absolute", top: "10%", left: 0, right: 0, height: "40%",
+          background: "linear-gradient(45deg, rgba(52,211,153,0.06) 0%, transparent 50%, rgba(56,189,248,0.06) 100%)",
+          animation: "auroraShift 8s 2s ease-in-out infinite alternate-reverse",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "hearts") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {HEART_PARTICLES.map(p => (
+          <svg key={p.id} width={p.size} height={p.size} viewBox="0 0 12 12" style={{
+            position: "absolute", left: `${p.x}%`, bottom: -12,
+            opacity: p.opacity,
+            animation: `heartFloat ${p.duration}s ${p.delay}s ease-in infinite`,
+            "--drift": `${p.drift}px`,
+          }}>
+            <path d="M6,10 C6,10 2,7 2,4.5 C2,3 3.2,2 4.5,2 C5.3,2 5.7,2.5 6,3 C6.3,2.5 6.7,2 7.5,2 C8.8,2 10,3 10,4.5 C10,7 6,10 6,10 Z" fill={["#FF2D55", "#FF6B8A", "#FFB3C1", "#C9184A"][p.id % 4]} opacity="0.6"/>
+          </svg>
+        ))}
+      </div>
+    );
+  }
+
+  if (decoration === "springPetals") {
+    return (
+      <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden", borderRadius: 16 }}>
+        {PETAL_PARTICLES.map(p => (
+          <div key={p.id} style={{
+            position: "absolute", left: `${p.x}%`, top: -10,
+            width: p.size, height: p.size * 0.6, borderRadius: "50% 0 50% 0",
+            backgroundColor: ["rgba(52,211,153,0.6)", "rgba(251,191,36,0.5)", "rgba(244,114,182,0.5)", "rgba(167,139,250,0.5)"][p.id % 4],
+            opacity: p.opacity,
+            transform: `rotate(${p.rotation}deg)`,
+            animation: `petalFall ${p.duration}s ${p.delay}s linear infinite`,
+            "--drift": `${p.drift}px`,
+          }} />
+        ))}
       </div>
     );
   }
@@ -3739,7 +4378,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateY(6px) scale(1.05)} 60%{transform:translateY(-3px) scale(0.98)} 80%{transform:translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateY(6px) scale(1.05)} 60%{transform:translateY(-3px) scale(0.98)} 80%{transform:translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} }`}</style>
 
       <Particles show={showParticles} />
 
