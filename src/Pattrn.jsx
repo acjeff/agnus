@@ -1285,6 +1285,26 @@ function parseToken(token) {
   return { color: token.slice(0, idx), shapeIndex: parseInt(token.slice(idx + 1), 10) };
 }
 
+// --- Helper: relative luminance & adaptive shape stroke ---
+function hexToLuminance(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const lin = (c) => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+
+const _lumCache = {};
+function getShapeStroke(bgColor, isEasy) {
+  if (!bgColor || bgColor.length !== 7 || bgColor[0] !== "#") {
+    return isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)";
+  }
+  let lum = _lumCache[bgColor];
+  if (lum === undefined) { lum = hexToLuminance(bgColor); _lumCache[bgColor] = lum; }
+  if (lum > 0.45) return isEasy ? "rgba(30,30,40,0.82)" : "rgba(30,30,40,0.72)";
+  return isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)";
+}
+
 // --- Achievements ---
 function countModeSolved(mp) { return Object.values(mp || {}).filter(v => v > 0).length; }
 function countModeGold(mp) { return Object.values(mp || {}).filter(v => v >= 1 && v <= 2).length; }
@@ -1400,7 +1420,7 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
         animation: winAnimation !== "none" ? winAnimation : wrongAnimation !== "none" ? wrongAnimation : emptyCellAnimation !== "none" ? emptyCellAnimation : fallAnimation,
       }}
     >
-      {showContent && parsed && shapes[parsed.shapeIndex % shapes.length](iconSize, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
+      {showContent && parsed && shapes[parsed.shapeIndex % shapes.length](iconSize, getShapeStroke(displayColor, isEasy))}
     </div>
   );
 }
@@ -1428,7 +1448,7 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
               position: "relative", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
             }}
           >
-            {shapes[shapeIndex % shapes.length](cellSize * 0.5, isEasy ? "rgba(255,255,255,0.9)" : "rgba(255,255,255,0.8)")}
+            {shapes[shapeIndex % shapes.length](cellSize * 0.5, getShapeStroke(displayColor, isEasy))}
             {left !== null && mode !== "hard" && (
               <div style={{
                 position: "absolute", top: -6, right: -6,
