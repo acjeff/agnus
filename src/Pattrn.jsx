@@ -859,8 +859,10 @@ export default function Pattrn() {
   const [showGameMenu, setShowGameMenu] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null); // { label, tier, key }
+  const [toastDismissing, setToastDismissing] = useState(false);
   const achievementQueueRef = useRef([]);
   const achievementToastTimer = useRef(null);
+  const toastDismissTimer = useRef(null);
   const prevUnlockedRef = useRef(null);
   const [birthdayInput, setBirthdayInput] = useState("");
   const goToDateRef = useRef(null);
@@ -1163,16 +1165,26 @@ export default function Pattrn() {
     return 0;
   }, []);
 
-  const advanceAchievementQueue = useCallback(() => {
+  const showNextToast = useCallback(() => {
     if (achievementQueueRef.current.length === 0) {
       setAchievementToast(null);
+      setToastDismissing(false);
       achievementToastTimer.current = null;
       return;
     }
     const next = achievementQueueRef.current.shift();
+    setToastDismissing(false);
     setAchievementToast({ label: next.label, desc: next.desc, tier: next.tier, key: next.id + "-" + Date.now() });
-    achievementToastTimer.current = setTimeout(() => advanceAchievementQueue(), 3200);
+    // After display duration, start dismiss animation
+    achievementToastTimer.current = setTimeout(() => {
+      setToastDismissing(true);
+      // After exit animation completes, show next or clear
+      toastDismissTimer.current = setTimeout(() => showNextToast(), 400);
+    }, 2800);
   }, []);
+
+  // Keep old name for compatibility with showNewAchievements
+  const advanceAchievementQueue = showNextToast;
 
   const showNewAchievements = useCallback((newProgress, newTimes) => {
     const beforeSet = prevUnlockedRef.current;
@@ -1473,6 +1485,7 @@ export default function Pattrn() {
     return () => {
       stopTimer();
       if (achievementToastTimer.current) { clearTimeout(achievementToastTimer.current); achievementToastTimer.current = null; }
+      if (toastDismissTimer.current) { clearTimeout(toastDismissTimer.current); toastDismissTimer.current = null; }
     };
   }, [stopTimer]);
 
@@ -3125,7 +3138,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateY(6px) scale(1.05)} 60%{transform:translateY(-3px) scale(0.98)} 80%{transform:translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateY(6px) scale(1.05)} 60%{transform:translateY(-3px) scale(0.98)} 80%{transform:translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-30px) scale(0.85)} }`}</style>
 
       <Particles show={showParticles} />
 
@@ -3143,7 +3156,9 @@ export default function Pattrn() {
           <div key={achievementToast.key} style={{
             position: "fixed", top: "calc(100px + env(safe-area-inset-top, 0px))", left: "50%",
             transform: "translateX(-50%)", zIndex: 100,
-            animation: "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+            animation: toastDismissing
+              ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
+              : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
             pointerEvents: "none",
           }}>
             <div style={{
