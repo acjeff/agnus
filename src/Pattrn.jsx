@@ -1371,17 +1371,27 @@ function computeAchievements(progress, times) {
 
 // --- Components ---
 
-function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0, colorMap, shapesArr }) {
-  const showContent = isRevealed || isLocked || !isBlank || isFilled;
-  const parsed = showContent && token ? parseToken(token) : null;
+function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0, colorMap, shapesArr, isJustPlaced, isRemoving, removingToken }) {
+  const effectiveToken = isRemoving ? removingToken : token;
+  const showContent = isRemoving || isRevealed || isLocked || !isBlank || isFilled;
+  const parsed = showContent && effectiveToken ? parseToken(effectiveToken) : null;
   const displayColor = parsed ? (colorMap ? (colorMap[parsed.color] || parsed.color) : parsed.color) : null;
   const shapes = shapesArr || SHAPES;
   const isEasy = mode === "easy";
   const fallAnimation = isPrefilled ? `fallIntoPlace 0.5s ${fallDelay}s cubic-bezier(0.34, 1.56, 0.64, 1) both` : "none";
   const wrongAnimation = isWrong ? `fallOff 0.32s ${wrongFallDelay}s cubic-bezier(0.55, 0.09, 0.68, 0.53) forwards` : "none";
-  const isEmptyUnfilled = isBlank && !isFilled && !isRevealed && !isLocked;
+  const isEmptyUnfilled = isBlank && !isFilled && !isRevealed && !isLocked && !isRemoving;
   const emptyCellAnimation = isEmptyUnfilled && emptyCellDelay != null ? `emptyCellIn 0.35s ${emptyCellDelay}s ease-out forwards` : "none";
   const winAnimation = isWon && showContent ? `tilesWinCelebrate 0.6s ${winCelebrateDelay}s cubic-bezier(0.34, 1.56, 0.64, 1) both` : "none";
+  const placeAnimation = isJustPlaced ? "blockPlace 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both" : "none";
+  const removeAnimation = isRemoving ? "blockRemove 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards" : "none";
+
+  const resolvedAnimation = winAnimation !== "none" ? winAnimation
+    : wrongAnimation !== "none" ? wrongAnimation
+    : removeAnimation !== "none" ? removeAnimation
+    : placeAnimation !== "none" ? placeAnimation
+    : emptyCellAnimation !== "none" ? emptyCellAnimation
+    : fallAnimation;
 
   return (
     <div
@@ -1395,12 +1405,12 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
         border: isLocked ? `2.5px solid ${C.correct}`
           : isSelected ? `2.5px solid ${C.accent}`
           : isWrong ? `2.5px solid ${C.incorrect}`
-          : isBlank && !isFilled && !isRevealed ? `2.5px dashed ${C.border}`
+          : isBlank && !isFilled && !isRevealed && !isRemoving ? `2.5px dashed ${C.border}`
           : "2.5px solid transparent",
         cursor: isBlank && !isRevealed && !isLocked ? "pointer" : "default",
         transition: "transform 0.15s cubic-bezier(0.4,0,0.2,1), box-shadow 0.15s cubic-bezier(0.4,0,0.2,1)",
         transform: isSelected ? "scale(1.08)" : "scale(1)",
-        opacity: isEmptyUnfilled && emptyCellDelay != null ? 0 : (isBlank && !isFilled && !isRevealed && !isLocked ? 0.45 : 1),
+        opacity: isEmptyUnfilled && emptyCellDelay != null ? 0 : (isBlank && !isFilled && !isRevealed && !isLocked && !isRemoving ? 0.45 : 1),
         boxShadow: isLocked ? `0 0 14px ${C.correct}55`
           : isCorrect ? `0 0 14px ${C.correct}55`
           : isWrong ? `0 0 12px ${C.incorrect}66`
@@ -1408,7 +1418,7 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
         position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
         touchAction: "none", userSelect: "none",
         zIndex: isWrong ? 10 : undefined,
-        animation: winAnimation !== "none" ? winAnimation : wrongAnimation !== "none" ? wrongAnimation : emptyCellAnimation !== "none" ? emptyCellAnimation : fallAnimation,
+        animation: resolvedAnimation,
       }}
     >
       {showContent && parsed && shapes[parsed.shapeIndex % shapes.length](iconSize, getShapeStroke(displayColor, isEasy))}
@@ -1910,6 +1920,9 @@ export default function Pattrn() {
   const [calendarMonth, setCalendarMonth] = useState(() => new Date().getUTCMonth());
 
   const [clearedBlanks, setClearedBlanks] = useState(() => new Set());
+  const [justPlacedCells, setJustPlacedCells] = useState(() => new Set());
+  const [removingCells, setRemovingCells] = useState({});
+  const removingTimersRef = useRef({});
   const [gridEpoch, setGridEpoch] = useState(0);
   const hasSyncedUrl = useRef(false);
   // Birthday: stored as "dd-mm-yyyy" (or "dd-mm" if no year), null if not set
@@ -2347,6 +2360,8 @@ export default function Pattrn() {
         setSelectedToken(null);
         setWrongCells(new Set());
         setClearedBlanks(new Set());
+        setJustPlacedCells(new Set());
+        setRemovingCells({});
         setShowParticles(false);
         setGridEpoch((e) => e + 1);
         stopTimer();
@@ -2414,6 +2429,8 @@ export default function Pattrn() {
     setWrongCells(new Set());
     setLockedCells(new Set());
     setClearedBlanks(new Set());
+    setJustPlacedCells(new Set());
+    setRemovingCells({});
     setShowParticles(false);
     setGridEpoch((e) => e + 1);
     if (effectiveDiff !== "cascade") setElapsedTime(0);
@@ -2445,6 +2462,8 @@ export default function Pattrn() {
     setGameState("playing");
     setWrongCells(new Set());
     setClearedBlanks(new Set());
+    setJustPlacedCells(new Set());
+    setRemovingCells({});
     setSelectedCell(null);
     setSelectedToken(null);
     setGridEpoch((e) => e + 1);
@@ -2460,6 +2479,8 @@ export default function Pattrn() {
     setWrongCells(new Set());
     setLockedCells(new Set());
     setClearedBlanks(new Set());
+    setJustPlacedCells(new Set());
+    setRemovingCells({});
     setGridEpoch((e) => e + 1);
     // Restart the timer
     stopTimer();
@@ -2498,6 +2519,20 @@ export default function Pattrn() {
     }
   };
 
+  const triggerPlaceAnimation = useCallback((key) => {
+    setJustPlacedCells(prev => new Set(prev).add(key));
+    setTimeout(() => setJustPlacedCells(prev => { const n = new Set(prev); n.delete(key); return n; }), 200);
+  }, []);
+
+  const triggerRemoveAnimation = useCallback((key, token) => {
+    if (removingTimersRef.current[key]) clearTimeout(removingTimersRef.current[key]);
+    setRemovingCells(prev => ({ ...prev, [key]: token }));
+    removingTimersRef.current[key] = setTimeout(() => {
+      setRemovingCells(prev => { const n = { ...prev }; delete n[key]; return n; });
+      delete removingTimersRef.current[key];
+    }, 200);
+  }, []);
+
   const paintCell = useCallback((r, c) => {
     if (gameState !== "playing") return;
     const key = `${r}-${c}`;
@@ -2506,6 +2541,7 @@ export default function Pattrn() {
     if (selectedToken) {
       if (fills[key] === selectedToken) {
         cancelWrongCellClear();
+        triggerRemoveAnimation(key, fills[key]);
         setClearedBlanks(prev => new Set(prev).add(key));
         setFills(prev => { const next = { ...prev }; delete next[key]; return next; });
         setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
@@ -2514,9 +2550,10 @@ export default function Pattrn() {
       cancelWrongCellClear();
       if (puzzle.mode !== "hard" && (tokenRemaining[selectedToken] ?? 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
+      triggerPlaceAnimation(key);
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation]);
 
   const applyCellAction = useCallback((r, c) => {
     const key = `${r}-${c}`;
@@ -2524,6 +2561,7 @@ export default function Pattrn() {
     if (selectedToken) {
       if (fills[key] === selectedToken) {
         cancelWrongCellClear();
+        triggerRemoveAnimation(key, fills[key]);
         setClearedBlanks(prev => new Set(prev).add(key));
         setFills(prev => { const next = { ...prev }; delete next[key]; return next; });
         setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
@@ -2532,11 +2570,12 @@ export default function Pattrn() {
       cancelWrongCellClear();
       if (puzzle.mode !== "hard" && (tokenRemaining[selectedToken] ?? 0) <= 0) return;
       setFills(prev => ({ ...prev, [key]: selectedToken }));
+      triggerPlaceAnimation(key);
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     } else {
       setSelectedCell(key);
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation]);
 
   const handleCellPointerUp = useCallback((r, c) => {
     if (gameState !== "playing") return;
@@ -4399,7 +4438,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} }`}</style>
 
       <Particles show={showParticles} />
 
@@ -4680,6 +4719,9 @@ export default function Pattrn() {
                     mode={puzzle.mode}
                     colorMap={themeColorMap}
                     shapesArr={themedShapes}
+                    isJustPlaced={justPlacedCells.has(key)}
+                    isRemoving={!!removingCells[key]}
+                    removingToken={removingCells[key] || null}
                   />
                 );
               })}
