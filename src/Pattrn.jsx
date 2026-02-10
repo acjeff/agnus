@@ -1945,6 +1945,10 @@ export default function Pattrn() {
   // Theme state
   const [activeThemeId, setActiveThemeId] = useState(() => loadTheme());
   const [showThemePicker, setShowThemePicker] = useState(false);
+  const [themeToast, setThemeToast] = useState(null); // { id, name, icon, key }
+  const [themeToastDismissing, setThemeToastDismissing] = useState(false);
+  const themeToastTimer = useRef(null);
+  const prevUnlockedThemesRef = useRef(null);
 
   const activeTheme = useMemo(() => PUZZLE_THEMES.find(t => t.id === activeThemeId) || PUZZLE_THEMES[0], [activeThemeId]);
   const themeColorMap = useMemo(() => buildColorMap(activeTheme.palettes), [activeTheme]);
@@ -2269,6 +2273,16 @@ export default function Pattrn() {
   // Keep old name for compatibility with showNewAchievements
   const advanceAchievementQueue = showNextToast;
 
+  const showThemeToast = useCallback((theme) => {
+    setThemeToastDismissing(false);
+    setThemeToast({ id: theme.id, name: theme.name, icon: theme.icon, key: theme.id + "-" + Date.now() });
+    if (themeToastTimer.current) clearTimeout(themeToastTimer.current);
+    themeToastTimer.current = setTimeout(() => {
+      setThemeToastDismissing(true);
+      setTimeout(() => { setThemeToast(null); setThemeToastDismissing(false); themeToastTimer.current = null; }, 400);
+    }, 4500);
+  }, []);
+
   const showNewAchievements = useCallback((newProgress, newTimes) => {
     const beforeSet = prevUnlockedRef.current;
     const after = computeAchievements(newProgress, newTimes);
@@ -2281,13 +2295,30 @@ export default function Pattrn() {
         advanceAchievementQueue();
       }
     }
-  }, [advanceAchievementQueue]);
 
-  // Snapshot current achievements on puzzle start so we can diff on win
+    // Check for newly unlocked themes
+    const beforeThemes = prevUnlockedThemesRef.current;
+    const nowUnlockedThemes = PUZZLE_THEMES.filter(t => isThemeUnlocked(t, after));
+    prevUnlockedThemesRef.current = new Set(nowUnlockedThemes.map(t => t.id));
+    if (beforeThemes) {
+      const newThemes = nowUnlockedThemes.filter(t => !beforeThemes.has(t.id));
+      if (newThemes.length > 0) {
+        // Delay theme toast so it appears after achievement toasts finish
+        const achDelay = newlyUnlocked.length * 3600; // ~3.2s per achievement toast + buffer
+        setTimeout(() => showThemeToast(newThemes[0]), achDelay + 400);
+      }
+    }
+  }, [advanceAchievementQueue, showThemeToast]);
+
+  // Snapshot current achievements & unlocked themes on puzzle start so we can diff on win
   useEffect(() => {
     if (view === "play" && gameState === "playing") {
       const current = computeAchievements(progress, times);
       prevUnlockedRef.current = new Set(current.filter(a => a.unlocked).map(a => a.id));
+      // Snapshot currently unlocked themes
+      prevUnlockedThemesRef.current = new Set(
+        PUZZLE_THEMES.filter(t => isThemeUnlocked(t, current)).map(t => t.id)
+      );
     }
   }, [view, gameState === "playing"]);
 
@@ -2569,6 +2600,7 @@ export default function Pattrn() {
       stopTimer();
       if (achievementToastTimer.current) { clearTimeout(achievementToastTimer.current); achievementToastTimer.current = null; }
       if (toastDismissTimer.current) { clearTimeout(toastDismissTimer.current); toastDismissTimer.current = null; }
+      if (themeToastTimer.current) { clearTimeout(themeToastTimer.current); themeToastTimer.current = null; }
     };
   }, [stopTimer]);
 
@@ -4474,6 +4506,62 @@ export default function Pattrn() {
         );
       })()}
 
+      {/* Theme unlock toast — positioned at bottom to avoid overlap with achievement toast */}
+      {themeToast && (
+        <div key={themeToast.key} style={{
+          position: "fixed", bottom: "calc(160px + env(safe-area-inset-bottom, 0px))", left: "50%",
+          transform: "translateX(-50%)", zIndex: 100,
+          animation: themeToastDismissing
+            ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
+            : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+          pointerEvents: "auto",
+        }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "10px 14px", borderRadius: 14,
+            backgroundColor: C.surface, border: `1.5px solid ${C.accent}`,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 20px ${C.accent}33`,
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 9,
+              backgroundColor: C.accent + "18", display: "flex", alignItems: "center", justifyContent: "center",
+              border: `2px solid ${C.accent}66`, fontSize: 18, flexShrink: 0,
+            }}>
+              {themeToast.icon || "\uD83C\uDFA8"}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{
+                fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700,
+                color: C.accent, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2,
+              }}>Theme unlocked</div>
+              <div style={{
+                fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                color: C.text, letterSpacing: 0.5,
+              }}>{themeToast.name}</div>
+            </div>
+            <button
+              onClick={() => {
+                setActiveThemeId(themeToast.id);
+                saveTheme(themeToast.id);
+                setThemeToastDismissing(true);
+                setTimeout(() => { setThemeToast(null); setThemeToastDismissing(false); }, 350);
+                if (themeToastTimer.current) { clearTimeout(themeToastTimer.current); themeToastTimer.current = null; }
+              }}
+              style={{
+                background: C.accent, border: "none", borderRadius: 8, padding: "6px 12px",
+                color: C.bg, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                fontSize: 11, fontWeight: 700, letterSpacing: 0.5, whiteSpace: "nowrap",
+                transition: "opacity 0.15s", flexShrink: 0,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+            >
+              Use it
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Top bar - fixed at top so it always stays visible */}
       <div style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg,
@@ -4512,7 +4600,22 @@ export default function Pattrn() {
             </span>
           )}
         </div>
-        <div style={{ width: 80, display: "flex", justifyContent: "flex-end", alignItems: "center" }}>
+        <div style={{ width: 110, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6 }}>
+          <button
+            onClick={() => setShowThemePicker(true)}
+            style={{
+              background: "none", border: `1px solid ${activeThemeId !== "classic" ? (activeTheme.gridBorder || C.border).replace(/44$/, "88") : C.border}`,
+              borderRadius: 8, padding: "5px 8px", cursor: "pointer", fontSize: 14, lineHeight: 1,
+              transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
+              color: activeThemeId !== "classic" ? C.text : C.textDim,
+              minWidth: 32, height: 30,
+            }}
+            title="Change theme"
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = activeThemeId !== "classic" ? (activeTheme.gridBorder || C.border).replace(/44$/, "88") : C.border; e.currentTarget.style.color = activeThemeId !== "classic" ? C.text : C.textDim; }}
+          >
+            {activeTheme.icon || <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>}
+          </button>
           <button
             onClick={async () => {
               const url = typeof window !== "undefined" ? window.location.href : "";
