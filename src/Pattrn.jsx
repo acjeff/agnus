@@ -4942,8 +4942,8 @@ export default function Pattrn() {
                 const isBlankCell = puzzle.blanks.has(key);
                 const isLockedCell = lockedCells.has(key);
                 const fillToken = isBlankCell ? (isLockedCell ? token : fills[key]) : token;
-                const isRevealed = (gameState === "lost") && isBlankCell && !isLockedCell;
-                const displayToken = isRevealed ? token : fillToken;
+                const isRevealed = false;
+                const displayToken = fillToken;
                 const cellIndex = r * gridSize + c;
                 const isWrongCell = wrongCells.has(key) && gameState !== "lost";
                 const fallDelay = isBlankCell ? 0 : cellIndex * 0.032;
@@ -5125,7 +5125,7 @@ export default function Pattrn() {
             <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
               {isCascade ? (
                 <div>Reached {puzzle?.gridSize ?? 0}×{puzzle?.gridSize ?? 0}</div>
-              ) : "The correct pattern is shown above"}
+              ) : "Better luck next time"}
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               {isCascade && (
