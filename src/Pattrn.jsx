@@ -2911,6 +2911,148 @@ export default function Pattrn() {
   const iconSize = gridSize <= 5 ? 28 : gridSize === 6 ? 24 : gridSize === 7 ? 22 : gridSize === 8 ? 18 : 16;
   const pickerSize = 48;
 
+  // --- Theme Picker (shared across views) ---
+  const themePickerEl = showThemePicker ? (() => {
+    const achList = computeAchievements(progress, times);
+    return (
+      <div onClick={() => setShowThemePicker(false)} style={{
+        position: "fixed", inset: 0, zIndex: 1100,
+        display: "flex", flexDirection: "column", justifyContent: "flex-end",
+        animation: "drawerOverlayFade 0.25s ease both",
+      }}>
+        <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } } @keyframes drawerOverlayFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
+        <div style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)" }} />
+        <div onClick={e => e.stopPropagation()} style={{
+          backgroundColor: C.bg, borderRadius: "20px 20px 0 0",
+          border: `1px solid ${C.border}`, borderBottom: "none",
+          maxHeight: "75vh", display: "flex", flexDirection: "column",
+          animation: "drawerSlideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both",
+        }}>
+          <div style={{ padding: "20px 24px 0", flexShrink: 0 }}>
+            <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border, margin: "0 auto 16px" }} />
+            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, margin: "0 0 4px", letterSpacing: 1 }}>
+              Themes
+            </h2>
+            <p style={{ fontSize: 11, color: C.textDim, margin: "0 0 16px", lineHeight: 1.5 }}>
+              Unlock themes through achievements or play on themed days
+            </p>
+          </div>
+
+          <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
+            {PUZZLE_THEMES.map(theme => {
+              const unlocked = isThemeUnlocked(theme, achList);
+              const isActive = activeThemeId === theme.id;
+              const seasonalMonth = theme.unlock?.seasonal;
+              const achId = theme.unlock?.achievement;
+              const ach = achId ? ACHIEVEMENTS.find(a => a.id === achId) : null;
+              let unlockHint = "";
+              if (theme.unlock) {
+                const parts = [];
+                if (seasonalMonth) {
+                  const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                  parts.push(`Play in ${monthNames[seasonalMonth]}`);
+                }
+                if (ach) parts.push(`"${ach.label}" achievement`);
+                unlockHint = parts.join(" or ");
+              }
+
+              return (
+                <button
+                  key={theme.id}
+                  onClick={() => {
+                    if (unlocked) {
+                      setActiveThemeId(theme.id);
+                      saveTheme(theme.id);
+                    }
+                  }}
+                  style={{
+                    width: "100%", padding: "14px 16px", borderRadius: 12,
+                    backgroundColor: isActive ? (theme.gridBg || C.surface) : C.surface,
+                    border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
+                    cursor: unlocked ? "pointer" : "default",
+                    display: "flex", alignItems: "center", gap: 12,
+                    transition: "all 0.15s",
+                    opacity: unlocked ? 1 : 0.5,
+                  }}
+                  onMouseEnter={e => { if (unlocked && !isActive) e.currentTarget.style.borderColor = C.accent + "88"; }}
+                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.borderColor = C.border; }}
+                >
+                  <div style={{
+                    width: 38, height: 38, borderRadius: 10, flexShrink: 0,
+                    backgroundColor: theme.gridBg || C.surfaceLight,
+                    border: `1.5px solid ${theme.gridBorder || C.border}`,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 2,
+                    flexWrap: "wrap", padding: 4, position: "relative", overflow: "hidden",
+                  }}>
+                    {theme.icon ? (
+                      <span style={{ fontSize: 18, lineHeight: 1 }}>{theme.icon}</span>
+                    ) : (
+                      <>
+                        {(theme.palettes || PALETTES)[0].slice(0, 4).map((col, ci) => (
+                          <div key={ci} style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: col }} />
+                        ))}
+                      </>
+                    )}
+                    {!unlocked && (
+                      <div style={{
+                        position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <rect x="2" y="6" width="10" height="7" rx="1.5" fill="none" stroke={C.textDim} strokeWidth="1.5"/>
+                          <path d="M4.5,6 V4 C4.5,2.3 5.6,1 7,1 C8.4,1 9.5,2.3 9.5,4 V6" fill="none" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round"/>
+                        </svg>
+                      </div>
+                    )}
+                  </div>
+
+                  <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+                    <div style={{
+                      fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
+                      color: isActive ? C.accent : C.text, letterSpacing: 0.5,
+                      display: "flex", alignItems: "center", gap: 6,
+                    }}>
+                      {theme.name}
+                      {isActive && <span style={{ fontSize: 9, color: C.accent, fontWeight: 400 }}>(active)</span>}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                      {!unlocked ? unlockHint : theme.desc}
+                    </div>
+                  </div>
+
+                  {unlocked && !isActive && (
+                    <span style={{ color: C.textDim, fontSize: 11, fontFamily: "'Space Mono', monospace", flexShrink: 0 }}>Select</span>
+                  )}
+                  {isActive && (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
+                      <path d="M3 8.5L6.5 12L13 4" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          <div style={{
+            padding: "16px 24px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
+            borderTop: `1px solid ${C.border}`, marginTop: 8, flexShrink: 0,
+          }}>
+            <button onClick={() => setShowThemePicker(false)}
+              style={{
+                width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                textTransform: "uppercase", transition: "all 0.15s",
+              }}
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  })() : null;
+
   // --- MENU VIEW ---
   if (view === "menu") {
     return (
@@ -4071,148 +4213,7 @@ export default function Pattrn() {
           );
         })()}
 
-        {/* Theme Picker */}
-        {showThemePicker && (() => {
-          const achList = computeAchievements(progress, times);
-          return (
-            <div onClick={() => setShowThemePicker(false)} style={{
-              position: "fixed", inset: 0, zIndex: 1100,
-              display: "flex", flexDirection: "column", justifyContent: "flex-end",
-              animation: "drawerOverlayFade 0.25s ease both",
-            }}>
-              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } } @keyframes drawerOverlayFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
-              <div style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)" }} />
-              <div onClick={e => e.stopPropagation()} style={{
-                backgroundColor: C.bg, borderRadius: "20px 20px 0 0",
-                border: `1px solid ${C.border}`, borderBottom: "none",
-                maxHeight: "75vh", display: "flex", flexDirection: "column",
-                animation: "drawerSlideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both",
-              }}>
-                <div style={{ padding: "20px 24px 0", flexShrink: 0 }}>
-                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border, margin: "0 auto 16px" }} />
-                  <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, margin: "0 0 4px", letterSpacing: 1 }}>
-                    Themes
-                  </h2>
-                  <p style={{ fontSize: 11, color: C.textDim, margin: "0 0 16px", lineHeight: 1.5 }}>
-                    Unlock themes through achievements or play on themed days
-                  </p>
-                </div>
-
-                <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
-                  {PUZZLE_THEMES.map(theme => {
-                    const unlocked = isThemeUnlocked(theme, achList);
-                    const isActive = activeThemeId === theme.id;
-                    const seasonalMonth = theme.unlock?.seasonal;
-                    const achId = theme.unlock?.achievement;
-                    const ach = achId ? ACHIEVEMENTS.find(a => a.id === achId) : null;
-                    let unlockHint = "";
-                    if (theme.unlock) {
-                      const parts = [];
-                      if (seasonalMonth) {
-                        const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-                        parts.push(`Play in ${monthNames[seasonalMonth]}`);
-                      }
-                      if (ach) parts.push(`"${ach.label}" achievement`);
-                      unlockHint = parts.join(" or ");
-                    }
-
-                    return (
-                      <button
-                        key={theme.id}
-                        onClick={() => {
-                          if (unlocked) {
-                            setActiveThemeId(theme.id);
-                            saveTheme(theme.id);
-                          }
-                        }}
-                        style={{
-                          width: "100%", padding: "14px 16px", borderRadius: 12,
-                          backgroundColor: isActive ? (theme.gridBg || C.surface) : C.surface,
-                          border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
-                          cursor: unlocked ? "pointer" : "default",
-                          display: "flex", alignItems: "center", gap: 12,
-                          transition: "all 0.15s",
-                          opacity: unlocked ? 1 : 0.5,
-                        }}
-                        onMouseEnter={e => { if (unlocked && !isActive) e.currentTarget.style.borderColor = C.accent + "88"; }}
-                        onMouseLeave={e => { if (!isActive) e.currentTarget.style.borderColor = C.border; }}
-                      >
-                        {/* Theme preview: 3 color dots */}
-                        <div style={{
-                          width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-                          backgroundColor: theme.gridBg || C.surfaceLight,
-                          border: `1.5px solid ${theme.gridBorder || C.border}`,
-                          display: "flex", alignItems: "center", justifyContent: "center", gap: 2,
-                          flexWrap: "wrap", padding: 4, position: "relative", overflow: "hidden",
-                        }}>
-                          {theme.icon ? (
-                            <span style={{ fontSize: 18, lineHeight: 1 }}>{theme.icon}</span>
-                          ) : (
-                            <>
-                              {(theme.palettes || PALETTES)[0].slice(0, 4).map((col, ci) => (
-                                <div key={ci} style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: col }} />
-                              ))}
-                            </>
-                          )}
-                          {!unlocked && (
-                            <div style={{
-                              position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                <rect x="2" y="6" width="10" height="7" rx="1.5" fill="none" stroke={C.textDim} strokeWidth="1.5"/>
-                                <path d="M4.5,6 V4 C4.5,2.3 5.6,1 7,1 C8.4,1 9.5,2.3 9.5,4 V6" fill="none" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round"/>
-                              </svg>
-                            </div>
-                          )}
-                        </div>
-
-                        <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
-                          <div style={{
-                            fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
-                            color: isActive ? C.accent : C.text, letterSpacing: 0.5,
-                            display: "flex", alignItems: "center", gap: 6,
-                          }}>
-                            {theme.name}
-                            {isActive && <span style={{ fontSize: 9, color: C.accent, fontWeight: 400 }}>(active)</span>}
-                          </div>
-                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                            {!unlocked ? unlockHint : theme.desc}
-                          </div>
-                        </div>
-
-                        {unlocked && !isActive && (
-                          <span style={{ color: C.textDim, fontSize: 11, fontFamily: "'Space Mono', monospace", flexShrink: 0 }}>Select</span>
-                        )}
-                        {isActive && (
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                            <path d="M3 8.5L6.5 12L13 4" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          </svg>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                <div style={{
-                  padding: "16px 24px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
-                  borderTop: `1px solid ${C.border}`, marginTop: 8, flexShrink: 0,
-                }}>
-                  <button onClick={() => setShowThemePicker(false)}
-                    style={{
-                      width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                      padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
+        {themePickerEl}
 
         {/* Clear All Data confirmation dialog */}
         {showClearConfirm && (
@@ -4949,6 +4950,7 @@ export default function Pattrn() {
         )}
       </div>
 
+      {themePickerEl}
     </div>
   );
 }
