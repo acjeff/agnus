@@ -1262,6 +1262,7 @@ const STORAGE_KEY = "pattrn-progress-v3";
 const TIMES_KEY = "pattrn-times-v1";
 const BIRTHDAY_KEY = "pattrn-birthday-v1";
 const THEME_KEY = "pattrn-theme-v1";
+const ACHIEV_KEY = "pattrn-achievements-v1";
 
 function loadTheme() {
   try {
@@ -1270,6 +1271,16 @@ function loadTheme() {
 }
 function saveTheme(id) {
   try { localStorage.setItem(THEME_KEY, id); } catch { /* ignore */ }
+}
+
+function loadSavedAchievements() {
+  try {
+    const raw = localStorage.getItem(ACHIEV_KEY);
+    return raw ? new Set(JSON.parse(raw)) : new Set();
+  } catch { return new Set(); }
+}
+function saveSavedAchievements(ids) {
+  try { localStorage.setItem(ACHIEV_KEY, JSON.stringify([...ids])); } catch { /* ignore */ }
 }
 
 function normalizeCascadeRunState(entry) {
@@ -1472,8 +1483,9 @@ const ACHIEVEMENTS = [
   { id: "first_fail", cat: "special", label: "Trial & Error", desc: "Fail a puzzle for the first time", tier: 1, check: (p) => SOLVE_MODES.some(m => countModeFailed(p[m]) >= 1) },
 ];
 
-function computeAchievements(progress, times) {
-  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: a.check(progress, times) }));
+function computeAchievements(progress, times, savedIds) {
+  const saved = savedIds || new Set();
+  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: a.check(progress, times) || saved.has(a.id) }));
 }
 
 // --- Components ---
@@ -2102,6 +2114,7 @@ export default function Pattrn() {
   const [showParticles, setShowParticles] = useState(false);
   const [progress, setProgress] = useState(() => loadProgress());
   const [times, setTimes] = useState(() => loadTimes());
+  const [savedAchievementIds, setSavedAchievementIds] = useState(() => loadSavedAchievements());
   const [elapsedTime, setElapsedTime] = useState(0);
   const [shareMsg, setShareMsg] = useState("");
   const [dailyShareMsg, setDailyShareMsg] = useState("");
@@ -2499,9 +2512,20 @@ export default function Pattrn() {
 
   const showNewAchievements = useCallback((newProgress, newTimes) => {
     const beforeSet = prevUnlockedRef.current;
-    const after = computeAchievements(newProgress, newTimes);
+    const currentSaved = loadSavedAchievements();
+    const after = computeAchievements(newProgress, newTimes, currentSaved);
     const newlyUnlocked = after.filter(a => a.unlocked && (!beforeSet || !beforeSet.has(a.id)));
     prevUnlockedRef.current = new Set(after.filter(a => a.unlocked).map(a => a.id));
+    // Persist any newly unlocked achievements permanently
+    const allUnlockedIds = new Set(currentSaved);
+    let changed = false;
+    for (const a of after) {
+      if (a.unlocked && !allUnlockedIds.has(a.id)) { allUnlockedIds.add(a.id); changed = true; }
+    }
+    if (changed) {
+      saveSavedAchievements(allUnlockedIds);
+      setSavedAchievementIds(allUnlockedIds);
+    }
     if (newlyUnlocked.length > 0) {
       achievementQueueRef.current.push(...newlyUnlocked);
       // Only kick off the queue if not already showing
@@ -2527,7 +2551,7 @@ export default function Pattrn() {
   // Snapshot current achievements & unlocked themes on puzzle start so we can diff on win
   useEffect(() => {
     if (view === "play" && gameState === "playing") {
-      const current = computeAchievements(progress, times);
+      const current = computeAchievements(progress, times, savedAchievementIds);
       prevUnlockedRef.current = new Set(current.filter(a => a.unlocked).map(a => a.id));
       // Snapshot currently unlocked themes
       prevUnlockedThemesRef.current = new Set(
@@ -3160,7 +3184,7 @@ export default function Pattrn() {
 
   // --- Theme Picker (shared across views) ---
   const themePickerEl = showThemePicker ? (() => {
-    const achList = computeAchievements(progress, times);
+    const achList = computeAchievements(progress, times, savedAchievementIds);
     return (
       <div onClick={() => setShowThemePicker(false)} style={{
         position: "fixed", inset: 0, zIndex: 1100,
@@ -3536,7 +3560,7 @@ export default function Pattrn() {
 
         {/* Achievements button — now also accessible from game menu */}
         {(() => {
-          const achs = computeAchievements(progress, times);
+          const achs = computeAchievements(progress, times, savedAchievementIds);
           const unlocked = achs.filter(a => a.unlocked).length;
           const total = achs.length;
           return (
@@ -4222,7 +4246,7 @@ export default function Pattrn() {
 
         {/* Game Menu drawer */}
         {showGameMenu && (() => {
-          const achs = computeAchievements(progress, times);
+          const achs = computeAchievements(progress, times, savedAchievementIds);
           const achUnlocked = achs.filter(a => a.unlocked).length;
           const achTotal = achs.length;
           const totalSolvedAll = [...SOLVE_MODES, "daily"].reduce((s, m) => s + countModeSolved(progress[m]), 0)
@@ -4473,9 +4497,11 @@ export default function Pattrn() {
                       localStorage.removeItem(TIMES_KEY);
                       localStorage.removeItem(BIRTHDAY_KEY);
                       localStorage.removeItem(THEME_KEY);
+                      localStorage.removeItem(ACHIEV_KEY);
                     } catch { /* ignore */ }
                     setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
                     setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
+                    setSavedAchievementIds(new Set());
                     setBirthday(null);
                     setActiveThemeId("classic");
                     setShowClearConfirm(false);
@@ -4508,7 +4534,7 @@ export default function Pattrn() {
 
         {/* Achievements drawer */}
         {showAchievements && (() => {
-          const achievements = computeAchievements(progress, times);
+          const achievements = computeAchievements(progress, times, savedAchievementIds);
           const unlocked = achievements.filter(a => a.unlocked).length;
           const total = achievements.length;
           const tierColors = { 1: C.bronze, 2: C.silver, 3: C.gold };
