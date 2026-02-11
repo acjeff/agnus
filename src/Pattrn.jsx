@@ -4100,6 +4100,10 @@ export default function Pattrn() {
                     const bdStr = `${String(d).padStart(2, "0")}-${String(m).padStart(2, "0")}-${y}`;
                     setBirthday(bdStr);
                     try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
+                    if (bdStr === CHEAT_BIRTHDAY) {
+                      achievementQueueRef.current.push({ id: "cheat_turing", label: "Welcome Back, Alan", desc: "The enigma has been decoded", tier: 3 });
+                      if (!achievementToastTimer.current) advanceAchievementQueue();
+                    }
                     setShowBirthdayPrompt(false);
                     setBirthdayInput("");
                     setCalendarYear(y);
