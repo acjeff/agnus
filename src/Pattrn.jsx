@@ -10,6 +10,20 @@ import {
   saveCloudData,
   mergeGameData,
   summariseGameData,
+  saveMosaicDesign,
+  updateMosaicDesign,
+  loadUserMosaics,
+  deleteMosaicDesign,
+  submitMosaicForReview,
+  loadPendingMosaics,
+  approveMosaic,
+  rejectMosaic,
+  loadPublicMosaics,
+  shareMosaicWithUser,
+  loadSharedMosaics,
+  lookupUserByEmail,
+  saveUserEmail,
+  checkIsAdmin,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2635,6 +2649,29 @@ export default function Pattrn() {
   const [showSyncChoice, setShowSyncChoice] = useState(false);
   const [syncChoiceData, setSyncChoiceData] = useState(null); // { uid, localData, cloudData, localSummary, cloudSummary }
 
+  // --- Mosaic Creator state ---
+  const CREATOR_GRID_SIZE = 25; // 25x25 grid → 25 tiles of 5x5, matching mosaic mode
+  const CREATOR_COLORS = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#6C5CE7", "#FF9FF3", "#E17055", "#00B894", "#0984E3", "#FDCB6E", "#A8E6CF", "#FF8B94", "#01A3A4", "#F368E0", "#54A0FF", "#5F27CD", "#ffffff", "#333333"];
+  const [creatorGrid, setCreatorGrid] = useState(() => Array.from({ length: 25 }, () => Array(25).fill(null)));
+  const [creatorColor, setCreatorColor] = useState("#FF6B6B");
+  const [creatorTitle, setCreatorTitle] = useState("");
+  const [creatorEditingId, setCreatorEditingId] = useState(null);
+  const creatorPaintingRef = useRef(false);
+  const creatorGridRef = useRef(null); // for pointer-move based painting
+  const [myMosaics, setMyMosaics] = useState([]);
+  const [sharedMosaics, setSharedMosaics] = useState([]);
+  const [publicMosaicsList, setPublicMosaicsList] = useState([]);
+  const [pendingMosaicsList, setPendingMosaicsList] = useState([]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [mosaicLoading, setMosaicLoading] = useState(false);
+  const [mosaicMsg, setMosaicMsg] = useState("");
+  const [shareEmailInput, setShareEmailInput] = useState("");
+  const [shareTargetMosaic, setShareTargetMosaic] = useState(null);
+  const [mosaicGalleryTab, setMosaicGalleryTab] = useState("mine"); // "mine" | "shared" | "public"
+  const [customMosaicPlay, setCustomMosaicPlay] = useState(null); // mosaic object being played
+  const [customMosaicProgress, setCustomMosaicProgress] = useState({}); // { tileIndex: attempts }
+  const customMosaicPuzzlesRef = useRef(null); // array of 25 puzzle objects when playing custom mosaic
+
   // Listen for auth state changes
   useEffect(() => {
     if (!firebaseConfigured) return;
@@ -2643,6 +2680,289 @@ export default function Pattrn() {
     });
     return unsub;
   }, [firebaseConfigured]);
+
+  // Check admin status and save email for lookup when user logs in
+  useEffect(() => {
+    if (!firebaseUser || !firebaseConfigured) { setIsAdmin(false); return; }
+    checkIsAdmin(firebaseUser.uid).then(setIsAdmin).catch(() => setIsAdmin(false));
+    if (firebaseUser.email) {
+      saveUserEmail(firebaseUser.uid, firebaseUser.email).catch(() => {});
+    }
+  }, [firebaseUser, firebaseConfigured]);
+
+  // --- Mosaic Creator helpers ---
+  const resetCreator = useCallback(() => {
+    setCreatorGrid(Array.from({ length: 25 }, () => Array(25).fill(null)));
+    setCreatorTitle("");
+    setCreatorEditingId(null);
+  }, []);
+
+  // Pointer-move based painting: uses element coordinates for smooth drag across tiny cells
+  const creatorColorRef = useRef("#FF6B6B");
+  useEffect(() => { creatorColorRef.current = creatorColor; }, [creatorColor]);
+
+  const getCellFromPointer = useCallback((e) => {
+    const el = creatorGridRef.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const cellPx = rect.width / 25;
+    const c = Math.floor(x / cellPx);
+    const r = Math.floor(y / cellPx);
+    if (r < 0 || r >= 25 || c < 0 || c >= 25) return null;
+    return { r, c };
+  }, []);
+
+  const creatorPointerDown = useCallback((e) => {
+    e.preventDefault();
+    creatorPaintingRef.current = true;
+    const cell = getCellFromPointer(e);
+    if (!cell) return;
+    setCreatorGrid(g => {
+      const next = g.map(row => [...row]);
+      next[cell.r][cell.c] = next[cell.r][cell.c] === creatorColorRef.current ? null : creatorColorRef.current;
+      return next;
+    });
+  }, [getCellFromPointer]);
+
+  const creatorPointerMove = useCallback((e) => {
+    if (!creatorPaintingRef.current) return;
+    const cell = getCellFromPointer(e);
+    if (!cell) return;
+    setCreatorGrid(g => {
+      if (g[cell.r][cell.c] === creatorColorRef.current) return g; // no change needed
+      const next = g.map(row => [...row]);
+      next[cell.r][cell.c] = creatorColorRef.current;
+      return next;
+    });
+  }, [getCellFromPointer]);
+
+  const creatorPointerUp = useCallback(() => {
+    creatorPaintingRef.current = false;
+  }, []);
+
+  // Build playable 25 puzzle tiles from a custom 25x25 color grid
+  const buildCustomMosaicPuzzles = useCallback((grid) => {
+    const bgColor = "#1a1a2e"; // background color for null cells
+    // Collect unique colors to assign shape indices
+    const colorSet = new Set();
+    for (const row of grid) for (const c of row) colorSet.add(c || bgColor);
+    const colorList = [...colorSet];
+    const colorToShape = {};
+    colorList.forEach((c, i) => { colorToShape[c] = i % 7; });
+    // Build 25x25 token grid
+    const tokenGrid = grid.map(row => row.map(c => {
+      const color = c || bgColor;
+      return `${color}|${colorToShape[color]}`;
+    }));
+    // Slice into 25 tiles of 5x5
+    const puzzles = [];
+    for (let ti = 0; ti < 25; ti++) {
+      const tileRow = Math.floor(ti / 5);
+      const tileCol = ti % 5;
+      const solution = [];
+      for (let r = 0; r < 5; r++) {
+        const row = [];
+        for (let c = 0; c < 5; c++) {
+          row.push(tokenGrid[tileRow * 5 + r][tileCol * 5 + c]);
+        }
+        solution.push(row);
+      }
+      const mr = rng(ti * 9973 + 1234);
+      const numBlanks = Math.min(4 + Math.floor(ti / 2), 12);
+      const allCells = [];
+      for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) allCells.push(`${row}-${col}`);
+      const blanks = new Set(shuffle(allCells, mr).slice(0, numBlanks));
+      const usedTokens = [...new Set(solution.flat())];
+      puzzles.push({ id: ti, solution, blanks, usedTokens, gridSize: 5, mode: "mosaic" });
+    }
+    return puzzles;
+  }, []);
+
+  const startCustomMosaicPlay = useCallback((mosaic) => {
+    const puzzles = buildCustomMosaicPuzzles(mosaic.grid);
+    customMosaicPuzzlesRef.current = puzzles;
+    setCustomMosaicPlay(mosaic);
+    setCustomMosaicProgress({});
+    setView("custom-mosaic");
+  }, [buildCustomMosaicPuzzles]);
+
+  const handleSaveMosaic = useCallback(async () => {
+    if (!firebaseUser) { setMosaicMsg("Sign in to save mosaics"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    const hasContent = creatorGrid.some(row => row.some(c => c !== null));
+    if (!hasContent) { setMosaicMsg("Paint something first!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    setMosaicLoading(true);
+    try {
+      const mosaicData = {
+        title: creatorTitle || "Untitled",
+        grid: creatorGrid,
+        gridSize: 25,
+        authorEmail: firebaseUser.email || "",
+      };
+      if (creatorEditingId) {
+        await updateMosaicDesign(firebaseUser.uid, creatorEditingId, mosaicData);
+        setMosaicMsg("Mosaic updated!");
+      } else {
+        const id = await saveMosaicDesign(firebaseUser.uid, mosaicData);
+        setCreatorEditingId(id);
+        setMosaicMsg("Mosaic saved!");
+      }
+      // Refresh list
+      const list = await loadUserMosaics(firebaseUser.uid);
+      setMyMosaics(list);
+    } catch (e) {
+      console.error("Save mosaic failed:", e);
+      setMosaicMsg("Save failed");
+    } finally {
+      setMosaicLoading(false);
+      setTimeout(() => setMosaicMsg(""), 2500);
+    }
+  }, [firebaseUser, creatorGrid, creatorTitle, creatorEditingId]);
+
+  const handleDeleteMosaic = useCallback(async (mosaicId) => {
+    if (!firebaseUser) return;
+    setMosaicLoading(true);
+    try {
+      await deleteMosaicDesign(firebaseUser.uid, mosaicId);
+      const list = await loadUserMosaics(firebaseUser.uid);
+      setMyMosaics(list);
+      setMosaicMsg("Mosaic deleted");
+    } catch (e) {
+      console.error("Delete mosaic failed:", e);
+      setMosaicMsg("Delete failed");
+    } finally {
+      setMosaicLoading(false);
+      setTimeout(() => setMosaicMsg(""), 2500);
+    }
+  }, [firebaseUser]);
+
+  const handleSubmitForReview = useCallback(async (mosaic) => {
+    if (!firebaseUser) return;
+    if (mosaic.publicStatus === "pending") { setMosaicMsg("Already submitted for review"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    if (mosaic.publicStatus === "approved") { setMosaicMsg("Already published!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    setMosaicLoading(true);
+    try {
+      await submitMosaicForReview(firebaseUser.uid, mosaic.id, mosaic);
+      const list = await loadUserMosaics(firebaseUser.uid);
+      setMyMosaics(list);
+      setMosaicMsg("Submitted for review!");
+    } catch (e) {
+      console.error("Submit failed:", e);
+      setMosaicMsg("Submit failed");
+    } finally {
+      setMosaicLoading(false);
+      setTimeout(() => setMosaicMsg(""), 2500);
+    }
+  }, [firebaseUser]);
+
+  const handleShareMosaic = useCallback(async (mosaic, email) => {
+    if (!firebaseUser || !email) return;
+    setMosaicLoading(true);
+    try {
+      const target = await lookupUserByEmail(email.trim());
+      if (!target) { setMosaicMsg("User not found"); setMosaicLoading(false); setTimeout(() => setMosaicMsg(""), 2500); return; }
+      if (target.uid === firebaseUser.uid) { setMosaicMsg("Can't share with yourself"); setMosaicLoading(false); setTimeout(() => setMosaicMsg(""), 2500); return; }
+      await shareMosaicWithUser(firebaseUser.uid, firebaseUser.email, target.uid, mosaic.id, mosaic);
+      setMosaicMsg("Shared!");
+      setShareTargetMosaic(null);
+      setShareEmailInput("");
+    } catch (e) {
+      console.error("Share failed:", e);
+      setMosaicMsg("Share failed");
+    } finally {
+      setMosaicLoading(false);
+      setTimeout(() => setMosaicMsg(""), 2500);
+    }
+  }, [firebaseUser]);
+
+  const handleApproveMosaic = useCallback(async (mosaic) => {
+    setMosaicLoading(true);
+    try {
+      await approveMosaic(mosaic.id, mosaic);
+      const list = await loadPendingMosaics();
+      setPendingMosaicsList(list);
+      setMosaicMsg("Approved!");
+    } catch (e) {
+      console.error("Approve failed:", e);
+      setMosaicMsg("Approve failed");
+    } finally {
+      setMosaicLoading(false);
+      setTimeout(() => setMosaicMsg(""), 2500);
+    }
+  }, []);
+
+  const handleRejectMosaic = useCallback(async (mosaic) => {
+    setMosaicLoading(true);
+    try {
+      await rejectMosaic(mosaic.id, mosaic);
+      const list = await loadPendingMosaics();
+      setPendingMosaicsList(list);
+      setMosaicMsg("Rejected");
+    } catch (e) {
+      console.error("Reject failed:", e);
+      setMosaicMsg("Reject failed");
+    } finally {
+      setMosaicLoading(false);
+      setTimeout(() => setMosaicMsg(""), 2500);
+    }
+  }, []);
+
+  const loadMosaicData = useCallback(async (tab) => {
+    setMosaicLoading(true);
+    try {
+      if (tab === "mine" && firebaseUser) {
+        const [userList, sharedList] = await Promise.all([
+          loadUserMosaics(firebaseUser.uid),
+          loadSharedMosaics(firebaseUser.uid),
+        ]);
+        setMyMosaics(userList);
+        setSharedMosaics(sharedList);
+      } else if (tab === "shared" && firebaseUser) {
+        const sharedList = await loadSharedMosaics(firebaseUser.uid);
+        setSharedMosaics(sharedList);
+      } else if (tab === "public") {
+        const pubList = await loadPublicMosaics();
+        setPublicMosaicsList(pubList);
+      } else if (tab === "admin" && isAdmin) {
+        const pendList = await loadPendingMosaics();
+        setPendingMosaicsList(pendList);
+      }
+    } catch (e) {
+      console.error("Load mosaic data failed:", e);
+    } finally {
+      setMosaicLoading(false);
+    }
+  }, [firebaseUser, isAdmin]);
+
+  const editMosaic = useCallback((mosaic) => {
+    setCreatorGrid(mosaic.grid || Array.from({ length: 25 }, () => Array(25).fill(null)));
+    setCreatorTitle(mosaic.title || "");
+    setCreatorEditingId(mosaic.id);
+    setView("creator");
+  }, []);
+
+  // Helper: render a mosaic grid thumbnail (using canvas-like div grid)
+  const MosaicThumbnail = useCallback(({ grid, size = 80 }) => {
+    const gs = grid?.length || 25;
+    const cellSz = size / gs;
+    return (
+      <div style={{ width: size, height: size, borderRadius: 6, overflow: "hidden", flexShrink: 0, border: `1px solid ${C.border}`, position: "relative" }}>
+        <canvas ref={el => {
+          if (!el || !grid) return;
+          const ctx = el.getContext("2d");
+          el.width = size;
+          el.height = size;
+          for (let r = 0; r < gs; r++) {
+            for (let c = 0; c < (grid[r]?.length || 0); c++) {
+              ctx.fillStyle = grid[r][c] || "#14141f";
+              ctx.fillRect(c * cellSz, r * cellSz, Math.ceil(cellSz), Math.ceil(cellSz));
+            }
+          }
+        }} width={size} height={size} style={{ width: size, height: size, display: "block" }} />
+      </div>
+    );
+  }, []);
 
   // Helper: gather all local data into a single object for cloud sync
   const gatherLocalData = useCallback(() => ({
@@ -3148,7 +3468,7 @@ export default function Pattrn() {
     cascadeAttemptsRef.current = attempts;
     cascadeRunIndexRef.current = cascadeRunIndex;
   }
-  const puzzles = isCascade ? [] : isDaily ? [] : (PUZZLE_SETS[difficulty] || []);
+  const puzzles = isCascade ? [] : isDaily ? [] : (customMosaicPuzzlesRef.current && isMosaic ? customMosaicPuzzlesRef.current : (PUZZLE_SETS[difficulty] || []));
   const cascadePuzzle = useMemo(
     () => (isCascade ? buildCascadePuzzle(cascadeLevel, getCascadeRunSeed(cascadeRunIndex)) : null),
     [isCascade, cascadeLevel, cascadeRunIndex]
@@ -3370,14 +3690,15 @@ export default function Pattrn() {
         puz = buildDailyPuzzle(seed);
         lookupKey = seed;
       } else {
-        const puzzleSet = PUZZLE_SETS[effectiveDiff] || [];
+        const puzzleSet = (customMosaicPuzzlesRef.current && effectiveDiff === "mosaic") ? customMosaicPuzzlesRef.current : (PUZZLE_SETS[effectiveDiff] || []);
         puz = puzzleSet[idx];
         lookupKey = idx;
       }
+      const isCustomMosaic = !!customMosaicPuzzlesRef.current && effectiveDiff === "mosaic";
       const prog = loadProgress();
       const tms = loadTimes();
-      const dProg = prog[effectiveDiff] || {};
-      const dTimes = tms[effectiveDiff] || {};
+      const dProg = isCustomMosaic ? customMosaicProgress : (prog[effectiveDiff] || {});
+      const dTimes = isCustomMosaic ? {} : (tms[effectiveDiff] || {});
       const savedAttempts = dProg[lookupKey] ?? 0;
       const savedTime = dTimes[lookupKey];
       const alreadyCompleted = !forceRestart && savedAttempts > 0 && savedTime != null && puz;
@@ -3738,16 +4059,21 @@ export default function Pattrn() {
         if (isBlind) setLockedCells(new Set([...puzzle.blanks]));
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
-        const newDiffProgress = { ...diffProgress, [progressKey]: newAttempts };
-        const newProgress = { ...progress, [difficulty]: newDiffProgress };
-        setProgress(newProgress);
-        saveProgress(newProgress);
-        const diffTimes = times[difficulty] || {};
-        const newDiffTimes = { ...diffTimes, [progressKey]: finalTime };
-        const newTimes = { ...times, [difficulty]: newDiffTimes };
-        setTimes(newTimes);
-        saveTimes(newTimes);
-        showNewAchievements(newProgress, newTimes);
+        // Custom mosaic: track progress locally only (don't save to normal progress)
+        if (customMosaicPuzzlesRef.current && isMosaic) {
+          setCustomMosaicProgress(prev => ({ ...prev, [progressKey]: newAttempts }));
+        } else {
+          const newDiffProgress = { ...diffProgress, [progressKey]: newAttempts };
+          const newProgress = { ...progress, [difficulty]: newDiffProgress };
+          setProgress(newProgress);
+          saveProgress(newProgress);
+          const diffTimes = times[difficulty] || {};
+          const newDiffTimes = { ...diffTimes, [progressKey]: finalTime };
+          const newTimes = { ...times, [difficulty]: newDiffTimes };
+          setTimes(newTimes);
+          saveTimes(newTimes);
+          showNewAchievements(newProgress, newTimes);
+        }
       }
       } else if (newAttempts >= maxAttempts) {
       if (isCascade) {
@@ -4101,6 +4427,618 @@ export default function Pattrn() {
       </div>
     );
   })() : null;
+
+  // --- CUSTOM MOSAIC PLAY VIEW (puzzle selection for user-created mosaics) ---
+  if (view === "custom-mosaic" && customMosaicPlay) {
+    const cPuzzles = customMosaicPuzzlesRef.current || [];
+    const gridPxCm = Math.min(340, typeof window !== "undefined" ? window.innerWidth - 40 : 340);
+    const tileSzCm = Math.floor((gridPxCm - 20) / 5);
+    const miniCellSzCm = Math.floor((tileSzCm - 8) / 5);
+    const solvedCount = Object.values(customMosaicProgress).filter(v => v > 0).length;
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
+        {/* Header */}
+        <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
+          <button onClick={() => { setView("gallery"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; }}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            &larr; Back
+          </button>
+          <div style={{ flex: 1 }}>
+            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent }}>
+              {customMosaicPlay.title || "Untitled"}
+            </h2>
+            {customMosaicPlay.authorEmail && (
+              <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorEmail}</div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Space Mono', monospace", marginBottom: 10, animation: "fadeUp 0.3s 0.02s ease both" }}>
+          Solve all 25 tiles to reveal the picture
+        </div>
+
+        {/* 5x5 tile grid */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3,
+          padding: 8, borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+          animation: "fadeUp 0.3s 0.04s ease both",
+        }}>
+          {cPuzzles.map((p, i) => {
+            const solved = (customMosaicProgress[i] || 0) > 0;
+            return (
+              <button key={i} onClick={() => {
+                startPuzzle(i, "mosaic", true);
+              }}
+                style={{
+                  width: tileSzCm, height: tileSzCm, borderRadius: 6,
+                  border: `1.5px solid ${solved ? C.correct + "66" : C.border}`,
+                  backgroundColor: solved ? C.correct + "10" : C.surface,
+                  cursor: "pointer", padding: 2, position: "relative",
+                  display: "flex", flexDirection: "column", gap: 0.5, alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s", overflow: "hidden",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = solved ? C.correct + "66" : C.border; }}
+              >
+                {solved ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                    {p.solution.map((row, ri) => (
+                      <div key={ri} style={{ display: "flex", gap: 0.5 }}>
+                        {row.map((token, ci) => {
+                          const { color } = parseToken(token);
+                          return <div key={ci} style={{ width: miniCellSzCm, height: miniCellSzCm, borderRadius: 1, backgroundColor: color }} />;
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{
+                    fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                    color: C.textDim, lineHeight: 1,
+                  }}>
+                    {i + 1}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Progress */}
+        <div style={{ marginTop: 16, fontSize: 12, color: C.textDim, fontFamily: "'Space Mono', monospace", animation: "fadeUp 0.3s 0.06s ease both" }}>
+          {solvedCount}/25 tiles solved
+        </div>
+
+        {/* Full picture preview when all solved */}
+        {solvedCount === 25 && (
+          <div style={{ marginTop: 20, animation: "fadeUp 0.4s ease both", textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: 12 }}>
+              Picture revealed!
+            </div>
+            <MosaicThumbnail grid={customMosaicPlay.grid} size={Math.min(280, typeof window !== "undefined" ? window.innerWidth - 80 : 280)} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- MOSAIC CREATOR VIEW ---
+  if (view === "creator") {
+    const gridPx = Math.min(360, typeof window !== "undefined" ? window.innerWidth - 32 : 360);
+    const cellPx = gridPx / CREATOR_GRID_SIZE;
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
+        {/* Header */}
+        <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
+          <button onClick={() => { setView("menu"); resetCreator(); }}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            &larr; Back
+          </button>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+            {creatorEditingId ? "Edit Mosaic" : "Create Mosaic"}
+          </h2>
+        </div>
+
+        {/* Title input */}
+        <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, animation: "fadeUp 0.3s 0.02s ease both" }}>
+          <input
+            type="text"
+            value={creatorTitle}
+            onChange={e => setCreatorTitle(e.target.value)}
+            placeholder="Mosaic title..."
+            maxLength={40}
+            style={{
+              width: "100%", padding: "10px 14px", borderRadius: 10,
+              backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              color: C.text, fontSize: 14, fontFamily: "'Space Mono', monospace",
+              outline: "none", boxSizing: "border-box", letterSpacing: 0.5,
+            }}
+            onFocus={e => { e.target.style.borderColor = C.accent; }}
+            onBlur={e => { e.target.style.borderColor = C.border; }}
+          />
+        </div>
+
+        {/* Color palette */}
+        <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, animation: "fadeUp 0.3s 0.04s ease both" }}>
+          <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
+            Colors
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {CREATOR_COLORS.map(color => (
+              <button
+                key={color}
+                onClick={() => setCreatorColor(color)}
+                style={{
+                  width: 28, height: 28, borderRadius: 6, backgroundColor: color, border: creatorColor === color ? `2.5px solid ${C.accent}` : `1.5px solid ${C.border}`,
+                  cursor: "pointer", transition: "all 0.15s",
+                  boxShadow: creatorColor === color ? `0 0 8px ${C.accent}66` : "none",
+                }}
+              />
+            ))}
+            {/* Eraser */}
+            <button
+              onClick={() => setCreatorColor(null)}
+              style={{
+                width: 28, height: 28, borderRadius: 6, backgroundColor: C.surface,
+                border: creatorColor === null ? `2.5px solid ${C.accent}` : `1.5px solid ${C.border}`,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 14, color: C.textDim, transition: "all 0.15s",
+              }}
+              title="Eraser"
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2-8 8-3 1 1-3z" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* 25x25 info */}
+        <div style={{ width: "100%", maxWidth: 400, marginBottom: 6, animation: "fadeUp 0.3s 0.05s ease both" }}>
+          <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, fontFamily: "'Space Mono', monospace", textAlign: "center" }}>
+            25x25 grid &middot; becomes 25 playable puzzle tiles
+          </div>
+        </div>
+
+        {/* Grid - uses pointer-move on container for smooth finger drag */}
+        <div
+          ref={creatorGridRef}
+          style={{
+            width: gridPx, height: gridPx, marginBottom: 16, animation: "fadeUp 0.3s 0.06s ease both",
+            borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}`,
+            touchAction: "none", userSelect: "none", position: "relative",
+            display: "grid", gridTemplateColumns: `repeat(25, 1fr)`, gridTemplateRows: `repeat(25, 1fr)`,
+          }}
+          onPointerDown={creatorPointerDown}
+          onPointerMove={creatorPointerMove}
+          onPointerUp={creatorPointerUp}
+          onPointerLeave={creatorPointerUp}
+          onPointerCancel={creatorPointerUp}
+        >
+          {creatorGrid.flat().map((color, i) => (
+            <div
+              key={i}
+              style={{
+                backgroundColor: color || C.surface,
+                outline: (i % 5 === 4 && (i % 25) < 24) || (Math.floor(i / 25) % 5 === 4 && Math.floor(i / 25) < 24) ? `0.5px solid ${C.border}88` : "none",
+              }}
+            />
+          ))}
+          {/* 5x5 tile grid lines overlay */}
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+            {[1,2,3,4].map(i => (
+              <div key={`v${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: `${i * 20}%`, width: 1, backgroundColor: C.accent + "44" }} />
+            ))}
+            {[1,2,3,4].map(i => (
+              <div key={`h${i}`} style={{ position: "absolute", left: 0, right: 0, top: `${i * 20}%`, height: 1, backgroundColor: C.accent + "44" }} />
+            ))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div style={{ width: "100%", maxWidth: 400, display: "flex", flexDirection: "column", gap: 8, animation: "fadeUp 0.3s 0.08s ease both" }}>
+          {mosaicMsg && (
+            <div style={{
+              textAlign: "center", padding: "8px 12px", borderRadius: 8,
+              backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
+              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, letterSpacing: 0.5,
+            }}>
+              {mosaicMsg}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              onClick={handleSaveMosaic}
+              disabled={mosaicLoading}
+              style={{
+                flex: 1, padding: "12px 0", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 1.5,
+                background: C.accent, color: C.bg, border: "none", cursor: mosaicLoading ? "not-allowed" : "pointer",
+                textTransform: "uppercase", transition: "all 0.15s", opacity: mosaicLoading ? 0.6 : 1,
+              }}
+            >
+              {mosaicLoading ? "Saving..." : creatorEditingId ? "Update" : "Save"}
+            </button>
+            <button
+              onClick={() => { resetCreator(); }}
+              style={{
+                padding: "12px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                textTransform: "uppercase", transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+            >
+              Clear
+            </button>
+          </div>
+          {!firebaseUser && firebaseConfigured && (
+            <div style={{ textAlign: "center", fontSize: 11, color: C.textDim, marginTop: 4 }}>
+              Sign in from the menu to save your creations
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // --- MOSAIC GALLERY VIEW ---
+  if (view === "gallery") {
+    const currentList = mosaicGalleryTab === "mine" ? myMosaics
+      : mosaicGalleryTab === "shared" ? sharedMosaics
+      : publicMosaicsList;
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
+        {/* Header */}
+        <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
+          <button onClick={() => setView("menu")}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            &larr; Back
+          </button>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+            Mosaics
+          </h2>
+          {firebaseUser && (
+            <button onClick={() => { resetCreator(); setView("creator"); }}
+              style={{
+                background: C.accent, color: C.bg, border: "none", borderRadius: 8, padding: "6px 14px",
+                cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                fontSize: 11, fontWeight: 700, letterSpacing: 1,
+              }}
+            >
+              + New
+            </button>
+          )}
+        </div>
+
+        {/* Tabs */}
+        <div style={{ width: "100%", maxWidth: 400, display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}`, marginBottom: 16, animation: "fadeUp 0.3s 0.02s ease both" }}>
+          {[
+            { key: "mine", label: "My Mosaics" },
+            { key: "shared", label: "Shared" },
+            { key: "public", label: "Public" },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => { setMosaicGalleryTab(tab.key); loadMosaicData(tab.key); }}
+              style={{
+                flex: 1, padding: "10px 0", fontSize: 11, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                background: mosaicGalleryTab === tab.key ? C.accent : "transparent",
+                color: mosaicGalleryTab === tab.key ? C.bg : C.textDim,
+                border: "none", cursor: "pointer", textTransform: "uppercase",
+                transition: "all 0.15s",
+              }}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {mosaicMsg && (
+          <div style={{
+            width: "100%", maxWidth: 400, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+            backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
+            fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent,
+          }}>
+            {mosaicMsg}
+          </div>
+        )}
+
+        {/* Share modal */}
+        {shareTargetMosaic && (
+          <div onClick={() => { setShareTargetMosaic(null); setShareEmailInput(""); }} style={{
+            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
+              padding: 24, maxWidth: 340, width: "100%", animation: "fadeUp 0.25s ease",
+            }}>
+              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, margin: "0 0 12px", textAlign: "center" }}>
+                Share Mosaic
+              </h3>
+              <p style={{ fontSize: 11, color: C.textDim, textAlign: "center", marginBottom: 16 }}>
+                Enter the email of the user you want to share "{shareTargetMosaic.title}" with
+              </p>
+              <input
+                type="email"
+                value={shareEmailInput}
+                onChange={e => setShareEmailInput(e.target.value)}
+                placeholder="user@example.com"
+                style={{
+                  width: "100%", padding: "10px 14px", borderRadius: 10,
+                  backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                  color: C.text, fontSize: 13, fontFamily: "'Space Mono', monospace",
+                  outline: "none", boxSizing: "border-box", marginBottom: 12,
+                }}
+                onFocus={e => { e.target.style.borderColor = C.accent; }}
+                onBlur={e => { e.target.style.borderColor = C.border; }}
+              />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => handleShareMosaic(shareTargetMosaic, shareEmailInput)}
+                  disabled={!shareEmailInput.trim() || mosaicLoading}
+                  style={{
+                    flex: 1, padding: "10px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    background: shareEmailInput.trim() ? C.accent : C.surfaceLight,
+                    color: shareEmailInput.trim() ? C.bg : C.textDim,
+                    border: "none", cursor: shareEmailInput.trim() ? "pointer" : "not-allowed",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {mosaicLoading ? "Sharing..." : "Share"}
+                </button>
+                <button
+                  onClick={() => { setShareTargetMosaic(null); setShareEmailInput(""); }}
+                  style={{
+                    padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Content */}
+        {mosaicLoading && currentList.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: C.textDim, fontSize: 13 }}>Loading...</div>
+        ) : !firebaseUser && mosaicGalleryTab !== "public" ? (
+          <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
+            Sign in to see your mosaics<br/>
+            <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
+              style={{ marginTop: 8, padding: "8px 20px", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", background: C.accent, color: C.bg, border: "none", cursor: "pointer" }}
+            >Sign In</button>
+          </div>
+        ) : currentList.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8, animation: "fadeUp 0.3s ease" }}>
+            {mosaicGalleryTab === "mine" ? "No mosaics yet. Create your first one!" :
+             mosaicGalleryTab === "shared" ? "No mosaics shared with you yet." :
+             "No public mosaics yet."}
+          </div>
+        ) : (
+          <div style={{ width: "100%", maxWidth: 400, display: "flex", flexDirection: "column", gap: 10, animation: "fadeUp 0.3s 0.04s ease both" }}>
+            {currentList.map(mosaic => (
+              <div key={mosaic.id} style={{
+                display: "flex", gap: 12, padding: "12px", borderRadius: 12,
+                backgroundColor: C.surface, border: `1px solid ${C.border}`, alignItems: "center",
+              }}>
+                <div style={{ cursor: "pointer" }} onClick={() => mosaic.grid && startCustomMosaicPlay(mosaic)}>
+                  <MosaicThumbnail grid={mosaic.grid} size={64} />
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {mosaic.title || "Untitled"}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.textDim }}>
+                    {mosaicGalleryTab === "shared" && mosaic.sharedByEmail ? `From ${mosaic.sharedByEmail}` :
+                     mosaicGalleryTab === "public" && mosaic.authorEmail ? `By ${mosaic.authorEmail}` :
+                     mosaic.publicStatus === "approved" ? "Published" :
+                     mosaic.publicStatus === "pending" ? "Pending review" :
+                     mosaic.publicStatus === "rejected" ? "Not approved" : ""}
+                  </div>
+                </div>
+                {mosaic.grid && (
+                  <button onClick={() => startCustomMosaicPlay(mosaic)} title="Play as puzzle"
+                    style={{ background: C.accent, border: "none", borderRadius: 6, padding: "4px 10px", color: C.bg, cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "'Space Mono', monospace", flexShrink: 0, transition: "all 0.15s" }}
+                    onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+                  >Play</button>
+                )}
+                {mosaicGalleryTab === "mine" && (
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    <button onClick={() => editMosaic(mosaic)} title="Edit"
+                      style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                    >Edit</button>
+                    <button onClick={() => setShareTargetMosaic(mosaic)} title="Share"
+                      style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#4ECDC4"; e.currentTarget.style.color = "#4ECDC4"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                    >Share</button>
+                    {!mosaic.publicStatus && (
+                      <button onClick={() => handleSubmitForReview(mosaic)} title="Submit to public gallery"
+                        style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#FFE66D"; e.currentTarget.style.color = "#FFE66D"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                      >Publish</button>
+                    )}
+                    <button onClick={() => handleDeleteMosaic(mosaic.id)} title="Delete"
+                      style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                    >Del</button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- ADMIN REVIEW VIEW ---
+  if (view === "admin-review") {
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
+        {/* Header */}
+        <div style={{ width: "100%", maxWidth: 480, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
+          <button onClick={() => setView("menu")}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            &larr; Back
+          </button>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+            Review Mosaics
+          </h2>
+          <button onClick={() => loadMosaicData("admin")}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            Refresh
+          </button>
+        </div>
+
+        {mosaicMsg && (
+          <div style={{
+            width: "100%", maxWidth: 480, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+            backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
+            fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent,
+          }}>
+            {mosaicMsg}
+          </div>
+        )}
+
+        {mosaicLoading && pendingMosaicsList.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: C.textDim, fontSize: 13 }}>Loading...</div>
+        ) : pendingMosaicsList.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, animation: "fadeUp 0.3s ease" }}>
+            No mosaics pending review
+          </div>
+        ) : (
+          <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 12, animation: "fadeUp 0.3s 0.02s ease both" }}>
+            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+              {pendingMosaicsList.length} pending
+            </div>
+            {pendingMosaicsList.map(mosaic => (
+              <div key={mosaic.id} style={{
+                padding: 16, borderRadius: 14,
+                backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              }}>
+                <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 12 }}>
+                  <MosaicThumbnail grid={mosaic.grid} size={100} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+                      {mosaic.title || "Untitled"}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 2 }}>
+                      By: {mosaic.authorEmail || "Unknown"}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.textDim }}>
+                      {mosaic.gridSize || 8}x{mosaic.gridSize || 8} grid
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    onClick={() => handleApproveMosaic(mosaic)}
+                    disabled={mosaicLoading}
+                    style={{
+                      flex: 1, padding: "10px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      background: C.correct, color: C.bg, border: "none", cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s", opacity: mosaicLoading ? 0.6 : 1,
+                    }}
+                  >
+                    Approve
+                  </button>
+                  <button
+                    onClick={() => handleRejectMosaic(mosaic)}
+                    disabled={mosaicLoading}
+                    style={{
+                      flex: 1, padding: "10px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      background: C.incorrect, color: "#fff", border: "none", cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s", opacity: mosaicLoading ? 0.6 : 1,
+                    }}
+                  >
+                    Reject
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // --- MENU VIEW ---
   if (view === "menu") {
@@ -4838,7 +5776,7 @@ export default function Pattrn() {
               const miniSize = 56;
               const miniCellSize = Math.floor((miniSize - 8) / 5);
               return (
-                <button key={i} onClick={() => startPuzzle(i, "mosaic")}
+                <button key={i} onClick={() => { customMosaicPuzzlesRef.current = null; startPuzzle(i, "mosaic"); }}
                   style={{
                     width: miniSize, height: miniSize, borderRadius: 6,
                     border: `1.5px solid ${solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border}`,
@@ -5145,14 +6083,15 @@ export default function Pattrn() {
                 padding: "0", maxWidth: 480, width: "100%",
                 boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`,
                 display: "flex", flexDirection: "column",
+                maxHeight: "85vh",
                 animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
               }}>
                 {/* Drag handle */}
-                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
+                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px", flexShrink: 0 }}>
                   <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
                 </div>
 
-                <div style={{ padding: "8px 24px 0" }}>
+                <div style={{ padding: "8px 24px 0", overflowY: "auto", flex: 1, minHeight: 0, WebkitOverflowScrolling: "touch" }}>
                   {/* Header */}
                   <div style={{ textAlign: "center", marginBottom: 20 }}>
                     <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
@@ -5281,6 +6220,104 @@ export default function Pattrn() {
                       </div>
                       <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
                     </button>
+
+                    {/* Mosaic Creator */}
+                    <button onClick={() => { setShowGameMenu(false); resetCreator(); setView("creator"); }} style={{
+                      width: "100%", padding: "14px 16px", borderRadius: 12,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                      transition: "all 0.15s",
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#F59E0B"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        backgroundColor: "#F59E0B22", display: "flex", alignItems: "center", justifyContent: "center",
+                        border: "1.5px solid #F59E0B44", flexShrink: 0,
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <rect x="2" y="2" width="5" height="5" rx="1" fill="#F59E0B" opacity="0.8"/>
+                          <rect x="9" y="2" width="5" height="5" rx="1" fill="#F59E0B" opacity="0.5"/>
+                          <rect x="2" y="9" width="5" height="5" rx="1" fill="#F59E0B" opacity="0.5"/>
+                          <rect x="9" y="9" width="5" height="5" rx="1" fill="#F59E0B" opacity="0.3"/>
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                          Create Mosaic
+                        </div>
+                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                          Paint your own design
+                        </div>
+                      </div>
+                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                    </button>
+
+                    {/* Mosaic Gallery */}
+                    <button onClick={() => { setShowGameMenu(false); setMosaicGalleryTab("mine"); setView("gallery"); loadMosaicData("mine"); }} style={{
+                      width: "100%", padding: "14px 16px", borderRadius: 12,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                      transition: "all 0.15s",
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#10B981"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                    >
+                      <div style={{
+                        width: 32, height: 32, borderRadius: 8,
+                        backgroundColor: "#10B98122", display: "flex", alignItems: "center", justifyContent: "center",
+                        border: "1.5px solid #10B98144", flexShrink: 0,
+                      }}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <rect x="1" y="1" width="6" height="6" rx="1" stroke="#10B981" strokeWidth="1.5" fill="none"/>
+                          <rect x="9" y="1" width="6" height="6" rx="1" stroke="#10B981" strokeWidth="1.5" fill="none"/>
+                          <rect x="1" y="9" width="6" height="6" rx="1" stroke="#10B981" strokeWidth="1.5" fill="none"/>
+                          <rect x="9" y="9" width="6" height="6" rx="1" stroke="#10B981" strokeWidth="1.5" fill="none"/>
+                        </svg>
+                      </div>
+                      <div style={{ flex: 1, textAlign: "left" }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                          Mosaic Gallery
+                        </div>
+                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                          Browse &amp; share mosaics
+                        </div>
+                      </div>
+                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                    </button>
+
+                    {/* Admin Review (only for admins) */}
+                    {isAdmin && (
+                      <button onClick={() => { setShowGameMenu(false); setView("admin-review"); loadMosaicData("admin"); }} style={{
+                        width: "100%", padding: "14px 16px", borderRadius: 12,
+                        backgroundColor: C.surface, border: `1px solid ${C.incorrect}33`,
+                        cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                        transition: "all 0.15s",
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#EF4444"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.incorrect + "33"; }}
+                      >
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          backgroundColor: "#EF444422", display: "flex", alignItems: "center", justifyContent: "center",
+                          border: "1.5px solid #EF444444", flexShrink: 0,
+                        }}>
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 9.5 4.5 11.5 5 8 2.5 5.5 6 5z" stroke="#EF4444" strokeWidth="1.5" fill="none" strokeLinejoin="round"/>
+                          </svg>
+                        </div>
+                        <div style={{ flex: 1, textAlign: "left" }}>
+                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                            Review Mosaics
+                          </div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                            Admin: approve submissions
+                          </div>
+                        </div>
+                        <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                      </button>
+                    )}
 
                     {/* Account */}
                     {firebaseConfigured && (
@@ -6263,7 +7300,11 @@ export default function Pattrn() {
             saveProgress(nextProgress);
           }
           stopTimer();
-          setView("menu");
+          if (customMosaicPuzzlesRef.current && isMosaic) {
+            setView("custom-mosaic");
+          } else {
+            setView("menu");
+          }
         }}
           style={{
             background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
@@ -6273,7 +7314,7 @@ export default function Pattrn() {
           onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
         >
-          &larr; PUZZLES
+          &larr; {customMosaicPuzzlesRef.current && isMosaic ? "MOSAIC" : "PUZZLES"}
         </button>
         <div style={{ flex: 1, textAlign: "center" }}>
           <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
@@ -6506,8 +7547,8 @@ export default function Pattrn() {
               >
                 Retry
               </button>
-              {(isDaily || isCascade) ? (
-                <button onClick={() => { setView("menu"); }}
+              {(isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) ? (
+                <button onClick={() => { setView(customMosaicPuzzlesRef.current && isMosaic ? "custom-mosaic" : "menu"); }}
                   style={{
                     backgroundColor: C.accent, color: C.bg, border: "none",
                     padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
@@ -6518,7 +7559,7 @@ export default function Pattrn() {
                   onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
                   onMouseLeave={e => e.target.style.transform = "translateY(0)"}
                 >
-                  Back to puzzles
+                  {customMosaicPuzzlesRef.current && isMosaic ? "Back to mosaic" : "Back to puzzles"}
                 </button>
               ) : currentPuzzle < totalPuzzles - 1 ? (
                 <button onClick={() => startPuzzle(currentPuzzle + 1)}

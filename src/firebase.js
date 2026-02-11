@@ -13,6 +13,9 @@ import {
   ref,
   get,
   set,
+  push,
+  remove,
+  update,
   serverTimestamp,
 } from "firebase/database";
 
@@ -129,6 +132,169 @@ export function summariseGameData(data) {
   totalSolved += cascadeClears;
   const achievements = (data.achievements || []).length;
   return { totalSolved, achievements, modes };
+}
+
+// --- Mosaic Creator ---
+
+// Save a user-created mosaic to the user's private collection
+export async function saveMosaicDesign(uid, mosaic) {
+  if (!db) return null;
+  const mosaicRef = ref(db, `mosaics/user/${uid}`);
+  const newRef = push(mosaicRef);
+  const id = newRef.key;
+  await set(newRef, {
+    ...removeUndefined(mosaic),
+    id,
+    authorUid: uid,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return id;
+}
+
+// Update an existing mosaic
+export async function updateMosaicDesign(uid, mosaicId, mosaic) {
+  if (!db) return;
+  const mosaicRef = ref(db, `mosaics/user/${uid}/${mosaicId}`);
+  await update(mosaicRef, {
+    ...removeUndefined(mosaic),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// Load all mosaics for a user
+export async function loadUserMosaics(uid) {
+  if (!db) return [];
+  const snap = await get(ref(db, `mosaics/user/${uid}`));
+  if (!snap.exists()) return [];
+  const val = snap.val();
+  return Object.values(val).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+// Delete a user's mosaic
+export async function deleteMosaicDesign(uid, mosaicId) {
+  if (!db) return;
+  await remove(ref(db, `mosaics/user/${uid}/${mosaicId}`));
+  // Also remove from public/pending if it was submitted
+  try {
+    await remove(ref(db, `mosaics/pending/${mosaicId}`));
+  } catch { /* may not exist */ }
+}
+
+// Submit a mosaic for public review
+export async function submitMosaicForReview(uid, mosaicId, mosaic) {
+  if (!db) return;
+  await set(ref(db, `mosaics/pending/${mosaicId}`), {
+    ...removeUndefined(mosaic),
+    id: mosaicId,
+    authorUid: uid,
+    authorEmail: mosaic.authorEmail || "",
+    status: "pending",
+    submittedAt: serverTimestamp(),
+  });
+  // Mark the user's copy as submitted
+  await update(ref(db, `mosaics/user/${uid}/${mosaicId}`), {
+    publicStatus: "pending",
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// Admin: load all pending mosaics
+export async function loadPendingMosaics() {
+  if (!db) return [];
+  const snap = await get(ref(db, "mosaics/pending"));
+  if (!snap.exists()) return [];
+  return Object.values(snap.val()).sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0));
+}
+
+// Admin: approve a pending mosaic (move to public gallery)
+export async function approveMosaic(mosaicId, mosaic) {
+  if (!db) return;
+  await set(ref(db, `mosaics/public/${mosaicId}`), {
+    ...removeUndefined(mosaic),
+    id: mosaicId,
+    status: "approved",
+    approvedAt: serverTimestamp(),
+  });
+  await remove(ref(db, `mosaics/pending/${mosaicId}`));
+  // Update the user's copy status
+  if (mosaic.authorUid) {
+    try {
+      await update(ref(db, `mosaics/user/${mosaic.authorUid}/${mosaicId}`), {
+        publicStatus: "approved",
+        updatedAt: serverTimestamp(),
+      });
+    } catch { /* user may have deleted their copy */ }
+  }
+}
+
+// Admin: reject a pending mosaic
+export async function rejectMosaic(mosaicId, mosaic) {
+  if (!db) return;
+  await remove(ref(db, `mosaics/pending/${mosaicId}`));
+  // Update the user's copy status
+  if (mosaic.authorUid) {
+    try {
+      await update(ref(db, `mosaics/user/${mosaic.authorUid}/${mosaicId}`), {
+        publicStatus: "rejected",
+        updatedAt: serverTimestamp(),
+      });
+    } catch { /* user may have deleted their copy */ }
+  }
+}
+
+// Load all approved public mosaics
+export async function loadPublicMosaics() {
+  if (!db) return [];
+  const snap = await get(ref(db, "mosaics/public"));
+  if (!snap.exists()) return [];
+  return Object.values(snap.val()).sort((a, b) => (b.approvedAt || 0) - (a.approvedAt || 0));
+}
+
+// Share a mosaic with a specific user by email (stores in shared/{recipientUid}/{mosaicId})
+export async function shareMosaicWithUser(fromUid, fromEmail, toUid, mosaicId, mosaic) {
+  if (!db) return;
+  await set(ref(db, `mosaics/shared/${toUid}/${mosaicId}`), {
+    ...removeUndefined(mosaic),
+    id: mosaicId,
+    sharedBy: fromUid,
+    sharedByEmail: fromEmail,
+    sharedAt: serverTimestamp(),
+  });
+}
+
+// Load mosaics shared with a user
+export async function loadSharedMosaics(uid) {
+  if (!db) return [];
+  const snap = await get(ref(db, `mosaics/shared/${uid}`));
+  if (!snap.exists()) return [];
+  return Object.values(snap.val()).sort((a, b) => (b.sharedAt || 0) - (a.sharedAt || 0));
+}
+
+// Look up a user by email to get their uid (for sharing)
+export async function lookupUserByEmail(email) {
+  if (!db) return null;
+  const snap = await get(ref(db, "users"));
+  if (!snap.exists()) return null;
+  const users = snap.val();
+  for (const [uid, data] of Object.entries(users)) {
+    if (data?.email === email) return { uid, email };
+  }
+  return null;
+}
+
+// Save user email to their profile (for lookup when sharing)
+export async function saveUserEmail(uid, email) {
+  if (!db) return;
+  await update(ref(db, `users/${uid}`), { email });
+}
+
+// Check if user is admin
+export async function checkIsAdmin(uid) {
+  if (!db) return false;
+  const snap = await get(ref(db, `users/${uid}/admin`));
+  if (!snap.exists()) return false;
+  return snap.val() === true;
 }
 
 // Merges local data into cloud, preferring the "better" result for each puzzle
