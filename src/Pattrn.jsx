@@ -2650,13 +2650,14 @@ export default function Pattrn() {
   const [syncChoiceData, setSyncChoiceData] = useState(null); // { uid, localData, cloudData, localSummary, cloudSummary }
 
   // --- Mosaic Creator state ---
-  const CREATOR_GRID_SIZE = 8;
+  const CREATOR_GRID_SIZE = 25; // 25x25 grid → 25 tiles of 5x5, matching mosaic mode
   const CREATOR_COLORS = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#6C5CE7", "#FF9FF3", "#E17055", "#00B894", "#0984E3", "#FDCB6E", "#A8E6CF", "#FF8B94", "#01A3A4", "#F368E0", "#54A0FF", "#5F27CD", "#ffffff", "#333333"];
-  const [creatorGrid, setCreatorGrid] = useState(() => Array.from({ length: CREATOR_GRID_SIZE }, () => Array(CREATOR_GRID_SIZE).fill(null)));
+  const [creatorGrid, setCreatorGrid] = useState(() => Array.from({ length: 25 }, () => Array(25).fill(null)));
   const [creatorColor, setCreatorColor] = useState("#FF6B6B");
   const [creatorTitle, setCreatorTitle] = useState("");
   const [creatorEditingId, setCreatorEditingId] = useState(null);
   const creatorPaintingRef = useRef(false);
+  const creatorGridRef = useRef(null); // for pointer-move based painting
   const [myMosaics, setMyMosaics] = useState([]);
   const [sharedMosaics, setSharedMosaics] = useState([]);
   const [publicMosaicsList, setPublicMosaicsList] = useState([]);
@@ -2667,6 +2668,9 @@ export default function Pattrn() {
   const [shareEmailInput, setShareEmailInput] = useState("");
   const [shareTargetMosaic, setShareTargetMosaic] = useState(null);
   const [mosaicGalleryTab, setMosaicGalleryTab] = useState("mine"); // "mine" | "shared" | "public"
+  const [customMosaicPlay, setCustomMosaicPlay] = useState(null); // mosaic object being played
+  const [customMosaicProgress, setCustomMosaicProgress] = useState({}); // { tileIndex: attempts }
+  const customMosaicPuzzlesRef = useRef(null); // array of 25 puzzle objects when playing custom mosaic
 
   // Listen for auth state changes
   useEffect(() => {
@@ -2688,32 +2692,101 @@ export default function Pattrn() {
 
   // --- Mosaic Creator helpers ---
   const resetCreator = useCallback(() => {
-    setCreatorGrid(Array.from({ length: CREATOR_GRID_SIZE }, () => Array(CREATOR_GRID_SIZE).fill(null)));
+    setCreatorGrid(Array.from({ length: 25 }, () => Array(25).fill(null)));
     setCreatorTitle("");
     setCreatorEditingId(null);
-  }, [CREATOR_GRID_SIZE]);
+  }, []);
 
-  const creatorCellPointerDown = useCallback((r, c) => {
+  // Pointer-move based painting: uses element coordinates for smooth drag across tiny cells
+  const creatorColorRef = useRef("#FF6B6B");
+  useEffect(() => { creatorColorRef.current = creatorColor; }, [creatorColor]);
+
+  const getCellFromPointer = useCallback((e) => {
+    const el = creatorGridRef.current;
+    if (!el) return null;
+    const rect = el.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const cellPx = rect.width / 25;
+    const c = Math.floor(x / cellPx);
+    const r = Math.floor(y / cellPx);
+    if (r < 0 || r >= 25 || c < 0 || c >= 25) return null;
+    return { r, c };
+  }, []);
+
+  const creatorPointerDown = useCallback((e) => {
+    e.preventDefault();
     creatorPaintingRef.current = true;
+    const cell = getCellFromPointer(e);
+    if (!cell) return;
     setCreatorGrid(g => {
       const next = g.map(row => [...row]);
-      next[r][c] = next[r][c] === creatorColor ? null : creatorColor;
+      next[cell.r][cell.c] = next[cell.r][cell.c] === creatorColorRef.current ? null : creatorColorRef.current;
       return next;
     });
-  }, [creatorColor]);
+  }, [getCellFromPointer]);
 
-  const creatorCellPointerEnter = useCallback((r, c) => {
+  const creatorPointerMove = useCallback((e) => {
     if (!creatorPaintingRef.current) return;
+    const cell = getCellFromPointer(e);
+    if (!cell) return;
     setCreatorGrid(g => {
+      if (g[cell.r][cell.c] === creatorColorRef.current) return g; // no change needed
       const next = g.map(row => [...row]);
-      next[r][c] = creatorColor;
+      next[cell.r][cell.c] = creatorColorRef.current;
       return next;
     });
-  }, [creatorColor]);
+  }, [getCellFromPointer]);
 
-  const creatorCellPointerUp = useCallback(() => {
+  const creatorPointerUp = useCallback(() => {
     creatorPaintingRef.current = false;
   }, []);
+
+  // Build playable 25 puzzle tiles from a custom 25x25 color grid
+  const buildCustomMosaicPuzzles = useCallback((grid) => {
+    const bgColor = "#1a1a2e"; // background color for null cells
+    // Collect unique colors to assign shape indices
+    const colorSet = new Set();
+    for (const row of grid) for (const c of row) colorSet.add(c || bgColor);
+    const colorList = [...colorSet];
+    const colorToShape = {};
+    colorList.forEach((c, i) => { colorToShape[c] = i % 7; });
+    // Build 25x25 token grid
+    const tokenGrid = grid.map(row => row.map(c => {
+      const color = c || bgColor;
+      return `${color}|${colorToShape[color]}`;
+    }));
+    // Slice into 25 tiles of 5x5
+    const puzzles = [];
+    for (let ti = 0; ti < 25; ti++) {
+      const tileRow = Math.floor(ti / 5);
+      const tileCol = ti % 5;
+      const solution = [];
+      for (let r = 0; r < 5; r++) {
+        const row = [];
+        for (let c = 0; c < 5; c++) {
+          row.push(tokenGrid[tileRow * 5 + r][tileCol * 5 + c]);
+        }
+        solution.push(row);
+      }
+      const mr = rng(ti * 9973 + 1234);
+      const numBlanks = Math.min(4 + Math.floor(ti / 2), 12);
+      const allCells = [];
+      for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) allCells.push(`${row}-${col}`);
+      const blanks = new Set(shuffle(allCells, mr).slice(0, numBlanks));
+      const usedTokens = [...new Set(solution.flat())];
+      puzzles.push({ id: ti, solution, blanks, usedTokens, gridSize: 5, mode: "mosaic" });
+    }
+    return puzzles;
+  }, []);
+
+  const startCustomMosaicPlay = useCallback((mosaic) => {
+    const puzzles = buildCustomMosaicPuzzles(mosaic.grid);
+    customMosaicPuzzlesRef.current = puzzles;
+    setCustomMosaicPlay(mosaic);
+    setCustomMosaicProgress({});
+    setView("custom-mosaic");
+  }, [buildCustomMosaicPuzzles]);
 
   const handleSaveMosaic = useCallback(async () => {
     if (!firebaseUser) { setMosaicMsg("Sign in to save mosaics"); setTimeout(() => setMosaicMsg(""), 2500); return; }
@@ -2724,7 +2797,7 @@ export default function Pattrn() {
       const mosaicData = {
         title: creatorTitle || "Untitled",
         grid: creatorGrid,
-        gridSize: CREATOR_GRID_SIZE,
+        gridSize: 25,
         authorEmail: firebaseUser.email || "",
       };
       if (creatorEditingId) {
@@ -2745,7 +2818,7 @@ export default function Pattrn() {
       setMosaicLoading(false);
       setTimeout(() => setMosaicMsg(""), 2500);
     }
-  }, [firebaseUser, creatorGrid, creatorTitle, creatorEditingId, CREATOR_GRID_SIZE]);
+  }, [firebaseUser, creatorGrid, creatorTitle, creatorEditingId]);
 
   const handleDeleteMosaic = useCallback(async (mosaicId) => {
     if (!firebaseUser) return;
@@ -2863,25 +2936,30 @@ export default function Pattrn() {
   }, [firebaseUser, isAdmin]);
 
   const editMosaic = useCallback((mosaic) => {
-    setCreatorGrid(mosaic.grid || Array.from({ length: CREATOR_GRID_SIZE }, () => Array(CREATOR_GRID_SIZE).fill(null)));
+    setCreatorGrid(mosaic.grid || Array.from({ length: 25 }, () => Array(25).fill(null)));
     setCreatorTitle(mosaic.title || "");
     setCreatorEditingId(mosaic.id);
     setView("creator");
-  }, [CREATOR_GRID_SIZE]);
+  }, []);
 
-  // Helper: render a mosaic grid thumbnail
+  // Helper: render a mosaic grid thumbnail (using canvas-like div grid)
   const MosaicThumbnail = useCallback(({ grid, size = 80 }) => {
-    const gs = grid?.length || 8;
+    const gs = grid?.length || 25;
     const cellSz = size / gs;
     return (
-      <div style={{ width: size, height: size, display: "flex", flexDirection: "column", borderRadius: 6, overflow: "hidden", flexShrink: 0, border: `1px solid ${C.border}` }}>
-        {(grid || []).map((row, r) => (
-          <div key={r} style={{ display: "flex" }}>
-            {row.map((color, c) => (
-              <div key={c} style={{ width: cellSz, height: cellSz, backgroundColor: color || C.surface }} />
-            ))}
-          </div>
-        ))}
+      <div style={{ width: size, height: size, borderRadius: 6, overflow: "hidden", flexShrink: 0, border: `1px solid ${C.border}`, position: "relative" }}>
+        <canvas ref={el => {
+          if (!el || !grid) return;
+          const ctx = el.getContext("2d");
+          el.width = size;
+          el.height = size;
+          for (let r = 0; r < gs; r++) {
+            for (let c = 0; c < (grid[r]?.length || 0); c++) {
+              ctx.fillStyle = grid[r][c] || "#14141f";
+              ctx.fillRect(c * cellSz, r * cellSz, Math.ceil(cellSz), Math.ceil(cellSz));
+            }
+          }
+        }} width={size} height={size} style={{ width: size, height: size, display: "block" }} />
       </div>
     );
   }, []);
@@ -3390,7 +3468,7 @@ export default function Pattrn() {
     cascadeAttemptsRef.current = attempts;
     cascadeRunIndexRef.current = cascadeRunIndex;
   }
-  const puzzles = isCascade ? [] : isDaily ? [] : (PUZZLE_SETS[difficulty] || []);
+  const puzzles = isCascade ? [] : isDaily ? [] : (customMosaicPuzzlesRef.current && isMosaic ? customMosaicPuzzlesRef.current : (PUZZLE_SETS[difficulty] || []));
   const cascadePuzzle = useMemo(
     () => (isCascade ? buildCascadePuzzle(cascadeLevel, getCascadeRunSeed(cascadeRunIndex)) : null),
     [isCascade, cascadeLevel, cascadeRunIndex]
@@ -3612,14 +3690,15 @@ export default function Pattrn() {
         puz = buildDailyPuzzle(seed);
         lookupKey = seed;
       } else {
-        const puzzleSet = PUZZLE_SETS[effectiveDiff] || [];
+        const puzzleSet = (customMosaicPuzzlesRef.current && effectiveDiff === "mosaic") ? customMosaicPuzzlesRef.current : (PUZZLE_SETS[effectiveDiff] || []);
         puz = puzzleSet[idx];
         lookupKey = idx;
       }
+      const isCustomMosaic = !!customMosaicPuzzlesRef.current && effectiveDiff === "mosaic";
       const prog = loadProgress();
       const tms = loadTimes();
-      const dProg = prog[effectiveDiff] || {};
-      const dTimes = tms[effectiveDiff] || {};
+      const dProg = isCustomMosaic ? customMosaicProgress : (prog[effectiveDiff] || {});
+      const dTimes = isCustomMosaic ? {} : (tms[effectiveDiff] || {});
       const savedAttempts = dProg[lookupKey] ?? 0;
       const savedTime = dTimes[lookupKey];
       const alreadyCompleted = !forceRestart && savedAttempts > 0 && savedTime != null && puz;
@@ -3980,16 +4059,21 @@ export default function Pattrn() {
         if (isBlind) setLockedCells(new Set([...puzzle.blanks]));
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
-        const newDiffProgress = { ...diffProgress, [progressKey]: newAttempts };
-        const newProgress = { ...progress, [difficulty]: newDiffProgress };
-        setProgress(newProgress);
-        saveProgress(newProgress);
-        const diffTimes = times[difficulty] || {};
-        const newDiffTimes = { ...diffTimes, [progressKey]: finalTime };
-        const newTimes = { ...times, [difficulty]: newDiffTimes };
-        setTimes(newTimes);
-        saveTimes(newTimes);
-        showNewAchievements(newProgress, newTimes);
+        // Custom mosaic: track progress locally only (don't save to normal progress)
+        if (customMosaicPuzzlesRef.current && isMosaic) {
+          setCustomMosaicProgress(prev => ({ ...prev, [progressKey]: newAttempts }));
+        } else {
+          const newDiffProgress = { ...diffProgress, [progressKey]: newAttempts };
+          const newProgress = { ...progress, [difficulty]: newDiffProgress };
+          setProgress(newProgress);
+          saveProgress(newProgress);
+          const diffTimes = times[difficulty] || {};
+          const newDiffTimes = { ...diffTimes, [progressKey]: finalTime };
+          const newTimes = { ...times, [difficulty]: newDiffTimes };
+          setTimes(newTimes);
+          saveTimes(newTimes);
+          showNewAchievements(newProgress, newTimes);
+        }
       }
       } else if (newAttempts >= maxAttempts) {
       if (isCascade) {
@@ -4344,6 +4428,114 @@ export default function Pattrn() {
     );
   })() : null;
 
+  // --- CUSTOM MOSAIC PLAY VIEW (puzzle selection for user-created mosaics) ---
+  if (view === "custom-mosaic" && customMosaicPlay) {
+    const cPuzzles = customMosaicPuzzlesRef.current || [];
+    const gridPxCm = Math.min(340, typeof window !== "undefined" ? window.innerWidth - 40 : 340);
+    const tileSzCm = Math.floor((gridPxCm - 20) / 5);
+    const miniCellSzCm = Math.floor((tileSzCm - 8) / 5);
+    const solvedCount = Object.values(customMosaicProgress).filter(v => v > 0).length;
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
+        {/* Header */}
+        <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
+          <button onClick={() => { setView("gallery"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; }}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            &larr; Back
+          </button>
+          <div style={{ flex: 1 }}>
+            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent }}>
+              {customMosaicPlay.title || "Untitled"}
+            </h2>
+            {customMosaicPlay.authorEmail && (
+              <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorEmail}</div>
+            )}
+          </div>
+        </div>
+
+        <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Space Mono', monospace", marginBottom: 10, animation: "fadeUp 0.3s 0.02s ease both" }}>
+          Solve all 25 tiles to reveal the picture
+        </div>
+
+        {/* 5x5 tile grid */}
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3,
+          padding: 8, borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+          animation: "fadeUp 0.3s 0.04s ease both",
+        }}>
+          {cPuzzles.map((p, i) => {
+            const solved = (customMosaicProgress[i] || 0) > 0;
+            return (
+              <button key={i} onClick={() => {
+                startPuzzle(i, "mosaic", true);
+              }}
+                style={{
+                  width: tileSzCm, height: tileSzCm, borderRadius: 6,
+                  border: `1.5px solid ${solved ? C.correct + "66" : C.border}`,
+                  backgroundColor: solved ? C.correct + "10" : C.surface,
+                  cursor: "pointer", padding: 2, position: "relative",
+                  display: "flex", flexDirection: "column", gap: 0.5, alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s", overflow: "hidden",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = solved ? C.correct + "66" : C.border; }}
+              >
+                {solved ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                    {p.solution.map((row, ri) => (
+                      <div key={ri} style={{ display: "flex", gap: 0.5 }}>
+                        {row.map((token, ci) => {
+                          const { color } = parseToken(token);
+                          return <div key={ci} style={{ width: miniCellSzCm, height: miniCellSzCm, borderRadius: 1, backgroundColor: color }} />;
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{
+                    fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                    color: C.textDim, lineHeight: 1,
+                  }}>
+                    {i + 1}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Progress */}
+        <div style={{ marginTop: 16, fontSize: 12, color: C.textDim, fontFamily: "'Space Mono', monospace", animation: "fadeUp 0.3s 0.06s ease both" }}>
+          {solvedCount}/25 tiles solved
+        </div>
+
+        {/* Full picture preview when all solved */}
+        {solvedCount === 25 && (
+          <div style={{ marginTop: 20, animation: "fadeUp 0.4s ease both", textAlign: "center" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: 12 }}>
+              Picture revealed!
+            </div>
+            <MosaicThumbnail grid={customMosaicPlay.grid} size={Math.min(280, typeof window !== "undefined" ? window.innerWidth - 80 : 280)} />
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // --- MOSAIC CREATOR VIEW ---
   if (view === "creator") {
     const gridPx = Math.min(360, typeof window !== "undefined" ? window.innerWidth - 32 : 360);
@@ -4427,33 +4619,46 @@ export default function Pattrn() {
           </div>
         </div>
 
-        {/* Grid */}
+        {/* 25x25 info */}
+        <div style={{ width: "100%", maxWidth: 400, marginBottom: 6, animation: "fadeUp 0.3s 0.05s ease both" }}>
+          <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, fontFamily: "'Space Mono', monospace", textAlign: "center" }}>
+            25x25 grid &middot; becomes 25 playable puzzle tiles
+          </div>
+        </div>
+
+        {/* Grid - uses pointer-move on container for smooth finger drag */}
         <div
+          ref={creatorGridRef}
           style={{
-            width: gridPx, marginBottom: 16, animation: "fadeUp 0.3s 0.06s ease both",
+            width: gridPx, height: gridPx, marginBottom: 16, animation: "fadeUp 0.3s 0.06s ease both",
             borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}`,
-            touchAction: "none", userSelect: "none",
+            touchAction: "none", userSelect: "none", position: "relative",
+            display: "grid", gridTemplateColumns: `repeat(25, 1fr)`, gridTemplateRows: `repeat(25, 1fr)`,
           }}
-          onPointerUp={creatorCellPointerUp}
-          onPointerLeave={creatorCellPointerUp}
+          onPointerDown={creatorPointerDown}
+          onPointerMove={creatorPointerMove}
+          onPointerUp={creatorPointerUp}
+          onPointerLeave={creatorPointerUp}
+          onPointerCancel={creatorPointerUp}
         >
-          {creatorGrid.map((row, r) => (
-            <div key={r} style={{ display: "flex" }}>
-              {row.map((color, c) => (
-                <div
-                  key={c}
-                  onPointerDown={(e) => { e.preventDefault(); creatorCellPointerDown(r, c); }}
-                  onPointerEnter={() => creatorCellPointerEnter(r, c)}
-                  style={{
-                    width: cellPx, height: cellPx, backgroundColor: color || C.surface,
-                    borderRight: c < CREATOR_GRID_SIZE - 1 ? `0.5px solid ${C.border}` : "none",
-                    borderBottom: r < CREATOR_GRID_SIZE - 1 ? `0.5px solid ${C.border}` : "none",
-                    cursor: "pointer", transition: "background-color 0.05s",
-                  }}
-                />
-              ))}
-            </div>
+          {creatorGrid.flat().map((color, i) => (
+            <div
+              key={i}
+              style={{
+                backgroundColor: color || C.surface,
+                outline: (i % 5 === 4 && (i % 25) < 24) || (Math.floor(i / 25) % 5 === 4 && Math.floor(i / 25) < 24) ? `0.5px solid ${C.border}88` : "none",
+              }}
+            />
           ))}
+          {/* 5x5 tile grid lines overlay */}
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+            {[1,2,3,4].map(i => (
+              <div key={`v${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: `${i * 20}%`, width: 1, backgroundColor: C.accent + "44" }} />
+            ))}
+            {[1,2,3,4].map(i => (
+              <div key={`h${i}`} style={{ position: "absolute", left: 0, right: 0, top: `${i * 20}%`, height: 1, backgroundColor: C.accent + "44" }} />
+            ))}
+          </div>
         </div>
 
         {/* Actions */}
@@ -4665,7 +4870,9 @@ export default function Pattrn() {
                 display: "flex", gap: 12, padding: "12px", borderRadius: 12,
                 backgroundColor: C.surface, border: `1px solid ${C.border}`, alignItems: "center",
               }}>
-                <MosaicThumbnail grid={mosaic.grid} size={64} />
+                <div style={{ cursor: "pointer" }} onClick={() => mosaic.grid && startCustomMosaicPlay(mosaic)}>
+                  <MosaicThumbnail grid={mosaic.grid} size={64} />
+                </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {mosaic.title || "Untitled"}
@@ -4678,6 +4885,13 @@ export default function Pattrn() {
                      mosaic.publicStatus === "rejected" ? "Not approved" : ""}
                   </div>
                 </div>
+                {mosaic.grid && (
+                  <button onClick={() => startCustomMosaicPlay(mosaic)} title="Play as puzzle"
+                    style={{ background: C.accent, border: "none", borderRadius: 6, padding: "4px 10px", color: C.bg, cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "'Space Mono', monospace", flexShrink: 0, transition: "all 0.15s" }}
+                    onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; }}
+                    onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+                  >Play</button>
+                )}
                 {mosaicGalleryTab === "mine" && (
                   <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                     <button onClick={() => editMosaic(mosaic)} title="Edit"
@@ -5562,7 +5776,7 @@ export default function Pattrn() {
               const miniSize = 56;
               const miniCellSize = Math.floor((miniSize - 8) / 5);
               return (
-                <button key={i} onClick={() => startPuzzle(i, "mosaic")}
+                <button key={i} onClick={() => { customMosaicPuzzlesRef.current = null; startPuzzle(i, "mosaic"); }}
                   style={{
                     width: miniSize, height: miniSize, borderRadius: 6,
                     border: `1.5px solid ${solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border}`,
@@ -7085,7 +7299,11 @@ export default function Pattrn() {
             saveProgress(nextProgress);
           }
           stopTimer();
-          setView("menu");
+          if (customMosaicPuzzlesRef.current && isMosaic) {
+            setView("custom-mosaic");
+          } else {
+            setView("menu");
+          }
         }}
           style={{
             background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
@@ -7095,7 +7313,7 @@ export default function Pattrn() {
           onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
           onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
         >
-          &larr; PUZZLES
+          &larr; {customMosaicPuzzlesRef.current && isMosaic ? "MOSAIC" : "PUZZLES"}
         </button>
         <div style={{ flex: 1, textAlign: "center" }}>
           <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
@@ -7328,8 +7546,8 @@ export default function Pattrn() {
               >
                 Retry
               </button>
-              {(isDaily || isCascade) ? (
-                <button onClick={() => { setView("menu"); }}
+              {(isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) ? (
+                <button onClick={() => { setView(customMosaicPuzzlesRef.current && isMosaic ? "custom-mosaic" : "menu"); }}
                   style={{
                     backgroundColor: C.accent, color: C.bg, border: "none",
                     padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
@@ -7340,7 +7558,7 @@ export default function Pattrn() {
                   onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
                   onMouseLeave={e => e.target.style.transform = "translateY(0)"}
                 >
-                  Back to puzzles
+                  {customMosaicPuzzlesRef.current && isMosaic ? "Back to mosaic" : "Back to puzzles"}
                 </button>
               ) : currentPuzzle < totalPuzzles - 1 ? (
                 <button onClick={() => startPuzzle(currentPuzzle + 1)}

@@ -16,9 +16,6 @@ import {
   push,
   remove,
   update,
-  query,
-  orderByChild,
-  equalTo,
   serverTimestamp,
 } from "firebase/database";
 
