@@ -137,9 +137,10 @@ export function summariseGameData(data) {
 // --- Mosaic Creator ---
 
 // Save a user-created mosaic to the user's private collection
+// Stored under users/{uid}/data/mosaics/ so it inherits the user's existing write rules
 export async function saveMosaicDesign(uid, mosaic) {
   if (!db) return null;
-  const mosaicRef = ref(db, `mosaics/user/${uid}`);
+  const mosaicRef = ref(db, `users/${uid}/data/mosaics`);
   const newRef = push(mosaicRef);
   const id = newRef.key;
   await set(newRef, {
@@ -155,7 +156,7 @@ export async function saveMosaicDesign(uid, mosaic) {
 // Update an existing mosaic
 export async function updateMosaicDesign(uid, mosaicId, mosaic) {
   if (!db) return;
-  const mosaicRef = ref(db, `mosaics/user/${uid}/${mosaicId}`);
+  const mosaicRef = ref(db, `users/${uid}/data/mosaics/${mosaicId}`);
   await update(mosaicRef, {
     ...removeUndefined(mosaic),
     updatedAt: serverTimestamp(),
@@ -165,7 +166,7 @@ export async function updateMosaicDesign(uid, mosaicId, mosaic) {
 // Load all mosaics for a user
 export async function loadUserMosaics(uid) {
   if (!db) return [];
-  const snap = await get(ref(db, `mosaics/user/${uid}`));
+  const snap = await get(ref(db, `users/${uid}/data/mosaics`));
   if (!snap.exists()) return [];
   const val = snap.val();
   return Object.values(val).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
@@ -174,7 +175,7 @@ export async function loadUserMosaics(uid) {
 // Delete a user's mosaic
 export async function deleteMosaicDesign(uid, mosaicId) {
   if (!db) return;
-  await remove(ref(db, `mosaics/user/${uid}/${mosaicId}`));
+  await remove(ref(db, `users/${uid}/data/mosaics/${mosaicId}`));
   // Also remove from public/pending if it was submitted
   try {
     await remove(ref(db, `mosaics/pending/${mosaicId}`));
@@ -193,7 +194,7 @@ export async function submitMosaicForReview(uid, mosaicId, mosaic) {
     submittedAt: serverTimestamp(),
   });
   // Mark the user's copy as submitted
-  await update(ref(db, `mosaics/user/${uid}/${mosaicId}`), {
+  await update(ref(db, `users/${uid}/data/mosaics/${mosaicId}`), {
     publicStatus: "pending",
     updatedAt: serverTimestamp(),
   });
@@ -220,11 +221,11 @@ export async function approveMosaic(mosaicId, mosaic) {
   // Update the user's copy status
   if (mosaic.authorUid) {
     try {
-      await update(ref(db, `mosaics/user/${mosaic.authorUid}/${mosaicId}`), {
+      await update(ref(db, `users/${mosaic.authorUid}/data/mosaics/${mosaicId}`), {
         publicStatus: "approved",
         updatedAt: serverTimestamp(),
       });
-    } catch { /* user may have deleted their copy */ }
+    } catch { /* user may have deleted their copy, or admin lacks write access */ }
   }
 }
 
@@ -235,11 +236,11 @@ export async function rejectMosaic(mosaicId, mosaic) {
   // Update the user's copy status
   if (mosaic.authorUid) {
     try {
-      await update(ref(db, `mosaics/user/${mosaic.authorUid}/${mosaicId}`), {
+      await update(ref(db, `users/${mosaic.authorUid}/data/mosaics/${mosaicId}`), {
         publicStatus: "rejected",
         updatedAt: serverTimestamp(),
       });
-    } catch { /* user may have deleted their copy */ }
+    } catch { /* user may have deleted their copy, or admin lacks write access */ }
   }
 }
 

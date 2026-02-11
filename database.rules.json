@@ -1,0 +1,38 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid",
+        "admin": {
+          ".write": false
+        },
+        "email": {
+          ".read": "auth != null"
+        }
+      }
+    },
+    "mosaics": {
+      "pending": {
+        ".read": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true",
+        "$mosaicId": {
+          ".write": "auth != null"
+        }
+      },
+      "public": {
+        ".read": "auth != null",
+        "$mosaicId": {
+          ".write": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true"
+        }
+      },
+      "shared": {
+        "$uid": {
+          ".read": "auth != null && auth.uid === $uid",
+          "$mosaicId": {
+            ".write": "auth != null"
+          }
+        }
+      }
+    }
+  }
+}
