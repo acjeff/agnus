@@ -4171,14 +4171,14 @@ export default function Pattrn() {
                       onClick={() => setDifficulty(d.key)}
                       style={{
                         padding: "12px 8px",
-                        background: active ? (d.key === "blind" ? "#e06040" : C.accent) : C.surface,
-                        color: active ? (d.key === "blind" ? "#fff" : C.bg) : C.textDim,
+                        background: active ? (isCleared ? C.gold : d.key === "blind" ? "#e06040" : C.accent) : C.surface,
+                        color: active ? (d.key === "blind" && !isCleared ? "#fff" : C.bg) : isCleared ? C.gold : C.textDim,
                         border: active ? "1px solid transparent" : isCleared ? `1.5px solid ${C.gold}88` : `1px solid ${C.border}`,
                         borderRadius: 10,
                         cursor: "pointer",
                         fontFamily: "'Space Mono', monospace",
                         fontSize: 11,
-                        fontWeight: active ? 700 : 400,
+                        fontWeight: active ? 700 : isCleared ? 600 : 400,
                         letterSpacing: 0.5,
                         textTransform: "uppercase",
                         transition: "background 0.2s, color 0.2s, border 0.2s",
@@ -4192,9 +4192,9 @@ export default function Pattrn() {
                       <span style={{ whiteSpace: "nowrap" }}>{d.label}</span>
                       <span style={{
                         fontSize: 8,
-                        color: active ? (d.key === "blind" ? "#fff9" : C.bg + "aa") : C.textDim,
+                        color: active ? (d.key === "blind" && !isCleared ? "#fff9" : C.bg + "aa") : isCleared ? C.gold + "cc" : C.textDim,
                       }}>{d.desc}</span>
-                      <span style={{ fontSize: 8, color: isCleared && !active ? C.gold : active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{d.key === "daily" ? `${solved} solved` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}{isCleared ? " \u2713" : ""}</span>
+                      <span style={{ fontSize: 8, color: active ? (d.key === "blind" && !isCleared ? "#fff7" : C.bg + "88") : isCleared ? C.gold + "bb" : C.textDim }}>{d.key === "daily" ? `${solved} solved` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}{isCleared ? " \u2713" : ""}</span>
                     </button>
                   );
                 })}
