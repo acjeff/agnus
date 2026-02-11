@@ -3503,6 +3503,7 @@ export default function Pattrn() {
     cascadeAttemptsRef.current = attempts;
     cascadeRunIndexRef.current = cascadeRunIndex;
   }
+  const isMosaic = difficulty === "mosaic";
   const puzzles = isCascade ? [] : isDaily ? [] : (customMosaicPuzzlesRef.current && isMosaic ? customMosaicPuzzlesRef.current : (PUZZLE_SETS[difficulty] || []));
   const cascadePuzzle = useMemo(
     () => (isCascade ? buildCascadePuzzle(cascadeLevel, getCascadeRunSeed(cascadeRunIndex)) : null),
@@ -3517,7 +3518,6 @@ export default function Pattrn() {
   const diffProgress = progress[difficulty] || {};
   const isBlind = difficulty === "blind" && !isDaily;
   const isSpin = difficulty === "spin";
-  const isMosaic = difficulty === "mosaic";
   const progressKey = isCascade ? cascadeRunIndex : isDaily ? (currentDailyDate ? getDailySeedForDate(currentDailyDate) : null) : currentPuzzle;
 
   // How many of each token still need to be placed (only counts blanks, not full grid)
