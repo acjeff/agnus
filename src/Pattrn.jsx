@@ -1,4 +1,15 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import {
+  isFirebaseConfigured,
+  subscribeToAuthChanges,
+  signUpWithEmail,
+  signInWithEmail,
+  signInWithGoogle,
+  logOut,
+  loadCloudData,
+  saveCloudData,
+  mergeGameData,
+} from "./firebase.js";
 
 // --- Theme ---
 const C = {
@@ -2428,6 +2439,20 @@ function updateUrl(mode, level, replace = true, date = null) {
 }
 
 // --- Main App ---
+function friendlyAuthError(code) {
+  switch (code) {
+    case "auth/email-already-in-use": return "An account with this email already exists.";
+    case "auth/invalid-email": return "Please enter a valid email address.";
+    case "auth/weak-password": return "Password must be at least 6 characters.";
+    case "auth/user-not-found": return "No account found with this email.";
+    case "auth/wrong-password": return "Incorrect password.";
+    case "auth/invalid-credential": return "Invalid email or password.";
+    case "auth/too-many-requests": return "Too many attempts. Please try again later.";
+    case "auth/network-request-failed": return "Network error. Check your connection.";
+    default: return "Something went wrong. Please try again.";
+  }
+}
+
 export default function Pattrn() {
   const [view, setView] = useState("menu");
   const [difficulty, setDifficulty] = useState("easy");
@@ -2502,6 +2527,217 @@ export default function Pattrn() {
   const activeTheme = useMemo(() => PUZZLE_THEMES.find(t => t.id === activeThemeId) || PUZZLE_THEMES[0], [activeThemeId]);
   const themeColorMap = useMemo(() => buildColorMap(activeTheme.palettes), [activeTheme]);
   const themedShapes = activeTheme.shapes || SHAPES;
+
+  // --- Account / Firebase state ---
+  const [firebaseUser, setFirebaseUser] = useState(null);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [accountTab, setAccountTab] = useState("login"); // "login" | "signup"
+  const [accountEmail, setAccountEmail] = useState("");
+  const [accountPassword, setAccountPassword] = useState("");
+  const [accountError, setAccountError] = useState("");
+  const [accountLoading, setAccountLoading] = useState(false);
+  const [syncStatus, setSyncStatus] = useState(""); // "", "syncing", "synced", "error"
+  const cloudSyncInFlight = useRef(false);
+  const firebaseConfigured = isFirebaseConfigured();
+
+  // Listen for auth state changes
+  useEffect(() => {
+    if (!firebaseConfigured) return;
+    const unsub = subscribeToAuthChanges((user) => {
+      setFirebaseUser(user);
+    });
+    return unsub;
+  }, [firebaseConfigured]);
+
+  // Helper: gather all local data into a single object for cloud sync
+  const gatherLocalData = useCallback(() => ({
+    progress: {
+      easy: progress.easy || {},
+      medium: progress.medium || {},
+      hard: progress.hard || {},
+      blind: progress.blind || {},
+      daily: progress.daily || {},
+      cascade: progress.cascade || {},
+      spin: progress.spin || {},
+      mosaic: progress.mosaic || {},
+      cascadeRunState: progress.cascadeRunState || {},
+      cascadeRunStateLastIndex: progress.cascadeRunStateLastIndex,
+    },
+    times: {
+      easy: times.easy || {},
+      medium: times.medium || {},
+      hard: times.hard || {},
+      blind: times.blind || {},
+      daily: times.daily || {},
+      cascade: times.cascade || {},
+    },
+    achievements: [...savedAchievementIds],
+    theme: activeThemeId,
+    birthday,
+  }), [progress, times, savedAchievementIds, activeThemeId, birthday]);
+
+  // Apply merged data to local state + localStorage
+  const applyMergedData = useCallback((merged) => {
+    if (merged.progress) {
+      setProgress(merged.progress);
+      saveProgress(merged.progress);
+    }
+    if (merged.times) {
+      setTimes(merged.times);
+      saveTimes(merged.times);
+    }
+    if (merged.achievements) {
+      const ids = new Set(merged.achievements);
+      setSavedAchievementIds(ids);
+      saveSavedAchievements(ids);
+    }
+    if (merged.theme) {
+      setActiveThemeId(merged.theme);
+      saveTheme(merged.theme);
+    }
+    if (merged.birthday) {
+      setBirthday(merged.birthday);
+      try { localStorage.setItem(BIRTHDAY_KEY, merged.birthday); } catch { /* ignore */ }
+    }
+  }, []);
+
+  // Sync local data to cloud (debounced, called after every save when logged in)
+  const syncToCloud = useCallback(async (uid, data) => {
+    if (!uid || cloudSyncInFlight.current) return;
+    cloudSyncInFlight.current = true;
+    setSyncStatus("syncing");
+    try {
+      await saveCloudData(uid, data);
+      setSyncStatus("synced");
+      setTimeout(() => setSyncStatus(""), 2000);
+    } catch (e) {
+      console.error("Cloud sync failed:", e);
+      setSyncStatus("error");
+      setTimeout(() => setSyncStatus(""), 3000);
+    } finally {
+      cloudSyncInFlight.current = false;
+    }
+  }, []);
+
+  // Handle sign up: create account, merge local->cloud, push to cloud
+  const handleSignUp = useCallback(async (email, password) => {
+    setAccountLoading(true);
+    setAccountError("");
+    try {
+      const user = await signUpWithEmail(email, password);
+      // New account: push all local data to cloud
+      const localData = gatherLocalData();
+      await saveCloudData(user.uid, localData);
+      setShowAccountModal(false);
+      setAccountEmail("");
+      setAccountPassword("");
+      setSyncStatus("synced");
+      setTimeout(() => setSyncStatus(""), 2000);
+    } catch (e) {
+      setAccountError(friendlyAuthError(e.code));
+    } finally {
+      setAccountLoading(false);
+    }
+  }, [gatherLocalData]);
+
+  // Handle sign in: pull cloud data, merge with local, apply
+  const handleSignIn = useCallback(async (email, password) => {
+    setAccountLoading(true);
+    setAccountError("");
+    try {
+      const user = await signInWithEmail(email, password);
+      const cloudData = await loadCloudData(user.uid);
+      const localData = gatherLocalData();
+      const merged = mergeGameData(localData, cloudData);
+      applyMergedData(merged);
+      await saveCloudData(user.uid, merged);
+      setShowAccountModal(false);
+      setAccountEmail("");
+      setAccountPassword("");
+      setSyncStatus("synced");
+      setTimeout(() => setSyncStatus(""), 2000);
+    } catch (e) {
+      setAccountError(friendlyAuthError(e.code));
+    } finally {
+      setAccountLoading(false);
+    }
+  }, [gatherLocalData, applyMergedData]);
+
+  // Handle Google sign in
+  const handleGoogleSignIn = useCallback(async () => {
+    setAccountLoading(true);
+    setAccountError("");
+    try {
+      const user = await signInWithGoogle();
+      const cloudData = await loadCloudData(user.uid);
+      const localData = gatherLocalData();
+      if (cloudData) {
+        // Existing account: merge
+        const merged = mergeGameData(localData, cloudData);
+        applyMergedData(merged);
+        await saveCloudData(user.uid, merged);
+      } else {
+        // First time with Google: push local data
+        await saveCloudData(user.uid, localData);
+      }
+      setShowAccountModal(false);
+      setAccountEmail("");
+      setAccountPassword("");
+      setSyncStatus("synced");
+      setTimeout(() => setSyncStatus(""), 2000);
+    } catch (e) {
+      if (e.code !== "auth/popup-closed-by-user") {
+        setAccountError(friendlyAuthError(e.code));
+      }
+    } finally {
+      setAccountLoading(false);
+    }
+  }, [gatherLocalData, applyMergedData]);
+
+  // Handle sign out
+  const handleSignOut = useCallback(async () => {
+    try {
+      await logOut();
+      setShowAccountModal(false);
+      setSyncStatus("");
+    } catch (e) {
+      console.error("Sign out failed:", e);
+    }
+  }, []);
+
+  // Auto-sync to cloud when data changes and user is logged in
+  const cloudSyncTimer = useRef(null);
+  useEffect(() => {
+    if (!firebaseUser) return;
+    // Debounce cloud syncs to avoid excessive writes
+    if (cloudSyncTimer.current) clearTimeout(cloudSyncTimer.current);
+    cloudSyncTimer.current = setTimeout(() => {
+      const data = gatherLocalData();
+      syncToCloud(firebaseUser.uid, data);
+    }, 2000);
+    return () => {
+      if (cloudSyncTimer.current) clearTimeout(cloudSyncTimer.current);
+    };
+  }, [firebaseUser, progress, times, savedAchievementIds, activeThemeId, birthday, gatherLocalData, syncToCloud]);
+
+  // On initial auth (page reload while logged in): pull cloud data and merge
+  const hasRestoredFromCloud = useRef(false);
+  useEffect(() => {
+    if (!firebaseUser || hasRestoredFromCloud.current) return;
+    hasRestoredFromCloud.current = true;
+    (async () => {
+      try {
+        const cloudData = await loadCloudData(firebaseUser.uid);
+        if (cloudData) {
+          const localData = gatherLocalData();
+          const merged = mergeGameData(localData, cloudData);
+          applyMergedData(merged);
+        }
+      } catch (e) {
+        console.error("Failed to restore cloud data:", e);
+      }
+    })();
+  }, [firebaseUser, gatherLocalData, applyMergedData]);
 
   // Viewport size tracking for dynamic grid sizing
   const [viewportSize, setViewportSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
@@ -3724,6 +3960,19 @@ export default function Pattrn() {
           <p style={{ color: C.textDim, fontSize: 13, marginTop: 6, letterSpacing: 2 }}>
             find the pattern &middot; fill the gaps
           </p>
+          {firebaseConfigured && firebaseUser && (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+              marginTop: 6, fontSize: 10, color: C.textDim,
+            }}>
+              <div style={{
+                width: 6, height: 6, borderRadius: "50%",
+                backgroundColor: syncStatus === "syncing" ? C.inProgress : syncStatus === "error" ? C.incorrect : C.correct,
+                transition: "background-color 0.3s",
+              }} />
+              <span>Signed in as {firebaseUser.email}</span>
+            </div>
+          )}
         </div>
 
         {/* Daily overview: streak, play today, share */}
@@ -4850,6 +5099,45 @@ export default function Pattrn() {
                       <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
                     </button>
 
+                    {/* Account */}
+                    {firebaseConfigured && (
+                      <button onClick={() => { setShowGameMenu(false); setShowAccountModal(true); setAccountError(""); }} style={{
+                        width: "100%", padding: "14px 16px", borderRadius: 12,
+                        backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                        cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                        transition: "all 0.15s",
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#60A5FA"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                      >
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
+                          border: "1.5px solid #60A5FA44", flexShrink: 0,
+                        }}>
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <circle cx="8" cy="5" r="3" stroke="#60A5FA" strokeWidth="1.5" fill="none"/>
+                            <path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5" stroke="#60A5FA" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                          </svg>
+                        </div>
+                        <div style={{ flex: 1, textAlign: "left" }}>
+                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                            Account
+                          </div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                            {firebaseUser ? firebaseUser.email : "Sign in to sync progress"}
+                          </div>
+                        </div>
+                        {firebaseUser && syncStatus === "synced" && (
+                          <span style={{ fontSize: 10, color: C.correct }}>Synced</span>
+                        )}
+                        {firebaseUser && syncStatus === "syncing" && (
+                          <span style={{ fontSize: 10, color: C.textDim }}>Syncing...</span>
+                        )}
+                        <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                      </button>
+                    )}
+
                     {/* Divider */}
                     <div style={{ height: 1, backgroundColor: C.border, margin: "4px 0" }} />
 
@@ -4942,7 +5230,7 @@ export default function Pattrn() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <button
-                  onClick={() => {
+                  onClick={async () => {
                     try {
                       localStorage.removeItem(STORAGE_KEY);
                       localStorage.removeItem(TIMES_KEY);
@@ -4950,7 +5238,11 @@ export default function Pattrn() {
                       localStorage.removeItem(THEME_KEY);
                       localStorage.removeItem(ACHIEV_KEY);
                     } catch { /* ignore */ }
-                    setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
+                    // Sign out if logged in (clears cloud sync link)
+                    if (firebaseUser) {
+                      try { await logOut(); } catch { /* ignore */ }
+                    }
+                    setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
                     setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
                     setSavedAchievementIds(new Set());
                     setBirthday(null);
@@ -4979,6 +5271,227 @@ export default function Pattrn() {
                   Cancel
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Account modal */}
+        {showAccountModal && firebaseConfigured && (
+          <div onClick={() => setShowAccountModal(false)} style={{
+            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 24,
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
+              padding: "24px", maxWidth: 380, width: "100%",
+              boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
+              animation: "fadeUp 0.25s ease",
+            }}>
+              {firebaseUser ? (
+                // Signed in view
+                <>
+                  <div style={{ textAlign: "center", marginBottom: 20 }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
+                      backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "2px solid #60A5FA44",
+                    }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
+                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    <h3 style={{
+                      fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
+                    }}>
+                      Signed In
+                    </h3>
+                    <p style={{ color: C.textDim, fontSize: 12, margin: 0, wordBreak: "break-all" }}>
+                      {firebaseUser.email}
+                    </p>
+                  </div>
+
+                  <div style={{
+                    padding: "12px 16px", borderRadius: 10, backgroundColor: C.surface,
+                    border: `1px solid ${C.border}`, marginBottom: 16, textAlign: "center",
+                  }}>
+                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct }}>
+                      {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 4 }}>
+                      Your progress syncs automatically
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSignOut}
+                    style={{
+                      width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                    }}
+                  >
+                    Sign out
+                  </button>
+                </>
+              ) : (
+                // Sign in / Sign up view
+                <>
+                  <div style={{ textAlign: "center", marginBottom: 20 }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
+                      backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "2px solid #60A5FA44",
+                    }}>
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
+                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    <h3 style={{
+                      fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
+                    }}>
+                      {accountTab === "login" ? "Sign In" : "Create Account"}
+                    </h3>
+                    <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5 }}>
+                      {accountTab === "login"
+                        ? "Sign in to sync your progress across devices"
+                        : "Your current progress will be saved to your new account"}
+                    </p>
+                  </div>
+
+                  {/* Tab toggle */}
+                  <div style={{
+                    display: "flex", borderRadius: 8, overflow: "hidden",
+                    border: `1px solid ${C.border}`, marginBottom: 16,
+                  }}>
+                    {["login", "signup"].map(tab => (
+                      <button key={tab} onClick={() => { setAccountTab(tab); setAccountError(""); }} style={{
+                        flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                        background: accountTab === tab ? C.accent : "transparent",
+                        color: accountTab === tab ? C.bg : C.textDim,
+                        border: "none", cursor: "pointer", textTransform: "uppercase",
+                        transition: "all 0.15s",
+                      }}>
+                        {tab === "login" ? "Sign In" : "Sign Up"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Google sign in */}
+                  <button
+                    onClick={handleGoogleSignIn}
+                    disabled={accountLoading}
+                    style={{
+                      width: "100%", padding: "11px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                      background: C.surface, border: `1px solid ${C.border}`, color: C.text,
+                      cursor: accountLoading ? "not-allowed" : "pointer",
+                      opacity: accountLoading ? 0.5 : 1, textTransform: "uppercase",
+                      transition: "all 0.15s", marginBottom: 12,
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 48 48">
+                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                    </svg>
+                    Continue with Google
+                  </button>
+
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
+                  }}>
+                    <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
+                    <span style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1 }}>or</span>
+                    <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
+                  </div>
+
+                  {/* Email / password form */}
+                  <form onSubmit={e => {
+                    e.preventDefault();
+                    if (accountTab === "login") handleSignIn(accountEmail, accountPassword);
+                    else handleSignUp(accountEmail, accountPassword);
+                  }}>
+                    <input
+                      type="email"
+                      placeholder="Email"
+                      value={accountEmail}
+                      onChange={e => setAccountEmail(e.target.value)}
+                      autoComplete="email"
+                      style={{
+                        width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 13,
+                        fontFamily: "'DM Sans', sans-serif",
+                        background: C.surface, border: `1px solid ${C.border}`, color: C.text,
+                        outline: "none", marginBottom: 8, boxSizing: "border-box",
+                        transition: "border-color 0.15s",
+                      }}
+                      onFocus={e => e.target.style.borderColor = C.accent}
+                      onBlur={e => e.target.style.borderColor = C.border}
+                    />
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={accountPassword}
+                      onChange={e => setAccountPassword(e.target.value)}
+                      autoComplete={accountTab === "login" ? "current-password" : "new-password"}
+                      style={{
+                        width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 13,
+                        fontFamily: "'DM Sans', sans-serif",
+                        background: C.surface, border: `1px solid ${C.border}`, color: C.text,
+                        outline: "none", marginBottom: 12, boxSizing: "border-box",
+                        transition: "border-color 0.15s",
+                      }}
+                      onFocus={e => e.target.style.borderColor = C.accent}
+                      onBlur={e => e.target.style.borderColor = C.border}
+                    />
+
+                    {accountError && (
+                      <div style={{
+                        padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+                        backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
+                        fontSize: 11, color: C.incorrect, textAlign: "center",
+                      }}>
+                        {accountError}
+                      </div>
+                    )}
+
+                    <button
+                      type="submit"
+                      disabled={accountLoading || !accountEmail || !accountPassword}
+                      style={{
+                        width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                        fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+                        background: C.accent, color: C.bg, border: "none",
+                        cursor: (accountLoading || !accountEmail || !accountPassword) ? "not-allowed" : "pointer",
+                        opacity: (accountLoading || !accountEmail || !accountPassword) ? 0.5 : 1,
+                        textTransform: "uppercase", transition: "all 0.15s",
+                      }}
+                    >
+                      {accountLoading ? "..." : accountTab === "login" ? "Sign In" : "Create Account"}
+                    </button>
+                  </form>
+                </>
+              )}
+
+              {/* Close button */}
+              <button
+                onClick={() => setShowAccountModal(false)}
+                style={{
+                  width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                  background: "none", border: "none", color: C.textDim, cursor: "pointer",
+                  textTransform: "uppercase", transition: "all 0.15s", marginTop: 12,
+                }}
+              >
+                Close
+              </button>
             </div>
           </div>
         )}
