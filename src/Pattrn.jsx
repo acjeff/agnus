@@ -3864,10 +3864,11 @@ export default function Pattrn() {
   };
 
   const gridSize = puzzle ? puzzle.gridSize : 5;
-  const gridGap = gridSize >= 7 ? 3 : 4;
-  const gridPad = gridSize >= 7 ? 10 : 14;
-  const availW = viewportSize.w - 50 - (gridSize - 1) * gridGap - 2 * gridPad;
-  const availH = viewportSize.h - 320 - (gridSize - 1) * gridGap - 2 * gridPad;
+  const isMobile = viewportSize.w < 480;
+  const gridGap = gridSize >= 7 ? (isMobile ? 2 : 3) : 4;
+  const gridPad = gridSize >= 7 ? (isMobile ? 6 : 10) : (isMobile ? 10 : 14);
+  const availW = viewportSize.w - (isMobile ? 24 : 50) - (gridSize - 1) * gridGap - 2 * gridPad;
+  const availH = viewportSize.h - (isMobile ? 290 : 320) - (gridSize - 1) * gridGap - 2 * gridPad;
   const dynamicCell = Math.min(Math.floor(availW / gridSize), Math.floor(availH / gridSize));
   const cellSize = Math.max(28, Math.min(dynamicCell, 80));
   const iconSize = Math.max(14, Math.round(cellSize * 0.5));
