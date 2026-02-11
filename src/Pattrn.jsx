@@ -3213,16 +3213,32 @@ export default function Pattrn() {
     };
   }, [stopTimer]);
 
-  const handleTokenSelect = (token) => {
+  const handleTokenSelect = useCallback((token) => {
     setSelectedToken(token);
-    if (selectedCell && puzzle.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
+    if (selectedCell && puzzle?.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
       if (puzzle.mode !== "hard" && fills[selectedCell] !== token && (tokenRemaining[token] ?? 0) <= 0) return;
       cancelWrongCellClear();
       setFills(prev => ({ ...prev, [selectedCell]: token }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(selectedCell); return n; });
       setSelectedCell(null);
     }
-  };
+  }, [selectedCell, puzzle, lockedCells, fills, tokenRemaining, cancelWrongCellClear]);
+
+  // Arrow keys to cycle through token options
+  useEffect(() => {
+    if (view !== "play" || gameState !== "playing" || !puzzle?.usedTokens?.length) return;
+    const tokens = puzzle.usedTokens;
+    const handler = (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const currentIdx = tokens.indexOf(selectedToken);
+      const dir = e.key === "ArrowRight" ? 1 : -1;
+      const nextIdx = (currentIdx + dir + tokens.length) % tokens.length;
+      handleTokenSelect(tokens[nextIdx]);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [view, gameState, puzzle, selectedToken, handleTokenSelect]);
 
   const maxAttempts = isCascade ? 11 : isBlind ? 6 : 5;
 
