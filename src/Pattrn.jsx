@@ -4163,6 +4163,8 @@ export default function Pattrn() {
                   const solved = d.key === "cascade"
                     ? Object.keys(dp).filter((k) => /^\d+$/.test(k) && dp[k] === CASCADE_LEVELS.length).length
                     : Object.keys(dp).filter((k) => dp[k] > 0).length;
+                  const modeTotal = d.key === "mosaic" ? 25 : 50;
+                  const isCleared = d.key !== "daily" && solved >= modeTotal;
                   return (
                     <button
                       key={d.key}
@@ -4171,7 +4173,7 @@ export default function Pattrn() {
                         padding: "12px 8px",
                         background: active ? (d.key === "blind" ? "#e06040" : C.accent) : C.surface,
                         color: active ? (d.key === "blind" ? "#fff" : C.bg) : C.textDim,
-                        border: `1px solid ${active ? "transparent" : C.border}`,
+                        border: active ? "1px solid transparent" : isCleared ? `1.5px solid ${C.gold}88` : `1px solid ${C.border}`,
                         borderRadius: 10,
                         cursor: "pointer",
                         fontFamily: "'Space Mono', monospace",
@@ -4179,11 +4181,12 @@ export default function Pattrn() {
                         fontWeight: active ? 700 : 400,
                         letterSpacing: 0.5,
                         textTransform: "uppercase",
-                        transition: "background 0.2s, color 0.2s",
+                        transition: "background 0.2s, color 0.2s, border 0.2s",
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
                         gap: 2,
+                        position: "relative",
                       }}
                     >
                       <span style={{ whiteSpace: "nowrap" }}>{d.label}</span>
@@ -4191,7 +4194,7 @@ export default function Pattrn() {
                         fontSize: 8,
                         color: active ? (d.key === "blind" ? "#fff9" : C.bg + "aa") : C.textDim,
                       }}>{d.desc}</span>
-                      <span style={{ fontSize: 8, color: active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{d.key === "daily" ? `${solved} solved` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}</span>
+                      <span style={{ fontSize: 8, color: isCleared && !active ? C.gold : active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{d.key === "daily" ? `${solved} solved` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}{isCleared ? " \u2713" : ""}</span>
                     </button>
                   );
                 })}
