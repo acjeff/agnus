@@ -5157,6 +5157,67 @@ export default function Pattrn() {
           </div>
         );
       })()}
+
+      {/* Theme unlock toast (menu view) */}
+      {themeToast && (
+        <div key={themeToast.key} style={{
+          position: "fixed",
+          top: achievementToast
+            ? "calc(170px + env(safe-area-inset-top, 0px))"
+            : "calc(100px + env(safe-area-inset-top, 0px))",
+          left: "50%",
+          transform: "translateX(-50%)", zIndex: 100,
+          maxWidth: "calc(100vw - 32px)", boxSizing: "border-box",
+          animation: themeToastDismissing
+            ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
+            : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+          pointerEvents: "auto",
+        }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "10px 14px", borderRadius: 14,
+            backgroundColor: C.surface, border: `1.5px solid ${C.accent}`,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 20px ${C.accent}33`,
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 9,
+              backgroundColor: C.accent + "18", display: "flex", alignItems: "center", justifyContent: "center",
+              border: `2px solid ${C.accent}66`, fontSize: 18, flexShrink: 0,
+            }}>
+              {themeToast.icon || "\uD83C\uDFA8"}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{
+                fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700,
+                color: C.accent, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2,
+              }}>Theme unlocked</div>
+              <div style={{
+                fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                color: C.text, letterSpacing: 0.5,
+              }}>{themeToast.name}</div>
+            </div>
+            <button
+              onClick={() => {
+                setActiveThemeId(themeToast.id);
+                saveTheme(themeToast.id);
+                setThemeToastDismissing(true);
+                setTimeout(() => { setThemeToast(null); setThemeToastDismissing(false); }, 350);
+                if (themeToastTimer.current) { clearTimeout(themeToastTimer.current); themeToastTimer.current = null; }
+              }}
+              style={{
+                background: C.accent, border: "none", borderRadius: 8, padding: "6px 12px",
+                color: C.bg, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                fontSize: 11, fontWeight: 700, letterSpacing: 0.5, whiteSpace: "nowrap",
+                transition: "opacity 0.15s", flexShrink: 0,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+            >
+              Use it
+            </button>
+          </div>
+        </div>
+      )}
       </div>
     );
   }
