@@ -868,8 +868,13 @@ const PUZZLE_THEMES = [
   },
 ];
 
+function isCheatBirthdayActive() {
+  try { return localStorage.getItem(BIRTHDAY_KEY) === CHEAT_BIRTHDAY; } catch { return false; }
+}
+
 function isThemeUnlocked(theme, achievementsList) {
   if (!theme.unlock) return true;
+  if (isCheatBirthdayActive()) return true;
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   if (theme.unlock.seasonal) {
@@ -1377,6 +1382,7 @@ const TIMES_KEY = "pattrn-times-v1";
 const BIRTHDAY_KEY = "pattrn-birthday-v1";
 const THEME_KEY = "pattrn-theme-v1";
 const ACHIEV_KEY = "pattrn-achievements-v1";
+const CHEAT_BIRTHDAY = "23-06-1912";
 
 function loadTheme() {
   try {
@@ -1601,7 +1607,8 @@ const ACHIEVEMENTS = [
 
 function computeAchievements(progress, times, savedIds) {
   const saved = savedIds || new Set();
-  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: a.check(progress, times) || saved.has(a.id) }));
+  const cheat = isCheatBirthdayActive();
+  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: cheat || a.check(progress, times) || saved.has(a.id) }));
 }
 
 // --- Components ---
@@ -4093,6 +4100,13 @@ export default function Pattrn() {
                     const bdStr = `${String(d).padStart(2, "0")}-${String(m).padStart(2, "0")}-${y}`;
                     setBirthday(bdStr);
                     try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
+                    if (bdStr === CHEAT_BIRTHDAY) {
+                      const allIds = new Set(ACHIEVEMENTS.map(a => a.id));
+                      saveSavedAchievements(allIds);
+                      setSavedAchievementIds(allIds);
+                      prevUnlockedRef.current = allIds;
+                      prevUnlockedThemesRef.current = new Set(PUZZLE_THEMES.map(t => t.id));
+                    }
                     setShowBirthdayPrompt(false);
                     setBirthdayInput("");
                     setCalendarYear(y);
