@@ -2530,6 +2530,10 @@ export default function Pattrn() {
   const themeColorMap = useMemo(() => buildColorMap(activeTheme.palettes), [activeTheme]);
   const themedShapes = activeTheme.shapes || SHAPES;
 
+  // Tile carousel state for mobile puzzle grid
+  const [tileCarouselPage, setTileCarouselPage] = useState(0);
+  const tileCarouselRef = useRef(null);
+
   // --- Account / Firebase state ---
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
@@ -2839,6 +2843,12 @@ export default function Pattrn() {
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+
+  // Reset tile carousel to first page when switching difficulty
+  useEffect(() => {
+    setTileCarouselPage(0);
+    if (tileCarouselRef.current) tileCarouselRef.current.scrollLeft = 0;
+  }, [difficulty]);
 
   // Scroll play view to top when entering or changing puzzle
   useEffect(() => {
@@ -4804,12 +4814,9 @@ export default function Pattrn() {
         </>)}
 
         {/* Puzzle grid: 50 for non-daily modes (not mosaic) */}
-        {!isDaily && !isMosaic && (<>
-        <div style={{
-          display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
-          maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
-        }}>
-          {(isCascade ? Array.from({ length: 50 }, (_, i) => i) : puzzles).map((p, i) => {
+        {!isDaily && !isMosaic && (() => {
+          const allTiles = isCascade ? Array.from({ length: 50 }, (_, i) => i) : puzzles;
+          const renderTile = (p, i) => {
             const idx = isCascade ? i : p?.id ?? i;
             const result = isCascade ? (diffProgress[idx] ?? -1) : diffProgress[idx];
             const solved = isCascade ? result === CASCADE_LEVELS.length : result > 0;
@@ -4827,7 +4834,7 @@ export default function Pattrn() {
                   ? `${CASCADE_LEVELS[cascadeLevels]}×${CASCADE_LEVELS[cascadeLevels]}`
                   : cascadeLevelValid(cascadeInProgressLevel)
                     ? `${CASCADE_LEVELS[cascadeInProgressLevel]}×${CASCADE_LEVELS[cascadeInProgressLevel]}`
-                    : (cascadeLevels !== null || cascadeInProgressLevel !== null) ? "…" : null
+                    : (cascadeLevels !== null || cascadeInProgressLevel !== null) ? "\u2026" : null
               : null;
             const borderColor = solved ? C.correct + "66" : failed ? C.incorrect + "44" : cascadeInProgress ? C.inProgress + "99" : C.border;
             const bgColor = solved ? C.correct + "15" : failed ? C.incorrect + "10" : cascadeInProgress ? C.inProgress + "18" : C.surface;
@@ -4869,21 +4876,136 @@ export default function Pattrn() {
                 )}
               </button>
             );
-          })}
-        </div>
+          };
 
-        {/* Legend */}
-        <div style={{
-          marginTop: 24, display: "flex", gap: 16, fontSize: 11, color: C.textDim,
-          fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, animation: "fadeUp 0.5s 0.25s ease both",
-          flexWrap: "wrap", justifyContent: "center",
-        }}>
-          <span><span style={{ color: C.gold }}>{"\u2605"}</span> 1-2 tries</span>
-          <span><span style={{ color: C.silver }}>{"\u25CF"}</span> 3-4 tries</span>
-          <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
-          <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
-        </div>
-        </>)}
+          const TILES_PER_PAGE = 10;
+          const totalPages = Math.ceil(allTiles.length / TILES_PER_PAGE);
+
+          return (<>
+          {isMobile ? (<>
+            {/* Page label */}
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              width: "100%", maxWidth: 360, marginBottom: 8, animation: "fadeUp 0.5s 0.15s ease both",
+            }}>
+              <span style={{
+                fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.textDim,
+                letterSpacing: 1.5, textTransform: "uppercase",
+              }}>
+                {tileCarouselPage * TILES_PER_PAGE + 1}&ndash;{Math.min((tileCarouselPage + 1) * TILES_PER_PAGE, allTiles.length)} of {allTiles.length}
+              </span>
+              <div style={{ display: "flex", gap: 4 }}>
+                <button
+                  onClick={() => {
+                    if (tileCarouselPage > 0) {
+                      const newPage = tileCarouselPage - 1;
+                      setTileCarouselPage(newPage);
+                      if (tileCarouselRef.current) tileCarouselRef.current.scrollTo({ left: newPage * tileCarouselRef.current.offsetWidth, behavior: "smooth" });
+                    }
+                  }}
+                  style={{
+                    width: 28, height: 28, borderRadius: 7, border: `1px solid ${tileCarouselPage > 0 ? C.border : C.border + "44"}`,
+                    background: "none", cursor: tileCarouselPage > 0 ? "pointer" : "default",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    opacity: tileCarouselPage > 0 ? 1 : 0.3,
+                  }}
+                  aria-label="Previous page"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M7.5 2.5L4 6l3.5 3.5" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+                <button
+                  onClick={() => {
+                    if (tileCarouselPage < totalPages - 1) {
+                      const newPage = tileCarouselPage + 1;
+                      setTileCarouselPage(newPage);
+                      if (tileCarouselRef.current) tileCarouselRef.current.scrollTo({ left: newPage * tileCarouselRef.current.offsetWidth, behavior: "smooth" });
+                    }
+                  }}
+                  style={{
+                    width: 28, height: 28, borderRadius: 7, border: `1px solid ${tileCarouselPage < totalPages - 1 ? C.border : C.border + "44"}`,
+                    background: "none", cursor: tileCarouselPage < totalPages - 1 ? "pointer" : "default",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    opacity: tileCarouselPage < totalPages - 1 ? 1 : 0.3,
+                  }}
+                  aria-label="Next page"
+                >
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4.5 2.5L8 6l-3.5 3.5" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Swipeable carousel */}
+            <style>{`.tile-carousel::-webkit-scrollbar { display: none; }`}</style>
+            <div
+              ref={tileCarouselRef}
+              className="tile-carousel"
+              onScroll={(e) => {
+                const el = e.target;
+                const page = Math.round(el.scrollLeft / el.offsetWidth);
+                if (page !== tileCarouselPage && page >= 0 && page < totalPages) setTileCarouselPage(page);
+              }}
+              style={{
+                display: "flex", overflowX: "auto", scrollSnapType: "x mandatory",
+                WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none",
+                width: "100%", maxWidth: 360, animation: "fadeUp 0.5s 0.15s ease both",
+              }}
+            >
+              {Array.from({ length: totalPages }).map((_, pageIdx) => {
+                const pageTiles = allTiles.slice(pageIdx * TILES_PER_PAGE, (pageIdx + 1) * TILES_PER_PAGE);
+                return (
+                  <div key={pageIdx} style={{
+                    scrollSnapAlign: "start", width: "100%", flexShrink: 0, boxSizing: "border-box",
+                    display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
+                    gridTemplateRows: "1fr 1fr",
+                  }}>
+                    {pageTiles.map((p, j) => renderTile(p, pageIdx * TILES_PER_PAGE + j))}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Page dots */}
+            <div style={{
+              display: "flex", gap: 6, justifyContent: "center", marginTop: 12,
+              animation: "fadeUp 0.5s 0.2s ease both",
+            }}>
+              {Array.from({ length: totalPages }).map((_, i) => (
+                <button key={i}
+                  onClick={() => {
+                    setTileCarouselPage(i);
+                    if (tileCarouselRef.current) tileCarouselRef.current.scrollTo({ left: i * tileCarouselRef.current.offsetWidth, behavior: "smooth" });
+                  }}
+                  style={{
+                    width: tileCarouselPage === i ? 20 : 8, height: 8, borderRadius: 4, padding: 0,
+                    backgroundColor: tileCarouselPage === i ? C.accent : C.border,
+                    border: "none", cursor: "pointer", transition: "all 0.25s ease",
+                  }}
+                />
+              ))}
+            </div>
+          </>) : (
+            /* Desktop: original 5-column grid */
+            <div style={{
+              display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
+              maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
+            }}>
+              {allTiles.map((p, i) => renderTile(p, i))}
+            </div>
+          )}
+
+          {/* Legend */}
+          <div style={{
+            marginTop: 24, display: "flex", gap: 16, fontSize: 11, color: C.textDim,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, animation: "fadeUp 0.5s 0.25s ease both",
+            flexWrap: "wrap", justifyContent: "center",
+          }}>
+            <span><span style={{ color: C.gold }}>{"\u2605"}</span> 1-2 tries</span>
+            <span><span style={{ color: C.silver }}>{"\u25CF"}</span> 3-4 tries</span>
+            <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
+            <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
+          </div>
+          </>);
+        })()}
 
         {/* Stats drawer */}
         {showShareModal && (() => {
