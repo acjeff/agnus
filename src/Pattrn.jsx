@@ -1808,51 +1808,103 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
   const isEasy = mode === "easy" || mode === "blind";
   const shapes = shapesArr || SHAPES;
   const isEnigma = themeId === "enigma";
+  const scrollRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [overflows, setOverflows] = useState(false);
+  const dragRef = useRef({ active: false, startX: 0, scrollStart: 0, moved: false });
+
+  const checkOverflow = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const has = el.scrollWidth > el.clientWidth + 1;
+    setOverflows(has);
+    setCanScrollLeft(el.scrollLeft > 1);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 1);
+  }, []);
+
+  useEffect(() => {
+    checkOverflow();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener("scroll", checkOverflow, { passive: true });
+    const ro = new ResizeObserver(checkOverflow);
+    ro.observe(el);
+    return () => { el.removeEventListener("scroll", checkOverflow); ro.disconnect(); };
+  }, [checkOverflow, tokens]);
+
+  // Touch & mouse drag for swiping (parent has touchAction:none so native scroll won't work)
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const d = dragRef.current;
+    const getX = (e) => e.touches ? e.touches[0].clientX : e.clientX;
+    const down = (e) => { d.active = true; d.moved = false; d.startX = getX(e); d.scrollStart = el.scrollLeft; };
+    const move = (e) => { if (!d.active) return; const dx = d.startX - getX(e); if (Math.abs(dx) > 3) d.moved = true; el.scrollLeft = d.scrollStart + dx; };
+    const up = () => { d.active = false; };
+    el.addEventListener("touchstart", down, { passive: true });
+    el.addEventListener("touchmove", move, { passive: true });
+    el.addEventListener("touchend", up);
+    el.addEventListener("mousedown", down);
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => { el.removeEventListener("touchstart", down); el.removeEventListener("touchmove", move); el.removeEventListener("touchend", up); el.removeEventListener("mousedown", down); window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+  }, []);
+
+  const doScroll = (dir) => { const el = scrollRef.current; if (el) el.scrollBy({ left: dir * (cellSize + 10) * 3, behavior: "smooth" }); };
+  const handleTileClick = (token) => { if (!dragRef.current.moved) onSelect(token); };
+
+  const arrowStyle = { width: 28, height: 28, borderRadius: "50%", backgroundColor: C.surface, border: `1px solid ${C.border}`, color: C.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0, transition: "opacity 0.2s" };
+
   return (
-    <div className="token-picker-scroll" style={{ display: "flex", gap: 10, justifyContent: "center", padding: "8px 16px", flexWrap: "nowrap", overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
-      {tokens.map((token, i) => {
-        const { color, shapeIndex } = parseToken(token);
-        const displayColor = colorMap ? (colorMap[color] || color) : color;
-        const selected = selectedToken === token;
-        const left = remaining && remaining[token] !== undefined ? remaining[token] : null;
-        const exhausted = left !== null && left <= 0 && mode !== "hard";
-        return (
-          <div key={i} onClick={() => onSelect(token)}
-            style={{
-              width: cellSize, height: cellSize,
-              borderRadius: isEnigma ? "50%" : 12,
-              backgroundColor: displayColor,
-              border: isEnigma
-                ? (selected ? "3px solid rgba(201,168,76,0.9)" : "2px solid rgba(201,168,76,0.35)")
-                : (selected ? `3px solid ${C.text}` : "3px solid transparent"),
-              cursor: exhausted ? "not-allowed" : "pointer", transition: "all 0.2s cubic-bezier(0.4,0,0.2,1)",
-              transform: selected ? "scale(1.15)" : "scale(1)",
-              opacity: exhausted ? 0.35 : 1,
-              boxShadow: isEnigma
-                ? (selected ? `0 0 20px rgba(201,168,76,0.4), inset 0 0 8px rgba(0,0,0,0.3)` : `inset 0 0 6px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.4)`)
-                : (selected ? `0 0 20px ${displayColor}66` : `0 2px 8px ${displayColor}33`),
-              position: "relative", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-              outline: isEnigma ? "1px solid rgba(201,168,76,0.1)" : undefined,
-              outlineOffset: isEnigma ? "3px" : undefined,
-            }}
-          >
-            {shapes[shapeIndex % shapes.length](cellSize * 0.5, getShapeStroke(displayColor, isEasy))}
-            {left !== null && mode !== "hard" && (
-              <div style={{
-                position: "absolute", top: -6, right: -6,
-                backgroundColor: exhausted ? C.textDim : (isEnigma ? "rgba(201,168,76,0.9)" : C.text),
-                color: C.bg, fontSize: 10, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace",
-                width: 18, height: 18, borderRadius: 9,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                lineHeight: 1,
-              }}>
-                {left}
-              </div>
-            )}
-          </div>
-        );
-      })}
+    <div style={{ position: "relative", maxWidth: "100%", display: "flex", alignItems: "center", gap: 4 }}>
+      {canScrollLeft && <button onClick={() => doScroll(-1)} style={arrowStyle} aria-label="Scroll left">{"\u2039"}</button>}
+      <div ref={scrollRef} className="token-picker-scroll" style={{ display: "flex", gap: 10, justifyContent: overflows ? "flex-start" : "center", padding: "8px 16px", flexWrap: "nowrap", overflowX: "auto", flex: "1 1 auto", minWidth: 0, maxWidth: "100%", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", touchAction: "pan-x", userSelect: "none" }}>
+        {tokens.map((token, i) => {
+          const { color, shapeIndex } = parseToken(token);
+          const displayColor = colorMap ? (colorMap[color] || color) : color;
+          const selected = selectedToken === token;
+          const left = remaining && remaining[token] !== undefined ? remaining[token] : null;
+          const exhausted = left !== null && left <= 0 && mode !== "hard";
+          return (
+            <div key={i} onClick={() => handleTileClick(token)}
+              style={{
+                width: cellSize, height: cellSize,
+                borderRadius: isEnigma ? "50%" : 12,
+                backgroundColor: displayColor,
+                border: isEnigma
+                  ? (selected ? "3px solid rgba(201,168,76,0.9)" : "2px solid rgba(201,168,76,0.35)")
+                  : (selected ? `3px solid ${C.text}` : "3px solid transparent"),
+                cursor: exhausted ? "not-allowed" : "pointer", transition: "all 0.2s cubic-bezier(0.4,0,0.2,1)",
+                transform: selected ? "scale(1.15)" : "scale(1)",
+                opacity: exhausted ? 0.35 : 1,
+                boxShadow: isEnigma
+                  ? (selected ? `0 0 20px rgba(201,168,76,0.4), inset 0 0 8px rgba(0,0,0,0.3)` : `inset 0 0 6px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.4)`)
+                  : (selected ? `0 0 20px ${displayColor}66` : `0 2px 8px ${displayColor}33`),
+                position: "relative", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                outline: isEnigma ? "1px solid rgba(201,168,76,0.1)" : undefined,
+                outlineOffset: isEnigma ? "3px" : undefined,
+              }}
+            >
+              {shapes[shapeIndex % shapes.length](cellSize * 0.5, getShapeStroke(displayColor, isEasy))}
+              {left !== null && mode !== "hard" && (
+                <div style={{
+                  position: "absolute", top: -6, right: -6,
+                  backgroundColor: exhausted ? C.textDim : (isEnigma ? "rgba(201,168,76,0.9)" : C.text),
+                  color: C.bg, fontSize: 10, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace",
+                  width: 18, height: 18, borderRadius: 9,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  lineHeight: 1,
+                }}>
+                  {left}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {canScrollRight && <button onClick={() => doScroll(1)} style={arrowStyle} aria-label="Scroll right">{"\u203A"}</button>}
     </div>
   );
 }
