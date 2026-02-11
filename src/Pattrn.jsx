@@ -6083,14 +6083,15 @@ export default function Pattrn() {
                 padding: "0", maxWidth: 480, width: "100%",
                 boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`,
                 display: "flex", flexDirection: "column",
+                maxHeight: "85vh",
                 animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
               }}>
                 {/* Drag handle */}
-                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
+                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px", flexShrink: 0 }}>
                   <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
                 </div>
 
-                <div style={{ padding: "8px 24px 0" }}>
+                <div style={{ padding: "8px 24px 0", overflowY: "auto", flex: 1, minHeight: 0, WebkitOverflowScrolling: "touch" }}>
                   {/* Header */}
                   <div style={{ textAlign: "center", marginBottom: 20 }}>
                     <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
