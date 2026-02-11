@@ -2513,19 +2513,23 @@ const DIFFICULTIES = [
 const MODE_CATEGORIES = ["classic", "special"];
 const VALID_MODES = new Set(["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"]);
 
+const VALID_VIEWS = new Set(["gallery", "creator", "custom-mosaic"]);
+
 function getSearchParams() {
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
   const mode = params.get("mode");
   const level = params.get("level");
   const date = params.get("date");
+  const viewParam = params.get("view");
   return {
     mode: mode && VALID_MODES.has(mode) ? mode : null,
     level: level != null ? Math.max(0, Math.min(49, parseInt(level, 10) || 0)) : null,
     date: date && /^\d{2}-\d{2}-\d{4}$/.test(date) ? date : null,
+    view: viewParam && VALID_VIEWS.has(viewParam) ? viewParam : null,
   };
 }
 
-function updateUrl(mode, level, replace = true, date = null) {
+function updateUrl(mode, level, replace = true, date = null, viewParam = null) {
   if (typeof window === "undefined") return;
   const params = new URLSearchParams();
   if (mode) params.set("mode", mode);
@@ -2534,6 +2538,7 @@ function updateUrl(mode, level, replace = true, date = null) {
   } else if (level != null) {
     params.set("level", String(level));
   }
+  if (viewParam) params.set("view", viewParam);
   const search = params.toString();
   const url = search ? `${window.location.pathname}?${search}` : window.location.pathname;
   if (replace) window.history.replaceState({}, "", url);
@@ -2672,6 +2677,7 @@ export default function Pattrn() {
   const [customMosaicPlay, setCustomMosaicPlay] = useState(null); // mosaic object being played
   const [customMosaicProgress, setCustomMosaicProgress] = useState({}); // { tileIndex: attempts }
   const customMosaicPuzzlesRef = useRef(null); // array of 25 puzzle objects when playing custom mosaic
+  const [creatorReturnView, setCreatorReturnView] = useState("menu"); // where to go when leaving creator
 
   // Listen for auth state changes
   useEffect(() => {
@@ -2974,8 +2980,22 @@ export default function Pattrn() {
     setCreatorGrid(mosaic.grid || Array.from({ length: 25 }, () => Array(25).fill(null)));
     setCreatorTitle(mosaic.title || "");
     setCreatorEditingId(mosaic.id);
+    setCreatorReturnView("gallery");
     setView("creator");
   }, []);
+
+  // Load mosaic carousel data when mosaic mode is selected on menu
+  const mosaicCarouselLoadedRef = useRef(false);
+  useEffect(() => {
+    if (difficulty !== "mosaic" || view !== "menu") return;
+    if (mosaicCarouselLoadedRef.current) return;
+    mosaicCarouselLoadedRef.current = true;
+    // Load public mosaics (always) and user mosaics (if signed in)
+    loadPublicMosaics().then(setPublicMosaicsList).catch(() => {});
+    if (firebaseUser) {
+      loadUserMosaics(firebaseUser.uid).then(setMyMosaics).catch(() => {});
+    }
+  }, [difficulty, view, firebaseUser]);
 
   // Helper: render a mosaic grid thumbnail (using canvas-like div grid)
   const MosaicThumbnail = useCallback(({ grid, size = 80 }) => {
@@ -3312,10 +3332,30 @@ export default function Pattrn() {
 
   // Initial load: read URL or restore saved cascade run
   useEffect(() => {
-    const { mode, level, date } = getSearchParams();
+    const { mode, level, date, view: viewParam } = getSearchParams();
     const levelNum = level != null ? parseInt(level, 10) : null;
     const hasDailyDeepLink = mode === "daily" && date;
     const hasDeepLink = hasDailyDeepLink || (mode && levelNum != null && !Number.isNaN(levelNum));
+
+    // Handle view param (gallery, creator, custom-mosaic)
+    if (viewParam) {
+      if (viewParam === "gallery") {
+        setView("gallery");
+        setMosaicGalleryTab("mine");
+        loadMosaicData("mine");
+      } else if (viewParam === "creator") {
+        resetCreator();
+        setView("creator");
+      }
+      // custom-mosaic can't be restored without mosaic data, fallback to menu
+      return;
+    }
+
+    // Handle mode-only URL (no level) — restore selected game mode on menu
+    if (mode && !hasDeepLink && !hasDailyDeepLink) {
+      setDifficulty(mode);
+      return;
+    }
     const runStateMap = progress.cascadeRunState || {};
     const lastIndex = progress.cascadeRunStateLastIndex;
 
@@ -3490,6 +3530,8 @@ export default function Pattrn() {
         const level = difficulty === "cascade" ? cascadeRunIndex : currentPuzzle;
         updateUrl(difficulty, level);
       }
+    } else if (view === "gallery" || view === "creator" || view === "custom-mosaic") {
+      updateUrl(null, null, true, null, view);
     } else {
       updateUrl(difficulty, null);
     }
@@ -4586,7 +4628,17 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => { setView("menu"); resetCreator(); }}
+          <button onClick={() => {
+            const returnTo = creatorReturnView || "menu";
+            resetCreator();
+            setCreatorReturnView("menu");
+            if (returnTo === "gallery") {
+              setView("gallery");
+              loadMosaicData(mosaicGalleryTab || "mine");
+            } else {
+              setView("menu");
+            }
+          }}
             style={{
               background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
               color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
@@ -4812,7 +4864,7 @@ export default function Pattrn() {
             Mosaics
           </h2>
           {firebaseUser && (
-            <button onClick={() => { resetCreator(); setView("creator"); }}
+            <button onClick={() => { resetCreator(); setCreatorReturnView("gallery"); setView("creator"); }}
               style={{
                 background: C.accent, color: C.bg, border: "none", borderRadius: 8, padding: "6px 14px",
                 cursor: "pointer", fontFamily: "'Space Mono', monospace",
@@ -5897,6 +5949,63 @@ export default function Pattrn() {
           <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
           <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
         </div>
+
+        {/* Community & your mosaics carousel */}
+        {(() => {
+          const carouselMosaics = [
+            ...(publicMosaicsList || []).map(m => ({ ...m, _source: "public" })),
+            ...(myMosaics || []).filter(m => !publicMosaicsList?.some(p => p.id === m.id)).map(m => ({ ...m, _source: "mine" })),
+          ];
+          if (carouselMosaics.length === 0) return null;
+          return (
+            <div style={{
+              width: "100%", maxWidth: 360, marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
+            }}>
+              <div style={{
+                fontSize: 9, color: C.textDim, textTransform: "uppercase",
+                letterSpacing: 1.5, marginBottom: 8,
+                fontFamily: "'Space Mono', monospace",
+              }}>Community Mosaics</div>
+              <div className="mosaic-carousel" style={{
+                display: "flex", gap: 10, overflowX: "auto", paddingBottom: 8,
+                scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
+                msOverflowStyle: "none", scrollbarWidth: "none",
+              }}>
+                <style>{`.mosaic-carousel::-webkit-scrollbar { display: none; }`}</style>
+                {carouselMosaics.map((mosaic) => (
+                  <button
+                    key={mosaic.id}
+                    onClick={() => startCustomMosaicPlay(mosaic)}
+                    style={{
+                      flexShrink: 0, width: 100, scrollSnapAlign: "start",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                      padding: "10px 8px", borderRadius: 10,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      cursor: "pointer", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; }}
+                  >
+                    <MosaicThumbnail grid={mosaic.grid} size={72} />
+                    <div style={{
+                      fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 600,
+                      color: C.text, textAlign: "center", lineHeight: 1.2,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      width: "100%",
+                    }}>
+                      {mosaic.title || "Untitled"}
+                    </div>
+                    <div style={{
+                      fontSize: 8, color: C.textDim, letterSpacing: 0.5,
+                    }}>
+                      {mosaic._source === "mine" ? "You" : mosaic.authorEmail ? mosaic.authorEmail.split("@")[0] : ""}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
         </>)}
 
         {/* Puzzle grid: 50 for non-daily modes (not mosaic) */}
@@ -6294,7 +6403,7 @@ export default function Pattrn() {
                     </button>
 
                     {/* Mosaic Creator */}
-                    <button onClick={() => { setShowGameMenu(false); resetCreator(); setView("creator"); }} style={{
+                    <button onClick={() => { setShowGameMenu(false); resetCreator(); setCreatorReturnView("menu"); setView("creator"); }} style={{
                       width: "100%", padding: "14px 16px", borderRadius: 12,
                       backgroundColor: C.surface, border: `1px solid ${C.border}`,
                       cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
