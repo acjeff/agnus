@@ -9,16 +9,17 @@ import {
   signInWithPopup,
 } from "firebase/auth";
 import {
-  getFirestore,
-  doc,
-  getDoc,
-  setDoc,
+  getDatabase,
+  ref,
+  get,
+  set,
   serverTimestamp,
-} from "firebase/firestore";
+} from "firebase/database";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  databaseURL: import.meta.env.VITE_FIREBASE_DATABASE_URL,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
@@ -35,7 +36,7 @@ let googleProvider = null;
 if (hasConfig) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app);
+  db = getDatabase(app);
   googleProvider = new GoogleAuthProvider();
 }
 
@@ -78,23 +79,23 @@ export async function logOut() {
 // Cloud data structure matches localStorage keys
 const USER_DATA_DOC = "gameData";
 
-function userDocRef(uid) {
-  return doc(db, "users", uid, "data", USER_DATA_DOC);
+function userRef(uid) {
+  return ref(db, `users/${uid}/data/${USER_DATA_DOC}`);
 }
 
 export async function loadCloudData(uid) {
   if (!db) return null;
-  const snap = await getDoc(userDocRef(uid));
+  const snap = await get(userRef(uid));
   if (!snap.exists()) return null;
-  return snap.data();
+  return snap.val();
 }
 
 export async function saveCloudData(uid, data) {
   if (!db) return;
-  await setDoc(userDocRef(uid), {
+  await set(userRef(uid), {
     ...data,
     updatedAt: serverTimestamp(),
-  }, { merge: true });
+  });
 }
 
 // Merges local data into cloud, preferring the "better" result for each puzzle
