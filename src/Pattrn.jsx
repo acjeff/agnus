@@ -963,13 +963,8 @@ const PUZZLE_THEMES = [
   },
 ];
 
-function isCheatBirthdayActive() {
-  try { return localStorage.getItem(BIRTHDAY_KEY) === CHEAT_BIRTHDAY; } catch { return false; }
-}
-
 function isThemeUnlocked(theme, achievementsList) {
   if (!theme.unlock) return true;
-  if (isCheatBirthdayActive()) return true;
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   if (theme.unlock.seasonal) {
@@ -980,7 +975,7 @@ function isThemeUnlocked(theme, achievementsList) {
     const ach = achievementsList.find(a => a.id === theme.unlock.achievement);
     if (ach && ach.unlocked) return true;
   }
-  // Check saved achievements for special achievements not in main list (e.g. cheat_turing)
+  // Fallback: check saved achievements directly (e.g. cheat_turing persisted via easter egg)
   if (theme.unlock.achievement) {
     try {
       const saved = loadSavedAchievements();
@@ -1705,12 +1700,12 @@ const ACHIEVEMENTS = [
   { id: "total_100", cat: "special", label: "Centurion", desc: "Solve 100 puzzles total", tier: 3, check: (p) => [...SOLVE_MODES, "daily"].reduce((s, m) => s + countModeSolved(p[m]), 0) + countCascadeClears(p.cascade) >= 100 },
   { id: "birthday_puzzle", cat: "special", label: "Birthday Bash", desc: "Solve your birthday puzzle", tier: 2, check: (p) => { try { const bd = localStorage.getItem(BIRTHDAY_KEY); if (!bd) return false; const seed = getDailySeedForDate(bd); return (p.daily || {})[seed] > 0; } catch { return false; } } },
   { id: "first_fail", cat: "special", label: "Trial & Error", desc: "Fail a puzzle for the first time", tier: 1, check: (p) => SOLVE_MODES.some(m => countModeFailed(p[m]) >= 1) },
+  { id: "cheat_turing", cat: "special", label: "Welcome Back, Alan", desc: "Born on the day the father of computing was born", tier: 3, check: () => false },
 ];
 
 function computeAchievements(progress, times, savedIds) {
   const saved = savedIds || new Set();
-  const cheat = isCheatBirthdayActive();
-  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: cheat || a.check(progress, times) || saved.has(a.id) }));
+  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: a.check(progress, times) || saved.has(a.id) }));
 }
 
 // --- Components ---
@@ -3576,7 +3571,6 @@ export default function Pattrn() {
                 }
                 if (ach) parts.push(`"${ach.label}" achievement`);
                 unlockHint = parts.join(" or ");
-                if (!unlockHint && theme.id === "enigma") unlockHint = "???";
               }
 
               return (
@@ -4310,19 +4304,20 @@ export default function Pattrn() {
                     setBirthday(bdStr);
                     try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
                     if (bdStr === CHEAT_BIRTHDAY) {
-                      achievementQueueRef.current.push({ id: "cheat_turing", label: "Welcome Back, Alan", desc: "The enigma has been decoded", tier: 3 });
-                      if (!achievementToastTimer.current) advanceAchievementQueue();
-                      // Persist cheat_turing so the Enigma theme stays unlocked
                       const saved = loadSavedAchievements();
                       if (!saved.has("cheat_turing")) {
+                        // Show achievement toast
+                        achievementQueueRef.current.push({ id: "cheat_turing", label: "Welcome Back, Alan", desc: "The enigma has been decoded", tier: 3 });
+                        if (!achievementToastTimer.current) advanceAchievementQueue();
+                        // Persist so it survives birthday changes
                         saved.add("cheat_turing");
                         saveSavedAchievements(saved);
                         setSavedAchievementIds(new Set(saved));
-                      }
-                      // Show Enigma theme unlock toast after achievement toast
-                      const enigmaTheme = PUZZLE_THEMES.find(t => t.id === "enigma");
-                      if (enigmaTheme) {
-                        setTimeout(() => showThemeToast(enigmaTheme), 3800);
+                        // Show Enigma theme unlock toast after achievement toast
+                        const enigmaTheme = PUZZLE_THEMES.find(t => t.id === "enigma");
+                        if (enigmaTheme) {
+                          setTimeout(() => showThemeToast(enigmaTheme), 3800);
+                        }
                       }
                     }
                     setShowBirthdayPrompt(false);
