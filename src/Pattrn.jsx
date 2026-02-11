@@ -4100,13 +4100,6 @@ export default function Pattrn() {
                     const bdStr = `${String(d).padStart(2, "0")}-${String(m).padStart(2, "0")}-${y}`;
                     setBirthday(bdStr);
                     try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
-                    if (bdStr === CHEAT_BIRTHDAY) {
-                      const allIds = new Set(ACHIEVEMENTS.map(a => a.id));
-                      saveSavedAchievements(allIds);
-                      setSavedAchievementIds(allIds);
-                      prevUnlockedRef.current = allIds;
-                      prevUnlockedThemesRef.current = new Set(PUZZLE_THEMES.map(t => t.id));
-                    }
                     setShowBirthdayPrompt(false);
                     setBirthdayInput("");
                     setCalendarYear(y);
