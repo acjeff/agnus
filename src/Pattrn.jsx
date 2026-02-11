@@ -515,6 +515,80 @@ const BIRTHDAY_SHAPES = [
   ),
 ];
 
+// --- Enigma machine themed shapes ---
+const ENIGMA_SHAPES = [
+  // Rotor / cipher wheel
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="9" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="12" cy="12" r="5.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+      <circle cx="12" cy="12" r="2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+      <line x1="12" y1="3" x2="12" y2="6.5" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinecap="round"/>
+      <line x1="12" y1="17.5" x2="12" y2="21" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinecap="round"/>
+      <line x1="3" y1="12" x2="6.5" y2="12" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinecap="round"/>
+      <line x1="17.5" y1="12" x2="21" y2="12" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Plugboard / patch panel
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="7.5" cy="10" r="1.3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="12" cy="10" r="1.3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="16.5" cy="10" r="1.3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="9.75" cy="14" r="1.3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="14.25" cy="14" r="1.3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <path d="M7.5,10 C7.5,12 14.25,12 14.25,14" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Lampboard (lit indicator)
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="10" r="6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="12" cy="10" r="2.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+      <line x1="10" y1="16" x2="14" y2="16" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="10.5" y1="18" x2="13.5" y2="18" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="11" y1="20" x2="13" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Gear / cog
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="4.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <path d="M12,2 L13.5,5.5 M12,22 L10.5,18.5 M2,12 L5.5,10.5 M22,12 L18.5,13.5 M5.1,5.1 L7.8,7.2 M18.9,18.9 L16.2,16.8 M18.9,5.1 L16.8,7.8 M5.1,18.9 L7.2,16.2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Cipher letter (A in a circle)
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="8.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <path d="M8.5,17 L12,6 L15.5,17 M9.5,14 L14.5,14" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Typewriter key
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="12" cy="12" r="2.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+    </svg>
+  ),
+  // Enigma machine silhouette
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="5" y="8" width="14" height="13" rx="1.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <path d="M7,8 L7,5 C7,3.5 8,2.5 10,2.5 L14,2.5 C16,2.5 17,3.5 17,5 L17,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="5" y1="14" x2="19" y2="14" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="9" cy="11" r="1.2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1"/>
+      <circle cx="12" cy="11" r="1.2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1"/>
+      <circle cx="15" cy="11" r="1.2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1"/>
+      <circle cx="9" cy="17.5" r="1" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="0.8"/>
+      <circle cx="12" cy="17.5" r="1" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="0.8"/>
+      <circle cx="15" cy="17.5" r="1" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="0.8"/>
+    </svg>
+  ),
+];
+
 // --- Themed color palettes ---
 const CHRISTMAS_PALETTES = [
   ["#C62828", "#2E7D32", "#FFD700", "#ECEFF1", "#880E4F"],
@@ -642,6 +716,14 @@ const GLITCH_PALETTES = [
   ["#FF3366", "#00CCBB", "#CC00EE", "#AAFF33", "#FF6600"],
   ["#E80060", "#00FFB3", "#AA00FF", "#66FF22", "#FFCC00"],
   ["#FF004D", "#00DDAA", "#BB00DD", "#77FF44", "#FF9900"],
+];
+
+const ENIGMA_PALETTES = [
+  ["#C9A84C", "#5B6B4A", "#8B7355", "#3D5C5C", "#A0522D"],
+  ["#D4AF37", "#4A5D3C", "#9E8B6E", "#2F4F4F", "#B87333"],
+  ["#BFA14A", "#6B7F5E", "#7D6B52", "#4A7070", "#8B6914"],
+  ["#E8C547", "#546B46", "#A67B5B", "#365656", "#CD853F"],
+  ["#B8960C", "#3E5432", "#6F5B3E", "#527A7A", "#946B2D"],
 ];
 
 // --- Build color map from original palettes to themed palettes ---
@@ -866,6 +948,19 @@ const PUZZLE_THEMES = [
     gridBorder: "#FF004044",
     unlock: { achievement: "first_fail" },
   },
+  // --- Secret Enigma theme — unlocked via Alan Turing birthday easter egg ---
+  {
+    id: "enigma",
+    name: "Enigma",
+    desc: "The code has been broken",
+    icon: null,
+    palettes: ENIGMA_PALETTES,
+    shapes: ENIGMA_SHAPES,
+    decoration: "rotors",
+    gridBg: "#0c0c08",
+    gridBorder: "#C9A84C33",
+    unlock: { achievement: "cheat_turing" },
+  },
 ];
 
 function isCheatBirthdayActive() {
@@ -884,6 +979,13 @@ function isThemeUnlocked(theme, achievementsList) {
   if (theme.unlock.achievement && achievementsList) {
     const ach = achievementsList.find(a => a.id === theme.unlock.achievement);
     if (ach && ach.unlocked) return true;
+  }
+  // Check saved achievements for special achievements not in main list (e.g. cheat_turing)
+  if (theme.unlock.achievement) {
+    try {
+      const saved = loadSavedAchievements();
+      if (saved.has(theme.unlock.achievement)) return true;
+    } catch { /* ignore */ }
   }
   return false;
 }
@@ -1827,6 +1929,17 @@ const CONFETTI_PARTICLES = Array.from({ length: 22 }, (_, i) => ({
   opacity: 0.25 + Math.random() * 0.35,
 }));
 
+const ROTOR_PARTICLES = Array.from({ length: 5 }, (_, i) => ({
+  id: i,
+  x: 10 + (i * 20),
+  y: 15 + (i % 3) * 25,
+  size: 14 + Math.random() * 10,
+  duration: 6 + Math.random() * 6,
+  delay: i * 1.2,
+  direction: i % 2 === 0 ? 1 : -1,
+  opacity: 0.08 + Math.random() * 0.07,
+}));
+
 function GridDecoration({ decoration }) {
   if (!decoration) return null;
 
@@ -2154,6 +2267,52 @@ function GridDecoration({ decoration }) {
           boxShadow: "inset 3px 0 0 rgba(255,0,64,0.25), inset -3px 0 0 rgba(0,255,221,0.25), inset 0 2px 0 rgba(255,0,255,0.15), inset 0 -2px 0 rgba(0,255,64,0.15)",
           animation: "glitchBorder 2s steps(3) infinite",
         }} />
+      </div>
+    );
+  }
+
+  if (decoration === "rotors") {
+    return (
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, overflow: "hidden",
+      }}>
+        {/* Spinning rotor gears */}
+        {ROTOR_PARTICLES.map(p => (
+          <svg key={p.id} width={p.size} height={p.size} viewBox="0 0 24 24" style={{
+            position: "absolute", left: `${p.x}%`, top: `${p.y}%`,
+            opacity: p.opacity,
+            animation: `enigmaRotor ${p.duration}s ${p.delay}s linear infinite${p.direction < 0 ? " reverse" : ""}`,
+          }}>
+            <circle cx="12" cy="12" r="10" fill="none" stroke="rgba(201,168,76,0.5)" strokeWidth="1.2"/>
+            <circle cx="12" cy="12" r="6" fill="none" stroke="rgba(201,168,76,0.4)" strokeWidth="1"/>
+            <circle cx="12" cy="12" r="2" fill="none" stroke="rgba(201,168,76,0.5)" strokeWidth="1"/>
+            {[0,45,90,135,180,225,270,315].map(angle => (
+              <line key={angle}
+                x1={12 + Math.cos(angle * Math.PI / 180) * 6}
+                y1={12 + Math.sin(angle * Math.PI / 180) * 6}
+                x2={12 + Math.cos(angle * Math.PI / 180) * 10}
+                y2={12 + Math.sin(angle * Math.PI / 180) * 10}
+                stroke="rgba(201,168,76,0.4)" strokeWidth="1.5" strokeLinecap="round"
+              />
+            ))}
+          </svg>
+        ))}
+        {/* Brass mechanical border lines */}
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 2,
+          background: "linear-gradient(90deg, transparent, rgba(201,168,76,0.3), rgba(184,150,12,0.4), rgba(201,168,76,0.3), transparent)",
+          borderRadius: "16px 16px 0 0",
+        }} />
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, height: 2,
+          background: "linear-gradient(90deg, transparent, rgba(201,168,76,0.3), rgba(184,150,12,0.4), rgba(201,168,76,0.3), transparent)",
+          borderRadius: "0 0 16px 16px",
+        }} />
+        {/* Subtle wiring overlay */}
+        <svg style={{ position: "absolute", inset: 0, opacity: 0.06, width: "100%", height: "100%" }} viewBox="0 0 200 200" preserveAspectRatio="none">
+          <path d="M20,40 C60,20 80,80 120,60 S180,100 160,140 S100,160 60,140 S20,100 40,80" fill="none" stroke="rgba(201,168,76,0.8)" strokeWidth="0.8"/>
+          <path d="M180,30 C140,50 160,100 120,120 S60,100 80,60 S120,40 160,60" fill="none" stroke="rgba(201,168,76,0.6)" strokeWidth="0.6"/>
+        </svg>
       </div>
     );
   }
@@ -3368,6 +3527,7 @@ export default function Pattrn() {
                 }
                 if (ach) parts.push(`"${ach.label}" achievement`);
                 unlockHint = parts.join(" or ");
+                if (!unlockHint && theme.id === "enigma") unlockHint = "???";
               }
 
               return (
@@ -4103,6 +4263,18 @@ export default function Pattrn() {
                     if (bdStr === CHEAT_BIRTHDAY) {
                       achievementQueueRef.current.push({ id: "cheat_turing", label: "Welcome Back, Alan", desc: "The enigma has been decoded", tier: 3 });
                       if (!achievementToastTimer.current) advanceAchievementQueue();
+                      // Persist cheat_turing so the Enigma theme stays unlocked
+                      const saved = loadSavedAchievements();
+                      if (!saved.has("cheat_turing")) {
+                        saved.add("cheat_turing");
+                        saveSavedAchievements(saved);
+                        setSavedAchievementIds(new Set(saved));
+                      }
+                      // Show Enigma theme unlock toast after achievement toast
+                      const enigmaTheme = PUZZLE_THEMES.find(t => t.id === "enigma");
+                      if (enigmaTheme) {
+                        setTimeout(() => showThemeToast(enigmaTheme), 3800);
+                      }
                     }
                     setShowBirthdayPrompt(false);
                     setBirthdayInput("");
@@ -4963,7 +5135,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} } @keyframes enigmaRotor { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} }`}</style>
 
       <Particles show={showParticles} />
 
