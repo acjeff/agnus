@@ -2938,12 +2938,18 @@ export default function Pattrn() {
     setMosaicLoading(true);
     try {
       if (tab === "mine" && firebaseUser) {
-        const [userList, sharedList] = await Promise.all([
+        const [userResult, sharedResult] = await Promise.allSettled([
           loadUserMosaics(firebaseUser.uid),
           loadSharedMosaics(firebaseUser.uid),
         ]);
-        setMyMosaics(userList);
-        setSharedMosaics(sharedList);
+        setMyMosaics(userResult.status === "fulfilled" ? userResult.value : []);
+        setSharedMosaics(sharedResult.status === "fulfilled" ? sharedResult.value : []);
+        const failed = [userResult, sharedResult].filter(r => r.status === "rejected");
+        if (failed.length > 0) {
+          const isPermErr = failed.some(r => r.reason?.message?.includes("PERMISSION_DENIED") || r.reason?.message?.includes("Permission denied"));
+          setMosaicMsg(isPermErr ? "Load failed — database rules need to be deployed (see database.rules.json)" : "Failed to load some mosaic data");
+          setTimeout(() => setMosaicMsg(""), 4000);
+        }
       } else if (tab === "shared" && firebaseUser) {
         const sharedList = await loadSharedMosaics(firebaseUser.uid);
         setSharedMosaics(sharedList);
@@ -2956,6 +2962,9 @@ export default function Pattrn() {
       }
     } catch (e) {
       console.error("Load mosaic data failed:", e);
+      const isPermErr = e?.message?.includes("PERMISSION_DENIED") || e?.message?.includes("Permission denied");
+      setMosaicMsg(isPermErr ? "Load failed — database rules need to be deployed (see database.rules.json)" : "Failed to load mosaic data");
+      setTimeout(() => setMosaicMsg(""), 4000);
     } finally {
       setMosaicLoading(false);
     }
