@@ -90,10 +90,20 @@ export async function loadCloudData(uid) {
   return snap.val();
 }
 
+function removeUndefined(obj) {
+  if (obj === null || typeof obj !== "object") return obj;
+  if (Array.isArray(obj)) return obj.map(removeUndefined);
+  const clean = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (v !== undefined) clean[k] = removeUndefined(v);
+  }
+  return clean;
+}
+
 export async function saveCloudData(uid, data) {
   if (!db) return;
   await set(userRef(uid), {
-    ...data,
+    ...removeUndefined(data),
     updatedAt: serverTimestamp(),
   });
 }
@@ -153,7 +163,7 @@ export function mergeGameData(local, cloud) {
     mergedRunState[key] = (lr.level || 0) >= (cr.level || 0) ? lr : cr;
   }
   mergedProgress.cascadeRunState = mergedRunState;
-  mergedProgress.cascadeRunStateLastIndex = localProgress.cascadeRunStateLastIndex ?? cloudProgress.cascadeRunStateLastIndex;
+  mergedProgress.cascadeRunStateLastIndex = localProgress.cascadeRunStateLastIndex ?? cloudProgress.cascadeRunStateLastIndex ?? null;
 
   merged.progress = mergedProgress;
 

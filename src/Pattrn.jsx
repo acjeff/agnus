@@ -2561,7 +2561,7 @@ export default function Pattrn() {
       spin: progress.spin || {},
       mosaic: progress.mosaic || {},
       cascadeRunState: progress.cascadeRunState || {},
-      cascadeRunStateLastIndex: progress.cascadeRunStateLastIndex,
+      cascadeRunStateLastIndex: progress.cascadeRunStateLastIndex ?? null,
     },
     times: {
       easy: times.easy || {},
