@@ -2654,6 +2654,7 @@ export default function Pattrn() {
   const CREATOR_COLORS = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#6C5CE7", "#FF9FF3", "#E17055", "#00B894", "#0984E3", "#FDCB6E", "#A8E6CF", "#FF8B94", "#01A3A4", "#F368E0", "#54A0FF", "#5F27CD", "#ffffff", "#333333"];
   const [creatorGrid, setCreatorGrid] = useState(() => Array.from({ length: 25 }, () => Array(25).fill(null)));
   const [creatorColor, setCreatorColor] = useState("#FF6B6B");
+  const [creatorTool, setCreatorTool] = useState("draw"); // "draw" | "fill"
   const [creatorTitle, setCreatorTitle] = useState("");
   const [creatorEditingId, setCreatorEditingId] = useState(null);
   const creatorPaintingRef = useRef(false);
@@ -2695,11 +2696,14 @@ export default function Pattrn() {
     setCreatorGrid(Array.from({ length: 25 }, () => Array(25).fill(null)));
     setCreatorTitle("");
     setCreatorEditingId(null);
+    setCreatorTool("draw");
   }, []);
 
   // Pointer-move based painting: uses element coordinates for smooth drag across tiny cells
   const creatorColorRef = useRef("#FF6B6B");
   useEffect(() => { creatorColorRef.current = creatorColor; }, [creatorColor]);
+  const creatorToolRef = useRef("draw");
+  useEffect(() => { creatorToolRef.current = creatorTool; }, [creatorTool]);
 
   const getCellFromPointer = useCallback((e) => {
     const el = creatorGridRef.current;
@@ -2714,20 +2718,39 @@ export default function Pattrn() {
     return { r, c };
   }, []);
 
+  const creatorFloodFill = useCallback((grid, startR, startC, fillColor) => {
+    const targetColor = grid[startR][startC];
+    if (targetColor === fillColor) return grid; // already the same color, no-op
+    const next = grid.map(row => [...row]);
+    const stack = [[startR, startC]];
+    while (stack.length > 0) {
+      const [r, c] = stack.pop();
+      if (r < 0 || r >= 25 || c < 0 || c >= 25) continue;
+      if (next[r][c] !== targetColor) continue;
+      next[r][c] = fillColor;
+      stack.push([r - 1, c], [r + 1, c], [r, c - 1], [r, c + 1]);
+    }
+    return next;
+  }, []);
+
   const creatorPointerDown = useCallback((e) => {
     e.preventDefault();
-    creatorPaintingRef.current = true;
     const cell = getCellFromPointer(e);
     if (!cell) return;
+    if (creatorToolRef.current === "fill") {
+      setCreatorGrid(g => creatorFloodFill(g, cell.r, cell.c, creatorColorRef.current));
+      return;
+    }
+    creatorPaintingRef.current = true;
     setCreatorGrid(g => {
       const next = g.map(row => [...row]);
       next[cell.r][cell.c] = next[cell.r][cell.c] === creatorColorRef.current ? null : creatorColorRef.current;
       return next;
     });
-  }, [getCellFromPointer]);
+  }, [getCellFromPointer, creatorFloodFill]);
 
   const creatorPointerMove = useCallback((e) => {
-    if (!creatorPaintingRef.current) return;
+    if (!creatorPaintingRef.current || creatorToolRef.current === "fill") return;
     const cell = getCellFromPointer(e);
     if (!cell) return;
     setCreatorGrid(g => {
@@ -4618,6 +4641,43 @@ export default function Pattrn() {
               title="Eraser"
             >
               <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2-8 8-3 1 1-3z" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Tools */}
+        <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, animation: "fadeUp 0.3s 0.045s ease both" }}>
+          <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
+            Tools
+          </div>
+          <div style={{ display: "flex", gap: 6 }}>
+            {/* Draw tool */}
+            <button
+              onClick={() => setCreatorTool("draw")}
+              style={{
+                display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 6,
+                backgroundColor: creatorTool === "draw" ? C.accent + "22" : C.surface,
+                border: creatorTool === "draw" ? `2px solid ${C.accent}` : `1.5px solid ${C.border}`,
+                cursor: "pointer", fontSize: 11, color: creatorTool === "draw" ? C.accent : C.textDim,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, transition: "all 0.15s",
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 13.5l1-3 8-8 2 2-8 8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Draw
+            </button>
+            {/* Fill tool */}
+            <button
+              onClick={() => setCreatorTool("fill")}
+              style={{
+                display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 6,
+                backgroundColor: creatorTool === "fill" ? C.accent + "22" : C.surface,
+                border: creatorTool === "fill" ? `2px solid ${C.accent}` : `1.5px solid ${C.border}`,
+                cursor: "pointer", fontSize: 11, color: creatorTool === "fill" ? C.accent : C.textDim,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, transition: "all 0.15s",
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13 9c0 2-1.5 4-3 4s-3-2-3-4 3-7 3-7 3 5 3 7z" stroke="currentColor" strokeWidth="1.3" fill="currentColor" fillOpacity="0.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M1.5 11l4-4 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              Fill
             </button>
           </div>
         </div>
