@@ -1286,25 +1286,41 @@ function buildSpinPuzzles() {
   return puzzles;
 }
 
-// --- MOSAIC: 25 puzzles that tile into a larger 25x25 pattern ---
+// --- MOSAIC: 25 puzzles that tile into a larger 25x25 dog pattern ---
 function buildMosaicPuzzles() {
   const mr = rng(42424);
   const palIdx = Math.floor(mr() * PALETTES.length);
   const pal = shuffle(PALETTES[palIdx], mr);
-  const gens25 = makeGenerators(25);
-  const validGens = gens25.map((_, idx) => idx).filter(idx => !TWO_COLOR_GENS.has(idx) && idx !== FOUR_COLOR_GEN && !STRIPE_GENS.has(idx));
-  const validWeights = validGens.map(idx => GEN_WEIGHTS[idx]);
-  const totalW = validWeights.reduce((a, b) => a + b, 0);
-  let roll = mr() * totalW;
-  let genIdx = validGens[validGens.length - 1];
-  for (let vi = 0; vi < validGens.length; vi++) {
-    roll -= validWeights[vi];
-    if (roll <= 0) { genIdx = validGens[vi]; break; }
-  }
-  const numShapes = 3;
-  const shapeIndices = Array.from({ length: numShapes }, (_, k) => k);
-  const bigGrid = gens25[genIdx](shapeIndices, numShapes);
-  const bigSolution = bigGrid.map(row => row.map(si => `${pal[si % pal.length]}|${si}`));
+  // 25×25 pixel art dog (front-facing, sitting)
+  // 0 = background, 1 = body/fur, 2 = detail (eyes, nose, tongue, collar, inner ears)
+  const DOG = [
+    [0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,1,1,2,1,1,1,0,0,0,0,0,1,1,1,2,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,2,2,1,1,1,1,1,1,1,1,1,2,2,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,0,0,1,1,1,1,1,2,1,2,1,1,1,1,1,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,1,1,1,1,1,2,1,1,1,1,1,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,0,0,0],
+    [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+    [0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0],
+    [0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  ];
+  const bigSolution = DOG.map(row => row.map(si => `${pal[si % pal.length]}|${si}`));
   // Slice into 25 tiles of 5x5
   const puzzles = [];
   for (let ti = 0; ti < 25; ti++) {
