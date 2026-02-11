@@ -515,6 +515,80 @@ const BIRTHDAY_SHAPES = [
   ),
 ];
 
+// --- Enigma machine themed shapes ---
+const ENIGMA_SHAPES = [
+  // Rotor / cipher wheel
+  (s, stroke) => (
+    <svg key="s0" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="9" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="12" cy="12" r="5.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+      <circle cx="12" cy="12" r="2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+      <line x1="12" y1="3" x2="12" y2="6.5" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinecap="round"/>
+      <line x1="12" y1="17.5" x2="12" y2="21" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinecap="round"/>
+      <line x1="3" y1="12" x2="6.5" y2="12" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinecap="round"/>
+      <line x1="17.5" y1="12" x2="21" y2="12" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Plugboard / patch panel
+  (s, stroke) => (
+    <svg key="s1" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="3" y="6" width="18" height="12" rx="2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="7.5" cy="10" r="1.3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="12" cy="10" r="1.3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="16.5" cy="10" r="1.3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="9.75" cy="14" r="1.3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="14.25" cy="14" r="1.3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <path d="M7.5,10 C7.5,12 14.25,12 14.25,14" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Lampboard (lit indicator)
+  (s, stroke) => (
+    <svg key="s2" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="10" r="6" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <circle cx="12" cy="10" r="2.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5"/>
+      <line x1="10" y1="16" x2="14" y2="16" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="10.5" y1="18" x2="13.5" y2="18" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="11" y1="20" x2="13" y2="20" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Gear / cog
+  (s, stroke) => (
+    <svg key="s3" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="4.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <path d="M12,2 L13.5,5.5 M12,22 L10.5,18.5 M2,12 L5.5,10.5 M22,12 L18.5,13.5 M5.1,5.1 L7.8,7.2 M18.9,18.9 L16.2,16.8 M18.9,5.1 L16.8,7.8 M5.1,18.9 L7.2,16.2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round"/>
+    </svg>
+  ),
+  // Cipher letter (A in a circle)
+  (s, stroke) => (
+    <svg key="s4" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <circle cx="12" cy="12" r="8.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <path d="M8.5,17 L12,6 L15.5,17 M9.5,14 L14.5,14" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  // Typewriter key
+  (s, stroke) => (
+    <svg key="s5" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="4" y="4" width="16" height="16" rx="3" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <rect x="6.5" y="6.5" width="11" height="11" rx="2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="12" cy="12" r="2.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+    </svg>
+  ),
+  // Enigma machine silhouette
+  (s, stroke) => (
+    <svg key="s6" viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
+      <rect x="5" y="8" width="14" height="13" rx="1.5" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.8"/>
+      <path d="M7,8 L7,5 C7,3.5 8,2.5 10,2.5 L14,2.5 C16,2.5 17,3.5 17,5 L17,8" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.5" strokeLinecap="round"/>
+      <line x1="5" y1="14" x2="19" y2="14" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1.2"/>
+      <circle cx="9" cy="11" r="1.2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1"/>
+      <circle cx="12" cy="11" r="1.2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1"/>
+      <circle cx="15" cy="11" r="1.2" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="1"/>
+      <circle cx="9" cy="17.5" r="1" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="0.8"/>
+      <circle cx="12" cy="17.5" r="1" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="0.8"/>
+      <circle cx="15" cy="17.5" r="1" fill="none" stroke={stroke || "rgba(255,255,255,0.8)"} strokeWidth="0.8"/>
+    </svg>
+  ),
+];
+
 // --- Themed color palettes ---
 const CHRISTMAS_PALETTES = [
   ["#C62828", "#2E7D32", "#FFD700", "#ECEFF1", "#880E4F"],
@@ -642,6 +716,14 @@ const GLITCH_PALETTES = [
   ["#FF3366", "#00CCBB", "#CC00EE", "#AAFF33", "#FF6600"],
   ["#E80060", "#00FFB3", "#AA00FF", "#66FF22", "#FFCC00"],
   ["#FF004D", "#00DDAA", "#BB00DD", "#77FF44", "#FF9900"],
+];
+
+const ENIGMA_PALETTES = [
+  ["#C9A84C", "#5B6B4A", "#8B7355", "#3D5C5C", "#A0522D"],
+  ["#D4AF37", "#4A5D3C", "#9E8B6E", "#2F4F4F", "#B87333"],
+  ["#BFA14A", "#6B7F5E", "#7D6B52", "#4A7070", "#8B6914"],
+  ["#E8C547", "#546B46", "#A67B5B", "#365656", "#CD853F"],
+  ["#B8960C", "#3E5432", "#6F5B3E", "#527A7A", "#946B2D"],
 ];
 
 // --- Build color map from original palettes to themed palettes ---
@@ -866,15 +948,23 @@ const PUZZLE_THEMES = [
     gridBorder: "#FF004044",
     unlock: { achievement: "first_fail" },
   },
+  // --- Secret Enigma theme — unlocked via Alan Turing birthday easter egg ---
+  {
+    id: "enigma",
+    name: "Enigma",
+    desc: "The code has been broken",
+    icon: null,
+    palettes: ENIGMA_PALETTES,
+    shapes: ENIGMA_SHAPES,
+    decoration: "rotors",
+    gridBg: "#0c0c08",
+    gridBorder: "#C9A84C33",
+    unlock: { achievement: "cheat_turing" },
+  },
 ];
-
-function isCheatBirthdayActive() {
-  try { return localStorage.getItem(BIRTHDAY_KEY) === CHEAT_BIRTHDAY; } catch { return false; }
-}
 
 function isThemeUnlocked(theme, achievementsList) {
   if (!theme.unlock) return true;
-  if (isCheatBirthdayActive()) return true;
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   if (theme.unlock.seasonal) {
@@ -884,6 +974,13 @@ function isThemeUnlocked(theme, achievementsList) {
   if (theme.unlock.achievement && achievementsList) {
     const ach = achievementsList.find(a => a.id === theme.unlock.achievement);
     if (ach && ach.unlocked) return true;
+  }
+  // Fallback: check saved achievements directly (e.g. cheat_turing persisted via easter egg)
+  if (theme.unlock.achievement) {
+    try {
+      const saved = loadSavedAchievements();
+      if (saved.has(theme.unlock.achievement)) return true;
+    } catch { /* ignore */ }
   }
   return false;
 }
@@ -1603,28 +1700,33 @@ const ACHIEVEMENTS = [
   { id: "total_100", cat: "special", label: "Centurion", desc: "Solve 100 puzzles total", tier: 3, check: (p) => [...SOLVE_MODES, "daily"].reduce((s, m) => s + countModeSolved(p[m]), 0) + countCascadeClears(p.cascade) >= 100 },
   { id: "birthday_puzzle", cat: "special", label: "Birthday Bash", desc: "Solve your birthday puzzle", tier: 2, check: (p) => { try { const bd = localStorage.getItem(BIRTHDAY_KEY); if (!bd) return false; const seed = getDailySeedForDate(bd); return (p.daily || {})[seed] > 0; } catch { return false; } } },
   { id: "first_fail", cat: "special", label: "Trial & Error", desc: "Fail a puzzle for the first time", tier: 1, check: (p) => SOLVE_MODES.some(m => countModeFailed(p[m]) >= 1) },
+  { id: "cheat_turing", cat: "special", label: "Welcome Back, Alan", desc: "Born on the day the father of computing was born", tier: 3, check: () => false },
 ];
 
 function computeAchievements(progress, times, savedIds) {
   const saved = savedIds || new Set();
-  const cheat = isCheatBirthdayActive();
-  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: cheat || a.check(progress, times) || saved.has(a.id) }));
+  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: a.check(progress, times) || saved.has(a.id) }));
 }
 
 // --- Components ---
 
-function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0, colorMap, shapesArr, isJustPlaced, isRemoving, removingToken }) {
+function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0, colorMap, shapesArr, isJustPlaced, isRemoving, removingToken, themeId }) {
   const effectiveToken = isRemoving ? removingToken : token;
   const showContent = isRemoving || isRevealed || isLocked || !isBlank || isFilled;
   const parsed = showContent && effectiveToken ? parseToken(effectiveToken) : null;
   const displayColor = parsed ? (colorMap ? (colorMap[parsed.color] || parsed.color) : parsed.color) : null;
   const shapes = shapesArr || SHAPES;
   const isEasy = mode === "easy";
+  const isEnigma = themeId === "enigma";
   const fallAnimation = isPrefilled ? `fallIntoPlace 0.5s ${fallDelay}s cubic-bezier(0.34, 1.56, 0.64, 1) both` : "none";
   const wrongAnimation = isWrong ? `fallOff 0.32s ${wrongFallDelay}s cubic-bezier(0.55, 0.09, 0.68, 0.53) forwards` : "none";
   const isEmptyUnfilled = isBlank && !isFilled && !isRevealed && !isLocked && !isRemoving;
   const emptyCellAnimation = isEmptyUnfilled && emptyCellDelay != null ? `emptyCellIn 0.35s ${emptyCellDelay}s ease-out forwards` : "none";
-  const winAnimation = isWon && showContent ? `tilesWinCelebrate 0.6s ${winCelebrateDelay}s cubic-bezier(0.34, 1.56, 0.64, 1) both` : "none";
+  const winAnimation = isWon && showContent
+    ? (isEnigma
+      ? `enigmaDecrypt 0.8s ${winCelebrateDelay}s cubic-bezier(0.25, 0.46, 0.45, 0.94) both`
+      : `tilesWinCelebrate 0.6s ${winCelebrateDelay}s cubic-bezier(0.34, 1.56, 0.64, 1) both`)
+    : "none";
   const placeAnimation = isJustPlaced ? "blockPlace 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both" : "none";
   const removeAnimation = isRemoving ? "blockRemove 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards" : "none";
 
@@ -1635,6 +1737,22 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
     : emptyCellAnimation !== "none" ? emptyCellAnimation
     : fallAnimation;
 
+  // Enigma theme: circular tiles with brass wiring borders
+  const enigmaBorderRadius = "50%";
+  const enigmaEmptyBorder = `2px dashed rgba(201,168,76,0.35)`;
+  const enigmaFilledBorder = showContent && displayColor
+    ? `2px solid rgba(201,168,76,0.5)` : `2px solid rgba(201,168,76,0.2)`;
+  const enigmaActiveBorder = isLocked ? `2.5px solid ${C.correct}`
+    : isSelected ? `2.5px solid rgba(201,168,76,0.9)`
+    : isWrong ? `2.5px solid ${C.incorrect}`
+    : isEmptyUnfilled ? enigmaEmptyBorder
+    : enigmaFilledBorder;
+  const enigmaBoxShadow = isLocked ? `0 0 14px ${C.correct}55, inset 0 0 8px rgba(201,168,76,0.15)`
+    : isCorrect ? `0 0 14px ${C.correct}55, inset 0 0 8px rgba(201,168,76,0.15)`
+    : isWrong ? `0 0 12px ${C.incorrect}66`
+    : isSelected ? `0 0 16px rgba(201,168,76,0.4), inset 0 0 10px rgba(201,168,76,0.12)`
+    : showContent && displayColor ? `inset 0 0 6px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.4)` : "none";
+
   return (
     <div
       onClick={onClick}
@@ -1642,9 +1760,11 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
       onPointerUp={onPointerUp}
       onPointerEnter={onPointerEnter}
       style={{
-        width: cellSize, height: cellSize, borderRadius: cellSize > 44 ? 10 : 8,
-        backgroundColor: showContent && displayColor ? displayColor : C.surfaceLight,
-        border: isLocked ? `2.5px solid ${C.correct}`
+        width: cellSize, height: cellSize,
+        borderRadius: isEnigma ? enigmaBorderRadius : (cellSize > 44 ? 10 : 8),
+        backgroundColor: showContent && displayColor ? displayColor : (isEnigma ? "rgba(12,12,8,0.7)" : C.surfaceLight),
+        border: isEnigma ? enigmaActiveBorder
+          : isLocked ? `2.5px solid ${C.correct}`
           : isSelected ? `2.5px solid ${C.accent}`
           : isWrong ? `2.5px solid ${C.incorrect}`
           : isBlank && !isFilled && !isRevealed && !isRemoving ? `2.5px dashed ${C.border}`
@@ -1653,7 +1773,8 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
         transition: "transform 0.15s cubic-bezier(0.4,0,0.2,1), box-shadow 0.15s cubic-bezier(0.4,0,0.2,1)",
         transform: isSelected ? "scale(1.08)" : "scale(1)",
         opacity: isEmptyUnfilled && emptyCellDelay != null ? 0 : (isBlank && !isFilled && !isRevealed && !isLocked && !isRemoving ? 0.45 : 1),
-        boxShadow: isLocked ? `0 0 14px ${C.correct}55`
+        boxShadow: isEnigma ? enigmaBoxShadow
+          : isLocked ? `0 0 14px ${C.correct}55`
           : isCorrect ? `0 0 14px ${C.correct}55`
           : isWrong ? `0 0 12px ${C.incorrect}66`
           : isSelected ? `0 0 14px ${C.accent}44` : "none",
@@ -1661,6 +1782,8 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
         touchAction: "none", userSelect: "none",
         zIndex: isWrong ? 10 : undefined,
         animation: resolvedAnimation,
+        outline: isEnigma && showContent && displayColor ? "1px solid rgba(201,168,76,0.12)" : undefined,
+        outlineOffset: isEnigma ? "3px" : undefined,
       }}
     >
       {showContent && parsed && shapes[parsed.shapeIndex % shapes.length](iconSize, getShapeStroke(displayColor, isEasy))}
@@ -1668,9 +1791,10 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
   );
 }
 
-function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remaining, colorMap, shapesArr }) {
+function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remaining, colorMap, shapesArr, themeId }) {
   const isEasy = mode === "easy" || mode === "blind";
   const shapes = shapesArr || SHAPES;
+  const isEnigma = themeId === "enigma";
   return (
     <div className="token-picker-scroll" style={{ display: "flex", gap: 10, justifyContent: "center", padding: "8px 16px", flexWrap: "nowrap", overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none" }}>
       {tokens.map((token, i) => {
@@ -1682,20 +1806,28 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
         return (
           <div key={i} onClick={() => onSelect(token)}
             style={{
-              width: cellSize, height: cellSize, borderRadius: 12, backgroundColor: displayColor,
-              border: selected ? `3px solid ${C.text}` : "3px solid transparent",
+              width: cellSize, height: cellSize,
+              borderRadius: isEnigma ? "50%" : 12,
+              backgroundColor: displayColor,
+              border: isEnigma
+                ? (selected ? "3px solid rgba(201,168,76,0.9)" : "2px solid rgba(201,168,76,0.35)")
+                : (selected ? `3px solid ${C.text}` : "3px solid transparent"),
               cursor: exhausted ? "not-allowed" : "pointer", transition: "all 0.2s cubic-bezier(0.4,0,0.2,1)",
               transform: selected ? "scale(1.15)" : "scale(1)",
               opacity: exhausted ? 0.35 : 1,
-              boxShadow: selected ? `0 0 20px ${displayColor}66` : `0 2px 8px ${displayColor}33`,
+              boxShadow: isEnigma
+                ? (selected ? `0 0 20px rgba(201,168,76,0.4), inset 0 0 8px rgba(0,0,0,0.3)` : `inset 0 0 6px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.4)`)
+                : (selected ? `0 0 20px ${displayColor}66` : `0 2px 8px ${displayColor}33`),
               position: "relative", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+              outline: isEnigma ? "1px solid rgba(201,168,76,0.1)" : undefined,
+              outlineOffset: isEnigma ? "3px" : undefined,
             }}
           >
             {shapes[shapeIndex % shapes.length](cellSize * 0.5, getShapeStroke(displayColor, isEasy))}
             {left !== null && mode !== "hard" && (
               <div style={{
                 position: "absolute", top: -6, right: -6,
-                backgroundColor: exhausted ? C.textDim : C.text,
+                backgroundColor: exhausted ? C.textDim : (isEnigma ? "rgba(201,168,76,0.9)" : C.text),
                 color: C.bg, fontSize: 10, fontWeight: 700,
                 fontFamily: "'Space Mono', monospace",
                 width: 18, height: 18, borderRadius: 9,
@@ -1825,6 +1957,17 @@ const CONFETTI_PARTICLES = Array.from({ length: 22 }, (_, i) => ({
   rotation: Math.random() * 360,
   color: ["#FF6B9D", "#FFD700", "#7B68EE", "#00CED1", "#FF8C00", "#FF69B4"][Math.floor(Math.random() * 6)],
   opacity: 0.25 + Math.random() * 0.35,
+}));
+
+const ROTOR_PARTICLES = Array.from({ length: 5 }, (_, i) => ({
+  id: i,
+  x: 10 + (i * 20),
+  y: 15 + (i % 3) * 25,
+  size: 14 + Math.random() * 10,
+  duration: 6 + Math.random() * 6,
+  delay: i * 1.2,
+  direction: i % 2 === 0 ? 1 : -1,
+  opacity: 0.08 + Math.random() * 0.07,
 }));
 
 function GridDecoration({ decoration }) {
@@ -2153,6 +2296,66 @@ function GridDecoration({ decoration }) {
           position: "absolute", inset: -1, borderRadius: 17,
           boxShadow: "inset 3px 0 0 rgba(255,0,64,0.25), inset -3px 0 0 rgba(0,255,221,0.25), inset 0 2px 0 rgba(255,0,255,0.15), inset 0 -2px 0 rgba(0,255,64,0.15)",
           animation: "glitchBorder 2s steps(3) infinite",
+        }} />
+      </div>
+    );
+  }
+
+  if (decoration === "rotors") {
+    return (
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", borderRadius: 16, overflow: "hidden",
+      }}>
+        {/* Slow drifting dark mechanical background */}
+        <div style={{
+          position: "absolute", inset: "-40%", width: "180%", height: "180%",
+          animation: "enigmaBgDrift 20s ease-in-out infinite alternate",
+          background: "radial-gradient(ellipse at 30% 25%, rgba(201,168,76,0.06) 0%, transparent 50%), radial-gradient(ellipse at 75% 70%, rgba(140,107,30,0.05) 0%, transparent 45%), radial-gradient(ellipse at 50% 50%, rgba(91,107,74,0.04) 0%, transparent 60%)",
+        }} />
+        {/* Animated wiring layer that slowly moves */}
+        <svg style={{ position: "absolute", inset: "-20%", width: "140%", height: "140%", opacity: 0.07, animation: "enigmaWireDrift 25s ease-in-out infinite alternate-reverse" }} viewBox="0 0 200 200" preserveAspectRatio="none">
+          <path d="M10,30 C40,10 70,70 110,50 S170,90 150,130 S90,150 50,130 S10,90 30,70" fill="none" stroke="rgba(201,168,76,0.9)" strokeWidth="0.7"/>
+          <path d="M190,20 C150,40 170,90 130,110 S70,90 90,50 S130,30 170,50" fill="none" stroke="rgba(201,168,76,0.7)" strokeWidth="0.6"/>
+          <path d="M30,170 C70,150 50,110 90,90 S150,110 130,150 S70,180 40,160" fill="none" stroke="rgba(201,168,76,0.6)" strokeWidth="0.5"/>
+          <path d="M160,180 C130,160 140,120 100,100 S60,130 80,160" fill="none" stroke="rgba(184,150,12,0.5)" strokeWidth="0.5"/>
+        </svg>
+        {/* Spinning rotor gears */}
+        {ROTOR_PARTICLES.map(p => (
+          <svg key={p.id} width={p.size} height={p.size} viewBox="0 0 24 24" style={{
+            position: "absolute", left: `${p.x}%`, top: `${p.y}%`,
+            opacity: p.opacity,
+            animation: `enigmaRotor ${p.duration}s ${p.delay}s linear infinite${p.direction < 0 ? " reverse" : ""}`,
+          }}>
+            <circle cx="12" cy="12" r="10" fill="none" stroke="rgba(201,168,76,0.5)" strokeWidth="1.2"/>
+            <circle cx="12" cy="12" r="6" fill="none" stroke="rgba(201,168,76,0.4)" strokeWidth="1"/>
+            <circle cx="12" cy="12" r="2" fill="none" stroke="rgba(201,168,76,0.5)" strokeWidth="1"/>
+            {[0,45,90,135,180,225,270,315].map(angle => (
+              <line key={angle}
+                x1={12 + Math.cos(angle * Math.PI / 180) * 6}
+                y1={12 + Math.sin(angle * Math.PI / 180) * 6}
+                x2={12 + Math.cos(angle * Math.PI / 180) * 10}
+                y2={12 + Math.sin(angle * Math.PI / 180) * 10}
+                stroke="rgba(201,168,76,0.4)" strokeWidth="1.5" strokeLinecap="round"
+              />
+            ))}
+          </svg>
+        ))}
+        {/* Pulsing brass glow */}
+        <div style={{
+          position: "absolute", inset: -2, borderRadius: 18,
+          animation: "enigmaGlow 4s ease-in-out infinite",
+          boxShadow: "inset 0 0 20px rgba(201,168,76,0.06), inset 0 0 60px rgba(140,107,30,0.03)",
+        }} />
+        {/* Brass mechanical border lines */}
+        <div style={{
+          position: "absolute", top: 0, left: 0, right: 0, height: 2,
+          background: "linear-gradient(90deg, transparent, rgba(201,168,76,0.3), rgba(184,150,12,0.4), rgba(201,168,76,0.3), transparent)",
+          borderRadius: "16px 16px 0 0",
+        }} />
+        <div style={{
+          position: "absolute", bottom: 0, left: 0, right: 0, height: 2,
+          background: "linear-gradient(90deg, transparent, rgba(201,168,76,0.3), rgba(184,150,12,0.4), rgba(201,168,76,0.3), transparent)",
+          borderRadius: "0 0 16px 16px",
         }} />
       </div>
     );
@@ -3010,16 +3213,32 @@ export default function Pattrn() {
     };
   }, [stopTimer]);
 
-  const handleTokenSelect = (token) => {
+  const handleTokenSelect = useCallback((token) => {
     setSelectedToken(token);
-    if (selectedCell && puzzle.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
+    if (selectedCell && puzzle?.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
       if (puzzle.mode !== "hard" && fills[selectedCell] !== token && (tokenRemaining[token] ?? 0) <= 0) return;
       cancelWrongCellClear();
       setFills(prev => ({ ...prev, [selectedCell]: token }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(selectedCell); return n; });
       setSelectedCell(null);
     }
-  };
+  }, [selectedCell, puzzle, lockedCells, fills, tokenRemaining, cancelWrongCellClear]);
+
+  // Arrow keys to cycle through token options
+  useEffect(() => {
+    if (view !== "play" || gameState !== "playing" || !puzzle?.usedTokens?.length) return;
+    const tokens = puzzle.usedTokens;
+    const handler = (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      const currentIdx = tokens.indexOf(selectedToken);
+      const dir = e.key === "ArrowRight" ? 1 : -1;
+      const nextIdx = (currentIdx + dir + tokens.length) % tokens.length;
+      handleTokenSelect(tokens[nextIdx]);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [view, gameState, puzzle, selectedToken, handleTokenSelect]);
 
   const maxAttempts = isCascade ? 11 : isBlind ? 6 : 5;
 
@@ -4101,8 +4320,21 @@ export default function Pattrn() {
                     setBirthday(bdStr);
                     try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
                     if (bdStr === CHEAT_BIRTHDAY) {
-                      achievementQueueRef.current.push({ id: "cheat_turing", label: "Welcome Back, Alan", desc: "The enigma has been decoded", tier: 3 });
-                      if (!achievementToastTimer.current) advanceAchievementQueue();
+                      const saved = loadSavedAchievements();
+                      if (!saved.has("cheat_turing")) {
+                        // Show achievement toast
+                        achievementQueueRef.current.push({ id: "cheat_turing", label: "Welcome Back, Alan", desc: "The enigma has been decoded", tier: 3 });
+                        if (!achievementToastTimer.current) advanceAchievementQueue();
+                        // Persist so it survives birthday changes
+                        saved.add("cheat_turing");
+                        saveSavedAchievements(saved);
+                        setSavedAchievementIds(new Set(saved));
+                        // Show Enigma theme unlock toast after achievement toast
+                        const enigmaTheme = PUZZLE_THEMES.find(t => t.id === "enigma");
+                        if (enigmaTheme) {
+                          setTimeout(() => showThemeToast(enigmaTheme), 3800);
+                        }
+                      }
                     }
                     setShowBirthdayPrompt(false);
                     setBirthdayInput("");
@@ -4941,6 +5173,67 @@ export default function Pattrn() {
           </div>
         );
       })()}
+
+      {/* Theme unlock toast (menu view) */}
+      {themeToast && (
+        <div key={themeToast.key} style={{
+          position: "fixed",
+          top: achievementToast
+            ? "calc(170px + env(safe-area-inset-top, 0px))"
+            : "calc(100px + env(safe-area-inset-top, 0px))",
+          left: "50%",
+          transform: "translateX(-50%)", zIndex: 100,
+          maxWidth: "calc(100vw - 32px)", boxSizing: "border-box",
+          animation: themeToastDismissing
+            ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
+            : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+          pointerEvents: "auto",
+        }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "10px 14px", borderRadius: 14,
+            backgroundColor: C.surface, border: `1.5px solid ${C.accent}`,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 20px ${C.accent}33`,
+          }}>
+            <div style={{
+              width: 36, height: 36, borderRadius: 9,
+              backgroundColor: C.accent + "18", display: "flex", alignItems: "center", justifyContent: "center",
+              border: `2px solid ${C.accent}66`, fontSize: 18, flexShrink: 0,
+            }}>
+              {themeToast.icon || "\uD83C\uDFA8"}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{
+                fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700,
+                color: C.accent, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2,
+              }}>Theme unlocked</div>
+              <div style={{
+                fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                color: C.text, letterSpacing: 0.5,
+              }}>{themeToast.name}</div>
+            </div>
+            <button
+              onClick={() => {
+                setActiveThemeId(themeToast.id);
+                saveTheme(themeToast.id);
+                setThemeToastDismissing(true);
+                setTimeout(() => { setThemeToast(null); setThemeToastDismissing(false); }, 350);
+                if (themeToastTimer.current) { clearTimeout(themeToastTimer.current); themeToastTimer.current = null; }
+              }}
+              style={{
+                background: C.accent, border: "none", borderRadius: 8, padding: "6px 12px",
+                color: C.bg, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                fontSize: 11, fontWeight: 700, letterSpacing: 0.5, whiteSpace: "nowrap",
+                transition: "opacity 0.15s", flexShrink: 0,
+              }}
+              onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; }}
+              onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+            >
+              Use it
+            </button>
+          </div>
+        </div>
+      )}
       </div>
     );
   }
@@ -4963,7 +5256,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} } @keyframes enigmaRotor { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} } @keyframes enigmaBgDrift { 0%{transform:translate(0%,0%) rotate(0deg)} 33%{transform:translate(5%,-3%) rotate(1deg)} 66%{transform:translate(-3%,5%) rotate(-1deg)} 100%{transform:translate(2%,2%) rotate(0.5deg)} } @keyframes enigmaWireDrift { 0%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(3%,-2%) scale(1.02)} 100%{transform:translate(-2%,3%) scale(0.98)} } @keyframes enigmaGlow { 0%,100%{box-shadow:inset 0 0 20px rgba(201,168,76,0.04),inset 0 0 60px rgba(140,107,30,0.02)} 50%{box-shadow:inset 0 0 30px rgba(201,168,76,0.08),inset 0 0 80px rgba(140,107,30,0.04)} } @keyframes enigmaDecrypt { 0%{transform:rotateY(0deg) scale(1);opacity:0.4;filter:brightness(0.5)} 25%{transform:rotateY(90deg) scale(0.9);opacity:0.6;filter:brightness(0.7)} 50%{transform:rotateY(180deg) scale(0.95);opacity:0.8;filter:brightness(1.3)} 75%{transform:rotateY(270deg) scale(1.02);filter:brightness(1.1)} 100%{transform:rotateY(360deg) scale(1);opacity:1;filter:brightness(1)} }`}</style>
 
       <Particles show={showParticles} />
 
@@ -5248,6 +5541,7 @@ export default function Pattrn() {
                     mode={puzzle.mode}
                     colorMap={themeColorMap}
                     shapesArr={themedShapes}
+                    themeId={activeThemeId}
                     isJustPlaced={justPlacedCells.has(key)}
                     isRemoving={!!removingCells[key]}
                     removingToken={removingCells[key] || null}
@@ -5265,7 +5559,7 @@ export default function Pattrn() {
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
         {/* Token picker row */}
         {gameState === "playing" && (
-          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} />
+          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId} />
         )}
         {gameState === "playing" && (
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
