@@ -1272,16 +1272,30 @@ function buildFogPuzzles() {
     const allCells = [];
     for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) allCells.push(`${row}-${col}`);
     const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
-    // Pick a starting pre-filled cell and reveal its 3x3 neighborhood
+    // Build initial visible area: start from a pre-filled cell, BFS-expand
+    // until at least one blank is visible so the player can always act.
     const prefilled = allCells.filter(k => !blanks.has(k));
     const startCell = shuffle(prefilled, r)[0];
     const [sr, sc] = startCell.split("-").map(Number);
     const initialVisible = new Set();
-    for (let dr = -1; dr <= 1; dr++) {
-      for (let dc = -1; dc <= 1; dc++) {
-        const nr = sr + dr, nc = sc + dc;
-        if (nr >= 0 && nr < 5 && nc >= 0 && nc < 5) initialVisible.add(`${nr}-${nc}`);
+    const addNeighbors = (cr, cc) => {
+      for (let dr = -1; dr <= 1; dr++) {
+        for (let dc = -1; dc <= 1; dc++) {
+          const nr = cr + dr, nc = cc + dc;
+          if (nr >= 0 && nr < 5 && nc >= 0 && nc < 5) initialVisible.add(`${nr}-${nc}`);
+        }
       }
+    };
+    addNeighbors(sr, sc);
+    // Keep expanding outward from visible pre-filled cells until a blank is visible
+    let safety = 0;
+    while (![...initialVisible].some(k => blanks.has(k)) && safety < 25) {
+      const frontier = [...initialVisible].filter(k => !blanks.has(k));
+      if (frontier.length === 0) break;
+      const next = frontier[safety % frontier.length];
+      const [nr2, nc2] = next.split("-").map(Number);
+      addNeighbors(nr2, nc2);
+      safety++;
     }
     const usedTokens = [...new Set(solution.flat())];
     puzzles.push({ id: i, solution, blanks, usedTokens, gridSize: 5, mode: "fog", initialVisible: [...initialVisible] });
@@ -3052,8 +3066,6 @@ export default function Pattrn() {
 
   const checkSolution = () => {
     if (!puzzle) return;
-    const newAttempts = attempts + 1;
-    setAttempts(newAttempts);
 
     let allCorrect = true;
     const wrong = new Set();
@@ -3077,29 +3089,86 @@ export default function Pattrn() {
 
     // In fog mode, expand visibility around correct placements
     if (isFog) {
-      const newFog = new Set(fogVisible);
-      for (const key of activeBlanks) {
-        const [r, c] = key.split("-").map(Number);
-        if (fills[key] === puzzle.solution[r][c]) {
-          // Reveal 3x3 neighborhood around correct cell
-          for (let dr = -1; dr <= 1; dr++) {
-            for (let dc = -1; dc <= 1; dc++) {
-              const nr = r + dr, nc = c + dc;
-              if (nr >= 0 && nr < puzzle.gridSize && nc >= 0 && nc < puzzle.gridSize) {
-                newFog.add(`${nr}-${nc}`);
-              }
-            }
-          }
-        }
-      }
-      setFogVisible(newFog);
-      // In fog mode, "allCorrect" means all blanks in the ENTIRE puzzle are correct
+      const visibleCorrect = wrong.size === 0; // all VISIBLE blanks were correct
       const allBlanksCorrect = [...puzzle.blanks].every(k => {
         const [r, c] = k.split("-").map(Number);
         return fills[k] === puzzle.solution[r][c];
       });
       allCorrect = allBlanksCorrect;
+
+      if (visibleCorrect && !allBlanksCorrect) {
+        // All visible blanks correct but puzzle not done — free reveal, no dot
+        const newFog = new Set(fogVisible);
+        const gs = puzzle.gridSize;
+        const addNeighbors = (cr, cc) => {
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              const nr = cr + dr, nc = cc + dc;
+              if (nr >= 0 && nr < gs && nc >= 0 && nc < gs) newFog.add(`${nr}-${nc}`);
+            }
+          }
+        };
+        // Expand from every correct placement
+        for (const key of activeBlanks) {
+          const [r2, c2] = key.split("-").map(Number);
+          addNeighbors(r2, c2);
+        }
+        // Keep expanding until at least one NEW unfilled blank is visible
+        let safety = 0;
+        while (safety < gs * gs) {
+          const hasVisibleUnfilled = [...puzzle.blanks].some(k => newFog.has(k) && !fills[k]);
+          if (hasVisibleUnfilled) break;
+          // Expand from all visible pre-filled cells on the frontier
+          const frontier = [...newFog].filter(k => {
+            if (puzzle.blanks.has(k)) return false;
+            const [fr, fc] = k.split("-").map(Number);
+            // Check if any neighbor is NOT yet visible
+            for (let dr = -1; dr <= 1; dr++) {
+              for (let dc = -1; dc <= 1; dc++) {
+                const nr = fr + dr, nc = fc + dc;
+                if (nr >= 0 && nr < gs && nc >= 0 && nc < gs && !newFog.has(`${nr}-${nc}`)) return true;
+              }
+            }
+            return false;
+          });
+          if (frontier.length === 0) break;
+          for (const fk of frontier) {
+            const [fr, fc] = fk.split("-").map(Number);
+            addNeighbors(fr, fc);
+          }
+          safety++;
+        }
+        setFogVisible(newFog);
+        // Clear the filled visible blanks so the player can see the new revealed area
+        return; // Don't increment attempts — this was a free reveal
+      }
+
+      if (!visibleCorrect) {
+        // Some wrong — still expand fog from correct ones, then increment attempt
+        const newFog = new Set(fogVisible);
+        const gs = puzzle.gridSize;
+        for (const key of activeBlanks) {
+          const [r2, c2] = key.split("-").map(Number);
+          if (!wrong.has(key)) {
+            for (let dr = -1; dr <= 1; dr++) {
+              for (let dc = -1; dc <= 1; dc++) {
+                const nr = r2 + dr, nc = c2 + dc;
+                if (nr >= 0 && nr < gs && nc >= 0 && nc < gs) newFog.add(`${nr}-${nc}`);
+              }
+            }
+          }
+        }
+        setFogVisible(newFog);
+      } else {
+        // allBlanksCorrect is true — full win, reveal everything
+        const allKeys = new Set();
+        for (let rr = 0; rr < puzzle.gridSize; rr++) for (let cc = 0; cc < puzzle.gridSize; cc++) allKeys.add(`${rr}-${cc}`);
+        setFogVisible(allKeys);
+      }
     }
+
+    const newAttempts = attempts + 1;
+    setAttempts(newAttempts);
 
     // In blind mode, also need all locked from before to count
     if (isBlind) {
@@ -5185,8 +5254,8 @@ export default function Pattrn() {
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(88px + env(safe-area-inset-top, 0px))", paddingBottom: "calc(140px + env(safe-area-inset-bottom, 0px))", width: "calc(100% + 32px)", margin: "0 -16px", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, position: "relative", boxSizing: "border-box" }}>
         <GridDecoration decoration={activeTheme.decoration} />
-      <div key={gridEpoch} style={{
-        animation: "slideIn 0.3s ease both", touchAction: "none",
+      <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
+      <div style={{
         transform: isSpin ? `rotate(${spinAngle}deg)` : undefined,
         transition: isSpin ? "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
       }}>
@@ -5260,6 +5329,7 @@ export default function Pattrn() {
             </div>
           ))}
         </div>
+      </div>
       </div>
       </div>
 
