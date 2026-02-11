@@ -108,6 +108,29 @@ export async function saveCloudData(uid, data) {
   });
 }
 
+// Summarise a game-data object into human-readable progress counts.
+// Returns { totalSolved, achievements, modes: { easy, medium, ... } }
+export function summariseGameData(data) {
+  if (!data) return { totalSolved: 0, achievements: 0, modes: {} };
+  const progress = data.progress || {};
+  const solveModes = ["easy", "medium", "hard", "blind", "daily", "spin", "mosaic"];
+  const modes = {};
+  let totalSolved = 0;
+  for (const mode of solveModes) {
+    const mp = progress[mode] || {};
+    const solved = Object.values(mp).filter(v => v > 0).length;
+    modes[mode] = solved;
+    totalSolved += solved;
+  }
+  // Cascade: count full clears (value === 10, i.e. all 10 levels)
+  const cascade = progress.cascade || {};
+  const cascadeClears = Object.values(cascade).filter(v => v === 10).length;
+  modes.cascade = cascadeClears;
+  totalSolved += cascadeClears;
+  const achievements = (data.achievements || []).length;
+  return { totalSolved, achievements, modes };
+}
+
 // Merges local data into cloud, preferring the "better" result for each puzzle
 export function mergeGameData(local, cloud) {
   if (!cloud) return local;

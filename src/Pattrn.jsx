@@ -9,6 +9,7 @@ import {
   loadCloudData,
   saveCloudData,
   mergeGameData,
+  summariseGameData,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2544,6 +2545,9 @@ export default function Pattrn() {
   const [loginHintToast, setLoginHintToast] = useState(false);
   const [loginHintDismissing, setLoginHintDismissing] = useState(false);
   const loginHintTimer = useRef(null);
+  // Sync choice prompt state (shown when both local + cloud data exist on login)
+  const [showSyncChoice, setShowSyncChoice] = useState(false);
+  const [syncChoiceData, setSyncChoiceData] = useState(null); // { uid, localData, cloudData, localSummary, cloudSummary }
 
   // Listen for auth state changes
   useEffect(() => {
@@ -2646,29 +2650,51 @@ export default function Pattrn() {
     }
   }, [gatherLocalData]);
 
-  // Handle sign in: pull cloud data, merge with local, apply
+  // After login, check for cloud vs local conflict and show choice prompt if needed
+  const handlePostLoginSync = useCallback(async (uid) => {
+    const cloudData = await loadCloudData(uid);
+    const localData = gatherLocalData();
+    const localSummary = summariseGameData(localData);
+    const cloudSummary = summariseGameData(cloudData);
+    const hasLocal = localSummary.totalSolved > 0 || localSummary.achievements > 0;
+    const hasCloud = cloudData && (cloudSummary.totalSolved > 0 || cloudSummary.achievements > 0);
+
+    if (hasLocal && hasCloud) {
+      // Both sides have progress — ask the user what to do
+      setSyncChoiceData({ uid, localData, cloudData, localSummary, cloudSummary });
+      setShowSyncChoice(true);
+      setShowAccountModal(false);
+      setAutoLoginModal(false);
+      setAccountEmail("");
+      setAccountPassword("");
+      return;
+    }
+
+    // Only one side has data (or neither): use the merge path which handles it correctly
+    const merged = mergeGameData(localData, cloudData);
+    applyMergedData(merged);
+    await saveCloudData(uid, merged);
+    setShowAccountModal(false);
+    setAutoLoginModal(false);
+    setAccountEmail("");
+    setAccountPassword("");
+    setSyncStatus("synced");
+    setTimeout(() => setSyncStatus(""), 2000);
+  }, [gatherLocalData, applyMergedData]);
+
+  // Handle sign in: pull cloud data, check for conflict
   const handleSignIn = useCallback(async (email, password) => {
     setAccountLoading(true);
     setAccountError("");
     try {
       const user = await signInWithEmail(email, password);
-      const cloudData = await loadCloudData(user.uid);
-      const localData = gatherLocalData();
-      const merged = mergeGameData(localData, cloudData);
-      applyMergedData(merged);
-      await saveCloudData(user.uid, merged);
-      setShowAccountModal(false);
-      setAutoLoginModal(false);
-      setAccountEmail("");
-      setAccountPassword("");
-      setSyncStatus("synced");
-      setTimeout(() => setSyncStatus(""), 2000);
+      await handlePostLoginSync(user.uid);
     } catch (e) {
       setAccountError(friendlyAuthError(e.code));
     } finally {
       setAccountLoading(false);
     }
-  }, [gatherLocalData, applyMergedData]);
+  }, [handlePostLoginSync]);
 
   // Handle Google sign in
   const handleGoogleSignIn = useCallback(async () => {
@@ -2676,23 +2702,7 @@ export default function Pattrn() {
     setAccountError("");
     try {
       const user = await signInWithGoogle();
-      const cloudData = await loadCloudData(user.uid);
-      const localData = gatherLocalData();
-      if (cloudData) {
-        // Existing account: merge
-        const merged = mergeGameData(localData, cloudData);
-        applyMergedData(merged);
-        await saveCloudData(user.uid, merged);
-      } else {
-        // First time with Google: push local data
-        await saveCloudData(user.uid, localData);
-      }
-      setShowAccountModal(false);
-      setAutoLoginModal(false);
-      setAccountEmail("");
-      setAccountPassword("");
-      setSyncStatus("synced");
-      setTimeout(() => setSyncStatus(""), 2000);
+      await handlePostLoginSync(user.uid);
     } catch (e) {
       if (e.code !== "auth/popup-closed-by-user") {
         setAccountError(friendlyAuthError(e.code));
@@ -2700,7 +2710,38 @@ export default function Pattrn() {
     } finally {
       setAccountLoading(false);
     }
-  }, [gatherLocalData, applyMergedData]);
+  }, [handlePostLoginSync]);
+
+  // Sync choice handlers: user picks how to resolve local vs cloud conflict
+  const handleSyncChoice = useCallback(async (choice) => {
+    if (!syncChoiceData) return;
+    const { uid, localData, cloudData } = syncChoiceData;
+    setSyncStatus("syncing");
+    setShowSyncChoice(false);
+    try {
+      let dataToApply;
+      if (choice === "local") {
+        // Overwrite cloud with local data
+        dataToApply = localData;
+      } else if (choice === "cloud") {
+        // Overwrite local with cloud data
+        dataToApply = cloudData;
+      } else {
+        // Merge both (best of both worlds)
+        dataToApply = mergeGameData(localData, cloudData);
+      }
+      applyMergedData(dataToApply);
+      await saveCloudData(uid, dataToApply);
+      setSyncStatus("synced");
+      setTimeout(() => setSyncStatus(""), 2000);
+    } catch (e) {
+      console.error("Sync choice failed:", e);
+      setSyncStatus("error");
+      setTimeout(() => setSyncStatus(""), 3000);
+    } finally {
+      setSyncChoiceData(null);
+    }
+  }, [syncChoiceData, applyMergedData]);
 
   // Handle sign out
   const handleSignOut = useCallback(async () => {
@@ -5562,6 +5603,104 @@ export default function Pattrn() {
             </div>
           </div>
         )}
+
+        {/* Sync choice prompt (local vs cloud data on login) */}
+        {showSyncChoice && syncChoiceData && (() => {
+          const { localSummary, cloudSummary } = syncChoiceData;
+          const localMore = localSummary.totalSolved > cloudSummary.totalSolved;
+          const cloudMore = cloudSummary.totalSolved > localSummary.totalSolved;
+          const SyncOption = ({ label, tag, summary, highlight, onClick }) => (
+            <button onClick={onClick} style={{
+              width: "100%", padding: "14px 16px", borderRadius: 12, textAlign: "left",
+              background: highlight ? C.accent + "14" : C.surface,
+              border: `1px solid ${highlight ? C.accent + "66" : C.border}`,
+              cursor: "pointer", transition: "all 0.15s", marginBottom: 8,
+              position: "relative",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text }}>
+                  {label}
+                </span>
+                {tag && (
+                  <span style={{
+                    fontSize: 9, fontWeight: 700, fontFamily: "'Space Mono', monospace",
+                    padding: "2px 6px", borderRadius: 4,
+                    backgroundColor: C.correct + "22", color: C.correct,
+                    textTransform: "uppercase", letterSpacing: 0.5,
+                  }}>
+                    {tag}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5 }}>
+                {summary.totalSolved} puzzle{summary.totalSolved !== 1 ? "s" : ""} solved
+                {summary.achievements > 0 && (<span> &middot; {summary.achievements} achievement{summary.achievements !== 1 ? "s" : ""}</span>)}
+              </div>
+            </button>
+          );
+          return (
+            <div onClick={() => {}} style={{
+              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
+              display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+            }}>
+              <div onClick={e => e.stopPropagation()} style={{
+                backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
+                padding: "24px", maxWidth: 400, width: "100%",
+                boxShadow: "0 16px 48px rgba(0,0,0,0.6)", animation: "fadeUp 0.25s ease",
+              }}>
+                <div style={{ textAlign: "center", marginBottom: 20 }}>
+                  <div style={{
+                    width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
+                    backgroundColor: "#F59E0B22", display: "flex", alignItems: "center", justifyContent: "center",
+                    border: "2px solid #F59E0B44",
+                  }}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                      <path d="M12 3L4 9v12h16V9l-8-6z" stroke="#F59E0B" strokeWidth="2" fill="none" strokeLinejoin="round"/>
+                      <path d="M9 21v-6h6v6" stroke="#F59E0B" strokeWidth="2" fill="none" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
+                  <h3 style={{
+                    fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, margin: "0 0 6px",
+                  }}>
+                    Existing Save Found
+                  </h3>
+                  <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5, maxWidth: 300, marginInline: "auto" }}>
+                    You have progress saved in the cloud and on this device. Which would you like to keep?
+                  </p>
+                </div>
+
+                <SyncOption
+                  label="Use This Device"
+                  tag={localMore ? "More progress" : null}
+                  summary={localSummary}
+                  highlight={localMore}
+                  onClick={() => handleSyncChoice("local")}
+                />
+                <SyncOption
+                  label="Use Cloud Save"
+                  tag={cloudMore ? "More progress" : null}
+                  summary={cloudSummary}
+                  highlight={cloudMore}
+                  onClick={() => handleSyncChoice("cloud")}
+                />
+                <button onClick={() => handleSyncChoice("merge")} style={{
+                  width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                  background: C.accent, color: C.bg, border: "none",
+                  cursor: "pointer", textTransform: "uppercase", transition: "all 0.15s", marginTop: 4,
+                }}>
+                  Merge Both
+                </button>
+                <p style={{
+                  fontSize: 10, color: C.textDim, textAlign: "center", margin: "10px 0 0",
+                  lineHeight: 1.5, fontFamily: "'DM Sans', sans-serif",
+                }}>
+                  Merge keeps the best results from both saves
+                </p>
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Achievements drawer */}
         {showAchievements && (() => {
