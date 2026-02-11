@@ -1254,11 +1254,104 @@ function buildCascadePuzzle(level, runSeed) {
   return { id: level, solution, blanks, usedTokens, gridSize: sz, mode: "medium" };
 }
 
+// --- SPIN: 7x7 paired puzzles, grid rotates 90° periodically ---
+function buildSpinPuzzles() {
+  const puzzles = [];
+  for (let i = 0; i < 50; i++) {
+    const r = rng(i * 9001 + 555);
+    const palIdx = Math.floor(r() * PALETTES.length);
+    const pal = shuffle(PALETTES[palIdx], r);
+    const validGens = GENERATORS_7.map((g, idx) => idx).filter(idx => !TWO_COLOR_GENS.has(idx) && idx !== FOUR_COLOR_GEN && !STRIPE_GENS.has(idx));
+    const validWeights = validGens.map(idx => GEN_WEIGHTS[idx]);
+    const totalW = validWeights.reduce((a, b) => a + b, 0);
+    let roll = r() * totalW;
+    let genIdx = validGens[validGens.length - 1];
+    for (let vi = 0; vi < validGens.length; vi++) {
+      roll -= validWeights[vi];
+      if (roll <= 0) { genIdx = validGens[vi]; break; }
+    }
+    const numShapes = 3;
+    const shapeIndices = Array.from({ length: numShapes }, (_, k) => k);
+    const grid = GENERATORS_7[genIdx](shapeIndices, numShapes);
+    const solution = grid.map(row => row.map(si => `${pal[si % pal.length]}|${si}`));
+    const numBlanks = Math.min(10 + Math.floor(i / 3), 24);
+    const allCells = [];
+    for (let row = 0; row < 7; row++) for (let col = 0; col < 7; col++) allCells.push(`${row}-${col}`);
+    const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
+    const usedTokens = [...new Set(solution.flat())];
+    // Spin interval: starts at 10s for puzzle 0, decreases to 5s for puzzle 49
+    const spinInterval = Math.max(5, 10 - Math.floor(i / 10));
+    puzzles.push({ id: i, solution, blanks, usedTokens, gridSize: 7, mode: "spin", spinInterval });
+  }
+  return puzzles;
+}
+
+// --- MOSAIC: 25 puzzles that tile into a larger 25x25 dog pattern ---
+function buildMosaicPuzzles() {
+  const mr = rng(42424);
+  const palIdx = Math.floor(mr() * PALETTES.length);
+  const pal = shuffle(PALETTES[palIdx], mr);
+  // 25×25 pixel art dog (front-facing, sitting)
+  // 0 = background, 1 = body/fur, 2 = detail (eyes, nose, tongue, collar, inner ears)
+  const DOG = [
+    [0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,1,1,2,1,1,1,0,0,0,0,0,1,1,1,2,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,2,2,1,1,1,1,1,1,1,1,1,2,2,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,1,1,2,2,2,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,0,0,1,1,1,1,1,2,1,2,1,1,1,1,1,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,1,1,1,1,1,2,1,1,1,1,1,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,2,2,2,2,2,2,2,2,2,2,2,2,2,0,0,0,0,0,0],
+    [0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0,0],
+    [0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+    [0,0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0,0],
+    [0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0],
+    [0,0,0,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+    [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],
+  ];
+  const bigSolution = DOG.map(row => row.map(si => `${pal[si % pal.length]}|${si}`));
+  // Slice into 25 tiles of 5x5
+  const puzzles = [];
+  for (let ti = 0; ti < 25; ti++) {
+    const tileRow = Math.floor(ti / 5);
+    const tileCol = ti % 5;
+    const solution = [];
+    for (let r = 0; r < 5; r++) {
+      const row = [];
+      for (let c = 0; c < 5; c++) {
+        row.push(bigSolution[tileRow * 5 + r][tileCol * 5 + c]);
+      }
+      solution.push(row);
+    }
+    const rr = rng(ti * 7331 + 4444);
+    const numBlanks = Math.min(4 + Math.floor(ti / 2), 12);
+    const allCells = [];
+    for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) allCells.push(`${row}-${col}`);
+    const blanks = new Set(shuffle(allCells, rr).slice(0, numBlanks));
+    const usedTokens = [...new Set(solution.flat())];
+    puzzles.push({ id: ti, solution, blanks, usedTokens, gridSize: 5, mode: "mosaic" });
+  }
+  return puzzles;
+}
+
 const PUZZLE_SETS = {
   easy: buildEasyPuzzles(),
   medium: buildMediumPuzzles(),
   hard: buildHardPuzzles(),
   blind: buildBlindPuzzles(),
+  spin: buildSpinPuzzles(),
+  mosaic: buildMosaicPuzzles(),
 };
 
 // --- Migrate daily data from index-based keys (0-49) to date-based keys (UTC midnight timestamps) ---
@@ -1348,11 +1441,13 @@ function loadProgress() {
       blind: base.blind ?? {},
       daily: migrateDailyData(base.daily ?? {}),
       cascade: base.cascade ?? {},
+      spin: base.spin ?? {},
+      mosaic: base.mosaic ?? {},
       cascadeRunState,
       cascadeRunStateLastIndex: typeof cascadeRunStateLastIndex === "number" ? cascadeRunStateLastIndex : undefined,
     };
   } catch {
-    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined };
+    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined };
   }
 }
 
@@ -1462,7 +1557,7 @@ const ACHIEVEMENT_CATS = [
   { key: "special", label: "Special" },
 ];
 
-const SOLVE_MODES = ["easy", "medium", "hard", "blind"];
+const SOLVE_MODES = ["easy", "medium", "hard", "blind", "spin", "mosaic"];
 
 const ACHIEVEMENTS = [
   // Progress — per mode
@@ -2088,10 +2183,12 @@ const DIFFICULTIES = [
   { key: "blind", label: "Blind", desc: "5\u00D75 \u2022 No Clues", cat: "special" },
   { key: "daily", label: "Daily", desc: "1 a day", cat: "special" },
   { key: "cascade", label: "Cascade", desc: "Keep on", cat: "special" },
+  { key: "spin", label: "Spin", desc: "7\u00D77 \u2022 Dizzy", cat: "special" },
+  { key: "mosaic", label: "Mosaic", desc: "5\u00D75 \u2022 Big picture", cat: "special" },
 ];
 
 const MODE_CATEGORIES = ["classic", "special"];
-const VALID_MODES = new Set(["easy", "medium", "hard", "blind", "daily", "cascade"]);
+const VALID_MODES = new Set(["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"]);
 
 function getSearchParams() {
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
@@ -2164,6 +2261,8 @@ export default function Pattrn() {
   const [removingCells, setRemovingCells] = useState({});
   const removingTimersRef = useRef({});
   const [gridEpoch, setGridEpoch] = useState(0);
+  const [spinAngle, setSpinAngle] = useState(0);
+  const spinTimerRef = useRef(null);
   const hasSyncedUrl = useRef(false);
   // Birthday: stored as "dd-mm-yyyy" (or "dd-mm" if no year), null if not set
   const [birthday, setBirthday] = useState(() => {
@@ -2437,6 +2536,8 @@ export default function Pattrn() {
   const puzzle = isCascade ? cascadePuzzle : isDaily ? currentDailyPuzzle : puzzles[currentPuzzle];
   const diffProgress = progress[difficulty] || {};
   const isBlind = difficulty === "blind" && !isDaily;
+  const isSpin = difficulty === "spin";
+  const isMosaic = difficulty === "mosaic";
   const progressKey = isCascade ? cascadeRunIndex : isDaily ? (currentDailyDate ? getDailySeedForDate(currentDailyDate) : null) : currentPuzzle;
 
   // How many of each token still need to be placed (only counts blanks, not full grid)
@@ -2684,6 +2785,8 @@ export default function Pattrn() {
     setRemovingCells({});
     setShowParticles(false);
     setGridEpoch((e) => e + 1);
+    // Reset spin angle
+    setSpinAngle(0);
     if (effectiveDiff !== "cascade") setElapsedTime(0);
     stopTimer();
     timerIsCascadeRun.current = effectiveDiff === "cascade";
@@ -2879,6 +2982,17 @@ export default function Pattrn() {
     };
   }, [paintCell]);
 
+  // Spin mode timer: rotate grid every N seconds
+  useEffect(() => {
+    if (spinTimerRef.current) { clearInterval(spinTimerRef.current); spinTimerRef.current = null; }
+    if (difficulty !== "spin" || view !== "play" || gameState !== "playing" || !puzzle) return;
+    const interval = (puzzle.spinInterval || 8) * 1000;
+    spinTimerRef.current = setInterval(() => {
+      setSpinAngle(prev => (prev + 90) % 360);
+    }, interval);
+    return () => { if (spinTimerRef.current) { clearInterval(spinTimerRef.current); spinTimerRef.current = null; } };
+  }, [difficulty, view, gameState, puzzle]);
+
   // Clean up timers on unmount
   useEffect(() => {
     return () => {
@@ -2904,8 +3018,6 @@ export default function Pattrn() {
 
   const checkSolution = () => {
     if (!puzzle) return;
-    const newAttempts = attempts + 1;
-    setAttempts(newAttempts);
 
     let allCorrect = true;
     const wrong = new Set();
@@ -2923,6 +3035,9 @@ export default function Pattrn() {
         wrong.add(key);
       }
     }
+
+    const newAttempts = attempts + 1;
+    setAttempts(newAttempts);
 
     // In blind mode, also need all locked from before to count
     if (isBlind) {
@@ -3508,7 +3623,7 @@ export default function Pattrn() {
                         fontSize: 8,
                         color: active ? (d.key === "blind" ? "#fff9" : C.bg + "aa") : C.textDim,
                       }}>{d.desc}</span>
-                      <span style={{ fontSize: 8, color: active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{d.key === "daily" ? `${solved} solved` : `${solved}/50`}</span>
+                      <span style={{ fontSize: 8, color: active ? (d.key === "blind" ? "#fff7" : C.bg + "88") : C.textDim }}>{d.key === "daily" ? `${solved} solved` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}</span>
                     </button>
                   );
                 })}
@@ -4028,8 +4143,79 @@ export default function Pattrn() {
           </div>
         )}
 
-        {/* Puzzle grid: 50 for non-daily modes */}
-        {!isDaily && (<>
+        {/* Mosaic grid: 5x5 mini-thumbnails forming the big picture */}
+        {isMosaic && (<>
+        <div style={{
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+          maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
+        }}>
+          <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+            Solve all 25 tiles to reveal the pattern
+          </div>
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3,
+            padding: 8, borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+          }}>
+            {puzzles.map((p, i) => {
+              const result = diffProgress[i];
+              const solved = result > 0;
+              const failed = result === 0;
+              const miniSize = 56;
+              const miniCellSize = Math.floor((miniSize - 8) / 5);
+              return (
+                <button key={i} onClick={() => startPuzzle(i, "mosaic")}
+                  style={{
+                    width: miniSize, height: miniSize, borderRadius: 6,
+                    border: `1.5px solid ${solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border}`,
+                    backgroundColor: solved ? C.correct + "10" : failed ? C.incorrect + "08" : C.surface,
+                    cursor: "pointer", padding: 2, position: "relative",
+                    display: "flex", flexDirection: "column", gap: 0.5, alignItems: "center", justifyContent: "center",
+                    transition: "all 0.15s", overflow: "hidden",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border; }}
+                >
+                  {solved ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                      {p.solution.map((row, ri) => (
+                        <div key={ri} style={{ display: "flex", gap: 0.5 }}>
+                          {row.map((token, ci) => {
+                            const { color } = parseToken(token);
+                            const dc = themeColorMap ? (themeColorMap[color] || color) : color;
+                            return <div key={ci} style={{ width: miniCellSize, height: miniCellSize, borderRadius: 1, backgroundColor: dc }} />;
+                          })}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <span style={{
+                      fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                      color: failed ? C.incorrect : C.textDim, lineHeight: 1,
+                    }}>
+                      {failed ? "\u2717" : i + 1}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Legend */}
+        <div style={{
+          marginTop: 16, display: "flex", gap: 16, fontSize: 11, color: C.textDim,
+          fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, animation: "fadeUp 0.5s 0.25s ease both",
+          flexWrap: "wrap", justifyContent: "center",
+        }}>
+          <span><span style={{ color: C.gold }}>{"\u2605"}</span> 1-2 tries</span>
+          <span><span style={{ color: C.silver }}>{"\u25CF"}</span> 3-4 tries</span>
+          <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
+          <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
+        </div>
+        </>)}
+
+        {/* Puzzle grid: 50 for non-daily modes (not mosaic) */}
+        {!isDaily && !isMosaic && (<>
         <div style={{
           display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
           maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
@@ -4931,6 +5117,10 @@ export default function Pattrn() {
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(88px + env(safe-area-inset-top, 0px))", paddingBottom: "calc(140px + env(safe-area-inset-bottom, 0px))", width: "calc(100% + 32px)", margin: "0 -16px", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, position: "relative", boxSizing: "border-box" }}>
         <GridDecoration decoration={activeTheme.decoration} />
       <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
+      <div style={{
+        transform: isSpin ? `rotate(${spinAngle}deg)` : undefined,
+        transition: isSpin ? "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
+      }}>
         <div style={{
           display: "flex", flexDirection: "column", gap: gridGap, padding: gridPad,
           position: "relative", zIndex: 1,
@@ -4986,6 +5176,7 @@ export default function Pattrn() {
         </div>
       </div>
       </div>
+      </div>
 
       {/* Fixed bottom bar: token picker + actions */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
@@ -5035,7 +5226,7 @@ export default function Pattrn() {
         {gameState === "won" && (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: 12, animation: "fadeUp 0.4s ease" }}>
-              &#x2713; {isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : "Perfect"}
+              &#x2713; {isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : isSpin ? "Nailed it!" : isMosaic ? "Tile complete!" : "Perfect"}
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={async () => {
