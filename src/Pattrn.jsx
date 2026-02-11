@@ -868,8 +868,13 @@ const PUZZLE_THEMES = [
   },
 ];
 
+function isCheatBirthdayActive() {
+  try { return localStorage.getItem(BIRTHDAY_KEY) === CHEAT_BIRTHDAY; } catch { return false; }
+}
+
 function isThemeUnlocked(theme, achievementsList) {
   if (!theme.unlock) return true;
+  if (isCheatBirthdayActive()) return true;
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   if (theme.unlock.seasonal) {
@@ -1377,6 +1382,7 @@ const TIMES_KEY = "pattrn-times-v1";
 const BIRTHDAY_KEY = "pattrn-birthday-v1";
 const THEME_KEY = "pattrn-theme-v1";
 const ACHIEV_KEY = "pattrn-achievements-v1";
+const CHEAT_BIRTHDAY = "23-06-1912";
 
 function loadTheme() {
   try {
@@ -1601,7 +1607,8 @@ const ACHIEVEMENTS = [
 
 function computeAchievements(progress, times, savedIds) {
   const saved = savedIds || new Set();
-  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: a.check(progress, times) || saved.has(a.id) }));
+  const cheat = isCheatBirthdayActive();
+  return ACHIEVEMENTS.map(a => ({ ...a, unlocked: cheat || a.check(progress, times) || saved.has(a.id) }));
 }
 
 // --- Components ---
@@ -3469,7 +3476,7 @@ export default function Pattrn() {
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: "calc(32px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} }`}</style>
 
         <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease", position: "relative", width: "100%", maxWidth: 360 }}>
           {/* Menu button */}
@@ -4093,6 +4100,10 @@ export default function Pattrn() {
                     const bdStr = `${String(d).padStart(2, "0")}-${String(m).padStart(2, "0")}-${y}`;
                     setBirthday(bdStr);
                     try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
+                    if (bdStr === CHEAT_BIRTHDAY) {
+                      achievementQueueRef.current.push({ id: "cheat_turing", label: "Welcome Back, Alan", desc: "The enigma has been decoded", tier: 3 });
+                      if (!achievementToastTimer.current) advanceAchievementQueue();
+                    }
                     setShowBirthdayPrompt(false);
                     setBirthdayInput("");
                     setCalendarYear(y);
@@ -4858,6 +4869,78 @@ export default function Pattrn() {
             </div>
           );
         })()}
+
+      {/* Achievement toast (menu view) */}
+      {achievementToast && (() => {
+        const tierColors = { 1: C.bronze, 2: C.silver, 3: C.gold };
+        const tierSymbols = { 1: "\u25C6", 2: "\u25CF", 3: "\u2605" };
+        const tc = tierColors[achievementToast.tier] || C.accent;
+        const sparkles = Array.from({ length: 8 }, (_, i) => {
+          const angle = (i / 8) * Math.PI * 2;
+          const dist = 18 + Math.random() * 10;
+          return { id: i, x: Math.cos(angle) * dist, y: Math.sin(angle) * dist, delay: i * 0.06, size: 3 + Math.random() * 3 };
+        });
+        return (
+          <div key={achievementToast.key} style={{
+            position: "fixed", top: "calc(100px + env(safe-area-inset-top, 0px))", left: "50%",
+            transform: "translateX(-50%)", zIndex: 100,
+            animation: toastDismissing
+              ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
+              : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+            pointerEvents: "none",
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "12px 20px 12px 14px", borderRadius: 14,
+              backgroundColor: C.surface, border: `1.5px solid ${tc}`,
+              boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 30px ${tc}44, inset 0 1px 0 rgba(255,255,255,0.06)`,
+              backgroundImage: `linear-gradient(90deg, transparent 0%, ${tc}11 50%, transparent 100%)`,
+              backgroundSize: "200% 100%",
+              animation: "achievementShimmer 2s 0.6s ease-in-out",
+            }}>
+              <div style={{ position: "relative", flexShrink: 0 }}>
+                {sparkles.map(s => (
+                  <div key={s.id} style={{
+                    position: "absolute", left: "50%", top: "50%",
+                    width: s.size, height: s.size, borderRadius: "50%",
+                    backgroundColor: tc,
+                    transform: `translate(calc(-50% + ${s.x}px), calc(-50% + ${s.y}px))`,
+                    animation: `achievementSparkle 0.6s ${0.3 + s.delay}s ease-out both`,
+                    opacity: 0,
+                  }} />
+                ))}
+                <div style={{
+                  width: 36, height: 36, borderRadius: 9,
+                  backgroundColor: tc + "22", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `2px solid ${tc}`,
+                  color: tc,
+                  animation: "achievementBadgeSpin 0.8s 0.2s cubic-bezier(0.34, 1.56, 0.64, 1) both, achievementGlow 1.2s 0.3s ease-out both",
+                  perspective: 200,
+                }}>
+                  <span style={{ fontSize: 18, color: tc, lineHeight: 1 }}>
+                    {tierSymbols[achievementToast.tier]}
+                  </span>
+                </div>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{
+                  fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700,
+                  color: tc, letterSpacing: 1.5, textTransform: "uppercase",
+                  marginBottom: 3,
+                }}>Achievement unlocked</div>
+                <div style={{
+                  fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                  color: C.text, letterSpacing: 0.5,
+                }}>{achievementToast.label}</div>
+                <div style={{
+                  fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: C.textDim,
+                  marginTop: 2, lineHeight: 1.3,
+                }}>{achievementToast.desc}</div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
       </div>
     );
   }
