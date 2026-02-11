@@ -2813,10 +2813,11 @@ export default function Pattrn() {
       setMyMosaics(list);
     } catch (e) {
       console.error("Save mosaic failed:", e);
-      setMosaicMsg("Save failed");
+      const isPermErr = e?.message?.includes("PERMISSION_DENIED");
+      setMosaicMsg(isPermErr ? "Save failed — database rules need to be deployed (see database.rules.json)" : "Save failed");
     } finally {
       setMosaicLoading(false);
-      setTimeout(() => setMosaicMsg(""), 2500);
+      setTimeout(() => setMosaicMsg(""), 4000);
     }
   }, [firebaseUser, creatorGrid, creatorTitle, creatorEditingId]);
 
@@ -2849,10 +2850,11 @@ export default function Pattrn() {
       setMosaicMsg("Submitted for review!");
     } catch (e) {
       console.error("Submit failed:", e);
-      setMosaicMsg("Submit failed");
+      const isPermErr = e?.message?.includes("PERMISSION_DENIED");
+      setMosaicMsg(isPermErr ? "Submit failed — database rules need to be deployed (see database.rules.json)" : "Submit failed");
     } finally {
       setMosaicLoading(false);
-      setTimeout(() => setMosaicMsg(""), 2500);
+      setTimeout(() => setMosaicMsg(""), 4000);
     }
   }, [firebaseUser]);
 
@@ -2869,10 +2871,11 @@ export default function Pattrn() {
       setShareEmailInput("");
     } catch (e) {
       console.error("Share failed:", e);
-      setMosaicMsg("Share failed");
+      const isPermErr = e?.message?.includes("PERMISSION_DENIED");
+      setMosaicMsg(isPermErr ? "Share failed — database rules need to be deployed (see database.rules.json)" : "Share failed");
     } finally {
       setMosaicLoading(false);
-      setTimeout(() => setMosaicMsg(""), 2500);
+      setTimeout(() => setMosaicMsg(""), 4000);
     }
   }, [firebaseUser]);
 
