@@ -12,6 +12,13 @@
         }
       }
     },
+    "emailIndex": {
+      "$emailKey": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.isString()"
+      }
+    },
     "mosaics": {
       "pending": {
         ".read": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true",
@@ -20,7 +27,7 @@
         }
       },
       "public": {
-        ".read": "auth != null",
+        ".read": true,
         "$mosaicId": {
           ".write": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true"
         }

@@ -272,22 +272,29 @@ export async function loadSharedMosaics(uid) {
   return Object.values(snap.val()).sort((a, b) => (b.sharedAt || 0) - (a.sharedAt || 0));
 }
 
-// Look up a user by email to get their uid (for sharing)
-export async function lookupUserByEmail(email) {
-  if (!db) return null;
-  const snap = await get(ref(db, "users"));
-  if (!snap.exists()) return null;
-  const users = snap.val();
-  for (const [uid, data] of Object.entries(users)) {
-    if (data?.email === email) return { uid, email };
-  }
-  return null;
+// Sanitise an email address into a valid Firebase key (replace '.' with ',')
+function sanitizeEmailKey(email) {
+  return email.toLowerCase().replace(/\./g, ",");
 }
 
-// Save user email to their profile (for lookup when sharing)
+// Look up a user by email to get their uid (for sharing)
+// Uses the emailIndex/{sanitizedEmail} path instead of scanning all users
+export async function lookupUserByEmail(email) {
+  if (!db || !email) return null;
+  const key = sanitizeEmailKey(email.trim());
+  const snap = await get(ref(db, `emailIndex/${key}`));
+  if (!snap.exists()) return null;
+  return { uid: snap.val(), email: email.trim().toLowerCase() };
+}
+
+// Save user email to their profile and the email-to-uid index (for lookup when sharing)
 export async function saveUserEmail(uid, email) {
   if (!db) return;
-  await update(ref(db, `users/${uid}`), { email });
+  const key = sanitizeEmailKey(email);
+  await Promise.all([
+    update(ref(db, `users/${uid}`), { email }),
+    set(ref(db, `emailIndex/${key}`), uid),
+  ]);
 }
 
 // Check if user is admin
