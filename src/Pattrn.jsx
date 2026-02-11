@@ -1490,6 +1490,7 @@ const TIMES_KEY = "pattrn-times-v1";
 const BIRTHDAY_KEY = "pattrn-birthday-v1";
 const THEME_KEY = "pattrn-theme-v1";
 const ACHIEV_KEY = "pattrn-achievements-v1";
+const LOGIN_DISMISS_KEY = "pattrn-login-dismissed-v1";
 const CHEAT_BIRTHDAY = "23-06-1912";
 
 function loadTheme() {
@@ -2539,6 +2540,10 @@ export default function Pattrn() {
   const [syncStatus, setSyncStatus] = useState(""); // "", "syncing", "synced", "error"
   const cloudSyncInFlight = useRef(false);
   const firebaseConfigured = isFirebaseConfigured();
+  const [autoLoginModal, setAutoLoginModal] = useState(false); // true when modal was auto-opened
+  const [loginHintToast, setLoginHintToast] = useState(false);
+  const [loginHintDismissing, setLoginHintDismissing] = useState(false);
+  const loginHintTimer = useRef(null);
 
   // Listen for auth state changes
   useEffect(() => {
@@ -2629,6 +2634,7 @@ export default function Pattrn() {
       const localData = gatherLocalData();
       await saveCloudData(user.uid, localData);
       setShowAccountModal(false);
+      setAutoLoginModal(false);
       setAccountEmail("");
       setAccountPassword("");
       setSyncStatus("synced");
@@ -2652,6 +2658,7 @@ export default function Pattrn() {
       applyMergedData(merged);
       await saveCloudData(user.uid, merged);
       setShowAccountModal(false);
+      setAutoLoginModal(false);
       setAccountEmail("");
       setAccountPassword("");
       setSyncStatus("synced");
@@ -2681,6 +2688,7 @@ export default function Pattrn() {
         await saveCloudData(user.uid, localData);
       }
       setShowAccountModal(false);
+      setAutoLoginModal(false);
       setAccountEmail("");
       setAccountPassword("");
       setSyncStatus("synced");
@@ -2704,6 +2712,50 @@ export default function Pattrn() {
       console.error("Sign out failed:", e);
     }
   }, []);
+
+  // Show a toast hint that login is available via the menu button
+  const showLoginHint = useCallback(() => {
+    setLoginHintToast(true);
+    setLoginHintDismissing(false);
+    if (loginHintTimer.current) clearTimeout(loginHintTimer.current);
+    loginHintTimer.current = setTimeout(() => {
+      setLoginHintDismissing(true);
+      setTimeout(() => { setLoginHintToast(false); setLoginHintDismissing(false); loginHintTimer.current = null; }, 400);
+    }, 5000);
+  }, []);
+
+  // Close the auto-opened login modal (shows hint toast)
+  const dismissAutoLogin = useCallback(() => {
+    setShowAccountModal(false);
+    setAutoLoginModal(false);
+    showLoginHint();
+  }, [showLoginHint]);
+
+  // "Don't ask me again" handler
+  const dismissAutoLoginPermanently = useCallback(() => {
+    try { localStorage.setItem(LOGIN_DISMISS_KEY, "1"); } catch { /* ignore */ }
+    setShowAccountModal(false);
+    setAutoLoginModal(false);
+    showLoginHint();
+  }, [showLoginHint]);
+
+  // Auto-open login modal on first visit if not logged in and not dismissed
+  const hasAutoOpenedLogin = useRef(false);
+  useEffect(() => {
+    if (!firebaseConfigured || hasAutoOpenedLogin.current) return;
+    hasAutoOpenedLogin.current = true;
+    // Wait for auth state to settle, then check
+    const timeout = setTimeout(() => {
+      if (firebaseUser) return; // already logged in
+      try {
+        if (localStorage.getItem(LOGIN_DISMISS_KEY)) return; // user dismissed permanently
+      } catch { /* ignore */ }
+      setAutoLoginModal(true);
+      setShowAccountModal(true);
+      setAccountError("");
+    }, 800);
+    return () => clearTimeout(timeout);
+  }, [firebaseConfigured, firebaseUser]);
 
   // Auto-sync to cloud when data changes and user is logged in
   const cloudSyncTimer = useRef(null);
@@ -5101,7 +5153,7 @@ export default function Pattrn() {
 
                     {/* Account */}
                     {firebaseConfigured && (
-                      <button onClick={() => { setShowGameMenu(false); setShowAccountModal(true); setAccountError(""); }} style={{
+                      <button onClick={() => { setShowGameMenu(false); setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }} style={{
                         width: "100%", padding: "14px 16px", borderRadius: 12,
                         backgroundColor: C.surface, border: `1px solid ${C.border}`,
                         cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -5277,7 +5329,7 @@ export default function Pattrn() {
 
         {/* Account modal */}
         {showAccountModal && firebaseConfigured && (
-          <div onClick={() => setShowAccountModal(false)} style={{
+          <div onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)} style={{
             position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
             display: "flex", alignItems: "center", justifyContent: "center",
             padding: 24,
@@ -5480,14 +5532,29 @@ export default function Pattrn() {
                 </>
               )}
 
+              {/* Don't ask me again (only shown when modal was auto-opened and user is not signed in) */}
+              {autoLoginModal && !firebaseUser && (
+                <button
+                  onClick={dismissAutoLoginPermanently}
+                  style={{
+                    width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 600,
+                    fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3,
+                    background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                    transition: "all 0.15s", marginTop: 12,
+                  }}
+                >
+                  Don't ask me again
+                </button>
+              )}
+
               {/* Close button */}
               <button
-                onClick={() => setShowAccountModal(false)}
+                onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)}
                 style={{
                   width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
                   fontFamily: "'Space Mono', monospace", letterSpacing: 1,
                   background: "none", border: "none", color: C.textDim, cursor: "pointer",
-                  textTransform: "uppercase", transition: "all 0.15s", marginTop: 12,
+                  textTransform: "uppercase", transition: "all 0.15s", marginTop: autoLoginModal && !firebaseUser ? 6 : 12,
                 }}
               >
                 Close
@@ -5743,6 +5810,51 @@ export default function Pattrn() {
               onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
             >
               Use it
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Login hint toast */}
+      {loginHintToast && (
+        <div style={{
+          position: "fixed", bottom: "calc(32px + env(safe-area-inset-bottom, 0px))", left: "50%",
+          transform: "translateX(-50%)", zIndex: 1200,
+          maxWidth: "calc(100vw - 32px)", boxSizing: "border-box",
+          animation: loginHintDismissing
+            ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
+            : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+          pointerEvents: "auto",
+        }}>
+          <div style={{
+            display: "flex", alignItems: "center", gap: 10,
+            padding: "12px 16px", borderRadius: 14,
+            backgroundColor: C.surface, border: `1.5px solid ${C.border}`,
+            boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+          }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+              <circle cx="12" cy="12" r="10" stroke={C.accent} strokeWidth="2" fill="none"/>
+              <path d="M12 7v6M12 16v1" stroke={C.accent} strokeWidth="2" strokeLinecap="round"/>
+            </svg>
+            <span style={{
+              fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: C.text, lineHeight: 1.4,
+            }}>
+              You can sign in anytime from the <strong style={{ color: C.accent }}>menu button</strong>
+            </span>
+            <button
+              onClick={() => {
+                setLoginHintDismissing(true);
+                setTimeout(() => { setLoginHintToast(false); setLoginHintDismissing(false); }, 350);
+                if (loginHintTimer.current) { clearTimeout(loginHintTimer.current); loginHintTimer.current = null; }
+              }}
+              style={{
+                background: "none", border: "none", color: C.textDim, cursor: "pointer",
+                padding: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
             </button>
           </div>
         </div>
