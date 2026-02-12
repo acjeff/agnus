@@ -17,6 +17,8 @@ import {
   remove,
   update,
   serverTimestamp,
+  onValue,
+  off,
 } from "firebase/database";
 
 const firebaseConfig = {
@@ -398,4 +400,100 @@ export function mergeGameData(local, cloud) {
   merged.birthday = local.birthday || cloud.birthday || null;
 
   return merged;
+}
+
+// --- Coop Mode ---
+
+// Create a new coop session. Returns the session ID.
+export async function createCoopSession(uid, { mode, level, dailyDate }) {
+  if (!db) return null;
+  const sessionsRef = ref(db, "coopSessions");
+  const newRef = push(sessionsRef);
+  const id = newRef.key;
+  await set(newRef, {
+    id,
+    hostUid: uid,
+    guestUid: null,
+    mode,
+    level: level ?? null,
+    dailyDate: dailyDate ?? null,
+    status: "waiting", // waiting | playing | complete
+    fills: {},
+    hostLockedIn: false,
+    guestLockedIn: false,
+    hostCorrect: false,
+    guestCorrect: false,
+    createdAt: serverTimestamp(),
+  });
+  return id;
+}
+
+// Join an existing coop session as guest
+export async function joinCoopSession(sessionId, uid) {
+  if (!db) return null;
+  const sessionRef = ref(db, `coopSessions/${sessionId}`);
+  const snap = await get(sessionRef);
+  if (!snap.exists()) return null;
+  const data = snap.val();
+  if (data.guestUid && data.guestUid !== uid) return null; // already taken
+  if (data.hostUid === uid) return data; // host rejoining
+  await update(sessionRef, { guestUid: uid, status: "playing" });
+  const updated = await get(sessionRef);
+  return updated.val();
+}
+
+// Subscribe to real-time changes on a coop session. Returns unsubscribe function.
+export function subscribeToCoopSession(sessionId, callback) {
+  if (!db) return () => {};
+  const sessionRef = ref(db, `coopSessions/${sessionId}`);
+  const handler = onValue(sessionRef, (snap) => {
+    callback(snap.exists() ? snap.val() : null);
+  });
+  return () => off(sessionRef, "value", handler);
+}
+
+// Update fills for a specific cell in the coop session
+export async function updateCoopFill(sessionId, cellKey, token) {
+  if (!db) return;
+  if (token === null || token === undefined) {
+    await remove(ref(db, `coopSessions/${sessionId}/fills/${cellKey}`));
+  } else {
+    await set(ref(db, `coopSessions/${sessionId}/fills/${cellKey}`), token);
+  }
+}
+
+// Lock in a player's half (host or guest)
+export async function lockInCoopPlayer(sessionId, role, isCorrect) {
+  if (!db) return;
+  const key = role === "host" ? "hostLockedIn" : "guestLockedIn";
+  const correctKey = role === "host" ? "hostCorrect" : "guestCorrect";
+  const updates = { [key]: true, [correctKey]: isCorrect };
+  await update(ref(db, `coopSessions/${sessionId}`), updates);
+}
+
+// Unlock a player's half (when they retry after wrong answer)
+export async function unlockCoopPlayer(sessionId, role) {
+  if (!db) return;
+  const key = role === "host" ? "hostLockedIn" : "guestLockedIn";
+  const correctKey = role === "host" ? "hostCorrect" : "guestCorrect";
+  await update(ref(db, `coopSessions/${sessionId}`), { [key]: false, [correctKey]: false });
+}
+
+// Mark session as complete
+export async function completeCoopSession(sessionId) {
+  if (!db) return;
+  await update(ref(db, `coopSessions/${sessionId}`), { status: "complete" });
+}
+
+// Delete / leave a coop session
+export async function deleteCoopSession(sessionId) {
+  if (!db) return;
+  await remove(ref(db, `coopSessions/${sessionId}`));
+}
+
+// Load a coop session by ID (one-time read)
+export async function loadCoopSession(sessionId) {
+  if (!db) return null;
+  const snap = await get(ref(db, `coopSessions/${sessionId}`));
+  return snap.exists() ? snap.val() : null;
 }
