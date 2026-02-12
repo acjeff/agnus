@@ -5961,7 +5961,7 @@ export default function Pattrn() {
                 backgroundColor: C.surface, border: `1px solid ${C.border}`, alignItems: "center",
               }}>
                 <div style={{ cursor: "pointer" }} onClick={() => mosaic.grid && startCustomMosaicPlay(mosaic)}>
-                  <MosaicThumbnail grid={mosaic.grid} size={64} hidden={!isAdmin && mosaicGalleryTab !== "mine" && mosaic.authorUid !== firebaseUser?.uid} completedTiles={mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null} />
+                  <MosaicThumbnail grid={mosaic.grid} size={64} hidden={true} completedTiles={mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -7670,7 +7670,7 @@ export default function Pattrn() {
                     onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.transform = "translateY(-2px)"; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; }}
                   >
-                    <MosaicThumbnail grid={mosaic.grid} size={72} hidden={!isAdmin && mosaic._source !== "mine" && mosaic.authorUid !== firebaseUser?.uid} completedTiles={mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null} />
+                    <MosaicThumbnail grid={mosaic.grid} size={72} hidden={true} completedTiles={mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null} />
                     <div style={{
                       fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 600,
                       color: C.text, textAlign: "center", lineHeight: 1.2,
