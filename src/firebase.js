@@ -191,7 +191,6 @@ export async function submitMosaicForReview(uid, mosaicId, mosaic) {
     ...removeUndefined(mosaic),
     id: mosaicId,
     authorUid: uid,
-    authorEmail: mosaic.authorEmail || "",
     authorUsername: mosaic.authorUsername || "",
     status: "pending",
     submittedAt: serverTimestamp(),
@@ -255,14 +254,13 @@ export async function loadPublicMosaics() {
   return Object.values(snap.val()).sort((a, b) => (b.approvedAt || 0) - (a.approvedAt || 0));
 }
 
-// Share a mosaic with a specific user by email (stores in shared/{recipientUid}/{mosaicId})
-export async function shareMosaicWithUser(fromUid, fromEmail, toUid, mosaicId, mosaic) {
+// Share a mosaic with a specific user by username (stores in shared/{recipientUid}/{mosaicId})
+export async function shareMosaicWithUser(fromUid, toUid, mosaicId, mosaic) {
   if (!db) return;
   await set(ref(db, `mosaics/shared/${toUid}/${mosaicId}`), {
     ...removeUndefined(mosaic),
     id: mosaicId,
     sharedBy: fromUid,
-    sharedByEmail: fromEmail,
     sharedAt: serverTimestamp(),
   });
 }
@@ -364,6 +362,54 @@ export async function lookupUserByUsername(username) {
   const uid = snap.val();
   const profile = await loadUserProfile(uid);
   return { uid, username: profile?.username || username, email: profile?.email || null };
+}
+
+// --- Friends ---
+
+// Add a friend by uid (bidirectional: both users see each other)
+export async function addFriend(myUid, friendUid) {
+  if (!db) return;
+  if (myUid === friendUid) throw new Error("Cannot add yourself as a friend");
+  await Promise.all([
+    set(ref(db, `friends/${myUid}/${friendUid}`), { addedAt: serverTimestamp() }),
+    set(ref(db, `friends/${friendUid}/${myUid}`), { addedAt: serverTimestamp() }),
+  ]);
+}
+
+// Remove a friend (bidirectional)
+export async function removeFriend(myUid, friendUid) {
+  if (!db) return;
+  await Promise.all([
+    remove(ref(db, `friends/${myUid}/${friendUid}`)),
+    remove(ref(db, `friends/${friendUid}/${myUid}`)),
+  ]);
+}
+
+// Load all friends for a user (returns array of { uid, username, profilePicture })
+export async function loadFriends(uid) {
+  if (!db) return [];
+  const snap = await get(ref(db, `friends/${uid}`));
+  if (!snap.exists()) return [];
+  const friendUids = Object.keys(snap.val());
+  // Load profiles for each friend
+  const profiles = await Promise.all(
+    friendUids.map(async (fUid) => {
+      const profile = await loadUserProfile(fUid);
+      return {
+        uid: fUid,
+        username: profile?.username || null,
+        profilePicture: profile?.profilePicture || null,
+      };
+    })
+  );
+  return profiles.filter(p => p.username); // only return friends who still have profiles
+}
+
+// Check if two users are friends
+export async function checkIsFriend(myUid, otherUid) {
+  if (!db) return false;
+  const snap = await get(ref(db, `friends/${myUid}/${otherUid}`));
+  return snap.exists();
 }
 
 // Check if user is admin

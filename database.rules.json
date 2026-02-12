@@ -32,6 +32,14 @@
         ".validate": "newData.isString()"
       }
     },
+    "friends": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$friendUid": {
+          ".write": "auth != null && (auth.uid === $uid || auth.uid === $friendUid)"
+        }
+      }
+    },
     "coopSessions": {
       "$sessionId": {
         ".read": "auth != null",
