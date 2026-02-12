@@ -39,6 +39,11 @@ import {
   loadUserProfile,
   saveProfilePicture,
   lookupUserByUsername,
+  updatePublicMosaicFields,
+  unpublishMosaic,
+  setStaffPick,
+  clearStaffPick,
+  loadStaffPickMosaic,
   addFriend,
   removeFriend,
   loadFriends,
@@ -2742,6 +2747,11 @@ export default function Pattrn() {
   const [addFriendMsg, setAddFriendMsg] = useState("");
   const [addFriendLoading, setAddFriendLoading] = useState(false);
 
+  // --- Staff Pick & Admin Manage state ---
+  const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
+  const staffPickPuzzlesRef = useRef(null); // puzzles built from staff pick grid
+  const staffPickLoadedRef = useRef(false);
+
   // Listen for auth state changes
   useEffect(() => {
     if (!firebaseConfigured) return;
@@ -3064,6 +3074,84 @@ export default function Pattrn() {
     }
   }, []);
 
+  const handleUnpublishMosaic = useCallback(async (mosaic) => {
+    setMosaicLoading(true);
+    try {
+      await unpublishMosaic(mosaic.id, mosaic);
+      const list = await loadPublicMosaics();
+      setPublicMosaicsList(list);
+      // Clear staff pick if this was it
+      if (staffPickMosaic && staffPickMosaic.id === mosaic.id) {
+        setStaffPickMosaic(null);
+        staffPickPuzzlesRef.current = null;
+      }
+      setMosaicMsg("Unpublished");
+    } catch (e) {
+      console.error("Unpublish failed:", e);
+      setMosaicMsg("Unpublish failed");
+    } finally {
+      setMosaicLoading(false);
+      setTimeout(() => setMosaicMsg(""), 2500);
+    }
+  }, [staffPickMosaic]);
+
+  const handleSetStaffPick = useCallback(async (mosaic) => {
+    setMosaicLoading(true);
+    try {
+      await setStaffPick(mosaic.id);
+      setStaffPickMosaic(mosaic);
+      staffPickPuzzlesRef.current = buildCustomMosaicPuzzles(mosaic.grid);
+      setMosaicMsg("Staff pick set!");
+    } catch (e) {
+      console.error("Set staff pick failed:", e);
+      setMosaicMsg("Set staff pick failed");
+    } finally {
+      setMosaicLoading(false);
+      setTimeout(() => setMosaicMsg(""), 2500);
+    }
+  }, [buildCustomMosaicPuzzles]);
+
+  const handleClearStaffPick = useCallback(async () => {
+    setMosaicLoading(true);
+    try {
+      await clearStaffPick();
+      setStaffPickMosaic(null);
+      staffPickPuzzlesRef.current = null;
+      setMosaicMsg("Staff pick cleared");
+    } catch (e) {
+      console.error("Clear staff pick failed:", e);
+      setMosaicMsg("Clear staff pick failed");
+    } finally {
+      setMosaicLoading(false);
+      setTimeout(() => setMosaicMsg(""), 2500);
+    }
+  }, []);
+
+  const handleMovePublicMosaic = useCallback(async (mosaicId, direction) => {
+    const idx = publicMosaicsList.findIndex(m => m.id === mosaicId);
+    if (idx < 0) return;
+    const swapIdx = direction === "up" ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= publicMosaicsList.length) return;
+    setMosaicLoading(true);
+    try {
+      // Swap displayOrder values
+      const orderA = publicMosaicsList[idx].displayOrder ?? idx;
+      const orderB = publicMosaicsList[swapIdx].displayOrder ?? swapIdx;
+      await Promise.all([
+        updatePublicMosaicFields(publicMosaicsList[idx].id, { displayOrder: orderB }),
+        updatePublicMosaicFields(publicMosaicsList[swapIdx].id, { displayOrder: orderA }),
+      ]);
+      const list = await loadPublicMosaics();
+      setPublicMosaicsList(list);
+    } catch (e) {
+      console.error("Reorder failed:", e);
+      setMosaicMsg("Reorder failed");
+      setTimeout(() => setMosaicMsg(""), 2500);
+    } finally {
+      setMosaicLoading(false);
+    }
+  }, [publicMosaicsList]);
+
   const loadMosaicData = useCallback(async (tab) => {
     setMosaicLoading(true);
     try {
@@ -3094,6 +3182,12 @@ export default function Pattrn() {
       } else if (tab === "admin" && isAdmin) {
         const pendList = await loadPendingMosaics();
         setPendingMosaicsList(pendList);
+      } else if (tab === "manage" && isAdmin) {
+        const pubList = await loadPublicMosaics();
+        setPublicMosaicsList(pubList);
+        // Also load current staff pick
+        const sp = await loadStaffPickMosaic();
+        setStaffPickMosaic(sp);
       }
     } catch (e) {
       console.error("Load mosaic data failed:", e);
@@ -3113,7 +3207,7 @@ export default function Pattrn() {
     setView("creator");
   }, []);
 
-  // Load mosaic carousel data when mosaic mode is selected on menu
+  // Load mosaic carousel data and staff pick when mosaic mode is selected on menu
   const mosaicCarouselLoadedRef = useRef(false);
   useEffect(() => {
     if (difficulty !== "mosaic" || view !== "menu") return;
@@ -3124,7 +3218,17 @@ export default function Pattrn() {
     if (firebaseUser) {
       loadUserMosaics(firebaseUser.uid).then(setMyMosaics).catch(() => {});
     }
-  }, [difficulty, view, firebaseUser]);
+    // Load staff pick mosaic for the main grid
+    if (!staffPickLoadedRef.current) {
+      staffPickLoadedRef.current = true;
+      loadStaffPickMosaic().then(sp => {
+        if (sp && sp.grid) {
+          setStaffPickMosaic(sp);
+          staffPickPuzzlesRef.current = buildCustomMosaicPuzzles(sp.grid);
+        }
+      }).catch(() => {});
+    }
+  }, [difficulty, view, firebaseUser, buildCustomMosaicPuzzles]);
 
   // Helper: render a mosaic grid thumbnail (using canvas-like div grid)
   const MosaicThumbnail = useCallback(({ grid, size = 80 }) => {
@@ -3817,7 +3921,8 @@ export default function Pattrn() {
     cascadeRunIndexRef.current = cascadeRunIndex;
   }
   const isMosaic = difficulty === "mosaic";
-  const puzzles = isCascade ? [] : isDaily ? [] : (customMosaicPuzzlesRef.current && isMosaic ? customMosaicPuzzlesRef.current : (PUZZLE_SETS[difficulty] || []));
+  const mosaicMainPuzzles = isMosaic ? (staffPickPuzzlesRef.current || PUZZLE_SETS.mosaic) : null;
+  const puzzles = isCascade ? [] : isDaily ? [] : (customMosaicPuzzlesRef.current && isMosaic ? customMosaicPuzzlesRef.current : isMosaic ? mosaicMainPuzzles : (PUZZLE_SETS[difficulty] || []));
   const cascadePuzzle = useMemo(
     () => (isCascade ? buildCascadePuzzle(cascadeLevel, getCascadeRunSeed(cascadeRunIndex)) : null),
     [isCascade, cascadeLevel, cascadeRunIndex]
@@ -5979,6 +6084,171 @@ export default function Pattrn() {
     );
   }
 
+  // --- ADMIN MANAGE PUBLIC MOSAICS VIEW ---
+  if (view === "admin-manage") {
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
+        {/* Header */}
+        <div style={{ width: "100%", maxWidth: 480, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
+          <button onClick={() => setView("menu")}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            &larr; Back
+          </button>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+            Manage Public
+          </h2>
+          <button onClick={() => loadMosaicData("manage")}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            Refresh
+          </button>
+        </div>
+
+        {mosaicMsg && (
+          <div style={{
+            width: "100%", maxWidth: 480, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+            backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
+            fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent,
+          }}>
+            {mosaicMsg}
+          </div>
+        )}
+
+        {mosaicLoading && publicMosaicsList.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: C.textDim, fontSize: 13 }}>Loading...</div>
+        ) : publicMosaicsList.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, animation: "fadeUp 0.3s ease" }}>
+            No public mosaics yet
+          </div>
+        ) : (
+          <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 10, animation: "fadeUp 0.3s 0.02s ease both" }}>
+            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+              {publicMosaicsList.length} published
+              {staffPickMosaic && <span> &middot; Staff pick: <span style={{ color: C.accent }}>{staffPickMosaic.title || "Untitled"}</span></span>}
+            </div>
+            {publicMosaicsList.map((mosaic, idx) => {
+              const isStaffPick = staffPickMosaic && staffPickMosaic.id === mosaic.id;
+              return (
+                <div key={mosaic.id} style={{
+                  padding: 14, borderRadius: 14,
+                  backgroundColor: C.surface,
+                  border: `1px solid ${isStaffPick ? C.accent + "66" : C.border}`,
+                  opacity: mosaicLoading ? 0.6 : 1,
+                  transition: "opacity 0.15s",
+                }}>
+                  <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                    <MosaicThumbnail grid={mosaic.grid} size={80} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {mosaic.title || "Untitled"}
+                        </div>
+                        {isStaffPick && (
+                          <span style={{ fontSize: 14, color: C.accent, lineHeight: 1 }} title="Staff Pick">&#9733;</span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.textDim, marginBottom: 2 }}>
+                        By: {mosaic.authorUsername || mosaic.authorEmail || "Unknown"}
+                      </div>
+                      <div style={{ fontSize: 10, color: C.textDim }}>
+                        Order: {mosaic.displayOrder ?? idx}
+                      </div>
+
+                      {/* Action buttons */}
+                      <div style={{ display: "flex", gap: 6, marginTop: 8, flexWrap: "wrap" }}>
+                        {/* Move Up */}
+                        <button
+                          onClick={() => handleMovePublicMosaic(mosaic.id, "up")}
+                          disabled={mosaicLoading || idx === 0}
+                          title="Move up"
+                          style={{
+                            background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px",
+                            color: idx === 0 ? C.border : C.textDim, cursor: idx === 0 ? "not-allowed" : "pointer",
+                            fontSize: 12, transition: "all 0.15s",
+                          }}
+                          onMouseEnter={e => { if (idx > 0) { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; } }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = idx === 0 ? C.border : C.textDim; }}
+                        >&uarr;</button>
+
+                        {/* Move Down */}
+                        <button
+                          onClick={() => handleMovePublicMosaic(mosaic.id, "down")}
+                          disabled={mosaicLoading || idx === publicMosaicsList.length - 1}
+                          title="Move down"
+                          style={{
+                            background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px",
+                            color: idx === publicMosaicsList.length - 1 ? C.border : C.textDim,
+                            cursor: idx === publicMosaicsList.length - 1 ? "not-allowed" : "pointer",
+                            fontSize: 12, transition: "all 0.15s",
+                          }}
+                          onMouseEnter={e => { if (idx < publicMosaicsList.length - 1) { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; } }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = idx === publicMosaicsList.length - 1 ? C.border : C.textDim; }}
+                        >&darr;</button>
+
+                        {/* Staff Pick toggle */}
+                        <button
+                          onClick={() => isStaffPick ? handleClearStaffPick() : handleSetStaffPick(mosaic)}
+                          disabled={mosaicLoading}
+                          title={isStaffPick ? "Remove staff pick" : "Set as staff pick"}
+                          style={{
+                            background: "none", border: `1px solid ${isStaffPick ? C.accent : C.border}`, borderRadius: 6,
+                            padding: "4px 10px", color: isStaffPick ? C.accent : C.textDim,
+                            cursor: "pointer", fontSize: 11, fontFamily: "'Space Mono', monospace",
+                            transition: "all 0.15s",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = isStaffPick ? C.accent : C.border; e.currentTarget.style.color = isStaffPick ? C.accent : C.textDim; }}
+                        >
+                          {isStaffPick ? "★ Pick" : "☆ Pick"}
+                        </button>
+
+                        {/* Unpublish */}
+                        <button
+                          onClick={() => handleUnpublishMosaic(mosaic)}
+                          disabled={mosaicLoading}
+                          title="Unpublish"
+                          style={{
+                            background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px",
+                            color: C.textDim, cursor: "pointer", fontSize: 11,
+                            fontFamily: "'Space Mono', monospace", transition: "all 0.15s",
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                        >
+                          Unpublish
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
   // --- Account modal (shared across views) ---
   const accountModalEl = showAccountModal && firebaseConfigured && (
     <div onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)} style={{
@@ -7226,8 +7496,14 @@ export default function Pattrn() {
           display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
           maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
         }}>
-          <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
-            Solve all 25 tiles to reveal the pattern
+          <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Space Mono', monospace", marginBottom: 4, textAlign: "center" }}>
+            {staffPickMosaic ? (
+              <>
+                <span style={{ color: C.accent }}>&#9733; Staff Pick</span>
+                {" — "}{staffPickMosaic.title || "Untitled"}
+                {staffPickMosaic.authorUsername && <span style={{ color: C.textDim }}> by {staffPickMosaic.authorUsername}</span>}
+              </>
+            ) : "Solve all 25 tiles to reveal the pattern"}
           </div>
           <div style={{
             display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3,
@@ -7856,6 +8132,41 @@ export default function Pattrn() {
                           </div>
                           <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
                             Admin: approve submissions
+                          </div>
+                        </div>
+                        <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                      </button>
+                    )}
+
+                    {/* Admin Manage Public (only for admins) */}
+                    {isAdmin && (
+                      <button onClick={() => { setShowGameMenu(false); setView("admin-manage"); loadMosaicData("manage"); }} style={{
+                        width: "100%", padding: "14px 16px", borderRadius: 12,
+                        backgroundColor: C.surface, border: `1px solid #F59E0B33`,
+                        cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                        transition: "all 0.15s",
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#F59E0B"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "#F59E0B33"; }}
+                      >
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          backgroundColor: "#F59E0B22", display: "flex", alignItems: "center", justifyContent: "center",
+                          border: "1.5px solid #F59E0B44", flexShrink: 0,
+                        }}>
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M2 4h12M2 8h12M2 12h12" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round"/>
+                            <circle cx="5" cy="4" r="1.5" fill="#F59E0B"/>
+                            <circle cx="11" cy="8" r="1.5" fill="#F59E0B"/>
+                            <circle cx="7" cy="12" r="1.5" fill="#F59E0B"/>
+                          </svg>
+                        </div>
+                        <div style={{ flex: 1, textAlign: "left" }}>
+                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                            Manage Public
+                          </div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                            Admin: order, staff pick, unpublish
                           </div>
                         </div>
                         <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>

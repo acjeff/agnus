@@ -59,6 +59,10 @@
           ".write": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true"
         }
       },
+      "meta": {
+        ".read": true,
+        ".write": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true"
+      },
       "shared": {
         "$uid": {
           ".read": "auth != null && auth.uid === $uid",

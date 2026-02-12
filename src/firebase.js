@@ -246,12 +246,66 @@ export async function rejectMosaic(mosaicId, mosaic) {
   }
 }
 
-// Load all approved public mosaics
+// Load all approved public mosaics (sorted by displayOrder if present, then approvedAt)
 export async function loadPublicMosaics() {
   if (!db) return [];
   const snap = await get(ref(db, "mosaics/public"));
   if (!snap.exists()) return [];
-  return Object.values(snap.val()).sort((a, b) => (b.approvedAt || 0) - (a.approvedAt || 0));
+  return Object.values(snap.val()).sort((a, b) => {
+    const oa = a.displayOrder ?? 999999;
+    const ob = b.displayOrder ?? 999999;
+    if (oa !== ob) return oa - ob;
+    return (b.approvedAt || 0) - (a.approvedAt || 0);
+  });
+}
+
+// Admin: update fields on a public mosaic (e.g. displayOrder, staffPick)
+export async function updatePublicMosaicFields(mosaicId, fields) {
+  if (!db) return;
+  await update(ref(db, `mosaics/public/${mosaicId}`), removeUndefined(fields));
+}
+
+// Admin: unpublish a public mosaic (remove from public, update user's copy)
+export async function unpublishMosaic(mosaicId, mosaic) {
+  if (!db) return;
+  await remove(ref(db, `mosaics/public/${mosaicId}`));
+  // Clear staff pick if this was the staff pick
+  const metaSnap = await get(ref(db, "mosaics/meta/staffPickId"));
+  if (metaSnap.exists() && metaSnap.val() === mosaicId) {
+    await remove(ref(db, "mosaics/meta/staffPickId"));
+  }
+  // Update the user's copy status
+  if (mosaic.authorUid) {
+    try {
+      await update(ref(db, `users/${mosaic.authorUid}/data/mosaics/${mosaicId}`), {
+        publicStatus: null,
+        updatedAt: serverTimestamp(),
+      });
+    } catch { /* user may have deleted their copy */ }
+  }
+}
+
+// Admin: set a mosaic as the staff pick (stores ID at mosaics/meta/staffPickId)
+export async function setStaffPick(mosaicId) {
+  if (!db) return;
+  await set(ref(db, "mosaics/meta/staffPickId"), mosaicId);
+}
+
+// Admin: clear the staff pick
+export async function clearStaffPick() {
+  if (!db) return;
+  await remove(ref(db, "mosaics/meta/staffPickId"));
+}
+
+// Load the staff pick mosaic (returns the mosaic object or null)
+export async function loadStaffPickMosaic() {
+  if (!db) return null;
+  const idSnap = await get(ref(db, "mosaics/meta/staffPickId"));
+  if (!idSnap.exists()) return null;
+  const mosaicId = idSnap.val();
+  const mosaicSnap = await get(ref(db, `mosaics/public/${mosaicId}`));
+  if (!mosaicSnap.exists()) return null;
+  return mosaicSnap.val();
 }
 
 // Share a mosaic with a specific user by username (stores in shared/{recipientUid}/{mosaicId})
