@@ -600,10 +600,56 @@ export function mergeGameData(local, cloud) {
   return merged;
 }
 
+// --- Notifications ---
+
+// Send a notification to a user
+export async function sendNotification(toUid, notification) {
+  if (!db) return null;
+  const notifRef = ref(db, `notifications/${toUid}`);
+  const newRef = push(notifRef);
+  const id = newRef.key;
+  await set(newRef, {
+    ...removeUndefined(notification),
+    id,
+    read: false,
+    createdAt: serverTimestamp(),
+  });
+  return id;
+}
+
+// Load all notifications for a user
+export async function loadNotifications(uid) {
+  if (!db) return [];
+  const snap = await get(ref(db, `notifications/${uid}`));
+  if (!snap.exists()) return [];
+  return Object.values(snap.val()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+}
+
+// Subscribe to notifications in real-time
+export function subscribeToNotifications(uid, callback) {
+  if (!db) return () => {};
+  const notifRef = ref(db, `notifications/${uid}`);
+  const handler = onValue(notifRef, (snap) => {
+    if (!snap.exists()) {
+      callback([]);
+      return;
+    }
+    const notifs = Object.values(snap.val()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    callback(notifs);
+  });
+  return () => off(notifRef, "value", handler);
+}
+
+// Dismiss (delete) a notification
+export async function dismissNotification(uid, notifId) {
+  if (!db) return;
+  await remove(ref(db, `notifications/${uid}/${notifId}`));
+}
+
 // --- Coop Mode ---
 
 // Create a new coop session. Returns the session ID.
-export async function createCoopSession(uid, { mode, level, dailyDate, hostTheme }) {
+export async function createCoopSession(uid, { mode, level, dailyDate, hostTheme, hostUsername }) {
   if (!db) return null;
   const sessionsRef = ref(db, "coopSessions");
   const newRef = push(sessionsRef);
@@ -611,7 +657,9 @@ export async function createCoopSession(uid, { mode, level, dailyDate, hostTheme
   await set(newRef, {
     id,
     hostUid: uid,
+    hostUsername: hostUsername || null,
     guestUid: null,
+    guestUsername: null,
     mode,
     level: level ?? null,
     dailyDate: dailyDate ?? null,
@@ -626,11 +674,13 @@ export async function createCoopSession(uid, { mode, level, dailyDate, hostTheme
     hostTimerStart: Date.now(),
     createdAt: serverTimestamp(),
   });
+  // Index this session under the user's session list
+  await set(ref(db, `userCoopSessions/${uid}/${id}`), { createdAt: serverTimestamp(), role: "host" });
   return id;
 }
 
 // Join an existing coop session as guest
-export async function joinCoopSession(sessionId, uid) {
+export async function joinCoopSession(sessionId, uid, guestUsername) {
   if (!db) return null;
   const sessionRef = ref(db, `coopSessions/${sessionId}`);
   const snap = await get(sessionRef);
@@ -638,7 +688,9 @@ export async function joinCoopSession(sessionId, uid) {
   const data = snap.val();
   if (data.guestUid && data.guestUid !== uid) return null; // already taken
   if (data.hostUid === uid) return data; // host rejoining
-  await update(sessionRef, { guestUid: uid, status: "playing" });
+  await update(sessionRef, { guestUid: uid, guestUsername: guestUsername || null, status: "playing" });
+  // Index this session under the guest's session list
+  await set(ref(db, `userCoopSessions/${uid}/${sessionId}`), { createdAt: serverTimestamp(), role: "guest" });
   const updated = await get(sessionRef);
   return updated.val();
 }
@@ -707,10 +759,65 @@ export async function resetCoopSession(sessionId) {
   });
 }
 
-// Delete / leave a coop session
+// Guest leaves a coop session: clear guest fields, reset to waiting
+export async function guestLeaveCoopSession(sessionId, guestUid) {
+  if (!db) return;
+  await update(ref(db, `coopSessions/${sessionId}`), {
+    guestUid: null,
+    guestUsername: null,
+    status: "waiting",
+    fills: {},
+    hostLockedIn: false,
+    guestLockedIn: false,
+    hostCorrect: false,
+    guestCorrect: false,
+    attempts: 0,
+    hostTimerStart: Date.now(),
+  });
+  // Remove from guest's session index
+  if (guestUid) {
+    await remove(ref(db, `userCoopSessions/${guestUid}/${sessionId}`)).catch(() => {});
+  }
+}
+
+// Close/delete a coop session (owner only)
+export async function closeCoopSession(sessionId, hostUid, guestUid) {
+  if (!db) return;
+  await remove(ref(db, `coopSessions/${sessionId}`));
+  // Clean up session indexes for both players
+  if (hostUid) {
+    await remove(ref(db, `userCoopSessions/${hostUid}/${sessionId}`)).catch(() => {});
+  }
+  if (guestUid) {
+    await remove(ref(db, `userCoopSessions/${guestUid}/${sessionId}`)).catch(() => {});
+  }
+}
+
+// Delete / leave a coop session (legacy - used for cleanup)
 export async function deleteCoopSession(sessionId) {
   if (!db) return;
   await remove(ref(db, `coopSessions/${sessionId}`));
+}
+
+// Load all active coop sessions for a user (via session index)
+export async function loadUserCoopSessions(uid) {
+  if (!db) return [];
+  const indexSnap = await get(ref(db, `userCoopSessions/${uid}`));
+  if (!indexSnap.exists()) return [];
+  const sessionIds = Object.keys(indexSnap.val());
+  // Load each session individually (respects per-session read rules)
+  const sessions = await Promise.all(
+    sessionIds.map(async (sid) => {
+      const snap = await get(ref(db, `coopSessions/${sid}`));
+      if (!snap.exists()) {
+        // Session was deleted, clean up stale index
+        remove(ref(db, `userCoopSessions/${uid}/${sid}`)).catch(() => {});
+        return null;
+      }
+      return snap.val();
+    })
+  );
+  return sessions.filter(Boolean).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 
 // Load a coop session by ID (one-time read)

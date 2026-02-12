@@ -40,6 +40,22 @@
         }
       }
     },
+    "notifications": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$notifId": {
+          ".write": "auth != null"
+        }
+      }
+    },
+    "userCoopSessions": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        "$sessionId": {
+          ".write": "auth != null"
+        }
+      }
+    },
     "coopSessions": {
       "$sessionId": {
         ".read": "auth != null",
