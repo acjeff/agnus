@@ -3524,8 +3524,10 @@ export default function Pattrn() {
         totalSolved: summary.totalSolved,
         achievements: summary.achievements,
         times: data.times || {},
-        username: username || null,
       };
+      if (username) {
+        publicStats.username = username;
+      }
       savePublicStats(uid, publicStats).catch(() => {});
       setSyncStatus("synced");
       setTimeout(() => setSyncStatus(""), 2000);
@@ -3713,6 +3715,8 @@ export default function Pattrn() {
     setUsernameError("");
     try {
       await saveUsername(firebaseUser.uid, trimmed);
+      // Also update publicStats so admin view reflects the username immediately
+      savePublicStats(firebaseUser.uid, { username: trimmed }).catch(() => {});
       setUsername(trimmed);
       setShowUsernameModal(false);
       setUsernameInput("");
