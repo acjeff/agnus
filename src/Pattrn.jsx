@@ -7389,10 +7389,9 @@ export default function Pattrn() {
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} }`}</style>
 
         <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease", position: "relative", width: "100%", maxWidth: 360 }}>
-          {/* Top-right buttons: friends + notification bell + menu */}
-          <div style={{ position: "absolute", top: 2, right: 0, display: "flex", gap: 6, alignItems: "center" }}>
-            {/* Friends button */}
-            {firebaseConfigured && firebaseUser && (
+          {/* Top-left: Friends button */}
+          {firebaseConfigured && firebaseUser && (
+            <div style={{ position: "absolute", top: 2, left: 0, display: "flex", gap: 6, alignItems: "center" }}>
               <button
                 onClick={() => {
                   loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {});
@@ -7427,7 +7426,10 @@ export default function Pattrn() {
                   </span>
                 )}
               </button>
-            )}
+            </div>
+          )}
+          {/* Top-right buttons: notification bell + menu */}
+          <div style={{ position: "absolute", top: 2, right: 0, display: "flex", gap: 6, alignItems: "center" }}>
             {/* Notification bell */}
             {firebaseConfigured && firebaseUser && (
               <button
