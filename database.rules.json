@@ -32,6 +32,12 @@
         ".validate": "newData.isString()"
       }
     },
+    "coopSessions": {
+      "$sessionId": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || data.child('hostUid').val() === auth.uid || data.child('guestUid').val() === auth.uid || data.child('guestUid').val() === null)"
+      }
+    },
     "mosaics": {
       "pending": {
         ".read": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true",
