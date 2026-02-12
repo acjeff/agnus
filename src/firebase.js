@@ -820,6 +820,17 @@ export async function loadUserCoopSessions(uid) {
   return sessions.filter(Boolean).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 
+// Subscribe to user's coop session index changes (triggers reload)
+export function subscribeToUserCoopSessionIndex(uid, callback) {
+  if (!db) return () => {};
+  const indexRef = ref(db, `userCoopSessions/${uid}`);
+  const handler = onValue(indexRef, () => {
+    // When the index changes, reload all sessions
+    loadUserCoopSessions(uid).then(callback).catch(() => callback([]));
+  });
+  return () => off(indexRef, "value", handler);
+}
+
 // Load a coop session by ID (one-time read)
 export async function loadCoopSession(sessionId) {
   if (!db) return null;

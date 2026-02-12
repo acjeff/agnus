@@ -37,6 +37,7 @@ import {
   guestLeaveCoopSession,
   closeCoopSession,
   loadUserCoopSessions,
+  subscribeToUserCoopSessionIndex,
   sendNotification,
   subscribeToNotifications,
   dismissNotification,
@@ -2765,6 +2766,7 @@ export default function Pattrn() {
   const [coopPartnerLockToast, setCoopPartnerLockToast] = useState(null); // toast when partner locks in
   const coopPartnerLockToastTimer = useRef(null);
   const prevCoopPartnerLockedRef = useRef(false); // track partner lock state changes
+  const coopGuestJoinedRef = useRef(false); // tracks whether guest has actually joined (prevents false kick detection)
 
   // --- Staff Pick & Admin Manage state ---
   const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
@@ -2833,7 +2835,7 @@ export default function Pattrn() {
     };
   }, [firebaseUser, firebaseConfigured]);
 
-  // Load active coop sessions when returning to menu
+  // Load active coop sessions (one-shot, used by callbacks)
   const loadActiveCoopSessions = useCallback(async () => {
     if (!firebaseUser || !firebaseConfigured) {
       setActiveCoopSessions([]);
@@ -2842,7 +2844,6 @@ export default function Pattrn() {
     setActiveSessionsLoading(true);
     try {
       const sessions = await loadUserCoopSessions(firebaseUser.uid);
-      // Filter to only active (non-closed) sessions
       setActiveCoopSessions(sessions.filter(s => s.status !== "closed"));
     } catch {
       setActiveCoopSessions([]);
@@ -2851,11 +2852,27 @@ export default function Pattrn() {
     }
   }, [firebaseUser, firebaseConfigured]);
 
+  // Subscribe to user's coop session index for real-time updates
+  const coopSessionIndexUnsubRef = useRef(null);
   useEffect(() => {
-    if (view === "menu" && firebaseUser) {
-      loadActiveCoopSessions();
+    if (coopSessionIndexUnsubRef.current) {
+      coopSessionIndexUnsubRef.current();
+      coopSessionIndexUnsubRef.current = null;
     }
-  }, [view, firebaseUser, loadActiveCoopSessions]);
+    if (!firebaseUser || !firebaseConfigured) {
+      setActiveCoopSessions([]);
+      return;
+    }
+    const unsub = subscribeToUserCoopSessionIndex(firebaseUser.uid, (sessions) => {
+      setActiveCoopSessions(sessions.filter(s => s.status !== "closed"));
+      setActiveSessionsLoading(false);
+    });
+    coopSessionIndexUnsubRef.current = unsub;
+    return () => {
+      unsub();
+      coopSessionIndexUnsubRef.current = null;
+    };
+  }, [firebaseUser, firebaseConfigured]);
 
   // --- Mosaic Creator helpers ---
   const resetCreator = useCallback(() => {
@@ -4637,6 +4654,7 @@ export default function Pattrn() {
     coopWriteThrottleRef.current = {};
     coopHostTimerStartRef.current = null;
     prevCoopPartnerLockedRef.current = false;
+    coopGuestJoinedRef.current = false;
   }, [coopSessionId, firebaseUser, coopRole]);
 
   // Close coop session permanently (owner only)
@@ -4733,9 +4751,14 @@ export default function Pattrn() {
         return;
       }
       const isHost = data.hostUid === firebaseUser.uid;
-      // If guest was removed from the session (kicked or left), handle it
-      if (!isHost && !data.guestUid) {
-        // Guest has been removed - leave the session locally
+      // Track whether the guest has actually joined the session
+      if (!isHost && data.guestUid === firebaseUser.uid) {
+        coopGuestJoinedRef.current = true;
+      }
+      // If guest was removed from the session (kicked or session reset), handle it
+      // Only applies AFTER the guest has successfully joined — not during initial "joining" phase
+      if (!isHost && !data.guestUid && coopGuestJoinedRef.current) {
+        coopGuestJoinedRef.current = false;
         leaveCoopSession();
         setView("menu");
         return;
@@ -5170,7 +5193,7 @@ export default function Pattrn() {
   // Detect coop completion: both players locked in correctly
   const coopComplete = isCoop && coopMyLockedIn && coopPartnerLockedIn && coopPartnerCorrect && gameState === "playing";
 
-  // Effect: when coop is complete, trigger win state and save progress
+  // Effect: when coop is complete, trigger win state, save progress, then auto-close session
   useEffect(() => {
     if (!coopComplete || !puzzle) return;
 
@@ -5199,7 +5222,24 @@ export default function Pattrn() {
     saveTimes(newTimes);
 
     showNewAchievements(newProgress, newTimes);
-  }, [coopComplete, puzzle, stopTimer, elapsedTime, difficulty, progressKey, attempts, showNewAchievements]);
+
+    // Auto-close the coop session after completion (with delay for the win animation)
+    const sessionId = coopSessionId;
+    const role = coopRole;
+    if (sessionId) {
+      // Only the host closes/deletes the session; guest just cleans up locally
+      setTimeout(async () => {
+        if (role === "host") {
+          try {
+            const session = await loadCoopSession(sessionId);
+            if (session) {
+              await closeCoopSession(sessionId, session.hostUid, session.guestUid);
+            }
+          } catch { /* ignore */ }
+        }
+      }, 3000);
+    }
+  }, [coopComplete, puzzle, stopTimer, elapsedTime, difficulty, progressKey, attempts, showNewAchievements, coopSessionId, coopRole]);
 
   // For blind mode: all non-locked blanks must be filled
   const activeBlanks = puzzle ? [...puzzle.blanks].filter(k => !lockedCells.has(k)) : [];
@@ -10001,9 +10041,14 @@ export default function Pattrn() {
 
         {gameState === "won" && (
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: 12, animation: "fadeUp 0.4s ease" }}>
+            <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: isCoop ? 4 : 12, animation: "fadeUp 0.4s ease" }}>
               &#x2713; {isCoop ? "Co-op complete!" : isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : isSpin ? "Nailed it!" : isMosaic ? "Tile complete!" : "Perfect"}
             </div>
+            {isCoop && (
+              <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 12, animation: "fadeUp 0.5s 0.1s ease both" }}>
+                Session complete — well played!
+              </div>
+            )}
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={async () => {
                 let text;
@@ -10054,7 +10099,11 @@ export default function Pattrn() {
                 Retry
               </button>
               {isCoop ? (
-                <button onClick={() => { leaveCoopSession(); setView("menu"); }}
+                <button onClick={() => {
+                  // Clean up local coop state; session auto-closes from the completion effect
+                  leaveCoopSession();
+                  setView("menu");
+                }}
                   style={{
                     backgroundColor: "#54A0FF", color: "#fff", border: "none",
                     padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
@@ -10065,7 +10114,7 @@ export default function Pattrn() {
                   onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
                   onMouseLeave={e => e.target.style.transform = "translateY(0)"}
                 >
-                  Back to puzzles
+                  Done
                 </button>
               ) : (isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) ? (
                 <button onClick={() => { setView(customMosaicPuzzlesRef.current && isMosaic ? "custom-mosaic" : "menu"); }}
