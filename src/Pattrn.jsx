@@ -1598,11 +1598,12 @@ function loadProgress() {
       spin: base.spin ?? {},
       mosaic: base.mosaic ?? {},
       coop: base.coop ?? {},
+      mosaicCompletions: base.mosaicCompletions ?? {},
       cascadeRunState,
       cascadeRunStateLastIndex: typeof cascadeRunStateLastIndex === "number" ? cascadeRunStateLastIndex : undefined,
     };
   } catch {
-    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, coop: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined };
+    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, coop: {}, mosaicCompletions: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined };
   }
 }
 
@@ -2910,9 +2911,11 @@ export default function Pattrn() {
     const puzzles = buildCustomMosaicPuzzles(mosaic.grid);
     customMosaicPuzzlesRef.current = puzzles;
     setCustomMosaicPlay(mosaic);
-    setCustomMosaicProgress({});
+    // Restore saved progress for this mosaic if available
+    const saved = mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null;
+    setCustomMosaicProgress(saved && typeof saved === "object" ? { ...saved } : {});
     setView("custom-mosaic");
-  }, [buildCustomMosaicPuzzles]);
+  }, [buildCustomMosaicPuzzles, progress.mosaicCompletions]);
 
   const handleSaveMosaic = useCallback(async () => {
     if (!firebaseUser) { setMosaicMsg("Sign in to save mosaics"); setTimeout(() => setMosaicMsg(""), 2500); return; }
@@ -3233,10 +3236,12 @@ export default function Pattrn() {
 
   // Helper: render a mosaic grid thumbnail (using canvas-like div grid)
   // When hidden=true, renders an obscured placeholder instead of the actual image
-  const MosaicThumbnail = useCallback(({ grid, size = 80, hidden = false }) => {
+  // When completedTiles is provided (object { tileIndex: attempts }), only reveal
+  // cells from completed tiles (attempts > 0); uncompleted areas are dimmed.
+  const MosaicThumbnail = useCallback(({ grid, size = 80, hidden = false, completedTiles = null }) => {
     const gs = grid?.length || 25;
     const cellSz = size / gs;
-    if (hidden) {
+    if (hidden && !completedTiles) {
       return (
         <div style={{
           width: size, height: size, borderRadius: 6, overflow: "hidden", flexShrink: 0,
@@ -3259,9 +3264,20 @@ export default function Pattrn() {
           const ctx = el.getContext("2d");
           el.width = size;
           el.height = size;
+          const tileSize = gs === 25 ? 5 : gs; // 25x25 grids have 5x5 tiles
+          const hasPartial = completedTiles && typeof completedTiles === "object";
+          const dimColor = "#14141f";
           for (let r = 0; r < gs; r++) {
             for (let c = 0; c < (grid[r]?.length || 0); c++) {
-              ctx.fillStyle = grid[r][c] || "#14141f";
+              if (hasPartial && gs === 25) {
+                const tileRow = Math.floor(r / tileSize);
+                const tileCol = Math.floor(c / tileSize);
+                const tileIdx = tileRow * 5 + tileCol;
+                const tileSolved = (completedTiles[tileIdx] || 0) > 0;
+                ctx.fillStyle = tileSolved ? (grid[r][c] || dimColor) : dimColor;
+              } else {
+                ctx.fillStyle = grid[r][c] || dimColor;
+              }
               ctx.fillRect(c * cellSz, r * cellSz, Math.ceil(cellSz), Math.ceil(cellSz));
             }
           }
@@ -3281,6 +3297,7 @@ export default function Pattrn() {
       cascade: progress.cascade || {},
       spin: progress.spin || {},
       mosaic: progress.mosaic || {},
+      mosaicCompletions: progress.mosaicCompletions || {},
       cascadeRunState: progress.cascadeRunState || {},
       cascadeRunStateLastIndex: progress.cascadeRunStateLastIndex ?? null,
     },
@@ -4834,9 +4851,20 @@ export default function Pattrn() {
         if (isBlind) setLockedCells(new Set([...puzzle.blanks]));
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
-        // Custom mosaic: track progress locally only (don't save to normal progress)
+        // Custom mosaic: track progress locally and persist to mosaicCompletions
         if (customMosaicPuzzlesRef.current && isMosaic) {
           setCustomMosaicProgress(prev => ({ ...prev, [progressKey]: newAttempts }));
+          // Persist completion to progress.mosaicCompletions keyed by mosaic ID
+          if (customMosaicPlay?.id) {
+            const mosaicId = customMosaicPlay.id;
+            const prevCompletions = progress.mosaicCompletions || {};
+            const prevMosaic = prevCompletions[mosaicId] || {};
+            const newMosaicProgress = { ...prevMosaic, [progressKey]: newAttempts };
+            const newCompletions = { ...prevCompletions, [mosaicId]: newMosaicProgress };
+            const newProgress = { ...progress, mosaicCompletions: newCompletions };
+            setProgress(newProgress);
+            saveProgress(newProgress);
+          }
         } else {
           const newDiffProgress = { ...diffProgress, [progressKey]: newAttempts };
           const newProgress = { ...progress, [difficulty]: newDiffProgress };
@@ -5395,13 +5423,13 @@ export default function Pattrn() {
           {solvedCount}/25 tiles solved
         </div>
 
-        {/* Full picture preview when all solved */}
-        {solvedCount === 25 && (
+        {/* Progressive picture preview — reveals completed tile areas */}
+        {solvedCount > 0 && (
           <div style={{ marginTop: 20, animation: "fadeUp 0.4s ease both", textAlign: "center" }}>
-            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: 12 }}>
-              Picture revealed!
+            <div style={{ fontSize: solvedCount === 25 ? 18 : 11, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: solvedCount === 25 ? C.correct : C.textDim, marginBottom: 12, letterSpacing: solvedCount === 25 ? 0 : 1, textTransform: solvedCount === 25 ? "none" : "uppercase" }}>
+              {solvedCount === 25 ? "Picture revealed!" : "Preview"}
             </div>
-            <MosaicThumbnail grid={customMosaicPlay.grid} size={Math.min(280, typeof window !== "undefined" ? window.innerWidth - 80 : 280)} />
+            <MosaicThumbnail grid={customMosaicPlay.grid} size={Math.min(280, typeof window !== "undefined" ? window.innerWidth - 80 : 280)} completedTiles={solvedCount === 25 ? null : customMosaicProgress} />
           </div>
         )}
       </div>
@@ -5933,7 +5961,7 @@ export default function Pattrn() {
                 backgroundColor: C.surface, border: `1px solid ${C.border}`, alignItems: "center",
               }}>
                 <div style={{ cursor: "pointer" }} onClick={() => mosaic.grid && startCustomMosaicPlay(mosaic)}>
-                  <MosaicThumbnail grid={mosaic.grid} size={64} hidden={!isAdmin && mosaicGalleryTab !== "mine" && mosaic.authorUid !== firebaseUser?.uid} />
+                  <MosaicThumbnail grid={mosaic.grid} size={64} hidden={!isAdmin && mosaicGalleryTab !== "mine" && mosaic.authorUid !== firebaseUser?.uid} completedTiles={mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -5946,6 +5974,17 @@ export default function Pattrn() {
                      mosaic.publicStatus === "pending" ? "Pending review" :
                      mosaic.publicStatus === "rejected" ? "Not approved" : ""}
                   </div>
+                  {(() => {
+                    const mc = mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null;
+                    if (!mc) return null;
+                    const solved = Object.values(mc).filter(v => v > 0).length;
+                    if (solved === 0) return null;
+                    return (
+                      <div style={{ fontSize: 9, color: solved === 25 ? C.correct : C.accent, marginTop: 2, fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                        {solved === 25 ? "Complete!" : `${solved}/25 tiles`}
+                      </div>
+                    );
+                  })()}
                 </div>
                 {mosaic.grid && (
                   <button onClick={() => startCustomMosaicPlay(mosaic)} title="Play as puzzle"
@@ -7631,7 +7670,7 @@ export default function Pattrn() {
                     onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.transform = "translateY(-2px)"; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; }}
                   >
-                    <MosaicThumbnail grid={mosaic.grid} size={72} hidden={!isAdmin && mosaic._source !== "mine" && mosaic.authorUid !== firebaseUser?.uid} />
+                    <MosaicThumbnail grid={mosaic.grid} size={72} hidden={!isAdmin && mosaic._source !== "mine" && mosaic.authorUid !== firebaseUser?.uid} completedTiles={mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null} />
                     <div style={{
                       fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 600,
                       color: C.text, textAlign: "center", lineHeight: 1.2,

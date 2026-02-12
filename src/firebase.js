@@ -538,6 +538,30 @@ export function mergeGameData(local, cloud) {
   mergedProgress.cascadeRunState = mergedRunState;
   mergedProgress.cascadeRunStateLastIndex = localProgress.cascadeRunStateLastIndex ?? cloudProgress.cascadeRunStateLastIndex ?? null;
 
+  // Merge mosaicCompletions: for each mosaic ID, merge tile completions (prefer lower non-zero)
+  const lMC = localProgress.mosaicCompletions || {};
+  const cMC = cloudProgress.mosaicCompletions || {};
+  const mcKeys = new Set([...Object.keys(lMC), ...Object.keys(cMC)]);
+  const mergedMC = {};
+  for (const mosaicId of mcKeys) {
+    const lTiles = lMC[mosaicId] || {};
+    const cTiles = cMC[mosaicId] || {};
+    const tileKeys = new Set([...Object.keys(lTiles), ...Object.keys(cTiles)]);
+    const mergedTiles = {};
+    for (const tk of tileKeys) {
+      const lv = lTiles[tk];
+      const cv = cTiles[tk];
+      if (lv == null) { mergedTiles[tk] = cv; continue; }
+      if (cv == null) { mergedTiles[tk] = lv; continue; }
+      if (lv === 0 && cv === 0) { mergedTiles[tk] = 0; continue; }
+      if (lv === 0) { mergedTiles[tk] = cv; continue; }
+      if (cv === 0) { mergedTiles[tk] = lv; continue; }
+      mergedTiles[tk] = Math.min(lv, cv);
+    }
+    mergedMC[mosaicId] = mergedTiles;
+  }
+  mergedProgress.mosaicCompletions = mergedMC;
+
   merged.progress = mergedProgress;
 
   // Merge times: keep the faster time for each puzzle
