@@ -2786,6 +2786,12 @@ export default function Pattrn() {
   const prevCoopPartnerLockedRef = useRef(false); // track partner lock state changes
   const coopGuestJoinedRef = useRef(false); // tracks whether guest has actually joined (prevents false kick detection)
 
+  // --- Global co-op invite toast (shown on any view) ---
+  const [coopInviteToast, setCoopInviteToast] = useState(null); // notification object for the toast
+  const coopInviteToastTimer = useRef(null);
+  const seenNotifIdsRef = useRef(new Set()); // track previously seen notification IDs
+  const notifInitialLoadRef = useRef(true); // skip toasting on initial load
+
   // --- Staff Pick & Admin Manage state ---
   const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
   const staffPickPuzzlesRef = useRef(null); // puzzles built from staff pick grid
@@ -2846,8 +2852,32 @@ export default function Pattrn() {
       setNotifications([]);
       return;
     }
+    notifInitialLoadRef.current = true;
+    seenNotifIdsRef.current = new Set();
     const unsub = subscribeToNotifications(firebaseUser.uid, (notifs) => {
       setNotifications(notifs);
+      // Detect new co-op invite notifications and show a toast
+      const currentIds = new Set(notifs.map(n => n.id));
+      if (notifInitialLoadRef.current) {
+        // First load: just record existing IDs, don't toast
+        seenNotifIdsRef.current = currentIds;
+        notifInitialLoadRef.current = false;
+      } else {
+        // Find new co-op invites that weren't in the previous set
+        for (const notif of notifs) {
+          if (notif.type === "coop_invite" && !seenNotifIdsRef.current.has(notif.id)) {
+            // Show toast for this new co-op invite
+            setCoopInviteToast(notif);
+            if (coopInviteToastTimer.current) clearTimeout(coopInviteToastTimer.current);
+            coopInviteToastTimer.current = setTimeout(() => {
+              setCoopInviteToast(null);
+              coopInviteToastTimer.current = null;
+            }, 15000);
+            break; // Only show one toast at a time
+          }
+        }
+        seenNotifIdsRef.current = currentIds;
+      }
     });
     notifUnsubRef.current = unsub;
     return () => {
@@ -5621,6 +5651,94 @@ export default function Pattrn() {
     );
   })() : null;
 
+  // --- Global co-op invite toast (appears on any view) ---
+  const coopInviteToastEl = coopInviteToast && firebaseUser && (
+    <div style={{
+      position: "fixed",
+      top: "calc(16px + env(safe-area-inset-top, 0px))",
+      left: "50%", transform: "translateX(-50%)",
+      zIndex: 1050,
+      maxWidth: "calc(100vw - 32px)", width: 360, boxSizing: "border-box",
+      animation: "fadeUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+      pointerEvents: "auto",
+    }}>
+      <div style={{
+        display: "flex", alignItems: "center", gap: 10,
+        padding: "12px 14px", borderRadius: 14,
+        backgroundColor: C.surface, border: `1.5px solid #54A0FF`,
+        boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px #54A0FF33`,
+      }}>
+        <div style={{
+          width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+          backgroundColor: "#54A0FF22", display: "flex", alignItems: "center", justifyContent: "center",
+          border: `2px solid #54A0FF44`,
+        }}>
+          <span style={{ fontSize: 16, color: "#54A0FF" }}>{"\u2694"}</span>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
+            color: C.text, lineHeight: 1.3,
+          }}>
+            {coopInviteToast.fromUsername || "Someone"} invited you to co-op!
+          </div>
+          {coopInviteToast.data?.mode && (
+            <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, fontFamily: "'Space Mono', monospace" }}>
+              {coopInviteToast.data.mode} #{(coopInviteToast.data.level ?? 0) + 1}
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+          {coopInviteToast.data?.sessionId && (
+            <button
+              onClick={async () => {
+                const session = await loadCoopSession(coopInviteToast.data.sessionId);
+                if (session && session.status !== "complete") {
+                  setDifficulty(session.mode);
+                  setCurrentPuzzle(session.level ?? 0);
+                  if (session.dailyDate) setCurrentDailyDate(session.dailyDate);
+                  setCoopSessionId(session.id);
+                  setCoopRole("guest");
+                  setCoopStatus("joining");
+                  setFills({});
+                  setAttempts(0);
+                  setGameState("playing");
+                  setWrongCells(new Set());
+                  setLockedCells(new Set());
+                  setShowParticles(false);
+                  setSelectedCell(null);
+                  setSelectedToken(null);
+                  setView("play");
+                }
+                dismissNotification(firebaseUser.uid, coopInviteToast.id).catch(() => {});
+                setCoopInviteToast(null);
+                if (coopInviteToastTimer.current) { clearTimeout(coopInviteToastTimer.current); coopInviteToastTimer.current = null; }
+              }}
+              style={{
+                background: "#54A0FF", border: "none", borderRadius: 8,
+                padding: "6px 14px", color: "#fff", cursor: "pointer", fontSize: 11,
+                fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
+              }}
+            >
+              Join
+            </button>
+          )}
+          <button
+            onClick={() => {
+              setCoopInviteToast(null);
+              if (coopInviteToastTimer.current) { clearTimeout(coopInviteToastTimer.current); coopInviteToastTimer.current = null; }
+            }}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+              padding: "6px 8px", color: C.textDim, cursor: "pointer", fontSize: 11,
+            }}
+            title="Dismiss"
+          >{"\u2715"}</button>
+        </div>
+      </div>
+    </div>
+  );
+
   // --- CUSTOM MOSAIC PLAY VIEW (puzzle selection for user-created mosaics) ---
   if (view === "custom-mosaic" && customMosaicPlay) {
     const cPuzzles = customMosaicPuzzlesRef.current || [];
@@ -5725,6 +5843,7 @@ export default function Pattrn() {
             <MosaicThumbnail grid={customMosaicPlay.grid} size={Math.min(280, typeof window !== "undefined" ? window.innerWidth - 80 : 280)} completedTiles={solvedCount === 25 ? null : customMosaicProgress} />
           </div>
         )}
+        {coopInviteToastEl}
       </div>
     );
   }
@@ -5945,6 +6064,7 @@ export default function Pattrn() {
             </div>
           )}
         </div>
+        {coopInviteToastEl}
       </div>
     );
   }
@@ -6316,6 +6436,7 @@ export default function Pattrn() {
             ))}
           </div>
         )}
+        {coopInviteToastEl}
       </div>
     );
   }
@@ -6430,6 +6551,7 @@ export default function Pattrn() {
             ))}
           </div>
         )}
+        {coopInviteToastEl}
       </div>
     );
   }
@@ -6595,6 +6717,7 @@ export default function Pattrn() {
             })}
           </div>
         )}
+        {coopInviteToastEl}
       </div>
     );
   }
@@ -9710,6 +9833,7 @@ export default function Pattrn() {
           </div>
         </div>
       )}
+      {coopInviteToastEl}
       </div>
     );
   }
@@ -10841,6 +10965,7 @@ export default function Pattrn() {
       {usernameModalEl}
       {profilePageEl}
       {friendsModalEl}
+      {coopInviteToastEl}
     </div>
   );
 }
