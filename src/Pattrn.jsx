@@ -21,7 +21,6 @@ import {
   loadPublicMosaics,
   shareMosaicWithUser,
   loadSharedMosaics,
-  lookupUserByEmail,
   saveUserEmail,
   checkIsAdmin,
   createCoopSession,
@@ -39,6 +38,9 @@ import {
   loadUserProfile,
   saveProfilePicture,
   lookupUserByUsername,
+  addFriend,
+  removeFriend,
+  loadFriends,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2732,6 +2734,10 @@ export default function Pattrn() {
   const [customMosaicProgress, setCustomMosaicProgress] = useState({}); // { tileIndex: attempts }
   const customMosaicPuzzlesRef = useRef(null); // array of 25 puzzle objects when playing custom mosaic
   const [creatorReturnView, setCreatorReturnView] = useState("menu"); // where to go when leaving creator
+  const [friendsList, setFriendsList] = useState([]); // array of { uid, username, profilePicture }
+  const [addFriendInput, setAddFriendInput] = useState("");
+  const [addFriendMsg, setAddFriendMsg] = useState("");
+  const [addFriendLoading, setAddFriendLoading] = useState(false);
 
   // Listen for auth state changes
   useEffect(() => {
@@ -2905,7 +2911,6 @@ export default function Pattrn() {
         title: creatorTitle || "Untitled",
         grid: creatorGrid,
         gridSize: 25,
-        authorEmail: firebaseUser.email || "",
         authorUsername: username || "",
       };
       if (creatorEditingId) {
@@ -2970,14 +2975,11 @@ export default function Pattrn() {
     if (!firebaseUser || !identifier) return;
     setMosaicLoading(true);
     try {
-      // Try lookup by username first, then by email
-      let target = await lookupUserByUsername(identifier.trim());
-      if (!target) {
-        target = await lookupUserByEmail(identifier.trim());
-      }
+      // Look up by username
+      const target = await lookupUserByUsername(identifier.trim());
       if (!target) { setMosaicMsg("User not found"); setMosaicLoading(false); setTimeout(() => setMosaicMsg(""), 2500); return; }
       if (target.uid === firebaseUser.uid) { setMosaicMsg("Can't share with yourself"); setMosaicLoading(false); setTimeout(() => setMosaicMsg(""), 2500); return; }
-      await shareMosaicWithUser(firebaseUser.uid, firebaseUser.email, target.uid, mosaic.id, {
+      await shareMosaicWithUser(firebaseUser.uid, target.uid, mosaic.id, {
         ...mosaic,
         sharedByUsername: username || "",
       });
@@ -2993,6 +2995,39 @@ export default function Pattrn() {
       setTimeout(() => setMosaicMsg(""), 4000);
     }
   }, [firebaseUser, username]);
+
+  const handleAddFriend = useCallback(async () => {
+    if (!firebaseUser || !addFriendInput.trim()) return;
+    setAddFriendLoading(true);
+    setAddFriendMsg("");
+    try {
+      const target = await lookupUserByUsername(addFriendInput.trim());
+      if (!target) { setAddFriendMsg("User not found"); return; }
+      if (target.uid === firebaseUser.uid) { setAddFriendMsg("Can't add yourself"); return; }
+      if (friendsList.some(f => f.uid === target.uid)) { setAddFriendMsg("Already friends"); return; }
+      await addFriend(firebaseUser.uid, target.uid);
+      const updated = await loadFriends(firebaseUser.uid);
+      setFriendsList(updated);
+      setAddFriendInput("");
+      setAddFriendMsg("Friend added!");
+    } catch (e) {
+      console.error("Add friend failed:", e);
+      setAddFriendMsg("Failed to add friend");
+    } finally {
+      setAddFriendLoading(false);
+      setTimeout(() => setAddFriendMsg(""), 3000);
+    }
+  }, [firebaseUser, addFriendInput, friendsList]);
+
+  const handleRemoveFriend = useCallback(async (friendUid) => {
+    if (!firebaseUser) return;
+    try {
+      await removeFriend(firebaseUser.uid, friendUid);
+      setFriendsList(prev => prev.filter(f => f.uid !== friendUid));
+    } catch (e) {
+      console.error("Remove friend failed:", e);
+    }
+  }, [firebaseUser]);
 
   const handleApproveMosaic = useCallback(async (mosaic) => {
     setMosaicLoading(true);
@@ -3030,12 +3065,14 @@ export default function Pattrn() {
     setMosaicLoading(true);
     try {
       if (tab === "mine" && firebaseUser) {
-        const [userResult, sharedResult] = await Promise.allSettled([
+        const [userResult, sharedResult, friendsResult] = await Promise.allSettled([
           loadUserMosaics(firebaseUser.uid),
           loadSharedMosaics(firebaseUser.uid),
+          loadFriends(firebaseUser.uid),
         ]);
         setMyMosaics(userResult.status === "fulfilled" ? userResult.value : []);
         setSharedMosaics(sharedResult.status === "fulfilled" ? sharedResult.value : []);
+        if (friendsResult.status === "fulfilled") setFriendsList(friendsResult.value);
         const failed = [userResult, sharedResult].filter(r => r.status === "rejected");
         if (failed.length > 0) {
           const isPermErr = failed.some(r => r.reason?.message?.includes("PERMISSION_DENIED") || r.reason?.message?.includes("Permission denied"));
@@ -3048,6 +3085,9 @@ export default function Pattrn() {
       } else if (tab === "public") {
         const pubList = await loadPublicMosaics();
         setPublicMosaicsList(pubList);
+      } else if (tab === "friends" && firebaseUser) {
+        const friends = await loadFriends(firebaseUser.uid);
+        setFriendsList(friends);
       } else if (tab === "admin" && isAdmin) {
         const pendList = await loadPendingMosaics();
         setPendingMosaicsList(pendList);
@@ -5115,8 +5155,8 @@ export default function Pattrn() {
             <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent }}>
               {customMosaicPlay.title || "Untitled"}
             </h2>
-            {(customMosaicPlay.authorUsername || customMosaicPlay.authorEmail) && (
-              <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorUsername || customMosaicPlay.authorEmail}</div>
+            {customMosaicPlay.authorUsername && (
+              <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorUsername}</div>
             )}
           </div>
         </div>
@@ -5414,7 +5454,8 @@ export default function Pattrn() {
   if (view === "gallery") {
     const currentList = mosaicGalleryTab === "mine" ? myMosaics
       : mosaicGalleryTab === "shared" ? sharedMosaics
-      : publicMosaicsList;
+      : mosaicGalleryTab === "public" ? publicMosaicsList
+      : [];
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
@@ -5459,6 +5500,7 @@ export default function Pattrn() {
             { key: "mine", label: "My Mosaics" },
             { key: "shared", label: "Shared" },
             { key: "public", label: "Public" },
+            { key: "friends", label: "Friends" },
           ].map(tab => (
             <button
               key={tab.key}
@@ -5496,18 +5538,60 @@ export default function Pattrn() {
             <div onClick={e => e.stopPropagation()} style={{
               backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
               padding: 24, maxWidth: 340, width: "100%", animation: "fadeUp 0.25s ease",
+              maxHeight: "80vh", overflowY: "auto",
             }}>
               <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, margin: "0 0 12px", textAlign: "center" }}>
                 Share Mosaic
               </h3>
               <p style={{ fontSize: 11, color: C.textDim, textAlign: "center", marginBottom: 16 }}>
-                Enter the username or email of the user you want to share "{shareTargetMosaic.title}" with
+                Share "{shareTargetMosaic.title}" with a friend
               </p>
+              {/* Friends list */}
+              {friendsList.length > 0 && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                    Friends
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {friendsList.map(friend => (
+                      <button
+                        key={friend.uid}
+                        onClick={() => handleShareMosaic(shareTargetMosaic, friend.username)}
+                        disabled={mosaicLoading}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
+                          borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                          cursor: mosaicLoading ? "not-allowed" : "pointer", transition: "all 0.15s",
+                          width: "100%", textAlign: "left",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                      >
+                        {friend.profilePicture ? (
+                          <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: C.accent, fontWeight: 700, flexShrink: 0 }}>
+                            {(friend.username || "?")[0].toUpperCase()}
+                          </div>
+                        )}
+                        <span style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", color: C.text, fontWeight: 600 }}>
+                          {friend.username}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                  <div style={{ borderTop: `1px solid ${C.border}`, margin: "14px 0 0" }} />
+                </div>
+              )}
+              {/* Manual username entry */}
+              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                {friendsList.length > 0 ? "Or enter a username" : "Enter a username"}
+              </div>
               <input
                 type="text"
                 value={shareEmailInput}
                 onChange={e => setShareEmailInput(e.target.value)}
-                placeholder="Username or email"
+                placeholder="Username"
                 style={{
                   width: "100%", padding: "10px 14px", borderRadius: 10,
                   backgroundColor: C.surface, border: `1px solid ${C.border}`,
@@ -5549,7 +5633,106 @@ export default function Pattrn() {
         )}
 
         {/* Content */}
-        {mosaicLoading && currentList.length === 0 ? (
+        {mosaicGalleryTab === "friends" ? (
+          /* Friends tab content */
+          !firebaseUser ? (
+            <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
+              Sign in to manage friends<br/>
+              <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
+                style={{ marginTop: 8, padding: "8px 20px", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", background: C.accent, color: C.bg, border: "none", cursor: "pointer" }}
+              >Sign In</button>
+            </div>
+          ) : (
+            <div style={{ width: "100%", maxWidth: 400, animation: "fadeUp 0.3s ease" }}>
+              {/* Add friend input */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                  Add Friend by Username
+                </div>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <input
+                    type="text"
+                    value={addFriendInput}
+                    onChange={e => setAddFriendInput(e.target.value)}
+                    placeholder="Enter username"
+                    style={{
+                      flex: 1, padding: "10px 14px", borderRadius: 10,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      color: C.text, fontSize: 14, fontFamily: "'Space Mono', monospace",
+                      outline: "none", boxSizing: "border-box",
+                    }}
+                    onFocus={e => { e.target.style.borderColor = C.accent; }}
+                    onBlur={e => { e.target.style.borderColor = C.border; }}
+                    onKeyDown={e => { if (e.key === "Enter" && addFriendInput.trim()) handleAddFriend(); }}
+                  />
+                  <button
+                    onClick={handleAddFriend}
+                    disabled={!addFriendInput.trim() || addFriendLoading}
+                    style={{
+                      padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      background: addFriendInput.trim() ? C.accent : C.surfaceLight,
+                      color: addFriendInput.trim() ? C.bg : C.textDim,
+                      border: "none", cursor: addFriendInput.trim() ? "pointer" : "not-allowed",
+                      textTransform: "uppercase", flexShrink: 0,
+                    }}
+                  >
+                    {addFriendLoading ? "..." : "Add"}
+                  </button>
+                </div>
+                {addFriendMsg && (
+                  <div style={{ fontSize: 11, color: C.accent, marginTop: 6, fontFamily: "'Space Mono', monospace" }}>
+                    {addFriendMsg}
+                  </div>
+                )}
+              </div>
+              {/* Friends list */}
+              {friendsList.length === 0 ? (
+                <div style={{ textAlign: "center", padding: "30px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
+                  No friends added yet. Add friends by their username to quickly share mosaics with them.
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                    Your Friends ({friendsList.length})
+                  </div>
+                  {friendsList.map(friend => (
+                    <div key={friend.uid} style={{
+                      display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
+                      borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                    }}>
+                      {friend.profilePicture ? (
+                        <img src={friend.profilePicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: C.accent, fontWeight: 700, flexShrink: 0 }}>
+                          {(friend.username || "?")[0].toUpperCase()}
+                        </div>
+                      )}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 14, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {friend.username}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveFriend(friend.uid)}
+                        title="Remove friend"
+                        style={{
+                          background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
+                          padding: "4px 10px", color: C.textDim, cursor: "pointer", fontSize: 10,
+                          fontFamily: "'Space Mono', monospace", transition: "all 0.15s", flexShrink: 0,
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        ) : mosaicLoading && currentList.length === 0 ? (
           <div style={{ textAlign: "center", padding: "40px 0", color: C.textDim, fontSize: 13 }}>Loading...</div>
         ) : !firebaseUser && mosaicGalleryTab !== "public" ? (
           <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
@@ -5579,8 +5762,8 @@ export default function Pattrn() {
                     {mosaic.title || "Untitled"}
                   </div>
                   <div style={{ fontSize: 10, color: C.textDim }}>
-                    {mosaicGalleryTab === "shared" && (mosaic.sharedByUsername || mosaic.sharedByEmail) ? `From ${mosaic.sharedByUsername || mosaic.sharedByEmail}` :
-                     mosaicGalleryTab === "public" && (mosaic.authorUsername || mosaic.authorEmail) ? `By ${mosaic.authorUsername || mosaic.authorEmail}` :
+                    {mosaicGalleryTab === "shared" && mosaic.sharedByUsername ? `From ${mosaic.sharedByUsername}` :
+                     mosaicGalleryTab === "public" && mosaic.authorUsername ? `By ${mosaic.authorUsername}` :
                      mosaic.publicStatus === "approved" ? "Published" :
                      mosaic.publicStatus === "pending" ? "Pending review" :
                      mosaic.publicStatus === "rejected" ? "Not approved" : ""}
@@ -5700,7 +5883,7 @@ export default function Pattrn() {
                       {mosaic.title || "Untitled"}
                     </div>
                     <div style={{ fontSize: 11, color: C.textDim, marginBottom: 2 }}>
-                      By: {mosaic.authorUsername || mosaic.authorEmail || "Unknown"}
+                      By: {mosaic.authorUsername || "Unknown"}
                     </div>
                     <div style={{ fontSize: 10, color: C.textDim }}>
                       {mosaic.gridSize || 8}x{mosaic.gridSize || 8} grid
@@ -7089,7 +7272,7 @@ export default function Pattrn() {
                     <div style={{
                       fontSize: 8, color: C.textDim, letterSpacing: 0.5,
                     }}>
-                      {mosaic._source === "mine" ? "You" : mosaic.authorUsername ? mosaic.authorUsername : mosaic.authorEmail ? mosaic.authorEmail.split("@")[0] : ""}
+                      {mosaic._source === "mine" ? "You" : mosaic.authorUsername || ""}
                     </div>
                   </button>
                 ))}
