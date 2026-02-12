@@ -3330,6 +3330,7 @@ export default function Pattrn() {
         else setUsernameError("");
       } catch {
         setUsernameAvailable(null);
+        setUsernameError("Could not check availability");
       }
     }, 400);
   }, []);
@@ -6040,14 +6041,14 @@ export default function Pattrn() {
 
         <button
           onClick={handleSaveUsername}
-          disabled={usernameLoading || !usernameInput.trim() || usernameInput.trim().length < 3 || usernameAvailable !== true}
+          disabled={usernameLoading || !usernameInput.trim() || usernameInput.trim().length < 3 || usernameAvailable === false}
           style={{
             width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
             fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-            background: (usernameAvailable === true && usernameInput.trim().length >= 3) ? C.accent : C.surfaceLight,
-            color: (usernameAvailable === true && usernameInput.trim().length >= 3) ? C.bg : C.textDim,
+            background: (usernameAvailable !== false && usernameInput.trim().length >= 3) ? C.accent : C.surfaceLight,
+            color: (usernameAvailable !== false && usernameInput.trim().length >= 3) ? C.bg : C.textDim,
             border: "none",
-            cursor: (usernameAvailable === true && usernameInput.trim().length >= 3 && !usernameLoading) ? "pointer" : "not-allowed",
+            cursor: (usernameAvailable !== false && usernameInput.trim().length >= 3 && !usernameLoading) ? "pointer" : "not-allowed",
             opacity: usernameLoading ? 0.5 : 1,
             textTransform: "uppercase", transition: "all 0.15s",
           }}
