@@ -56,6 +56,11 @@ import {
   loadFriends,
   registerAdminIndex,
   loadAdminUids,
+  savePublicStats,
+  loadPublicStats,
+  savePuzzleCompletion,
+  loadPuzzleCompletions,
+  loadFriendPuzzleCompletions,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2757,6 +2762,17 @@ export default function Pattrn() {
   const [addFriendMsg, setAddFriendMsg] = useState("");
   const [addFriendLoading, setAddFriendLoading] = useState(false);
 
+  // --- Friends Modal & Comparison state ---
+  const [showFriendsModal, setShowFriendsModal] = useState(false);
+  const [friendsModalTab, setFriendsModalTab] = useState("list"); // "list" | "compare"
+  const [compareFriend, setCompareFriend] = useState(null); // friend object being compared
+  const [compareFriendStats, setCompareFriendStats] = useState(null); // loaded public stats for comparison
+  const [compareFriendLoading, setCompareFriendLoading] = useState(false);
+  const [friendsPuzzleData, setFriendsPuzzleData] = useState({}); // { uid: { attempts, time } } for current puzzle
+  const [friendsPuzzleLoading, setFriendsPuzzleLoading] = useState(false);
+  const [puzzleRanking, setPuzzleRanking] = useState(null); // { rank, total } for current puzzle
+  const [puzzleRankingLoading, setPuzzleRankingLoading] = useState(false);
+
   // --- Notifications & Active Sessions state ---
   const [notifications, setNotifications] = useState([]); // array of notification objects
   const [showNotifications, setShowNotifications] = useState(false); // notification panel visible
@@ -3450,6 +3466,15 @@ export default function Pattrn() {
     setSyncStatus("syncing");
     try {
       await saveCloudData(uid, data);
+      // Also update public stats summary for friend comparisons
+      const summary = summariseGameData(data);
+      const publicStats = {
+        progress: summary.modes,
+        totalSolved: summary.totalSolved,
+        achievements: summary.achievements,
+        times: data.times || {},
+      };
+      savePublicStats(uid, publicStats).catch(() => {});
       setSyncStatus("synced");
       setTimeout(() => setSyncStatus(""), 2000);
     } catch (e) {
@@ -4347,6 +4372,18 @@ export default function Pattrn() {
         }
       }
     }, 1000);
+    // Reset ranking/friend data for new puzzle
+    setPuzzleRanking(null);
+    setFriendsPuzzleData({});
+    // Load friends' completion data for this puzzle
+    if (firebaseUser && friendsList.length > 0) {
+      const pKey = (effectiveDiff === "daily" && dailyDate) ? dailyDate : String(idx);
+      setFriendsPuzzleLoading(true);
+      loadFriendPuzzleCompletions(friendsList.map(f => f.uid), effectiveDiff, pKey)
+        .then(setFriendsPuzzleData)
+        .catch(() => {})
+        .finally(() => setFriendsPuzzleLoading(false));
+    }
     setView("play");
   };
 
@@ -5093,6 +5130,28 @@ export default function Pattrn() {
           setTimes(newTimes);
           saveTimes(newTimes);
           showNewAchievements(newProgress, newTimes);
+          // Save puzzle completion for rankings & load ranking
+          if (firebaseUser && progressKey != null) {
+            const compKey = isDaily && currentDailyDate ? currentDailyDate : String(progressKey);
+            savePuzzleCompletion(firebaseUser.uid, difficulty, compKey, {
+              attempts: newAttempts,
+              time: finalTime,
+              username: username || null,
+            }).catch(() => {});
+            // Load global ranking
+            setPuzzleRankingLoading(true);
+            loadPuzzleCompletions(difficulty, compKey).then(completions => {
+              const entries = Object.values(completions);
+              const myEntry = completions[firebaseUser.uid];
+              if (myEntry && entries.length > 0) {
+                const sorted = entries.slice().sort((a, b) => (a.time || 9999) - (b.time || 9999) || (a.attempts || 99) - (b.attempts || 99));
+                const myRank = sorted.findIndex(e => e.time === myEntry.time && e.attempts === myEntry.attempts) + 1;
+                setPuzzleRanking({ rank: myRank || entries.length, total: entries.length });
+              } else {
+                setPuzzleRanking({ rank: 1, total: entries.length || 1 });
+              }
+            }).catch(() => {}).finally(() => setPuzzleRankingLoading(false));
+          }
         }
       }
       } else if (newAttempts >= maxAttempts) {
@@ -7054,6 +7113,270 @@ export default function Pattrn() {
     </div>
   );
 
+  // --- Friends Modal ---
+  const friendsModalEl = showFriendsModal && firebaseUser && firebaseConfigured && (
+    <div onClick={() => setShowFriendsModal(false)} style={{
+      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
+        padding: 24, maxWidth: 420, width: "100%",
+        boxShadow: "0 16px 48px rgba(0,0,0,0.6)", animation: "fadeUp 0.25s ease",
+        maxHeight: "85vh", overflowY: "auto",
+      }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+          <h2 style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, margin: 0 }}>
+            {friendsModalTab === "compare" && compareFriend ? `vs ${compareFriend.username}` : "Friends"}
+          </h2>
+          <div style={{ display: "flex", gap: 6 }}>
+            {friendsModalTab === "compare" && (
+              <button onClick={() => { setFriendsModalTab("list"); setCompareFriend(null); setCompareFriendStats(null); }}
+                style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "4px 10px", color: C.textDim, cursor: "pointer", fontSize: 10, fontFamily: "'Space Mono', monospace", transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+              >Back</button>
+            )}
+            <button onClick={() => setShowFriendsModal(false)}
+              style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+            >&times;</button>
+          </div>
+        </div>
+
+        {/* Tabs (only on list view) */}
+        {friendsModalTab === "list" && (
+          <div style={{ marginBottom: 16 }}>
+            {/* Add friend input */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                Add Friend by Username
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="text" value={addFriendInput}
+                  onChange={e => setAddFriendInput(e.target.value)}
+                  placeholder="Enter username"
+                  style={{
+                    flex: 1, padding: "10px 14px", borderRadius: 10,
+                    backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                    color: C.text, fontSize: 14, fontFamily: "'Space Mono', monospace", outline: "none",
+                  }}
+                  onFocus={e => { e.target.style.borderColor = C.accent; }}
+                  onBlur={e => { e.target.style.borderColor = C.border; }}
+                  onKeyDown={e => { if (e.key === "Enter" && addFriendInput.trim()) handleAddFriend(); }}
+                />
+                <button onClick={handleAddFriend}
+                  disabled={!addFriendInput.trim() || addFriendLoading}
+                  style={{
+                    padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    background: addFriendInput.trim() ? C.accent : C.surfaceLight,
+                    color: addFriendInput.trim() ? C.bg : C.textDim,
+                    border: "none", cursor: addFriendInput.trim() ? "pointer" : "not-allowed",
+                    textTransform: "uppercase", flexShrink: 0,
+                  }}
+                >{addFriendLoading ? "..." : "Add"}</button>
+              </div>
+              {addFriendMsg && (
+                <div style={{ fontSize: 11, color: C.accent, marginTop: 6, fontFamily: "'Space Mono', monospace" }}>
+                  {addFriendMsg}
+                </div>
+              )}
+            </div>
+
+            {/* Friends list */}
+            {friendsList.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "30px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
+                No friends added yet.<br/>Add friends by their username to compare stats and see how they did on puzzles.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                  Your Friends ({friendsList.length})
+                </div>
+                {friendsList.map(friend => (
+                  <div key={friend.uid} style={{
+                    display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
+                    borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                  }}>
+                    {friend.profilePicture ? (
+                      <img src={friend.profilePicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: C.accent, fontWeight: 700, flexShrink: 0 }}>
+                        {(friend.username || "?")[0].toUpperCase()}
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {friend.username}
+                      </div>
+                    </div>
+                    <button onClick={() => {
+                      setCompareFriend(friend);
+                      setFriendsModalTab("compare");
+                      setCompareFriendLoading(true);
+                      setCompareFriendStats(null);
+                      loadPublicStats(friend.uid)
+                        .then(setCompareFriendStats)
+                        .catch(() => setCompareFriendStats(null))
+                        .finally(() => setCompareFriendLoading(false));
+                    }}
+                      style={{
+                        background: "none", border: `1px solid ${C.accent}55`, borderRadius: 6,
+                        padding: "4px 10px", color: C.accent, cursor: "pointer", fontSize: 10,
+                        fontFamily: "'Space Mono', monospace", transition: "all 0.15s", flexShrink: 0, fontWeight: 700,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.backgroundColor = C.accent + "11"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "55"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                    >Compare</button>
+                    <button onClick={() => handleRemoveFriend(friend.uid)}
+                      title="Remove friend"
+                      style={{
+                        background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
+                        padding: "4px 10px", color: C.textDim, cursor: "pointer", fontSize: 10,
+                        fontFamily: "'Space Mono', monospace", transition: "all 0.15s", flexShrink: 0,
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                    >Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Comparison view */}
+        {friendsModalTab === "compare" && compareFriend && (() => {
+          const myStats = summariseGameData({ progress, times, achievements: [...savedAchievementIds] });
+          const theirProgress = compareFriendStats?.progress || {};
+          const theirTotalSolved = compareFriendStats?.totalSolved || 0;
+          const theirAchievements = compareFriendStats?.achievements || 0;
+          const theirTimes = compareFriendStats?.times || {};
+          const statModes = [
+            { key: "easy", label: "Easy" },
+            { key: "medium", label: "Medium" },
+            { key: "hard", label: "Hard" },
+            { key: "blind", label: "Blind" },
+            { key: "daily", label: "Daily" },
+            { key: "cascade", label: "Cascade" },
+            { key: "spin", label: "Spin" },
+            { key: "mosaic", label: "Mosaic" },
+          ];
+
+          if (compareFriendLoading) {
+            return (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13 }}>
+                Loading stats...
+              </div>
+            );
+          }
+
+          if (!compareFriendStats) {
+            return (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
+                No stats available for this friend yet.<br/>They need to sign in and solve some puzzles first.
+              </div>
+            );
+          }
+
+          const CompareRow = ({ label, myVal, theirVal, isBetter }) => {
+            const myWins = myVal > theirVal;
+            const theyWin = theirVal > myVal;
+            const tie = myVal === theirVal && myVal > 0;
+            return (
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "8px 12px", borderRadius: 8,
+                backgroundColor: tie ? C.surface : myWins ? C.correct + "0a" : theyWin ? C.incorrect + "0a" : C.surface,
+                border: `1px solid ${tie ? C.border : myWins ? C.correct + "22" : theyWin ? C.incorrect + "22" : C.border}`,
+              }}>
+                <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: myWins ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
+                  {isBetter ? (myVal ? formatTime(myVal) : "--") : myVal}
+                </div>
+                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
+                  {label}
+                </div>
+                <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: theyWin ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
+                  {isBetter ? (theirVal ? formatTime(theirVal) : "--") : theirVal}
+                </div>
+              </div>
+            );
+          };
+
+          // Calculate best times per mode
+          const getBestTime = (timesObj, mode) => {
+            const modeTimes = timesObj[mode] || {};
+            const vals = Object.values(modeTimes).filter(t => t > 0);
+            return vals.length > 0 ? Math.min(...vals) : null;
+          };
+
+          return (
+            <div style={{ animation: "fadeUp 0.25s ease" }}>
+              {/* Header row */}
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, padding: "0 12px" }}>
+                <div style={{ fontSize: 11, color: C.accent, fontFamily: "'Space Mono', monospace", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+                  You
+                </div>
+                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+                  {compareFriend.username}
+                </div>
+              </div>
+
+              {/* Total solved */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+                <CompareRow label="Total Solved" myVal={myStats.totalSolved} theirVal={theirTotalSolved} />
+                <CompareRow label="Achievements" myVal={myStats.achievements} theirVal={theirAchievements} />
+              </div>
+
+              {/* Per-mode solved */}
+              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                Puzzles Solved by Mode
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
+                {statModes.map(m => (
+                  <CompareRow key={m.key} label={m.label} myVal={myStats.modes[m.key] || 0} theirVal={theirProgress[m.key] || 0} />
+                ))}
+              </div>
+
+              {/* Best times */}
+              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                Best Times (lower is better)
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {["easy", "medium", "hard", "blind", "daily"].map(mode => {
+                  const myBest = getBestTime(times, mode);
+                  const theirBest = getBestTime(theirTimes, mode);
+                  const myWins = myBest && theirBest ? myBest < theirBest : false;
+                  const theyWin = myBest && theirBest ? theirBest < myBest : false;
+                  return (
+                    <div key={mode} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "8px 12px", borderRadius: 8,
+                      backgroundColor: myWins ? C.correct + "0a" : theyWin ? C.incorrect + "0a" : C.surface,
+                      border: `1px solid ${myWins ? C.correct + "22" : theyWin ? C.incorrect + "22" : C.border}`,
+                    }}>
+                      <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: myWins ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
+                        {myBest ? formatTime(myBest) : "--"}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
+                        {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                      </div>
+                      <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: theyWin ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
+                        {theirBest ? formatTime(theirBest) : "--"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </div>
+  );
+
   // --- MENU VIEW ---
   if (view === "menu") {
     return (
@@ -7066,8 +7389,45 @@ export default function Pattrn() {
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} }`}</style>
 
         <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease", position: "relative", width: "100%", maxWidth: 360 }}>
-          {/* Top-right buttons: notification bell + menu */}
+          {/* Top-right buttons: friends + notification bell + menu */}
           <div style={{ position: "absolute", top: 2, right: 0, display: "flex", gap: 6, alignItems: "center" }}>
+            {/* Friends button */}
+            {firebaseConfigured && firebaseUser && (
+              <button
+                onClick={() => {
+                  loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {});
+                  setShowFriendsModal(true);
+                  setFriendsModalTab("list");
+                }}
+                style={{
+                  background: "none", border: `1px solid ${friendsList.length > 0 ? "#c8f03e55" : C.border}`, borderRadius: 10,
+                  width: 38, height: 38, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s", position: "relative",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = friendsList.length > 0 ? "#c8f03e55" : C.border; }}
+                aria-label="Friends"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={friendsList.length > 0 ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                  <circle cx="9" cy="7" r="4"/>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                {friendsList.length > 0 && (
+                  <span style={{
+                    position: "absolute", top: -2, right: -2,
+                    width: 16, height: 16, borderRadius: "50%",
+                    backgroundColor: C.accent, color: C.bg,
+                    fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: "'Space Mono', monospace",
+                  }}>
+                    {friendsList.length > 9 ? "9+" : friendsList.length}
+                  </span>
+                )}
+              </button>
+            )}
             {/* Notification bell */}
             {firebaseConfigured && firebaseUser && (
               <button
@@ -8952,6 +9312,7 @@ export default function Pattrn() {
         {accountModalEl}
         {usernameModalEl}
         {profilePageEl}
+        {friendsModalEl}
 
         {/* Sync choice prompt (local vs cloud data on login) */}
         {showSyncChoice && syncChoiceData && (() => {
@@ -9621,6 +9982,45 @@ export default function Pattrn() {
               Leave
             </button>
           )}
+          {/* Friends puzzle indicator - shows how friends did on this puzzle */}
+          {firebaseUser && Object.keys(friendsPuzzleData).length > 0 && !isCascade && !isMosaic && (() => {
+            const friendCompletions = Object.entries(friendsPuzzleData);
+            const count = friendCompletions.length;
+            const bestFriend = friendCompletions.reduce((best, [uid, data]) => {
+              if (!best || (data.time && (!best[1].time || data.time < best[1].time))) return [uid, data];
+              return best;
+            }, null);
+            const bestName = bestFriend ? (friendsList.find(f => f.uid === bestFriend[0])?.username || "Friend") : "";
+            return (
+              <div style={{ position: "relative" }}>
+                <button
+                  title={`${count} friend${count !== 1 ? "s" : ""} completed this puzzle${bestName ? `. Best: ${bestName} (${formatTime(bestFriend[1].time)})` : ""}`}
+                  style={{
+                    background: "none", border: `1px solid ${C.accent}44`, borderRadius: 8,
+                    padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                    transition: "all 0.15s", height: 30,
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "44"; }}
+                  onClick={() => {
+                    loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {});
+                    setShowFriendsModal(true);
+                    setFriendsModalTab("list");
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                  <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: C.accent, fontWeight: 700 }}>
+                    {count}
+                  </span>
+                </button>
+              </div>
+            );
+          })()}
         </div>
         </div>
       </div>
@@ -10140,6 +10540,70 @@ export default function Pattrn() {
                 Session complete — well played!
               </div>
             )}
+            {/* Global ranking display */}
+            {puzzleRanking && !isCoop && !isCascade && !isMosaic && (
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px",
+                borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                marginBottom: 10, animation: "fadeUp 0.5s 0.1s ease both",
+              }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={puzzleRanking.rank <= 3 ? C.gold : C.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+                </svg>
+                <span style={{
+                  fontSize: 16, fontWeight: 700, fontFamily: "'Space Mono', monospace",
+                  color: puzzleRanking.rank <= 3 ? C.gold : C.text,
+                }}>
+                  {puzzleRanking.rank}/{puzzleRanking.total}
+                </span>
+                <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
+                  {puzzleRanking.rank === 1 ? "1st place!" : puzzleRanking.rank === 2 ? "2nd place" : puzzleRanking.rank === 3 ? "3rd place" : "rank"}
+                </span>
+              </div>
+            )}
+            {puzzleRankingLoading && !isCoop && !isCascade && !isMosaic && (
+              <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 10, animation: "fadeUp 0.3s ease" }}>
+                Loading ranking...
+              </div>
+            )}
+            {/* Friends who completed this puzzle */}
+            {Object.keys(friendsPuzzleData).length > 0 && !isCoop && !isCascade && !isMosaic && (
+              <div style={{
+                marginBottom: 12, animation: "fadeUp 0.5s 0.15s ease both",
+              }}>
+                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+                  Friends on this puzzle
+                </div>
+                <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+                  {Object.entries(friendsPuzzleData).map(([uid, data]) => {
+                    const friend = friendsList.find(f => f.uid === uid);
+                    if (!friend) return null;
+                    const theyWereFaster = data.time && elapsedTime && data.time < elapsedTime;
+                    const iWasFaster = data.time && elapsedTime && elapsedTime < data.time;
+                    return (
+                      <div key={uid} style={{
+                        display: "flex", alignItems: "center", gap: 6, padding: "5px 10px",
+                        borderRadius: 8, backgroundColor: C.surface,
+                        border: `1px solid ${theyWereFaster ? C.incorrect + "33" : iWasFaster ? C.correct + "33" : C.border}`,
+                        fontSize: 11, fontFamily: "'Space Mono', monospace",
+                      }}>
+                        {friend.profilePicture ? (
+                          <img src={friend.profilePicture} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} />
+                        ) : (
+                          <div style={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: C.accent, fontWeight: 700 }}>
+                            {(friend.username || "?")[0].toUpperCase()}
+                          </div>
+                        )}
+                        <span style={{ color: C.text, fontWeight: 700 }}>{friend.username}</span>
+                        <span style={{ color: C.textDim }}>{formatTime(data.time)}</span>
+                        {theyWereFaster && <span style={{ color: C.incorrect, fontSize: 9 }}>faster</span>}
+                        {iWasFaster && <span style={{ color: C.correct, fontSize: 9 }}>slower</span>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={async () => {
                 let text;
@@ -10374,6 +10838,7 @@ export default function Pattrn() {
       {accountModalEl}
       {usernameModalEl}
       {profilePageEl}
+      {friendsModalEl}
     </div>
   );
 }

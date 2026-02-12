@@ -851,3 +851,52 @@ export async function loadCoopSession(sessionId) {
   const snap = await get(ref(db, `coopSessions/${sessionId}`));
   return snap.exists() ? snap.val() : null;
 }
+
+// --- Public Stats (for friend comparisons) ---
+
+// Save a summary of game stats to a publicly-readable path
+export async function savePublicStats(uid, stats) {
+  if (!db) return;
+  await set(ref(db, `publicStats/${uid}`), {
+    ...removeUndefined(stats),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+// Load another user's public stats
+export async function loadPublicStats(uid) {
+  if (!db) return null;
+  const snap = await get(ref(db, `publicStats/${uid}`));
+  return snap.exists() ? snap.val() : null;
+}
+
+// --- Puzzle Completions (for rankings & friend indicators) ---
+
+// Save a puzzle completion for ranking purposes
+export async function savePuzzleCompletion(uid, mode, puzzleKey, data) {
+  if (!db) return;
+  await set(ref(db, `puzzleCompletions/${mode}/${puzzleKey}/${uid}`), {
+    ...removeUndefined(data),
+    completedAt: serverTimestamp(),
+  });
+}
+
+// Load all completions for a puzzle (for global ranking)
+export async function loadPuzzleCompletions(mode, puzzleKey) {
+  if (!db) return {};
+  const snap = await get(ref(db, `puzzleCompletions/${mode}/${puzzleKey}`));
+  return snap.exists() ? snap.val() : {};
+}
+
+// Load friend completions for a specific puzzle
+export async function loadFriendPuzzleCompletions(friendUids, mode, puzzleKey) {
+  if (!db || !friendUids.length) return {};
+  const results = {};
+  await Promise.all(
+    friendUids.map(async (fUid) => {
+      const snap = await get(ref(db, `puzzleCompletions/${mode}/${puzzleKey}/${fUid}`));
+      if (snap.exists()) results[fUid] = snap.val();
+    })
+  );
+  return results;
+}
