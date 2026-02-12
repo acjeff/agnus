@@ -472,7 +472,7 @@ export function mergeGameData(local, cloud) {
 // --- Coop Mode ---
 
 // Create a new coop session. Returns the session ID.
-export async function createCoopSession(uid, { mode, level, dailyDate }) {
+export async function createCoopSession(uid, { mode, level, dailyDate, hostTheme }) {
   if (!db) return null;
   const sessionsRef = ref(db, "coopSessions");
   const newRef = push(sessionsRef);
@@ -490,6 +490,8 @@ export async function createCoopSession(uid, { mode, level, dailyDate }) {
     guestLockedIn: false,
     hostCorrect: false,
     guestCorrect: false,
+    attempts: 0,
+    hostTheme: hostTheme ?? "classic",
     createdAt: serverTimestamp(),
   });
   return id;
@@ -544,6 +546,12 @@ export async function unlockCoopPlayer(sessionId, role) {
   const key = role === "host" ? "hostLockedIn" : "guestLockedIn";
   const correctKey = role === "host" ? "hostCorrect" : "guestCorrect";
   await update(ref(db, `coopSessions/${sessionId}`), { [key]: false, [correctKey]: false });
+}
+
+// Update shared attempt counter for the coop session
+export async function updateCoopAttempts(sessionId, attempts) {
+  if (!db) return;
+  await update(ref(db, `coopSessions/${sessionId}`), { attempts });
 }
 
 // Mark session as complete
