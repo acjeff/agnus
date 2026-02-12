@@ -57,6 +57,7 @@ const C = {
   silver: "#C0C0C0",
   bronze: "#CD7F32",
   inProgress: "#eab308", // amber for cascade "started but not completed"
+  coop: "#60a5fa", // blue for co-op completions
 };
 
 // --- Shape overlays ---
@@ -6848,6 +6849,8 @@ export default function Pattrn() {
                   if (!cell) return <div key={`empty-${i}`} />;
                   const solved = cell.result > 0;
                   const failed = cell.result === 0 && cell.result !== undefined;
+                  const dailyCoopResult = (progress.coop || {})[`daily_${cell.seed}`];
+                  const dailyCoopSolved = dailyCoopResult > 0;
                   const isBd = cell.isBirthday || cell.isExactBirthday;
                   const borderColor = cell.isToday ? C.accent : isBd ? "#F472B6" : solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border;
                   const bgColor = isBd ? "#F472B620" : solved ? C.correct + "15" : failed ? C.incorrect + "10" : C.surface;
@@ -6872,6 +6875,14 @@ export default function Pattrn() {
                         <span style={{ position: "absolute", top: -2, right: -2, fontSize: 9, lineHeight: 1 }}>
                           {cell.isExactBirthday ? "\uD83C\uDF82" : "\uD83C\uDF70"}
                         </span>
+                      )}
+                      {dailyCoopSolved && (
+                        <span style={{
+                          position: "absolute", top: 2, left: 2,
+                          width: 6, height: 6, borderRadius: "50%",
+                          backgroundColor: C.coop,
+                          boxShadow: `0 0 3px ${C.coop}66`,
+                        }} />
                       )}
                       <span style={{
                         fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: cell.isToday ? 800 : isBd ? 800 : 600,
@@ -6898,6 +6909,7 @@ export default function Pattrn() {
                 <span><span style={{ color: C.silver }}>{"\u25CF"}</span> 3-4 tries</span>
                 <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
                 <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
+                <span><span style={{ color: C.coop }}>{"\u25CF"}</span> co-op</span>
                 {birthday && <span><span style={{ color: "#F472B6" }}>{"\uD83C\uDF82"}</span> birthday</span>}
               </div>
 
@@ -7042,6 +7054,8 @@ export default function Pattrn() {
               const result = diffProgress[i];
               const solved = result > 0;
               const failed = result === 0;
+              const mosaicCoopResult = (progress.coop || {})[`mosaic_${i}`];
+              const mosaicCoopSolved = mosaicCoopResult > 0;
               const miniSize = 56;
               const miniCellSize = Math.floor((miniSize - 8) / 5);
               return (
@@ -7057,6 +7071,14 @@ export default function Pattrn() {
                   onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border; }}
                 >
+                  {mosaicCoopSolved && (
+                    <span style={{
+                      position: "absolute", top: 2, right: 2, zIndex: 1,
+                      width: 7, height: 7, borderRadius: "50%",
+                      backgroundColor: C.coop,
+                      boxShadow: `0 0 4px ${C.coop}66`,
+                    }} />
+                  )}
                   {solved ? (
                     <div style={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                       {p.solution.map((row, ri) => (
@@ -7093,6 +7115,7 @@ export default function Pattrn() {
           <span><span style={{ color: C.silver }}>{"\u25CF"}</span> 3-4 tries</span>
           <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
           <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
+          <span><span style={{ color: C.coop }}>{"\u25CF"}</span> co-op</span>
         </div>
 
         {/* Community & your mosaics carousel */}
@@ -7179,6 +7202,8 @@ export default function Pattrn() {
                     ? `${CASCADE_LEVELS[cascadeInProgressLevel]}×${CASCADE_LEVELS[cascadeInProgressLevel]}`
                     : (cascadeLevels !== null || cascadeInProgressLevel !== null) ? "…" : null
               : null;
+            const coopResult = (progress.coop || {})[`${difficulty}_${i}`];
+            const coopSolved = coopResult > 0;
             const borderColor = solved ? C.correct + "66" : failed ? C.incorrect + "44" : cascadeInProgress ? C.inProgress + "99" : C.border;
             const bgColor = solved ? C.correct + "15" : failed ? C.incorrect + "10" : cascadeInProgress ? C.inProgress + "18" : C.surface;
             const numColor = solved ? C.correct : failed ? C.incorrect : cascadeInProgress ? C.inProgress : C.text;
@@ -7194,6 +7219,14 @@ export default function Pattrn() {
                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.borderColor = C.accent; }}
                 onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; }}
               >
+                {coopSolved && (
+                  <span style={{
+                    position: "absolute", top: 3, right: 3,
+                    width: 8, height: 8, borderRadius: "50%",
+                    backgroundColor: C.coop,
+                    boxShadow: `0 0 4px ${C.coop}66`,
+                  }} />
+                )}
                 <span style={{
                   fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700,
                   color: numColor, lineHeight: 1,
@@ -7232,6 +7265,7 @@ export default function Pattrn() {
           <span><span style={{ color: C.silver }}>{"\u25CF"}</span> 3-4 tries</span>
           <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
           <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
+          <span><span style={{ color: C.coop }}>{"\u25CF"}</span> co-op</span>
         </div>
         </>)}
 
