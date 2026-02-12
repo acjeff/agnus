@@ -7872,7 +7872,7 @@ export default function Pattrn() {
             </span>
           )}
         </div>
-        <div style={{ width: 110, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6 }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4, flexShrink: 0 }}>
           <button
             onClick={() => setShowThemePicker(true)}
             style={{
@@ -7912,18 +7912,24 @@ export default function Pattrn() {
           >
             {shareMsg || "Share"}
           </button>
-          {/* Coop invite button - only when logged in, playing, not already in coop, and not in special modes */}
-          {!isCoop && firebaseUser && gameState === "playing" && !isCascade && !isBlind && !isMosaic && (
+          {/* Coop invite button - visible when playing supported modes, prompts login if needed */}
+          {!isCoop && gameState === "playing" && !isCascade && !isBlind && !isMosaic && (
             <button
-              onClick={startCoopSession}
+              onClick={() => {
+                if (!firebaseUser) {
+                  setShowAccountModal(true);
+                  return;
+                }
+                startCoopSession();
+              }}
               style={{
-                background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px",
-                color: C.textDim, cursor: "pointer", fontSize: 12, transition: "all 0.15s",
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                background: "none", border: `1px solid #54A0FF55`, borderRadius: 8, padding: "6px 10px",
+                color: "#54A0FF", cursor: "pointer", fontSize: 12, transition: "all 0.15s",
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, fontWeight: 700,
               }}
               title="Invite a friend to play co-op"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.color = "#54A0FF"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#54A0FF55"; e.currentTarget.style.backgroundColor = "transparent"; }}
             >
               Co-op
             </button>
