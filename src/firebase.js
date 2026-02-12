@@ -192,6 +192,7 @@ export async function submitMosaicForReview(uid, mosaicId, mosaic) {
     id: mosaicId,
     authorUid: uid,
     authorEmail: mosaic.authorEmail || "",
+    authorUsername: mosaic.authorUsername || "",
     status: "pending",
     submittedAt: serverTimestamp(),
   });
@@ -297,6 +298,72 @@ export async function saveUserEmail(uid, email) {
     update(ref(db, `users/${uid}`), { email }),
     set(ref(db, `emailIndex/${key}`), uid),
   ]);
+}
+
+// --- Username & Profile ---
+
+// Check if a username is available (case-insensitive)
+export async function checkUsernameAvailability(username) {
+  if (!db || !username) return false;
+  const key = username.toLowerCase().trim();
+  if (!key || key.length < 3 || key.length > 20) return false;
+  if (!/^[a-zA-Z0-9_]+$/.test(key)) return false;
+  const snap = await get(ref(db, `usernameIndex/${key}`));
+  return !snap.exists();
+}
+
+// Save username for a user (also stores in usernameIndex for uniqueness)
+// If user already had a different username, removes the old index entry
+export async function saveUsername(uid, username) {
+  if (!db) return;
+  const key = username.toLowerCase().trim();
+  // Check it's not taken by someone else
+  const existing = await get(ref(db, `usernameIndex/${key}`));
+  if (existing.exists() && existing.val() !== uid) {
+    throw new Error("Username already taken");
+  }
+  // Remove old username index if user had one
+  const oldSnap = await get(ref(db, `users/${uid}/username`));
+  if (oldSnap.exists()) {
+    const oldKey = oldSnap.val().toLowerCase();
+    if (oldKey !== key) {
+      await remove(ref(db, `usernameIndex/${oldKey}`));
+    }
+  }
+  await Promise.all([
+    update(ref(db, `users/${uid}`), { username: username.trim() }),
+    set(ref(db, `usernameIndex/${key}`), uid),
+  ]);
+}
+
+// Load a user's profile (username + profilePicture)
+export async function loadUserProfile(uid) {
+  if (!db) return null;
+  const snap = await get(ref(db, `users/${uid}`));
+  if (!snap.exists()) return null;
+  const val = snap.val();
+  return {
+    username: val.username || null,
+    profilePicture: val.profilePicture || null,
+    email: val.email || null,
+  };
+}
+
+// Save profile picture (base64 data URL)
+export async function saveProfilePicture(uid, dataUrl) {
+  if (!db) return;
+  await update(ref(db, `users/${uid}`), { profilePicture: dataUrl || null });
+}
+
+// Look up a user by username
+export async function lookupUserByUsername(username) {
+  if (!db || !username) return null;
+  const key = username.toLowerCase().trim();
+  const snap = await get(ref(db, `usernameIndex/${key}`));
+  if (!snap.exists()) return null;
+  const uid = snap.val();
+  const profile = await loadUserProfile(uid);
+  return { uid, username: profile?.username || username, email: profile?.email || null };
 }
 
 // Check if user is admin
