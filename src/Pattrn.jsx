@@ -24,6 +24,15 @@ import {
   lookupUserByEmail,
   saveUserEmail,
   checkIsAdmin,
+  createCoopSession,
+  joinCoopSession,
+  subscribeToCoopSession,
+  updateCoopFill,
+  lockInCoopPlayer,
+  unlockCoopPlayer,
+  completeCoopSession,
+  deleteCoopSession,
+  loadCoopSession,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -1573,11 +1582,12 @@ function loadProgress() {
       cascade: base.cascade ?? {},
       spin: base.spin ?? {},
       mosaic: base.mosaic ?? {},
+      coop: base.coop ?? {},
       cascadeRunState,
       cascadeRunStateLastIndex: typeof cascadeRunStateLastIndex === "number" ? cascadeRunStateLastIndex : undefined,
     };
   } catch {
-    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined };
+    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, coop: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined };
   }
 }
 
@@ -1600,9 +1610,10 @@ function loadTimes() {
       blind: base.blind ?? {},
       daily: migrateDailyData(base.daily ?? {}),
       cascade: base.cascade ?? {},
+      coop: base.coop ?? {},
     };
   } catch {
-    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} };
+    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, coop: {} };
   }
 }
 
@@ -2521,11 +2532,13 @@ function getSearchParams() {
   const level = params.get("level");
   const date = params.get("date");
   const viewParam = params.get("view");
+  const coop = params.get("coop");
   return {
     mode: mode && VALID_MODES.has(mode) ? mode : null,
     level: level != null ? Math.max(0, Math.min(49, parseInt(level, 10) || 0)) : null,
     date: date && /^\d{2}-\d{2}-\d{4}$/.test(date) ? date : null,
     view: viewParam && VALID_VIEWS.has(viewParam) ? viewParam : null,
+    coop: coop || null,
   };
 }
 
@@ -2653,6 +2666,23 @@ export default function Pattrn() {
   // Sync choice prompt state (shown when both local + cloud data exist on login)
   const [showSyncChoice, setShowSyncChoice] = useState(false);
   const [syncChoiceData, setSyncChoiceData] = useState(null); // { uid, localData, cloudData, localSummary, cloudSummary }
+
+  // --- Coop mode state ---
+  const [coopSessionId, setCoopSessionId] = useState(null);
+  const [coopRole, setCoopRole] = useState(null); // "host" | "guest" | null
+  const [coopMyBlanks, setCoopMyBlanks] = useState(null); // Set of cell keys assigned to me
+  const [coopPartnerBlanks, setCoopPartnerBlanks] = useState(null); // Set of cell keys assigned to partner
+  const [coopPartnerFills, setCoopPartnerFills] = useState({}); // partner's fills from Firebase
+  const [coopMyLockedIn, setCoopMyLockedIn] = useState(false);
+  const [coopPartnerLockedIn, setCoopPartnerLockedIn] = useState(false);
+  const [coopPartnerCorrect, setCoopPartnerCorrect] = useState(false);
+  const [coopPartnerConnected, setCoopPartnerConnected] = useState(false);
+  const [showCoopInvite, setShowCoopInvite] = useState(false); // invite modal
+  const [coopStatus, setCoopStatus] = useState(null); // "waiting" | "playing" | "complete"
+  const coopUnsubRef = useRef(null); // unsubscribe function for Firebase listener
+  const coopWriteThrottleRef = useRef({}); // throttle writes to Firebase
+  const coopPendingLoginRef = useRef(false); // auto-start coop after login
+  const isCoop = !!coopSessionId;
 
   // --- Mosaic Creator state ---
   const CREATOR_GRID_SIZE = 25; // 25x25 grid → 25 tiles of 5x5, matching mosaic mode
@@ -3332,10 +3362,36 @@ export default function Pattrn() {
 
   // Initial load: read URL or restore saved cascade run
   useEffect(() => {
-    const { mode, level, date, view: viewParam } = getSearchParams();
+    const { mode, level, date, view: viewParam, coop: coopParam } = getSearchParams();
     const levelNum = level != null ? parseInt(level, 10) : null;
     const hasDailyDeepLink = mode === "daily" && date;
     const hasDeepLink = hasDailyDeepLink || (mode && levelNum != null && !Number.isNaN(levelNum));
+
+    // Handle coop join link — defer until Firebase auth is ready
+    if (coopParam && mode && levelNum != null) {
+      setDifficulty(mode);
+      setCurrentPuzzle(levelNum);
+      // Store the coop session ID; actual joining happens once auth is ready (see coop join effect)
+      setCoopSessionId(coopParam);
+      setCoopRole("guest");
+      setCoopStatus("joining");
+      setFills({});
+      setAttempts(0);
+      setElapsedTime(0);
+      setGameState("playing");
+      setWrongCells(new Set());
+      setLockedCells(new Set());
+      setShowParticles(false);
+      setSelectedCell(null);
+      setSelectedToken(null);
+      setView("play");
+      // Clear coop param from URL
+      const cleanParams = new URLSearchParams(window.location.search);
+      cleanParams.delete("coop");
+      const cleanUrl = cleanParams.toString() ? `${window.location.pathname}?${cleanParams}` : window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+      return;
+    }
 
     // Handle view param (gallery, creator, custom-mosaic)
     if (viewParam) {
@@ -3565,14 +3621,16 @@ export default function Pattrn() {
   // How many of each token still need to be placed (only counts blanks, not full grid)
   const tokenRemaining = useMemo(() => {
     if (!puzzle) return {};
+    // In coop mode, only count tokens needed for my blanks
+    const blanksToCount = coopMyBlanks || puzzle.blanks;
     const neededInBlanks = {};
-    for (const key of puzzle.blanks) {
+    for (const key of blanksToCount) {
       const [r, c] = key.split("-").map(Number);
       const token = puzzle.solution[r][c];
       if (token) neededInBlanks[token] = (neededInBlanks[token] || 0) + 1;
     }
     const usedCounts = {};
-    for (const key of puzzle.blanks) {
+    for (const key of blanksToCount) {
       let token;
       if (lockedCells.has(key)) {
         const [r, c] = key.split("-").map(Number);
@@ -3585,7 +3643,7 @@ export default function Pattrn() {
     const remaining = {};
     puzzle.usedTokens.forEach(t => { remaining[t] = (neededInBlanks[t] || 0) - (usedCounts[t] || 0); });
     return remaining;
-  }, [puzzle, fills, lockedCells]);
+  }, [puzzle, fills, lockedCells, coopMyBlanks]);
 
   // Default to first tile when game loads with no selection
   useEffect(() => {
@@ -3915,6 +3973,9 @@ export default function Pattrn() {
     const key = `${r}-${c}`;
     if (!puzzle.blanks.has(key)) return;
     if (lockedCells.has(key)) return;
+    // Coop: only allow filling my blanks, and not if I'm locked in
+    if (isCoop && coopMyBlanks && !coopMyBlanks.has(key)) return;
+    if (isCoop && coopMyLockedIn) return;
     if (selectedToken) {
       if (fills[key] === selectedToken) {
         cancelWrongCellClear();
@@ -3930,11 +3991,14 @@ export default function Pattrn() {
       triggerPlaceAnimation(key);
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn]);
 
   const applyCellAction = useCallback((r, c) => {
     const key = `${r}-${c}`;
     if (!puzzle.blanks.has(key) || lockedCells.has(key)) return;
+    // Coop: only allow filling my blanks, and not if I'm locked in
+    if (isCoop && coopMyBlanks && !coopMyBlanks.has(key)) return;
+    if (isCoop && coopMyLockedIn) return;
     if (selectedToken) {
       if (fills[key] === selectedToken) {
         cancelWrongCellClear();
@@ -3952,7 +4016,7 @@ export default function Pattrn() {
     } else {
       setSelectedCell(key);
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn]);
 
   const handleCellPointerUp = useCallback((r, c) => {
     if (gameState !== "playing") return;
@@ -4026,16 +4090,232 @@ export default function Pattrn() {
     };
   }, [stopTimer]);
 
+  // --- Coop mode helpers ---
+
+  // Split blank cells into two halves by column position (left/right of grid center)
+  const splitBlanksForCoop = useCallback((blanksSet, gridSz) => {
+    const blanksArr = [...blanksSet];
+    const mid = gridSz / 2;
+    const left = [];
+    const right = [];
+    const middle = [];
+    for (const key of blanksArr) {
+      const c = parseInt(key.split("-")[1], 10);
+      if (c < Math.floor(mid)) left.push(key);
+      else if (c >= Math.ceil(mid)) right.push(key);
+      else middle.push(key);
+    }
+    // Distribute middle column blanks evenly
+    middle.sort();
+    for (let i = 0; i < middle.length; i++) {
+      if (left.length <= right.length) left.push(middle[i]);
+      else right.push(middle[i]);
+    }
+    return { hostBlanks: new Set(left), guestBlanks: new Set(right) };
+  }, []);
+
+  // Create a coop session for the current puzzle
+  const startCoopSession = useCallback(async () => {
+    if (!firebaseUser || !puzzle) return;
+    const sessionId = await createCoopSession(firebaseUser.uid, {
+      mode: difficulty,
+      level: currentPuzzle,
+      dailyDate: isDaily ? currentDailyDate : null,
+    });
+    if (!sessionId) return;
+    setCoopSessionId(sessionId);
+    setCoopRole("host");
+    setCoopStatus("waiting");
+    setCoopMyLockedIn(false);
+    setCoopPartnerLockedIn(false);
+    setCoopPartnerCorrect(false);
+    setCoopPartnerConnected(false);
+    setCoopPartnerFills({});
+    // Split blanks
+    const { hostBlanks, guestBlanks } = splitBlanksForCoop(puzzle.blanks, puzzle.gridSize);
+    setCoopMyBlanks(hostBlanks);
+    setCoopPartnerBlanks(guestBlanks);
+    // Reset game state for coop
+    setFills({});
+    setAttempts(0);
+    setGameState("playing");
+    setWrongCells(new Set());
+    setLockedCells(new Set());
+    setShowParticles(false);
+    setSelectedCell(null);
+    // Restart timer
+    stopTimer();
+    setElapsedTime(0);
+    timerStart.current = Date.now();
+    timerInterval.current = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+    }, 1000);
+    setShowCoopInvite(true);
+  }, [firebaseUser, puzzle, difficulty, currentPuzzle, isDaily, currentDailyDate, splitBlanksForCoop, stopTimer]);
+
+  // Auto-start coop after login if user clicked Co-op while logged out
+  useEffect(() => {
+    if (firebaseUser && coopPendingLoginRef.current && !coopSessionId && puzzle) {
+      coopPendingLoginRef.current = false;
+      startCoopSession();
+    }
+  }, [firebaseUser, coopSessionId, puzzle, startCoopSession]);
+
+  // Leave coop session and clean up
+  const leaveCoopSession = useCallback(() => {
+    if (coopUnsubRef.current) {
+      coopUnsubRef.current();
+      coopUnsubRef.current = null;
+    }
+    if (coopSessionId && firebaseUser) {
+      deleteCoopSession(coopSessionId).catch(() => {});
+    }
+    setCoopSessionId(null);
+    setCoopRole(null);
+    setCoopMyBlanks(null);
+    setCoopPartnerBlanks(null);
+    setCoopPartnerFills({});
+    setCoopMyLockedIn(false);
+    setCoopPartnerLockedIn(false);
+    setCoopPartnerCorrect(false);
+    setCoopPartnerConnected(false);
+    setCoopStatus(null);
+    setShowCoopInvite(false);
+    coopWriteThrottleRef.current = {};
+  }, [coopSessionId, firebaseUser]);
+
+  // Subscribe to coop session changes (real-time sync)
+  useEffect(() => {
+    if (!coopSessionId || !firebaseUser) return;
+    // Clean up previous subscription
+    if (coopUnsubRef.current) coopUnsubRef.current();
+
+    const unsub = subscribeToCoopSession(coopSessionId, (data) => {
+      if (!data) {
+        // Session was deleted
+        leaveCoopSession();
+        return;
+      }
+      const isHost = data.hostUid === firebaseUser.uid;
+      const partnerConnected = isHost ? !!data.guestUid : true;
+      setCoopPartnerConnected(partnerConnected);
+      setCoopStatus(data.status);
+
+      // Update partner lock-in status
+      if (isHost) {
+        setCoopPartnerLockedIn(!!data.guestLockedIn);
+        setCoopPartnerCorrect(!!data.guestCorrect);
+      } else {
+        setCoopPartnerLockedIn(!!data.hostLockedIn);
+        setCoopPartnerCorrect(!!data.hostCorrect);
+      }
+
+      // Sync fills from Firebase
+      const remoteFills = data.fills || {};
+      if (coopMyBlanks) {
+        // Extract partner fills (fills for cells NOT in my blanks)
+        const partnerFillsObj = {};
+        for (const [key, val] of Object.entries(remoteFills)) {
+          if (!coopMyBlanks.has(key)) {
+            partnerFillsObj[key] = val;
+          }
+        }
+        setCoopPartnerFills(partnerFillsObj);
+      }
+
+      // Check if both locked in correctly → complete
+      if (data.hostLockedIn && data.guestLockedIn && data.hostCorrect && data.guestCorrect && data.status !== "complete") {
+        completeCoopSession(coopSessionId).catch(() => {});
+      }
+    });
+
+    coopUnsubRef.current = unsub;
+    return () => {
+      unsub();
+      coopUnsubRef.current = null;
+    };
+  }, [coopSessionId, firebaseUser, coopMyBlanks]);
+
+  // Handle guest joining: once auth is ready and we have a session ID with role=guest, actually join
+  useEffect(() => {
+    if (coopRole !== "guest" || coopStatus !== "joining" || !firebaseUser || !coopSessionId) return;
+    let cancelled = false;
+    (async () => {
+      const session = await joinCoopSession(coopSessionId, firebaseUser.uid);
+      if (cancelled || !session) {
+        if (!cancelled) {
+          // Session doesn't exist or is full
+          setCoopSessionId(null);
+          setCoopRole(null);
+          setCoopStatus(null);
+          setView("menu");
+        }
+        return;
+      }
+      // Set the puzzle info from the session
+      const mode = session.mode;
+      const level = session.level;
+      if (mode) setDifficulty(mode);
+      if (level != null) setCurrentPuzzle(level);
+      if (session.dailyDate) setCurrentDailyDate(session.dailyDate);
+
+      setCoopStatus("playing");
+    })();
+    return () => { cancelled = true; };
+  }, [coopRole, coopStatus, firebaseUser, coopSessionId]);
+
+  // Once guest has joined and puzzle is loaded, split blanks and assign guest side
+  useEffect(() => {
+    if (coopRole !== "guest" || coopStatus !== "playing" || !puzzle || coopMyBlanks) return;
+    const { hostBlanks, guestBlanks } = splitBlanksForCoop(puzzle.blanks, puzzle.gridSize);
+    setCoopMyBlanks(guestBlanks);
+    setCoopPartnerBlanks(hostBlanks);
+    // Start timer for guest
+    stopTimer();
+    setElapsedTime(0);
+    timerStart.current = Date.now();
+    timerInterval.current = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+    }, 1000);
+  }, [coopRole, coopStatus, puzzle, coopMyBlanks, splitBlanksForCoop, stopTimer]);
+
+  // Sync my fills to Firebase when they change in coop mode
+  useEffect(() => {
+    if (!isCoop || !coopMyBlanks || !coopSessionId) return;
+    // Write my fills to Firebase for cells in my blanks
+    for (const key of coopMyBlanks) {
+      const val = fills[key] || null;
+      const prev = coopWriteThrottleRef.current[key];
+      if (prev !== val) {
+        coopWriteThrottleRef.current[key] = val;
+        updateCoopFill(coopSessionId, key, val).catch(() => {});
+      }
+    }
+  }, [isCoop, fills, coopMyBlanks, coopSessionId]);
+
+  // Clean up coop on unmount or when leaving play view
+  useEffect(() => {
+    return () => {
+      if (coopUnsubRef.current) {
+        coopUnsubRef.current();
+        coopUnsubRef.current = null;
+      }
+    };
+  }, []);
+
   const handleTokenSelect = useCallback((token) => {
     setSelectedToken(token);
     if (selectedCell && puzzle?.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
+      // Coop: only allow filling my blanks
+      if (isCoop && coopMyBlanks && !coopMyBlanks.has(selectedCell)) return;
+      if (isCoop && coopMyLockedIn) return;
       if (puzzle.mode !== "hard" && fills[selectedCell] !== token && (tokenRemaining[token] ?? 0) <= 0) return;
       cancelWrongCellClear();
       setFills(prev => ({ ...prev, [selectedCell]: token }));
       setWrongCells(prev => { const n = new Set(prev); n.delete(selectedCell); return n; });
       setSelectedCell(null);
     }
-  }, [selectedCell, puzzle, lockedCells, fills, tokenRemaining, cancelWrongCellClear]);
+  }, [selectedCell, puzzle, lockedCells, fills, tokenRemaining, cancelWrongCellClear, isCoop, coopMyBlanks, coopMyLockedIn]);
 
   // Arrow keys to cycle through token options
   useEffect(() => {
@@ -4205,11 +4485,104 @@ export default function Pattrn() {
     }
   };
 
+  // Coop lock-in: check only my half of the blanks against the solution
+  const coopLockIn = async () => {
+    if (!puzzle || !isCoop || !coopMyBlanks || !coopSessionId || coopMyLockedIn) return;
+    let allCorrect = true;
+    const wrong = new Set();
+    for (const key of coopMyBlanks) {
+      const [r, c] = key.split("-").map(Number);
+      if (fills[key] === puzzle.solution[r][c]) {
+        // correct
+      } else {
+        allCorrect = false;
+        wrong.add(key);
+      }
+    }
+    const newAttempts = attempts + 1;
+    setAttempts(newAttempts);
+
+    if (allCorrect) {
+      setCoopMyLockedIn(true);
+      // Lock my cells visually
+      setLockedCells(prev => {
+        const next = new Set(prev);
+        for (const k of coopMyBlanks) next.add(k);
+        return next;
+      });
+      await lockInCoopPlayer(coopSessionId, coopRole, true);
+      setShowParticles(true);
+      setTimeout(() => setShowParticles(false), 1500);
+    } else if (newAttempts >= 5) {
+      // Failed all attempts — lock in as incorrect
+      setCoopMyLockedIn(true);
+      setWrongCells(wrong);
+      await lockInCoopPlayer(coopSessionId, coopRole, false);
+    } else {
+      // Show wrong cells, allow retry
+      setWrongCells(wrong);
+      if (wrongCellClearTimeoutRef.current) {
+        clearTimeout(wrongCellClearTimeoutRef.current);
+        wrongCellClearTimeoutRef.current = null;
+      }
+      const n = puzzle.gridSize * puzzle.gridSize;
+      const maxStagger = (n - 1) * 0.015;
+      const fallOffDuration = 0.32;
+      const clearDelayMs = (maxStagger + fallOffDuration + 0.05) * 1000;
+      const wrongSet = wrong;
+      wrongCellClearTimeoutRef.current = setTimeout(() => {
+        wrongCellClearTimeoutRef.current = null;
+        setClearedBlanks(prev => { const next = new Set(prev); for (const k of wrongSet) next.add(k); return next; });
+        setFills(prev => {
+          const next = { ...prev };
+          for (const k of wrongSet) delete next[k];
+          return next;
+        });
+        setWrongCells(new Set());
+      }, clearDelayMs);
+    }
+  };
+
+  // Detect coop completion: both players locked in correctly
+  const coopComplete = isCoop && coopMyLockedIn && coopPartnerLockedIn && coopPartnerCorrect && gameState === "playing";
+
+  // Effect: when coop is complete, trigger win state and save progress
+  useEffect(() => {
+    if (!coopComplete || !puzzle) return;
+
+    setGameState("won");
+    stopTimer();
+    setShowParticles(true);
+    setTimeout(() => setShowParticles(false), 1500);
+
+    // Lock all cells
+    setLockedCells(new Set(puzzle.blanks));
+
+    // Save progress as coop completion — read fresh from localStorage to avoid stale closure
+    const finalTime = timerStart.current ? Math.round((Date.now() - timerStart.current) / 1000) : elapsedTime;
+    const freshProgress = loadProgress();
+    const coopProgress = freshProgress.coop || {};
+    const newCoopProgress = { ...coopProgress, [`${difficulty}_${progressKey}`]: attempts || 1 };
+    const newProgress = { ...freshProgress, coop: newCoopProgress };
+    setProgress(newProgress);
+    saveProgress(newProgress);
+
+    const freshTimes = loadTimes();
+    const coopTimes = freshTimes.coop || {};
+    const newCoopTimes = { ...coopTimes, [`${difficulty}_${progressKey}`]: finalTime };
+    const newTimes = { ...freshTimes, coop: newCoopTimes };
+    setTimes(newTimes);
+    saveTimes(newTimes);
+  }, [coopComplete, puzzle, stopTimer, elapsedTime, difficulty, progressKey, attempts]);
+
   // For blind mode: all non-locked blanks must be filled
   const activeBlanks = puzzle ? [...puzzle.blanks].filter(k => !lockedCells.has(k)) : [];
-  const allFilled = isBlind
-    ? activeBlanks.every(k => fills[k])
-    : puzzle ? [...puzzle.blanks].every(k => fills[k]) : false;
+  const coopMyBlanksArr = isCoop && coopMyBlanks ? [...coopMyBlanks] : [];
+  const allFilled = isCoop
+    ? coopMyBlanksArr.every(k => fills[k])
+    : isBlind
+      ? activeBlanks.every(k => fills[k])
+      : puzzle ? [...puzzle.blanks].every(k => fills[k]) : false;
 
   const completedCount = isCascade
     ? Object.keys(diffProgress).filter(k => /^\d+$/.test(k) && diffProgress[k] === CASCADE_LEVELS.length).length
@@ -5163,6 +5536,242 @@ export default function Pattrn() {
       </div>
     );
   }
+
+  // --- Account modal (shared across views) ---
+  const accountModalEl = showAccountModal && firebaseConfigured && (
+    <div onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)} style={{
+      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: 24,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
+        padding: "24px", maxWidth: 380, width: "100%",
+        boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
+        animation: "fadeUp 0.25s ease",
+      }}>
+        {firebaseUser ? (
+          // Signed in view
+          <>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
+                backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
+                border: "2px solid #60A5FA44",
+              }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <h3 style={{
+                fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
+              }}>
+                Signed In
+              </h3>
+              <p style={{ color: C.textDim, fontSize: 12, margin: 0, wordBreak: "break-all" }}>
+                {firebaseUser.email}
+              </p>
+            </div>
+
+            <div style={{
+              padding: "12px 16px", borderRadius: 10, backgroundColor: C.surface,
+              border: `1px solid ${C.border}`, marginBottom: 16, textAlign: "center",
+            }}>
+              <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
+              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct }}>
+                {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
+              </div>
+              <div style={{ fontSize: 10, color: C.textDim, marginTop: 4 }}>
+                Your progress syncs automatically
+              </div>
+            </div>
+
+            <button
+              onClick={handleSignOut}
+              style={{
+                width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                textTransform: "uppercase", transition: "all 0.15s",
+              }}
+            >
+              Sign out
+            </button>
+          </>
+        ) : (
+          // Sign in / Sign up view
+          <>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
+                backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
+                border: "2px solid #60A5FA44",
+              }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <h3 style={{
+                fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
+              }}>
+                {accountTab === "login" ? "Sign In" : "Create Account"}
+              </h3>
+              <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5 }}>
+                {accountTab === "login"
+                  ? "Sign in to sync your progress across devices"
+                  : "Your current progress will be saved to your new account"}
+              </p>
+            </div>
+
+            {/* Tab toggle */}
+            <div style={{
+              display: "flex", borderRadius: 8, overflow: "hidden",
+              border: `1px solid ${C.border}`, marginBottom: 16,
+            }}>
+              {["login", "signup"].map(tab => (
+                <button key={tab} onClick={() => { setAccountTab(tab); setAccountError(""); }} style={{
+                  flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                  background: accountTab === tab ? C.accent : "transparent",
+                  color: accountTab === tab ? C.bg : C.textDim,
+                  border: "none", cursor: "pointer", textTransform: "uppercase",
+                  transition: "all 0.15s",
+                }}>
+                  {tab === "login" ? "Sign In" : "Sign Up"}
+                </button>
+              ))}
+            </div>
+
+            {/* Google sign in */}
+            <button
+              onClick={handleGoogleSignIn}
+              disabled={accountLoading}
+              style={{
+                width: "100%", padding: "11px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                background: C.surface, border: `1px solid ${C.border}`, color: C.text,
+                cursor: accountLoading ? "not-allowed" : "pointer",
+                opacity: accountLoading ? 0.5 : 1, textTransform: "uppercase",
+                transition: "all 0.15s", marginBottom: 12,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 48 48">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              </svg>
+              Continue with Google
+            </button>
+
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
+            }}>
+              <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
+              <span style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1 }}>or</span>
+              <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
+            </div>
+
+            {/* Email / password form */}
+            <form onSubmit={e => {
+              e.preventDefault();
+              if (accountTab === "login") handleSignIn(accountEmail, accountPassword);
+              else handleSignUp(accountEmail, accountPassword);
+            }}>
+              <input
+                type="email"
+                placeholder="Email"
+                value={accountEmail}
+                onChange={e => setAccountEmail(e.target.value)}
+                autoComplete="email"
+                style={{
+                  width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
+                  fontFamily: "'DM Sans', sans-serif",
+                  background: C.surface, border: `1px solid ${C.border}`, color: C.text,
+                  outline: "none", marginBottom: 8, boxSizing: "border-box",
+                  transition: "border-color 0.15s",
+                }}
+                onFocus={e => e.target.style.borderColor = C.accent}
+                onBlur={e => e.target.style.borderColor = C.border}
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={accountPassword}
+                onChange={e => setAccountPassword(e.target.value)}
+                autoComplete={accountTab === "login" ? "current-password" : "new-password"}
+                style={{
+                  width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
+                  fontFamily: "'DM Sans', sans-serif",
+                  background: C.surface, border: `1px solid ${C.border}`, color: C.text,
+                  outline: "none", marginBottom: 12, boxSizing: "border-box",
+                  transition: "border-color 0.15s",
+                }}
+                onFocus={e => e.target.style.borderColor = C.accent}
+                onBlur={e => e.target.style.borderColor = C.border}
+              />
+
+              {accountError && (
+                <div style={{
+                  padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+                  backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
+                  fontSize: 11, color: C.incorrect, textAlign: "center",
+                }}>
+                  {accountError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={accountLoading || !accountEmail || !accountPassword}
+                style={{
+                  width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+                  background: C.accent, color: C.bg, border: "none",
+                  cursor: (accountLoading || !accountEmail || !accountPassword) ? "not-allowed" : "pointer",
+                  opacity: (accountLoading || !accountEmail || !accountPassword) ? 0.5 : 1,
+                  textTransform: "uppercase", transition: "all 0.15s",
+                }}
+              >
+                {accountLoading ? "..." : accountTab === "login" ? "Sign In" : "Create Account"}
+              </button>
+            </form>
+          </>
+        )}
+
+        {/* Don't ask me again (only shown when modal was auto-opened and user is not signed in) */}
+        {autoLoginModal && !firebaseUser && (
+          <button
+            onClick={dismissAutoLoginPermanently}
+            style={{
+              width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 600,
+              fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3,
+              background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+              transition: "all 0.15s", marginTop: 12,
+            }}
+          >
+            Don't ask me again
+          </button>
+        )}
+
+        {/* Close button */}
+        <button
+          onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)}
+          style={{
+            width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            background: "none", border: "none", color: C.textDim, cursor: "pointer",
+            textTransform: "uppercase", transition: "all 0.15s", marginTop: autoLoginModal && !firebaseUser ? 6 : 12,
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
 
   // --- MENU VIEW ---
   if (view === "menu") {
@@ -6676,241 +7285,7 @@ export default function Pattrn() {
           </div>
         )}
 
-        {/* Account modal */}
-        {showAccountModal && firebaseConfigured && (
-          <div onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)} style={{
-            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 24,
-          }}>
-            <div onClick={e => e.stopPropagation()} style={{
-              backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
-              padding: "24px", maxWidth: 380, width: "100%",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
-              animation: "fadeUp 0.25s ease",
-            }}>
-              {firebaseUser ? (
-                // Signed in view
-                <>
-                  <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
-                      backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
-                      border: "2px solid #60A5FA44",
-                    }}>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
-                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                      </svg>
-                    </div>
-                    <h3 style={{
-                      fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
-                    }}>
-                      Signed In
-                    </h3>
-                    <p style={{ color: C.textDim, fontSize: 12, margin: 0, wordBreak: "break-all" }}>
-                      {firebaseUser.email}
-                    </p>
-                  </div>
-
-                  <div style={{
-                    padding: "12px 16px", borderRadius: 10, backgroundColor: C.surface,
-                    border: `1px solid ${C.border}`, marginBottom: 16, textAlign: "center",
-                  }}>
-                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct }}>
-                      {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
-                    </div>
-                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 4 }}>
-                      Your progress syncs automatically
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleSignOut}
-                    style={{
-                      width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                      background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                  >
-                    Sign out
-                  </button>
-                </>
-              ) : (
-                // Sign in / Sign up view
-                <>
-                  <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
-                      backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
-                      border: "2px solid #60A5FA44",
-                    }}>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
-                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                      </svg>
-                    </div>
-                    <h3 style={{
-                      fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
-                    }}>
-                      {accountTab === "login" ? "Sign In" : "Create Account"}
-                    </h3>
-                    <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5 }}>
-                      {accountTab === "login"
-                        ? "Sign in to sync your progress across devices"
-                        : "Your current progress will be saved to your new account"}
-                    </p>
-                  </div>
-
-                  {/* Tab toggle */}
-                  <div style={{
-                    display: "flex", borderRadius: 8, overflow: "hidden",
-                    border: `1px solid ${C.border}`, marginBottom: 16,
-                  }}>
-                    {["login", "signup"].map(tab => (
-                      <button key={tab} onClick={() => { setAccountTab(tab); setAccountError(""); }} style={{
-                        flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                        background: accountTab === tab ? C.accent : "transparent",
-                        color: accountTab === tab ? C.bg : C.textDim,
-                        border: "none", cursor: "pointer", textTransform: "uppercase",
-                        transition: "all 0.15s",
-                      }}>
-                        {tab === "login" ? "Sign In" : "Sign Up"}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Google sign in */}
-                  <button
-                    onClick={handleGoogleSignIn}
-                    disabled={accountLoading}
-                    style={{
-                      width: "100%", padding: "11px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                      background: C.surface, border: `1px solid ${C.border}`, color: C.text,
-                      cursor: accountLoading ? "not-allowed" : "pointer",
-                      opacity: accountLoading ? 0.5 : 1, textTransform: "uppercase",
-                      transition: "all 0.15s", marginBottom: 12,
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 48 48">
-                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                    </svg>
-                    Continue with Google
-                  </button>
-
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
-                  }}>
-                    <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
-                    <span style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1 }}>or</span>
-                    <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
-                  </div>
-
-                  {/* Email / password form */}
-                  <form onSubmit={e => {
-                    e.preventDefault();
-                    if (accountTab === "login") handleSignIn(accountEmail, accountPassword);
-                    else handleSignUp(accountEmail, accountPassword);
-                  }}>
-                    <input
-                      type="email"
-                      placeholder="Email"
-                      value={accountEmail}
-                      onChange={e => setAccountEmail(e.target.value)}
-                      autoComplete="email"
-                      style={{
-                        width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
-                        fontFamily: "'DM Sans', sans-serif",
-                        background: C.surface, border: `1px solid ${C.border}`, color: C.text,
-                        outline: "none", marginBottom: 8, boxSizing: "border-box",
-                        transition: "border-color 0.15s",
-                      }}
-                      onFocus={e => e.target.style.borderColor = C.accent}
-                      onBlur={e => e.target.style.borderColor = C.border}
-                    />
-                    <input
-                      type="password"
-                      placeholder="Password"
-                      value={accountPassword}
-                      onChange={e => setAccountPassword(e.target.value)}
-                      autoComplete={accountTab === "login" ? "current-password" : "new-password"}
-                      style={{
-                        width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
-                        fontFamily: "'DM Sans', sans-serif",
-                        background: C.surface, border: `1px solid ${C.border}`, color: C.text,
-                        outline: "none", marginBottom: 12, boxSizing: "border-box",
-                        transition: "border-color 0.15s",
-                      }}
-                      onFocus={e => e.target.style.borderColor = C.accent}
-                      onBlur={e => e.target.style.borderColor = C.border}
-                    />
-
-                    {accountError && (
-                      <div style={{
-                        padding: "8px 12px", borderRadius: 8, marginBottom: 12,
-                        backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
-                        fontSize: 11, color: C.incorrect, textAlign: "center",
-                      }}>
-                        {accountError}
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={accountLoading || !accountEmail || !accountPassword}
-                      style={{
-                        width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-                        background: C.accent, color: C.bg, border: "none",
-                        cursor: (accountLoading || !accountEmail || !accountPassword) ? "not-allowed" : "pointer",
-                        opacity: (accountLoading || !accountEmail || !accountPassword) ? 0.5 : 1,
-                        textTransform: "uppercase", transition: "all 0.15s",
-                      }}
-                    >
-                      {accountLoading ? "..." : accountTab === "login" ? "Sign In" : "Create Account"}
-                    </button>
-                  </form>
-                </>
-              )}
-
-              {/* Don't ask me again (only shown when modal was auto-opened and user is not signed in) */}
-              {autoLoginModal && !firebaseUser && (
-                <button
-                  onClick={dismissAutoLoginPermanently}
-                  style={{
-                    width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 600,
-                    fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3,
-                    background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                    transition: "all 0.15s", marginTop: 12,
-                  }}
-                >
-                  Don't ask me again
-                </button>
-              )}
-
-              {/* Close button */}
-              <button
-                onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)}
-                style={{
-                  width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                  background: "none", border: "none", color: C.textDim, cursor: "pointer",
-                  textTransform: "uppercase", transition: "all 0.15s", marginTop: autoLoginModal && !firebaseUser ? 6 : 12,
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
+        {accountModalEl}
 
         {/* Sync choice prompt (local vs cloud data on login) */}
         {showSyncChoice && syncChoiceData && (() => {
@@ -7474,6 +7849,7 @@ export default function Pattrn() {
       }}>
         <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridSize >= 7 ? 380 : 360, animation: "fadeUp 0.3s ease" }}>
         <button onClick={() => {
+          if (isCoop) leaveCoopSession();
           if (difficulty === "cascade") {
             const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
             const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
@@ -7497,17 +7873,8 @@ export default function Pattrn() {
         >
           &larr; {customMosaicPuzzlesRef.current && isMosaic ? "MOSAIC" : "PUZZLES"}
         </button>
-        <div style={{ flex: 1, textAlign: "center" }}>
-          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
-            {diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
-          </span>
-          {!isDaily && !isCascade && (
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700, color: C.accent, letterSpacing: 3 }}>
-              #{currentPuzzle + 1}
-            </span>
-          )}
-        </div>
-        <div style={{ width: 110, display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 6 }}>
+        <div style={{ flex: 1 }} />
+        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4, flexShrink: 0 }}>
           <button
             onClick={() => setShowThemePicker(true)}
             style={{
@@ -7547,9 +7914,115 @@ export default function Pattrn() {
           >
             {shareMsg || "Share"}
           </button>
+          {/* Coop invite button - visible when playing supported modes, prompts login if needed */}
+          {!isCoop && gameState === "playing" && !isCascade && !isMosaic && (
+            <button
+              onClick={() => {
+                if (!firebaseUser) {
+                  coopPendingLoginRef.current = true;
+                  setShowAccountModal(true);
+                  return;
+                }
+                startCoopSession();
+              }}
+              style={{
+                background: "none", border: `1px solid #54A0FF55`, borderRadius: 8, padding: "6px 10px",
+                color: "#54A0FF", cursor: "pointer", fontSize: 12, transition: "all 0.15s",
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, fontWeight: 700,
+              }}
+              title="Invite a friend to play co-op"
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#54A0FF55"; e.currentTarget.style.backgroundColor = "transparent"; }}
+            >
+              Co-op
+            </button>
+          )}
+          {/* Coop leave button when in coop */}
+          {isCoop && (
+            <button
+              onClick={() => { leaveCoopSession(); }}
+              style={{
+                background: "none", border: `1px solid #f8717188`, borderRadius: 8, padding: "6px 10px",
+                color: "#f87171", cursor: "pointer", fontSize: 11, transition: "all 0.15s",
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+              }}
+              title="Leave co-op session"
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#f8717188"; }}
+            >
+              Leave
+            </button>
+          )}
         </div>
         </div>
       </div>
+
+      {/* Coop invite modal */}
+      {showCoopInvite && coopSessionId && (
+        <div onClick={() => setShowCoopInvite(false)} style={{
+          position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          animation: "fadeUp 0.2s ease both",
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 340, width: "90%",
+            border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+          }}>
+            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+              Co-op Invite
+            </div>
+            <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
+              Share this link with a friend to solve together
+            </div>
+            <div style={{
+              backgroundColor: C.bg, borderRadius: 8, padding: "10px 12px", marginBottom: 12,
+              fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.text, wordBreak: "break-all",
+              border: `1px solid ${C.border}`,
+            }}>
+              {typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : ""}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={async () => {
+                  const url = `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}`;
+                  const result = await tryNativeShare({ title: "Agnus Co-op", text: "Join me for a co-op puzzle!", url });
+                  if (result === "shared") {
+                    setShowCoopInvite(false);
+                    return;
+                  }
+                  if (result === "cancelled") return;
+                  try { await navigator.clipboard.writeText(url); } catch {}
+                  setShowCoopInvite(false);
+                }}
+                style={{
+                  flex: 1, backgroundColor: "#54A0FF", color: "#fff", border: "none",
+                  padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase",
+                }}
+              >
+                Copy Link
+              </button>
+              <button
+                onClick={() => setShowCoopInvite(false)}
+                style={{
+                  backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                  padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase",
+                }}
+              >
+                Close
+              </button>
+            </div>
+            {!coopPartnerConnected && (
+              <div style={{ marginTop: 12, textAlign: "center", fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", animation: "pulse 2s infinite" }}>
+                Waiting for partner to join...
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Info row: fixed below header */}
       <div style={{
@@ -7561,9 +8034,79 @@ export default function Pattrn() {
           <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 18, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, letterSpacing: 2 }}>
             {formatTime(elapsedTime)}
           </div>
-          <AttemptDots max={maxAttempts} used={attempts} won={gameState === "won"} />
+          <div style={{ textAlign: "center" }}>
+            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
+              {isCoop ? "Co-op " : ""}{diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
+            </span>
+            {!isDaily && !isCascade && (
+              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.accent, letterSpacing: 2 }}>
+                #{currentPuzzle + 1}
+              </span>
+            )}
+          </div>
+          <AttemptDots max={isCoop ? 5 : maxAttempts} used={attempts} won={gameState === "won"} />
         </div>
+        {/* Coop status bar */}
+        {isCoop && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 12,
+            marginTop: 6, width: "100%", maxWidth: gridSize >= 7 ? 380 : 360,
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 4,
+              fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: 0.5,
+              color: coopMyLockedIn ? C.correct : "#54A0FF",
+            }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: "50%",
+                backgroundColor: coopMyLockedIn ? C.correct : "#54A0FF",
+                display: "inline-block",
+              }} />
+              YOU {coopMyLockedIn ? "\u2713" : ""}
+            </div>
+            <div style={{ width: 1, height: 10, backgroundColor: C.border }} />
+            <div style={{
+              display: "flex", alignItems: "center", gap: 4,
+              fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: 0.5,
+              color: !coopPartnerConnected ? C.textDim : coopPartnerLockedIn ? (coopPartnerCorrect ? C.correct : C.incorrect) : "#FF9FF3",
+            }}>
+              <span style={{
+                width: 7, height: 7, borderRadius: "50%",
+                backgroundColor: !coopPartnerConnected ? C.textDim : coopPartnerLockedIn ? (coopPartnerCorrect ? C.correct : C.incorrect) : "#FF9FF3",
+                display: "inline-block",
+                animation: !coopPartnerConnected ? "pulse 2s infinite" : "none",
+              }} />
+              PARTNER {!coopPartnerConnected ? "..." : coopPartnerLockedIn ? "\u2713" : ""}
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Coop waiting overlay - when partner hasn't joined yet */}
+      {isCoop && !coopPartnerConnected && coopStatus === "waiting" && (
+        <div style={{
+          position: "fixed", top: "calc(100px + env(safe-area-inset-top, 0px))", left: "50%",
+          transform: "translateX(-50%)", zIndex: 20,
+          backgroundColor: C.surface, border: `1px solid #54A0FF44`, borderRadius: 12,
+          padding: "12px 20px", boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+          fontFamily: "'Space Mono', monospace", fontSize: 12, color: C.text,
+          textAlign: "center", animation: "fadeUp 0.3s ease both",
+        }}>
+          <div style={{ marginBottom: 4, fontWeight: 700, color: "#54A0FF" }}>Waiting for partner</div>
+          <div style={{ fontSize: 10, color: C.textDim }}>Share the invite link to start</div>
+          <button
+            onClick={() => setShowCoopInvite(true)}
+            style={{
+              marginTop: 8, backgroundColor: "#54A0FF", color: "#fff", border: "none",
+              padding: "8px 16px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+              fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+              textTransform: "uppercase",
+            }}
+          >
+            Show Link
+          </button>
+        </div>
+      )}
 
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(88px + env(safe-area-inset-top, 0px))", paddingBottom: "calc(140px + env(safe-area-inset-bottom, 0px))", width: "calc(100% + 32px)", margin: "0 -16px", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, position: "relative", boxSizing: "border-box" }}>
@@ -7583,7 +8126,11 @@ export default function Pattrn() {
                 const key = `${r}-${c}`;
                 const isBlankCell = puzzle.blanks.has(key);
                 const isLockedCell = lockedCells.has(key);
-                const fillToken = isBlankCell ? (isLockedCell ? token : fills[key]) : token;
+                // In coop mode, show partner fills for their blanks
+                const partnerFill = isCoop && coopPartnerBlanks?.has(key) ? coopPartnerFills[key] : null;
+                const myFill = fills[key];
+                const effectiveFill = isBlankCell ? (isLockedCell ? token : (myFill || partnerFill)) : null;
+                const fillToken = isBlankCell ? (effectiveFill || null) : token;
                 const isRevealed = false;
                 const displayToken = fillToken;
                 const cellIndex = r * gridSize + c;
@@ -7595,33 +8142,47 @@ export default function Pattrn() {
                 const emptyCellDelay = isBlankCell && clearedBlanks.has(key) ? null : emptyCellDelayRaw;
                 const isWon = gameState === "won";
                 const winCelebrateDelay = isWon ? cellIndex * 0.04 : 0;
+                // Coop ownership visual hints
+                const isCoopMine = isCoop && coopMyBlanks?.has(key);
+                const isCoopPartner = isCoop && coopPartnerBlanks?.has(key);
                 return (
-                  <Cell key={key} token={displayToken} isBlank={isBlankCell}
-                    isSelected={selectedCell === key}
-                    isFilled={!!fills[key] || isLockedCell}
-                    isCorrect={isWon && isBlankCell}
-                    isWrong={isWrongCell}
-                    isRevealed={isRevealed}
-                    isLocked={isLockedCell && gameState === "playing"}
-                    isPrefilled={!isBlankCell}
-                    fallDelay={fallDelay}
-                    wrongFallDelay={wrongFallDelay}
-                    emptyCellDelay={emptyCellDelay}
-                    isWon={isWon}
-                    winCelebrateDelay={winCelebrateDelay}
-                    onClick={() => handleCellClick(r, c)}
-                    onPointerDown={() => handleCellPointerDown(r, c)}
-                    onPointerUp={() => handleCellPointerUp(r, c)}
-                    onPointerEnter={() => handleCellPointerEnter(r, c)}
-                    cellSize={cellSize} iconSize={iconSize}
-                    mode={puzzle.mode}
-                    colorMap={themeColorMap}
-                    shapesArr={themedShapes}
-                    themeId={activeThemeId}
-                    isJustPlaced={justPlacedCells.has(key)}
-                    isRemoving={!!removingCells[key]}
-                    removingToken={removingCells[key] || null}
-                  />
+                  <div key={key} style={{ position: "relative" }}>
+                    <Cell token={displayToken} isBlank={isBlankCell}
+                      isSelected={selectedCell === key}
+                      isFilled={!!(myFill || partnerFill) || isLockedCell}
+                      isCorrect={isWon && isBlankCell}
+                      isWrong={isWrongCell}
+                      isRevealed={isRevealed}
+                      isLocked={(isLockedCell && gameState === "playing") || (isCoop && isBlankCell && isCoopPartner && !isWon)}
+                      isPrefilled={!isBlankCell}
+                      fallDelay={fallDelay}
+                      wrongFallDelay={wrongFallDelay}
+                      emptyCellDelay={emptyCellDelay}
+                      isWon={isWon}
+                      winCelebrateDelay={winCelebrateDelay}
+                      onClick={() => handleCellClick(r, c)}
+                      onPointerDown={() => handleCellPointerDown(r, c)}
+                      onPointerUp={() => handleCellPointerUp(r, c)}
+                      onPointerEnter={() => handleCellPointerEnter(r, c)}
+                      cellSize={cellSize} iconSize={iconSize}
+                      mode={puzzle.mode}
+                      colorMap={themeColorMap}
+                      shapesArr={themedShapes}
+                      themeId={activeThemeId}
+                      isJustPlaced={justPlacedCells.has(key)}
+                      isRemoving={!!removingCells[key]}
+                      removingToken={removingCells[key] || null}
+                    />
+                    {/* Coop ownership indicator dot */}
+                    {isCoop && isBlankCell && gameState === "playing" && !isWon && (
+                      <div style={{
+                        position: "absolute", top: 2, right: 2,
+                        width: 5, height: 5, borderRadius: "50%",
+                        backgroundColor: isCoopMine ? "#54A0FF" : "#FF9FF3",
+                        opacity: 0.7, pointerEvents: "none",
+                      }} />
+                    )}
+                  </div>
                 );
               })}
             </div>
@@ -7639,26 +8200,38 @@ export default function Pattrn() {
         )}
         {gameState === "playing" && (
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            <button
-              onClick={allFilled ? checkSolution : undefined}
-              disabled={!allFilled}
-              style={{
-                backgroundColor: allFilled ? (isBlind ? "#e06040" : C.accent) : C.surfaceLight,
-                color: allFilled ? (isBlind ? "#fff" : C.bg) : C.textDim,
-                border: "none",
-                padding: "14px 48px", borderRadius: 12, fontSize: 15, fontWeight: 700,
+            {/* Coop: show Lock In or waiting state; Normal: show Check */}
+            {isCoop && coopMyLockedIn ? (
+              <div style={{
+                padding: "14px 32px", borderRadius: 12, fontSize: 13, fontWeight: 700,
                 fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-                cursor: allFilled ? "pointer" : "not-allowed",
-                textTransform: "uppercase", transition: "all 0.2s",
-                boxShadow: allFilled ? (isBlind ? "0 4px 20px #e0604044" : `0 4px 20px ${C.accent}44`) : "none",
-                opacity: allFilled ? 1 : 0.7,
-              }}
-              onMouseEnter={e => { if (allFilled) e.target.style.transform = "translateY(-2px)"; }}
-              onMouseLeave={e => { e.target.style.transform = "translateY(0)"; }}
-            >
-              {isBlind ? "Guess" : "Check"}
-            </button>
-            {(Object.keys(fills).length > 0 || attempts > 0) && (
+                textTransform: "uppercase", color: C.correct,
+                border: `2px solid ${C.correct}44`, backgroundColor: `${C.correct}11`,
+              }}>
+                {"\u2713"} Locked In {!coopPartnerLockedIn ? "- Waiting..." : ""}
+              </div>
+            ) : (
+              <button
+                onClick={allFilled ? (isCoop ? coopLockIn : checkSolution) : undefined}
+                disabled={!allFilled}
+                style={{
+                  backgroundColor: allFilled ? (isCoop ? "#54A0FF" : isBlind ? "#e06040" : C.accent) : C.surfaceLight,
+                  color: allFilled ? (isCoop ? "#fff" : isBlind ? "#fff" : C.bg) : C.textDim,
+                  border: "none",
+                  padding: "14px 48px", borderRadius: 12, fontSize: 15, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+                  cursor: allFilled ? "pointer" : "not-allowed",
+                  textTransform: "uppercase", transition: "all 0.2s",
+                  boxShadow: allFilled ? (isCoop ? "0 4px 20px #54A0FF44" : isBlind ? "0 4px 20px #e0604044" : `0 4px 20px ${C.accent}44`) : "none",
+                  opacity: allFilled ? 1 : 0.7,
+                }}
+                onMouseEnter={e => { if (allFilled) e.target.style.transform = "translateY(-2px)"; }}
+                onMouseLeave={e => { e.target.style.transform = "translateY(0)"; }}
+              >
+                {isCoop ? "Lock In" : isBlind ? "Guess" : "Check"}
+              </button>
+            )}
+            {!isCoop && (Object.keys(fills).length > 0 || attempts > 0) && (
               <button
                 onClick={resetBoard}
                 style={{
@@ -7679,12 +8252,14 @@ export default function Pattrn() {
         {gameState === "won" && (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: 12, animation: "fadeUp 0.4s ease" }}>
-              &#x2713; {isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : isSpin ? "Nailed it!" : isMosaic ? "Tile complete!" : "Perfect"}
+              &#x2713; {isCoop ? "Co-op complete!" : isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : isSpin ? "Nailed it!" : isMosaic ? "Tile complete!" : "Perfect"}
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
               <button onClick={async () => {
                 let text;
-                if (isCascade) {
+                if (isCoop) {
+                  text = `Agnus Co-op \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\nSolved together \u2022 ${formatTime(elapsedTime)}`;
+                } else if (isCascade) {
                   text = `Agnus Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
                 } else if (isDaily) {
                   const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
@@ -7716,7 +8291,7 @@ export default function Pattrn() {
               >
                 {shareMsg || "Share"}
               </button>
-              <button onClick={() => startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true, isDaily ? currentDailyDate : null)}
+              <button onClick={() => { if (isCoop) leaveCoopSession(); startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true, isDaily ? currentDailyDate : null); }}
                 style={{
                   backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
                   padding: "12px 24px", borderRadius: 12, fontSize: 13, fontWeight: 700,
@@ -7728,7 +8303,21 @@ export default function Pattrn() {
               >
                 Retry
               </button>
-              {(isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) ? (
+              {isCoop ? (
+                <button onClick={() => { leaveCoopSession(); setView("menu"); }}
+                  style={{
+                    backgroundColor: "#54A0FF", color: "#fff", border: "none",
+                    padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
+                    textTransform: "uppercase", transition: "all 0.2s",
+                    boxShadow: "0 4px 20px #54A0FF44",
+                  }}
+                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
+                >
+                  Back to puzzles
+                </button>
+              ) : (isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) ? (
                 <button onClick={() => { setView(customMosaicPuzzlesRef.current && isMosaic ? "custom-mosaic" : "menu"); }}
                   style={{
                     backgroundColor: C.accent, color: C.bg, border: "none",
@@ -7864,6 +8453,7 @@ export default function Pattrn() {
       </div>
 
       {themePickerEl}
+      {accountModalEl}
     </div>
   );
 }
