@@ -1641,9 +1641,10 @@ function loadTimes() {
       daily: migrateDailyData(base.daily ?? {}),
       cascade: base.cascade ?? {},
       coop: base.coop ?? {},
+      mosaicCompletionTimes: base.mosaicCompletionTimes ?? {},
     };
   } catch {
-    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, coop: {} };
+    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, coop: {}, mosaicCompletionTimes: {} };
   }
 }
 
@@ -2796,6 +2797,8 @@ export default function Pattrn() {
   const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
   const staffPickPuzzlesRef = useRef(null); // puzzles built from staff pick grid
   const staffPickLoadedRef = useRef(false);
+  const [showMosaicPreviewOverlay, setShowMosaicPreviewOverlay] = useState(false); // magnifying glass preview overlay
+  const customMosaicReturnViewRef = useRef("gallery"); // where to go when leaving custom-mosaic view
 
   // Listen for auth state changes
   useEffect(() => {
@@ -3458,6 +3461,7 @@ export default function Pattrn() {
       blind: times.blind || {},
       daily: times.daily || {},
       cascade: times.cascade || {},
+      mosaicCompletionTimes: times.mosaicCompletionTimes || {},
     },
     achievements: [...savedAchievementIds],
     theme: coopOriginalThemeRef.current ?? activeThemeId,
@@ -4347,7 +4351,7 @@ export default function Pattrn() {
       const prog = loadProgress();
       const tms = loadTimes();
       const dProg = isCustomMosaic ? customMosaicProgress : (prog[effectiveDiff] || {});
-      const dTimes = isCustomMosaic ? {} : (tms[effectiveDiff] || {});
+      const dTimes = isCustomMosaic ? ((tms.mosaicCompletionTimes || {})[customMosaicPlay?.id] || {}) : (tms[effectiveDiff] || {});
       const savedAttempts = dProg[lookupKey] ?? 0;
       const savedTime = dTimes[lookupKey];
       const alreadyCompleted = !forceRestart && savedAttempts > 0 && savedTime != null && puz;
@@ -5148,6 +5152,13 @@ export default function Pattrn() {
             const newProgress = { ...progress, mosaicCompletions: newCompletions };
             setProgress(newProgress);
             saveProgress(newProgress);
+            // Save per-tile time for mosaic stats
+            const mct = times.mosaicCompletionTimes || {};
+            const prevMosaicTimes = mct[mosaicId] || {};
+            const newMosaicTimes = { ...prevMosaicTimes, [progressKey]: finalTime };
+            const newTimes = { ...times, mosaicCompletionTimes: { ...mct, [mosaicId]: newMosaicTimes } };
+            setTimes(newTimes);
+            saveTimes(newTimes);
           }
         } else {
           const newDiffProgress = { ...diffProgress, [progressKey]: newAttempts };
@@ -5757,7 +5768,7 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => { setView("gallery"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; }}
+          <button onClick={() => { const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; }}
             style={{
               background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
               color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
@@ -5843,6 +5854,113 @@ export default function Pattrn() {
             <MosaicThumbnail grid={customMosaicPlay.grid} size={Math.min(280, typeof window !== "undefined" ? window.innerWidth - 80 : 280)} completedTiles={solvedCount === 25 ? null : customMosaicProgress} />
           </div>
         )}
+
+        {/* Mosaic stats section */}
+        {solvedCount > 0 && (() => {
+          const mosaicTimes = customMosaicPlay?.id ? ((times.mosaicCompletionTimes || {})[customMosaicPlay.id] || {}) : {};
+          const solvedTiles = Object.entries(customMosaicProgress).filter(([, v]) => typeof v === "number" && v > 0);
+          const totalAttempts = solvedTiles.reduce((sum, [, v]) => sum + v, 0);
+          const perfectCount = solvedTiles.filter(([, v]) => v === 1).length;
+          const timedTiles = solvedTiles.filter(([k]) => mosaicTimes[k] != null);
+          const totalTime = timedTiles.reduce((sum, [k]) => sum + (mosaicTimes[k] || 0), 0);
+          const avgAttempts = solvedTiles.length > 0 ? (totalAttempts / solvedTiles.length).toFixed(1) : "—";
+          const bestTime = timedTiles.length > 0 ? Math.min(...timedTiles.map(([k]) => mosaicTimes[k])) : null;
+          const worstTime = timedTiles.length > 0 ? Math.max(...timedTiles.map(([k]) => mosaicTimes[k])) : null;
+          return (
+            <div style={{
+              marginTop: 24, width: "100%", maxWidth: 360,
+              padding: 16, borderRadius: 14,
+              backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              animation: "fadeUp 0.4s 0.08s ease both",
+            }}>
+              <div style={{
+                fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5,
+                fontFamily: "'Space Mono', monospace", marginBottom: 14, textAlign: "center",
+              }}>
+                Mosaic Stats
+              </div>
+              <div style={{
+                display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10,
+              }}>
+                {/* Total time */}
+                <div style={{
+                  padding: "10px 8px", borderRadius: 10, backgroundColor: C.bg,
+                  border: `1px solid ${C.border}`, textAlign: "center",
+                }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: solvedCount === 25 ? C.accent : C.text }}>
+                    {timedTiles.length > 0 ? formatTime(totalTime) : "—"}
+                  </div>
+                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 4, letterSpacing: 0.5 }}>
+                    {solvedCount === 25 ? "Total Time" : "Time So Far"}
+                  </div>
+                </div>
+                {/* Tiles solved */}
+                <div style={{
+                  padding: "10px 8px", borderRadius: 10, backgroundColor: C.bg,
+                  border: `1px solid ${C.border}`, textAlign: "center",
+                }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: solvedCount === 25 ? C.correct : C.text }}>
+                    {solvedCount}/25
+                  </div>
+                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 4, letterSpacing: 0.5 }}>
+                    Tiles Solved
+                  </div>
+                </div>
+                {/* Avg attempts */}
+                <div style={{
+                  padding: "10px 8px", borderRadius: 10, backgroundColor: C.bg,
+                  border: `1px solid ${C.border}`, textAlign: "center",
+                }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text }}>
+                    {avgAttempts}
+                  </div>
+                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 4, letterSpacing: 0.5 }}>
+                    Avg Attempts
+                  </div>
+                </div>
+                {/* Perfect tiles */}
+                <div style={{
+                  padding: "10px 8px", borderRadius: 10, backgroundColor: C.bg,
+                  border: `1px solid ${C.border}`, textAlign: "center",
+                }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: perfectCount > 0 ? C.gold : C.text }}>
+                    {perfectCount}
+                  </div>
+                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 4, letterSpacing: 0.5 }}>
+                    Perfect (1st try)
+                  </div>
+                </div>
+              </div>
+              {/* Best / worst time row */}
+              {timedTiles.length > 1 && (
+                <div style={{ display: "flex", gap: 10, marginTop: 10 }}>
+                  <div style={{
+                    flex: 1, padding: "8px 6px", borderRadius: 8, backgroundColor: C.bg,
+                    border: `1px solid ${C.border}`, textAlign: "center",
+                  }}>
+                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.correct }}>
+                      {formatTime(bestTime)}
+                    </div>
+                    <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 3, letterSpacing: 0.5 }}>
+                      Best Tile
+                    </div>
+                  </div>
+                  <div style={{
+                    flex: 1, padding: "8px 6px", borderRadius: 8, backgroundColor: C.bg,
+                    border: `1px solid ${C.border}`, textAlign: "center",
+                  }}>
+                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.incorrect }}>
+                      {formatTime(worstTime)}
+                    </div>
+                    <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 3, letterSpacing: 0.5 }}>
+                      Slowest Tile
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {coopInviteToastEl}
       </div>
     );
@@ -8510,92 +8628,60 @@ export default function Pattrn() {
           </div>
         )}
 
-        {/* Mosaic grid: 5x5 mini-thumbnails forming the big picture */}
+        {/* Mosaic: Staff Pick featured panel + carousel of all mosaics */}
         {isMosaic && (<>
-        <div style={{
-          display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
-          maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
-        }}>
-          <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Space Mono', monospace", marginBottom: 4, textAlign: "center" }}>
-            {staffPickMosaic ? (
-              <>
-                <span style={{ color: C.accent }}>&#9733; Staff Pick</span>
-                {" — "}{staffPickMosaic.title || "Untitled"}
-                {staffPickMosaic.authorUsername && <span style={{ color: C.textDim }}> by {staffPickMosaic.authorUsername}</span>}
-              </>
-            ) : "Solve all 25 tiles to reveal the pattern"}
-          </div>
-          <div style={{
-            display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 3,
-            padding: 8, borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
-          }}>
-            {puzzles.map((p, i) => {
-              const result = diffProgress[i];
-              const solved = result > 0;
-              const failed = result === 0;
-              const mosaicCoopResult = (progress.coop || {})[`mosaic_${i}`];
-              const mosaicCoopSolved = mosaicCoopResult > 0;
-              const miniSize = 56;
-              const miniCellSize = Math.floor((miniSize - 8) / 5);
-              return (
-                <button key={i} onClick={() => { customMosaicPuzzlesRef.current = null; startPuzzle(i, "mosaic"); }}
-                  style={{
-                    width: miniSize, height: miniSize, borderRadius: 6,
-                    border: `1.5px solid ${solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border}`,
-                    backgroundColor: solved ? C.correct + "10" : failed ? C.incorrect + "08" : C.surface,
-                    cursor: "pointer", padding: 2, position: "relative",
-                    display: "flex", flexDirection: "column", gap: 0.5, alignItems: "center", justifyContent: "center",
-                    transition: "all 0.15s", overflow: "hidden",
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; }}
-                  onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border; }}
-                >
-                  {mosaicCoopSolved && (
-                    <span style={{
-                      position: "absolute", top: 2, right: 2, zIndex: 1,
-                      width: 7, height: 7, borderRadius: "50%",
-                      backgroundColor: C.coop,
-                      boxShadow: `0 0 4px ${C.coop}66`,
-                    }} />
-                  )}
-                  {solved ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                      {p.solution.map((row, ri) => (
-                        <div key={ri} style={{ display: "flex", gap: 0.5 }}>
-                          {row.map((token, ci) => {
-                            const { color } = parseToken(token);
-                            const dc = themeColorMap ? (themeColorMap[color] || color) : color;
-                            return <div key={ci} style={{ width: miniCellSize, height: miniCellSize, borderRadius: 1, backgroundColor: dc }} />;
-                          })}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <span style={{
-                      fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
-                      color: failed ? C.incorrect : C.textDim, lineHeight: 1,
-                    }}>
-                      {failed ? "\u2717" : i + 1}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        <style>{`.mosaic-carousel::-webkit-scrollbar { display: none; }`}</style>
 
-        {/* Legend */}
-        <div style={{
-          marginTop: 16, display: "flex", gap: 16, fontSize: 11, color: C.textDim,
-          fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, animation: "fadeUp 0.5s 0.25s ease both",
-          flexWrap: "wrap", justifyContent: "center",
-        }}>
-          <span><span style={{ color: C.gold }}>{"\u2605"}</span> 1-2 tries</span>
-          <span><span style={{ color: C.silver }}>{"\u25CF"}</span> 3-4 tries</span>
-          <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> 5+ tries</span>
-          <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
-          <span><span style={{ color: C.coop }}>{"\u25CF"}</span> co-op</span>
-        </div>
+        {/* Staff Pick — featured center-stage panel */}
+        {staffPickMosaic && (() => {
+          const spProgress = staffPickMosaic.id ? (progress.mosaicCompletions || {})[staffPickMosaic.id] : null;
+          const spSolved = spProgress ? Object.values(spProgress).filter(v => typeof v === "number" && v > 0).length : 0;
+          return (
+            <div style={{
+              width: "100%", maxWidth: 360, animation: "fadeUp 0.5s 0.15s ease both",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+            }}>
+              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Space Mono', monospace" }}>
+                <span style={{ color: C.accent }}>&#9733; Staff Pick</span>
+              </div>
+              <button
+                onClick={() => { customMosaicReturnViewRef.current = "menu"; startCustomMosaicPlay(staffPickMosaic); }}
+                style={{
+                  width: "100%", maxWidth: 320, padding: 16, borderRadius: 16,
+                  backgroundColor: C.surface, border: `2px solid ${C.accent}44`,
+                  cursor: "pointer", transition: "all 0.2s",
+                  display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.transform = "translateY(-3px)"; e.currentTarget.style.boxShadow = `0 8px 30px ${C.accent}22`; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "44"; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; }}
+              >
+                <MosaicThumbnail
+                  grid={staffPickMosaic.grid}
+                  size={Math.min(240, typeof window !== "undefined" ? window.innerWidth - 120 : 240)}
+                  hidden={true}
+                  completedTiles={spProgress}
+                />
+                <div style={{ textAlign: "center" }}>
+                  <div style={{
+                    fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700,
+                    color: C.text, letterSpacing: 1, marginBottom: 4,
+                  }}>
+                    {staffPickMosaic.title || "Untitled"}
+                  </div>
+                  {staffPickMosaic.authorUsername && (
+                    <div style={{ fontSize: 10, color: C.textDim, marginBottom: 6 }}>by {staffPickMosaic.authorUsername}</div>
+                  )}
+                  <div style={{
+                    fontSize: 10, fontFamily: "'Space Mono', monospace",
+                    color: spSolved === 25 ? C.correct : C.textDim, letterSpacing: 0.5,
+                  }}>
+                    {spSolved === 25 ? "Completed!" : `${spSolved}/25 tiles solved`}
+                  </div>
+                </div>
+              </button>
+            </div>
+          );
+        })()}
 
         {/* Shared mosaics carousel */}
         {(() => {
@@ -8615,7 +8701,6 @@ export default function Pattrn() {
                 scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
                 msOverflowStyle: "none", scrollbarWidth: "none",
               }}>
-                <style>{`.mosaic-carousel::-webkit-scrollbar { display: none; }`}</style>
                 {sharedCarouselMosaics.map((mosaic) => (
                   <button
                     key={mosaic.id}
@@ -8656,7 +8741,7 @@ export default function Pattrn() {
           const carouselMosaics = [
             ...(publicMosaicsList || []).map(m => ({ ...m, _source: "public" })),
             ...(myMosaics || []).filter(m => !publicMosaicsList?.some(p => p.id === m.id)).map(m => ({ ...m, _source: "mine" })),
-          ];
+          ].filter(m => !staffPickMosaic || m.id !== staffPickMosaic.id);
           if (carouselMosaics.length === 0) return null;
           return (
             <div style={{
@@ -8672,7 +8757,6 @@ export default function Pattrn() {
                 scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
                 msOverflowStyle: "none", scrollbarWidth: "none",
               }}>
-                <style>{`.mosaic-carousel::-webkit-scrollbar { display: none; }`}</style>
                 {carouselMosaics.map((mosaic) => (
                   <button
                     key={mosaic.id}
@@ -10010,6 +10094,7 @@ export default function Pattrn() {
             saveProgress(nextProgress);
           }
           stopTimer();
+          setShowMosaicPreviewOverlay(false);
           if (customMosaicPuzzlesRef.current && isMosaic) {
             setView("custom-mosaic");
           } else {
@@ -10067,6 +10152,25 @@ export default function Pattrn() {
           >
             {shareMsg || "Share"}
           </button>
+          {/* Magnifying glass button - visible when playing a custom mosaic puzzle */}
+          {customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay && (
+            <button
+              onClick={() => setShowMosaicPreviewOverlay(true)}
+              style={{
+                background: "none", border: `1px solid ${C.accent}44`, borderRadius: 8,
+                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.15s", minWidth: 32, height: 30,
+              }}
+              title="Preview full mosaic"
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.backgroundColor = C.accent + "11"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "44"; e.currentTarget.style.backgroundColor = "transparent"; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8"/>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </button>
+          )}
           {/* Coop invite button - visible when playing supported modes, prompts login if needed */}
           {!isCoop && gameState === "playing" && !isCascade && !isMosaic && (
             <button
@@ -10410,6 +10514,97 @@ export default function Pattrn() {
                 Stay
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mosaic preview overlay — shows full mosaic with current tile highlighted */}
+      {showMosaicPreviewOverlay && customMosaicPlay && customMosaicPuzzlesRef.current && (
+        <div onClick={() => setShowMosaicPreviewOverlay(false)} style={{
+          position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.85)",
+          display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
+          animation: "fadeUp 0.2s ease both",
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
+            padding: 20, maxWidth: "90vw",
+          }}>
+            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: "uppercase" }}>
+              Mosaic Preview — Tile {currentPuzzle + 1}
+            </div>
+            {/* Full mosaic canvas with current tile highlighted with in-progress fills */}
+            <canvas ref={el => {
+              if (!el || !customMosaicPlay.grid) return;
+              const grid = customMosaicPlay.grid;
+              const gs = grid.length;
+              const canvasSize = Math.min(320, typeof window !== "undefined" ? window.innerWidth - 60 : 320);
+              const cellSz = canvasSize / gs;
+              const ctx = el.getContext("2d");
+              el.width = canvasSize;
+              el.height = canvasSize;
+              const dimColor = "#14141f";
+              const tileRow = Math.floor(currentPuzzle / 5);
+              const tileCol = currentPuzzle % 5;
+              // Draw all cells
+              for (let r = 0; r < gs; r++) {
+                for (let c = 0; c < (grid[r]?.length || 0); c++) {
+                  const tr = Math.floor(r / 5);
+                  const tc = Math.floor(c / 5);
+                  const tileIdx = tr * 5 + tc;
+                  const isCurrentTile = (tr === tileRow && tc === tileCol);
+                  const tileSolved = (customMosaicProgress[tileIdx] || 0) > 0;
+                  if (isCurrentTile) {
+                    // Current tile: show user's in-progress fills or solution colors
+                    const localR = r - tileRow * 5;
+                    const localC = c - tileCol * 5;
+                    const cellKey = `${localR}-${localC}`;
+                    const puz = customMosaicPuzzlesRef.current[currentPuzzle];
+                    if (puz) {
+                      const isBlankCell = puz.blanks.has(cellKey);
+                      if (!isBlankCell || tileSolved) {
+                        // Pre-filled or solved: show actual color
+                        ctx.fillStyle = grid[r][c] || dimColor;
+                      } else if (fills[cellKey]) {
+                        // User has placed a token — show its color
+                        const placedToken = fills[cellKey];
+                        const parsed = placedToken.split("|");
+                        ctx.fillStyle = parsed[0] || dimColor;
+                      } else {
+                        // Empty blank: show with a slight highlight
+                        ctx.fillStyle = "#2a2a3a";
+                      }
+                    } else {
+                      ctx.fillStyle = grid[r][c] || dimColor;
+                    }
+                  } else if (tileSolved) {
+                    ctx.fillStyle = grid[r][c] || dimColor;
+                  } else {
+                    ctx.fillStyle = dimColor;
+                  }
+                  ctx.fillRect(c * cellSz, r * cellSz, Math.ceil(cellSz), Math.ceil(cellSz));
+                }
+              }
+              // Draw highlight border around current tile
+              ctx.strokeStyle = C.accent;
+              ctx.lineWidth = 3;
+              ctx.strokeRect(tileCol * 5 * cellSz + 1, tileRow * 5 * cellSz + 1, 5 * cellSz - 2, 5 * cellSz - 2);
+            }} style={{ borderRadius: 8, display: "block" }} />
+            <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", textAlign: "center", maxWidth: 280, lineHeight: 1.5 }}>
+              Your current tile is highlighted. Solved tiles are revealed.
+            </div>
+            <button
+              onClick={() => setShowMosaicPreviewOverlay(false)}
+              style={{
+                marginTop: 4, background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+                padding: "8px 24px", color: C.textDim, cursor: "pointer",
+                fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1,
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}

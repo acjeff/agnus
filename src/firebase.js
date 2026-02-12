@@ -598,6 +598,27 @@ export function mergeGameData(local, cloud) {
     }
     mergedTimes[mode] = mt;
   }
+  // Merge mosaicCompletionTimes: for each mosaic ID, merge tile times (prefer faster)
+  const lMCT = localTimes.mosaicCompletionTimes || {};
+  const cMCT = cloudTimes.mosaicCompletionTimes || {};
+  const mctKeys = new Set([...Object.keys(lMCT), ...Object.keys(cMCT)]);
+  const mergedMCT = {};
+  for (const mosaicId of mctKeys) {
+    const lTiles = lMCT[mosaicId] || {};
+    const cTiles = cMCT[mosaicId] || {};
+    const tileKeys = new Set([...Object.keys(lTiles), ...Object.keys(cTiles)]);
+    const mergedTileTimes = {};
+    for (const tk of tileKeys) {
+      const lv = lTiles[tk];
+      const cv = cTiles[tk];
+      if (lv == null) { mergedTileTimes[tk] = cv; continue; }
+      if (cv == null) { mergedTileTimes[tk] = lv; continue; }
+      mergedTileTimes[tk] = Math.min(lv, cv);
+    }
+    mergedMCT[mosaicId] = mergedTileTimes;
+  }
+  mergedTimes.mosaicCompletionTimes = mergedMCT;
+
   merged.times = mergedTimes;
 
   // Merge achievements: union of both sets
