@@ -973,6 +973,13 @@ export async function loadAllPublicStats() {
   return snap.exists() ? snap.val() : {};
 }
 
+// Load all presence data (admin only — reads entire presence node)
+export async function loadAllPresence() {
+  if (!db) return {};
+  const snap = await get(ref(db, "presence"));
+  return snap.exists() ? snap.val() : {};
+}
+
 // Load all puzzle completions for a specific mode (admin analytics)
 export async function loadAllPuzzleCompletionsForMode(mode) {
   if (!db) return {};

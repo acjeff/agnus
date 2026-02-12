@@ -66,6 +66,7 @@ import {
   subscribeToFriendPresence,
   loadAllPublicStats,
   loadAllPuzzleCompletionsForMode,
+  loadAllPresence,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2789,6 +2790,12 @@ export default function Pattrn() {
   const [adminMetricsLoading, setAdminMetricsLoading] = useState(false);
   const [adminMetricsTab, setAdminMetricsTab] = useState("overview"); // "overview" | "difficulty" | "engagement"
 
+  // --- Admin User Activity state ---
+  const [adminUserActivity, setAdminUserActivity] = useState([]); // array of user activity objects
+  const [adminUserActivityLoading, setAdminUserActivityLoading] = useState(false);
+  const [adminUserActivitySearch, setAdminUserActivitySearch] = useState("");
+  const [adminUserActivitySort, setAdminUserActivitySort] = useState("lastSeen"); // "lastSeen" | "totalSolved" | "username"
+
   // --- Notifications & Active Sessions state ---
   const [notifications, setNotifications] = useState([]); // array of notification objects
   const [showNotifications, setShowNotifications] = useState(false); // notification panel visible
@@ -3574,6 +3581,7 @@ export default function Pattrn() {
         totalSolved: summary.totalSolved,
         achievements: summary.achievements,
         times: data.times || {},
+        username: username || null,
       };
       savePublicStats(uid, publicStats).catch(() => {});
       setSyncStatus("synced");
@@ -5945,6 +5953,43 @@ export default function Pattrn() {
     }
   }, [isAdmin]);
 
+  // --- Load Admin User Activity ---
+  const loadAdminUserActivityData = useCallback(async () => {
+    if (!isAdmin) return;
+    setAdminUserActivityLoading(true);
+    try {
+      const [allStats, allPresence] = await Promise.all([
+        loadAllPublicStats(),
+        loadAllPresence(),
+      ]);
+      const userEntries = Object.entries(allStats);
+      const activityList = userEntries.map(([uid, stats]) => {
+        const presence = allPresence[uid] || {};
+        return {
+          uid,
+          username: stats.username || null,
+          totalSolved: stats.totalSolved || 0,
+          achievements: stats.achievements || 0,
+          progress: stats.progress || {},
+          updatedAt: stats.updatedAt || 0,
+          online: presence.online || false,
+          status: presence.status || null,
+          lastSeen: presence.lastSeen || 0,
+          currentMode: presence.currentMode || null,
+          currentPuzzle: presence.currentPuzzle || null,
+          lastSolvedMode: presence.lastSolvedMode || null,
+          lastSolvedPuzzle: presence.lastSolvedPuzzle || null,
+          lastSolvedAt: presence.lastSolvedAt || 0,
+        };
+      });
+      setAdminUserActivity(activityList);
+    } catch (e) {
+      console.error("Admin user activity load failed:", e);
+    } finally {
+      setAdminUserActivityLoading(false);
+    }
+  }, [isAdmin]);
+
   // --- CUSTOM MOSAIC PLAY VIEW (puzzle selection for user-created mosaics) ---
   if (view === "custom-mosaic" && customMosaicPlay) {
     const cPuzzles = customMosaicPuzzlesRef.current || [];
@@ -7414,6 +7459,254 @@ export default function Pattrn() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+        {coopInviteToastEl}
+      </div>
+    );
+  }
+
+  // --- ADMIN USER ACTIVITY VIEW ---
+  if (view === "admin-users") {
+    // Helper: format relative time
+    const fmtTimeAgo = (ts) => {
+      if (!ts) return "Never";
+      const diff = Date.now() - ts;
+      if (diff < 60000) return "Just now";
+      if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+      if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+      if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
+      return new Date(ts).toLocaleDateString();
+    };
+    // Helper: check if user is online (seen within last 2 minutes)
+    const isUserOnline = (user) => user.lastSeen && (Date.now() - user.lastSeen) < 120000;
+    // Helper: describe current activity
+    const describeActivity = (user) => {
+      if (isUserOnline(user) && user.status === "playing" && user.currentMode) {
+        return `Playing ${user.currentMode}${user.currentPuzzle ? ` #${user.currentPuzzle}` : ""}`;
+      }
+      if (isUserOnline(user) && user.status === "idle") return "In menu";
+      if (isUserOnline(user)) return "Online";
+      if (user.lastSolvedMode && user.lastSolvedAt) {
+        return `Last: ${user.lastSolvedMode}${user.lastSolvedPuzzle ? ` #${user.lastSolvedPuzzle}` : ""} (${fmtTimeAgo(user.lastSolvedAt)})`;
+      }
+      return user.lastSeen ? `Seen ${fmtTimeAgo(user.lastSeen)}` : "No activity";
+    };
+    // Filter and sort
+    const searchLower = adminUserActivitySearch.toLowerCase();
+    const filteredUsers = adminUserActivity.filter(u => {
+      if (!searchLower) return true;
+      return (u.username && u.username.toLowerCase().includes(searchLower)) || u.uid.toLowerCase().includes(searchLower);
+    });
+    const sortedUsers = [...filteredUsers].sort((a, b) => {
+      if (adminUserActivitySort === "lastSeen") {
+        // Online users first, then by lastSeen desc
+        const aOnline = isUserOnline(a) ? 1 : 0;
+        const bOnline = isUserOnline(b) ? 1 : 0;
+        if (aOnline !== bOnline) return bOnline - aOnline;
+        return (b.lastSeen || 0) - (a.lastSeen || 0);
+      }
+      if (adminUserActivitySort === "totalSolved") return b.totalSolved - a.totalSolved;
+      if (adminUserActivitySort === "username") return (a.username || "zzz").localeCompare(b.username || "zzz");
+      return 0;
+    });
+    const onlineCount = adminUserActivity.filter(isUserOnline).length;
+
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
+        {/* Header */}
+        <div style={{ width: "100%", maxWidth: 520, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
+          <button onClick={() => setView("menu")}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            &larr; Back
+          </button>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+            User Activity
+          </h2>
+          <button onClick={loadAdminUserActivityData}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            Refresh
+          </button>
+        </div>
+
+        {/* Summary stats */}
+        {adminUserActivity.length > 0 && (
+          <div style={{ width: "100%", maxWidth: 520, display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10, marginBottom: 16, animation: "fadeUp 0.3s 0.02s ease both" }}>
+            {[
+              { label: "Total Users", value: adminUserActivity.length, color: C.accent },
+              { label: "Online Now", value: onlineCount, color: C.correct },
+              { label: "Active (7d)", value: adminUserActivity.filter(u => u.lastSeen && (Date.now() - u.lastSeen) < 7 * 86400000).length, color: "#06B6D4" },
+            ].map((stat, i) => (
+              <div key={i} style={{
+                padding: "12px 10px", borderRadius: 12,
+                backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                textAlign: "center",
+              }}>
+                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                  {stat.label}
+                </div>
+                <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: stat.color }}>
+                  {stat.value}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Search bar */}
+        <div style={{ width: "100%", maxWidth: 520, marginBottom: 12, animation: "fadeUp 0.3s 0.04s ease both" }}>
+          <input
+            type="text"
+            placeholder="Search by username or UID..."
+            value={adminUserActivitySearch}
+            onChange={e => setAdminUserActivitySearch(e.target.value)}
+            style={{
+              width: "100%", padding: "10px 14px", borderRadius: 10,
+              backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              color: C.text, fontSize: 12, fontFamily: "'Space Mono', monospace",
+              outline: "none", boxSizing: "border-box",
+            }}
+            onFocus={e => { e.currentTarget.style.borderColor = C.accent; }}
+            onBlur={e => { e.currentTarget.style.borderColor = C.border; }}
+          />
+        </div>
+
+        {/* Sort controls */}
+        <div style={{ width: "100%", maxWidth: 520, display: "flex", gap: 4, marginBottom: 16, animation: "fadeUp 0.3s 0.06s ease both" }}>
+          {[
+            { key: "lastSeen", label: "Last Seen" },
+            { key: "totalSolved", label: "Most Solved" },
+            { key: "username", label: "Name" },
+          ].map(s => (
+            <button key={s.key}
+              onClick={() => setAdminUserActivitySort(s.key)}
+              style={{
+                flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 10, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                textTransform: "uppercase", cursor: "pointer", transition: "all 0.15s",
+                background: adminUserActivitySort === s.key ? "#06B6D4" : "transparent",
+                color: adminUserActivitySort === s.key ? C.bg : C.textDim,
+                border: `1px solid ${adminUserActivitySort === s.key ? "#06B6D4" : C.border}`,
+              }}
+            >{s.label}</button>
+          ))}
+        </div>
+
+        {/* User list */}
+        {adminUserActivityLoading && adminUserActivity.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: C.textDim, fontSize: 13 }}>Loading user activity...</div>
+        ) : adminUserActivity.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, animation: "fadeUp 0.3s ease" }}>
+            No user data available
+          </div>
+        ) : (
+          <div style={{ width: "100%", maxWidth: 520, display: "flex", flexDirection: "column", gap: 8, animation: "fadeUp 0.3s 0.08s ease both" }}>
+            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>
+              {sortedUsers.length} user{sortedUsers.length !== 1 ? "s" : ""}{searchLower ? " matching" : ""}
+            </div>
+            {sortedUsers.map(user => {
+              const online = isUserOnline(user);
+              return (
+                <div key={user.uid} style={{
+                  padding: "14px 16px", borderRadius: 14,
+                  backgroundColor: C.surface, border: `1px solid ${online ? C.correct + "44" : C.border}`,
+                  transition: "border-color 0.2s",
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                    {/* Online indicator */}
+                    <div style={{
+                      width: 10, height: 10, borderRadius: "50%", flexShrink: 0,
+                      backgroundColor: online ? C.correct : C.textDim + "44",
+                      boxShadow: online ? `0 0 8px ${C.correct}66` : "none",
+                    }} />
+                    {/* User info */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <span style={{
+                          fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text,
+                          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                        }}>
+                          {user.username || "No username"}
+                        </span>
+                        {online && user.status === "playing" && (
+                          <span style={{
+                            fontSize: 9, fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                            color: C.bg, backgroundColor: C.correct, padding: "1px 6px", borderRadius: 4,
+                            textTransform: "uppercase", letterSpacing: 0.5,
+                          }}>
+                            Playing
+                          </span>
+                        )}
+                        {online && user.status !== "playing" && (
+                          <span style={{
+                            fontSize: 9, fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                            color: C.bg, backgroundColor: "#06B6D4", padding: "1px 6px", borderRadius: 4,
+                            textTransform: "uppercase", letterSpacing: 0.5,
+                          }}>
+                            Online
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                        {describeActivity(user)}
+                      </div>
+                      {/* Stats row */}
+                      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                        <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: C.accent }}>
+                          {user.totalSolved} solved
+                        </span>
+                        <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: C.gold }}>
+                          {user.achievements} achievements
+                        </span>
+                        {user.updatedAt > 0 && (
+                          <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: C.textDim }}>
+                            Synced {fmtTimeAgo(user.updatedAt)}
+                          </span>
+                        )}
+                      </div>
+                      {/* Mode breakdown (compact) */}
+                      {user.totalSolved > 0 && (
+                        <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+                          {["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"]
+                            .filter(mode => (user.progress[mode] || 0) > 0)
+                            .map(mode => (
+                              <span key={mode} style={{
+                                fontSize: 9, fontFamily: "'Space Mono', monospace",
+                                color: C.textDim, backgroundColor: C.surfaceLight,
+                                padding: "2px 6px", borderRadius: 4,
+                              }}>
+                                {mode}: {user.progress[mode]}
+                              </span>
+                            ))
+                          }
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
         {coopInviteToastEl}
@@ -10086,6 +10379,39 @@ export default function Pattrn() {
                           </div>
                           <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
                             Admin: player stats, difficulty analysis
+                          </div>
+                        </div>
+                        <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                      </button>
+                    )}
+
+                    {/* Admin User Activity (only for admins) */}
+                    {isAdmin && (
+                      <button onClick={() => { setShowGameMenu(false); setView("admin-users"); loadAdminUserActivityData(); }} style={{
+                        width: "100%", padding: "14px 16px", borderRadius: 12,
+                        backgroundColor: C.surface, border: `1px solid #06B6D433`,
+                        cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                        transition: "all 0.15s",
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#06B6D4"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "#06B6D433"; }}
+                      >
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          backgroundColor: "#06B6D422", display: "flex", alignItems: "center", justifyContent: "center",
+                          border: "1.5px solid #06B6D444", flexShrink: 0,
+                        }}>
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <circle cx="8" cy="5" r="3" stroke="#06B6D4" strokeWidth="1.5" fill="none"/>
+                            <path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="#06B6D4" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                          </svg>
+                        </div>
+                        <div style={{ flex: 1, textAlign: "left" }}>
+                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                            User Activity
+                          </div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                            Admin: all users, online status, activity
                           </div>
                         </div>
                         <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
