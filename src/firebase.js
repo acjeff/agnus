@@ -391,13 +391,20 @@ export async function saveUsername(uid, username) {
 // Load a user's profile (username + profilePicture)
 export async function loadUserProfile(uid) {
   if (!db) return null;
-  const snap = await get(ref(db, `users/${uid}`));
-  if (!snap.exists()) return null;
-  const val = snap.val();
+  // Read individual fields instead of the parent node so that
+  // any authenticated user can load another user's public profile.
+  // The parent path users/$uid is restricted to the owning user,
+  // but username, profilePicture, and email each allow auth != null.
+  const [usernameSnap, picSnap, emailSnap] = await Promise.all([
+    get(ref(db, `users/${uid}/username`)),
+    get(ref(db, `users/${uid}/profilePicture`)),
+    get(ref(db, `users/${uid}/email`)),
+  ]);
+  if (!usernameSnap.exists() && !picSnap.exists() && !emailSnap.exists()) return null;
   return {
-    username: val.username || null,
-    profilePicture: val.profilePicture || null,
-    email: val.email || null,
+    username: usernameSnap.val() || null,
+    profilePicture: picSnap.val() || null,
+    email: emailSnap.val() || null,
   };
 }
 
