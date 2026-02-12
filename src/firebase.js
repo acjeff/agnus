@@ -966,18 +966,31 @@ export function subscribeToFriendPresence(friendUid, callback) {
 
 // --- Admin: Global Metrics ---
 
-// Load all public stats (admin only — reads entire publicStats node)
+// Load all public stats once (admin metrics — heavy aggregation)
 export async function loadAllPublicStats() {
   if (!db) return {};
   const snap = await get(ref(db, "publicStats"));
   return snap.exists() ? snap.val() : {};
 }
 
-// Load all presence data (admin only — reads entire presence node)
-export async function loadAllPresence() {
-  if (!db) return {};
-  const snap = await get(ref(db, "presence"));
-  return snap.exists() ? snap.val() : {};
+// Subscribe to all public stats in real-time (admin user activity)
+export function subscribeToAllPublicStats(callback) {
+  if (!db) return () => {};
+  const statsRef = ref(db, "publicStats");
+  const handler = onValue(statsRef, (snap) => {
+    callback(snap.exists() ? snap.val() : {});
+  });
+  return () => off(statsRef, "value", handler);
+}
+
+// Subscribe to all presence data in real-time (admin user activity)
+export function subscribeToAllPresence(callback) {
+  if (!db) return () => {};
+  const presRef = ref(db, "presence");
+  const handler = onValue(presRef, (snap) => {
+    callback(snap.exists() ? snap.val() : {});
+  });
+  return () => off(presRef, "value", handler);
 }
 
 // Load all puzzle completions for a specific mode (admin analytics)

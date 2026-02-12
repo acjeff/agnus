@@ -65,8 +65,9 @@ import {
   loadFriendPresence,
   subscribeToFriendPresence,
   loadAllPublicStats,
+  subscribeToAllPublicStats,
+  subscribeToAllPresence,
   loadAllPuzzleCompletionsForMode,
-  loadAllPresence,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -5953,42 +5954,50 @@ export default function Pattrn() {
     }
   }, [isAdmin]);
 
-  // --- Load Admin User Activity ---
-  const loadAdminUserActivityData = useCallback(async () => {
-    if (!isAdmin) return;
+  // --- Real-time Admin User Activity ---
+  const adminStatsRef = useRef({});
+  const adminPresenceRef = useRef({});
+  const buildAdminActivityList = useCallback((allStats, allPresence) => {
+    const userEntries = Object.entries(allStats);
+    return userEntries.map(([uid, stats]) => {
+      const presence = allPresence[uid] || {};
+      return {
+        uid,
+        username: stats.username || null,
+        totalSolved: stats.totalSolved || 0,
+        achievements: stats.achievements || 0,
+        progress: stats.progress || {},
+        updatedAt: stats.updatedAt || 0,
+        online: presence.online || false,
+        status: presence.status || null,
+        lastSeen: presence.lastSeen || 0,
+        currentMode: presence.currentMode || null,
+        currentPuzzle: presence.currentPuzzle || null,
+        lastSolvedMode: presence.lastSolvedMode || null,
+        lastSolvedPuzzle: presence.lastSolvedPuzzle || null,
+        lastSolvedAt: presence.lastSolvedAt || 0,
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin || view !== "admin-users") return;
     setAdminUserActivityLoading(true);
-    try {
-      const [allStats, allPresence] = await Promise.all([
-        loadAllPublicStats(),
-        loadAllPresence(),
-      ]);
-      const userEntries = Object.entries(allStats);
-      const activityList = userEntries.map(([uid, stats]) => {
-        const presence = allPresence[uid] || {};
-        return {
-          uid,
-          username: stats.username || null,
-          totalSolved: stats.totalSolved || 0,
-          achievements: stats.achievements || 0,
-          progress: stats.progress || {},
-          updatedAt: stats.updatedAt || 0,
-          online: presence.online || false,
-          status: presence.status || null,
-          lastSeen: presence.lastSeen || 0,
-          currentMode: presence.currentMode || null,
-          currentPuzzle: presence.currentPuzzle || null,
-          lastSolvedMode: presence.lastSolvedMode || null,
-          lastSolvedPuzzle: presence.lastSolvedPuzzle || null,
-          lastSolvedAt: presence.lastSolvedAt || 0,
-        };
-      });
-      setAdminUserActivity(activityList);
-    } catch (e) {
-      console.error("Admin user activity load failed:", e);
-    } finally {
+    const unsubStats = subscribeToAllPublicStats((allStats) => {
+      adminStatsRef.current = allStats;
+      setAdminUserActivity(buildAdminActivityList(allStats, adminPresenceRef.current));
       setAdminUserActivityLoading(false);
-    }
-  }, [isAdmin]);
+    });
+    const unsubPresence = subscribeToAllPresence((allPresence) => {
+      adminPresenceRef.current = allPresence;
+      setAdminUserActivity(buildAdminActivityList(adminStatsRef.current, allPresence));
+      setAdminUserActivityLoading(false);
+    });
+    return () => {
+      unsubStats();
+      unsubPresence();
+    };
+  }, [isAdmin, view, buildAdminActivityList]);
 
   // --- CUSTOM MOSAIC PLAY VIEW (puzzle selection for user-created mosaics) ---
   if (view === "custom-mosaic" && customMosaicPlay) {
@@ -7537,17 +7546,13 @@ export default function Pattrn() {
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             User Activity
           </h2>
-          <button onClick={loadAdminUserActivityData}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            Refresh
-          </button>
+          <span style={{
+              fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 0.5,
+              color: "#06B6D4", display: "flex", alignItems: "center", gap: 6,
+            }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#06B6D4", display: "inline-block" }} />
+            Live
+          </span>
         </div>
 
         {/* Summary stats */}
@@ -10387,7 +10392,7 @@ export default function Pattrn() {
 
                     {/* Admin User Activity (only for admins) */}
                     {isAdmin && (
-                      <button onClick={() => { setShowGameMenu(false); setView("admin-users"); loadAdminUserActivityData(); }} style={{
+                      <button onClick={() => { setShowGameMenu(false); setView("admin-users"); }} style={{
                         width: "100%", padding: "14px 16px", borderRadius: 12,
                         backgroundColor: C.surface, border: `1px solid #06B6D433`,
                         cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
