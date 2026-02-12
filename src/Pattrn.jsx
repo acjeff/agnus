@@ -2681,6 +2681,7 @@ export default function Pattrn() {
   const [coopStatus, setCoopStatus] = useState(null); // "waiting" | "playing" | "complete"
   const coopUnsubRef = useRef(null); // unsubscribe function for Firebase listener
   const coopWriteThrottleRef = useRef({}); // throttle writes to Firebase
+  const coopPendingLoginRef = useRef(false); // auto-start coop after login
   const isCoop = !!coopSessionId;
 
   // --- Mosaic Creator state ---
@@ -4151,6 +4152,14 @@ export default function Pattrn() {
     }, 1000);
     setShowCoopInvite(true);
   }, [firebaseUser, puzzle, difficulty, currentPuzzle, isDaily, currentDailyDate, splitBlanksForCoop, stopTimer]);
+
+  // Auto-start coop after login if user clicked Co-op while logged out
+  useEffect(() => {
+    if (firebaseUser && coopPendingLoginRef.current && !coopSessionId && puzzle) {
+      coopPendingLoginRef.current = false;
+      startCoopSession();
+    }
+  }, [firebaseUser, coopSessionId, puzzle, startCoopSession]);
 
   // Leave coop session and clean up
   const leaveCoopSession = useCallback(() => {
@@ -7913,10 +7922,11 @@ export default function Pattrn() {
             {shareMsg || "Share"}
           </button>
           {/* Coop invite button - visible when playing supported modes, prompts login if needed */}
-          {!isCoop && gameState === "playing" && !isCascade && !isBlind && !isMosaic && (
+          {!isCoop && gameState === "playing" && !isCascade && !isMosaic && (
             <button
               onClick={() => {
                 if (!firebaseUser) {
+                  coopPendingLoginRef.current = true;
                   setShowAccountModal(true);
                   return;
                 }
