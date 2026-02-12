@@ -481,6 +481,20 @@ export async function checkIsAdmin(uid) {
   return snap.val() === true;
 }
 
+// Register an admin in the adminIndex (called on admin login so other users can look up admin UIDs)
+export async function registerAdminIndex(uid) {
+  if (!db) return;
+  await set(ref(db, `adminIndex/${uid}`), true);
+}
+
+// Load all admin UIDs from the adminIndex
+export async function loadAdminUids() {
+  if (!db) return [];
+  const snap = await get(ref(db, "adminIndex"));
+  if (!snap.exists()) return [];
+  return Object.keys(snap.val());
+}
+
 // Merges local data into cloud, preferring the "better" result for each puzzle
 export function mergeGameData(local, cloud) {
   if (!cloud) return local;

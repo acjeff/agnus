@@ -54,6 +54,8 @@ import {
   addFriend,
   removeFriend,
   loadFriends,
+  registerAdminIndex,
+  loadAdminUids,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2785,7 +2787,10 @@ export default function Pattrn() {
   // Check admin status and save email for lookup when user logs in
   useEffect(() => {
     if (!firebaseUser || !firebaseConfigured) { setIsAdmin(false); return; }
-    checkIsAdmin(firebaseUser.uid).then(setIsAdmin).catch(() => setIsAdmin(false));
+    checkIsAdmin(firebaseUser.uid).then((admin) => {
+      setIsAdmin(admin);
+      if (admin) registerAdminIndex(firebaseUser.uid).catch(() => {});
+    }).catch(() => setIsAdmin(false));
     if (firebaseUser.email) {
       saveUserEmail(firebaseUser.uid, firebaseUser.email).catch(() => {});
     }
@@ -3057,6 +3062,18 @@ export default function Pattrn() {
       const list = await loadUserMosaics(firebaseUser.uid);
       setMyMosaics(list);
       setMosaicMsg("Submitted for review!");
+      // Notify all admins about the new pending mosaic
+      loadAdminUids().then((adminUids) => {
+        for (const adminUid of adminUids) {
+          if (adminUid === firebaseUser.uid) continue; // don't notify yourself
+          sendNotification(adminUid, {
+            type: "mosaic_pending_review",
+            fromUid: firebaseUser.uid,
+            fromUsername: username || firebaseUser.email,
+            data: { mosaicId: mosaic.id, title: mosaic.title || "Untitled" },
+          }).catch(() => {});
+        }
+      }).catch(() => {});
     } catch (e) {
       console.error("Submit failed:", e);
       const isPermErr = e?.message?.includes("PERMISSION_DENIED");
@@ -3065,7 +3082,7 @@ export default function Pattrn() {
       setMosaicLoading(false);
       setTimeout(() => setMosaicMsg(""), 4000);
     }
-  }, [firebaseUser]);
+  }, [firebaseUser, username]);
 
   const handleShareMosaic = useCallback(async (mosaic, identifier) => {
     if (!firebaseUser || !identifier) return;
@@ -7220,18 +7237,20 @@ export default function Pattrn() {
                 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-                    backgroundColor: notif.type === "coop_invite" ? "#54A0FF22" : C.accent + "22",
+                    backgroundColor: notif.type === "coop_invite" ? "#54A0FF22" : notif.type === "mosaic_pending_review" ? "#FFE66D22" : C.accent + "22",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    border: `1.5px solid ${notif.type === "coop_invite" ? "#54A0FF44" : C.accent + "44"}`,
+                    border: `1.5px solid ${notif.type === "coop_invite" ? "#54A0FF44" : notif.type === "mosaic_pending_review" ? "#FFE66D44" : C.accent + "44"}`,
                   }}>
-                    <span style={{ fontSize: 12, color: notif.type === "coop_invite" ? "#54A0FF" : C.accent }}>
-                      {notif.type === "coop_invite" ? "\u2694" : "\u25A6"}
+                    <span style={{ fontSize: 12, color: notif.type === "coop_invite" ? "#54A0FF" : notif.type === "mosaic_pending_review" ? "#FFE66D" : C.accent }}>
+                      {notif.type === "coop_invite" ? "\u2694" : notif.type === "mosaic_pending_review" ? "\u2691" : "\u25A6"}
                     </span>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, fontFamily: "'Space Mono', monospace", fontWeight: 600, color: C.text, lineHeight: 1.3 }}>
                       {notif.type === "coop_invite"
                         ? `${notif.fromUsername || "Someone"} invited you to co-op`
+                        : notif.type === "mosaic_pending_review"
+                        ? `${notif.fromUsername || "Someone"} submitted a mosaic for review`
                         : `${notif.fromUsername || "Someone"} shared a mosaic`
                       }
                     </div>
@@ -7240,7 +7259,7 @@ export default function Pattrn() {
                         {notif.data.mode} #{(notif.data.level ?? 0) + 1}
                       </div>
                     )}
-                    {notif.type === "mosaic_shared" && notif.data?.title && (
+                    {(notif.type === "mosaic_shared" || notif.type === "mosaic_pending_review") && notif.data?.title && (
                       <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
                         &ldquo;{notif.data.title}&rdquo;
                       </div>
@@ -7297,6 +7316,23 @@ export default function Pattrn() {
                         }}
                       >
                         View
+                      </button>
+                    )}
+                    {notif.type === "mosaic_pending_review" && (
+                      <button
+                        onClick={() => {
+                          dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
+                          loadMosaicData("admin");
+                          setView("admin-review");
+                          setShowNotifications(false);
+                        }}
+                        style={{
+                          background: "#FFE66D", border: "none", borderRadius: 6,
+                          padding: "4px 8px", color: C.bg, cursor: "pointer", fontSize: 9,
+                          fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                        }}
+                      >
+                        Review
                       </button>
                     )}
                     <button
