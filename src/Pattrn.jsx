@@ -3593,7 +3593,7 @@ export default function Pattrn() {
     } finally {
       cloudSyncInFlight.current = false;
     }
-  }, []);
+  }, [username]);
 
   // Handle sign up: create account, merge local->cloud, push to cloud, then prompt username
   const handleSignUp = useCallback(async (email, password) => {
