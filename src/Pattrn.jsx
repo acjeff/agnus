@@ -2681,6 +2681,7 @@ export default function Pattrn() {
   const [coopStatus, setCoopStatus] = useState(null); // "waiting" | "playing" | "complete"
   const coopUnsubRef = useRef(null); // unsubscribe function for Firebase listener
   const coopWriteThrottleRef = useRef({}); // throttle writes to Firebase
+  const isCoop = !!coopSessionId;
 
   // --- Mosaic Creator state ---
   const CREATOR_GRID_SIZE = 25; // 25x25 grid → 25 tiles of 5x5, matching mosaic mode
@@ -4089,7 +4090,6 @@ export default function Pattrn() {
   }, [stopTimer]);
 
   // --- Coop mode helpers ---
-  const isCoop = !!coopSessionId;
 
   // Split blank cells into two halves by column position (left/right of grid center)
   const splitBlanksForCoop = useCallback((blanksSet, gridSz) => {
@@ -4203,12 +4203,11 @@ export default function Pattrn() {
 
       // Sync fills from Firebase
       const remoteFills = data.fills || {};
-      const myBlanks = isHost ? coopMyBlanks : coopMyBlanks;
-      if (myBlanks) {
+      if (coopMyBlanks) {
         // Extract partner fills (fills for cells NOT in my blanks)
         const partnerFillsObj = {};
         for (const [key, val] of Object.entries(remoteFills)) {
-          if (!myBlanks.has(key)) {
+          if (!coopMyBlanks.has(key)) {
             partnerFillsObj[key] = val;
           }
         }
@@ -4541,12 +4540,6 @@ export default function Pattrn() {
   // Effect: when coop is complete, trigger win state and save progress
   useEffect(() => {
     if (!coopComplete || !puzzle) return;
-    // Check if my half was also correct
-    const myCorrect = coopMyBlanks ? [...coopMyBlanks].every(k => {
-      const [r, c] = k.split("-").map(Number);
-      return fills[k] === puzzle.solution[r][c];
-    }) : false;
-    if (!myCorrect) return;
 
     setGameState("won");
     stopTimer();
@@ -4556,20 +4549,22 @@ export default function Pattrn() {
     // Lock all cells
     setLockedCells(new Set(puzzle.blanks));
 
-    // Save progress as coop completion
+    // Save progress as coop completion — read fresh from localStorage to avoid stale closure
     const finalTime = timerStart.current ? Math.round((Date.now() - timerStart.current) / 1000) : elapsedTime;
-    const coopProgress = progress.coop || {};
+    const freshProgress = loadProgress();
+    const coopProgress = freshProgress.coop || {};
     const newCoopProgress = { ...coopProgress, [`${difficulty}_${progressKey}`]: attempts || 1 };
-    const newProgress = { ...progress, coop: newCoopProgress };
+    const newProgress = { ...freshProgress, coop: newCoopProgress };
     setProgress(newProgress);
     saveProgress(newProgress);
 
-    const coopTimes = times.coop || {};
+    const freshTimes = loadTimes();
+    const coopTimes = freshTimes.coop || {};
     const newCoopTimes = { ...coopTimes, [`${difficulty}_${progressKey}`]: finalTime };
-    const newTimes = { ...times, coop: newCoopTimes };
+    const newTimes = { ...freshTimes, coop: newCoopTimes };
     setTimes(newTimes);
     saveTimes(newTimes);
-  }, [coopComplete]);
+  }, [coopComplete, puzzle, stopTimer, elapsedTime, difficulty, progressKey, attempts]);
 
   // For blind mode: all non-locked blanks must be filled
   const activeBlanks = puzzle ? [...puzzle.blanks].filter(k => !lockedCells.has(k)) : [];
