@@ -4423,8 +4423,8 @@ export default function Pattrn() {
         timerInterval.current = setInterval(() => {
           setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
         }, 1000);
-        // If this is a timer reset (retry), also reset local game state for guest
-        if (!isHost && prevTimerStart !== null) {
+        // If this is a timer reset (retry), also reset local game state for the other player
+        if (prevTimerStart !== null) {
           setFills({});
           setGameState("playing");
           setWrongCells(new Set());
