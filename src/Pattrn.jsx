@@ -34,6 +34,12 @@ import {
   resetCoopSession,
   deleteCoopSession,
   loadCoopSession,
+  guestLeaveCoopSession,
+  closeCoopSession,
+  loadUserCoopSessions,
+  sendNotification,
+  subscribeToNotifications,
+  dismissNotification,
   checkUsernameAvailability,
   saveUsername,
   loadUserProfile,
@@ -2748,6 +2754,18 @@ export default function Pattrn() {
   const [addFriendMsg, setAddFriendMsg] = useState("");
   const [addFriendLoading, setAddFriendLoading] = useState(false);
 
+  // --- Notifications & Active Sessions state ---
+  const [notifications, setNotifications] = useState([]); // array of notification objects
+  const [showNotifications, setShowNotifications] = useState(false); // notification panel visible
+  const notifUnsubRef = useRef(null); // unsubscribe function for notification listener
+  const [activeCoopSessions, setActiveCoopSessions] = useState([]); // user's active coop sessions
+  const [activeSessionsLoading, setActiveSessionsLoading] = useState(false);
+  const [showCoopFriendPicker, setShowCoopFriendPicker] = useState(false); // friend picker for coop
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false); // leave coop confirmation
+  const [coopPartnerLockToast, setCoopPartnerLockToast] = useState(null); // toast when partner locks in
+  const coopPartnerLockToastTimer = useRef(null);
+  const prevCoopPartnerLockedRef = useRef(false); // track partner lock state changes
+
   // --- Staff Pick & Admin Manage state ---
   const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
   const staffPickPuzzlesRef = useRef(null); // puzzles built from staff pick grid
@@ -2794,6 +2812,50 @@ export default function Pattrn() {
       setShowUsernameModal(true);
     });
   }, [firebaseUser, firebaseConfigured]);
+
+  // Subscribe to real-time notifications when user is signed in
+  useEffect(() => {
+    if (notifUnsubRef.current) {
+      notifUnsubRef.current();
+      notifUnsubRef.current = null;
+    }
+    if (!firebaseUser || !firebaseConfigured) {
+      setNotifications([]);
+      return;
+    }
+    const unsub = subscribeToNotifications(firebaseUser.uid, (notifs) => {
+      setNotifications(notifs);
+    });
+    notifUnsubRef.current = unsub;
+    return () => {
+      unsub();
+      notifUnsubRef.current = null;
+    };
+  }, [firebaseUser, firebaseConfigured]);
+
+  // Load active coop sessions when returning to menu
+  const loadActiveCoopSessions = useCallback(async () => {
+    if (!firebaseUser || !firebaseConfigured) {
+      setActiveCoopSessions([]);
+      return;
+    }
+    setActiveSessionsLoading(true);
+    try {
+      const sessions = await loadUserCoopSessions(firebaseUser.uid);
+      // Filter to only active (non-closed) sessions
+      setActiveCoopSessions(sessions.filter(s => s.status !== "closed"));
+    } catch {
+      setActiveCoopSessions([]);
+    } finally {
+      setActiveSessionsLoading(false);
+    }
+  }, [firebaseUser, firebaseConfigured]);
+
+  useEffect(() => {
+    if (view === "menu" && firebaseUser) {
+      loadActiveCoopSessions();
+    }
+  }, [view, firebaseUser, loadActiveCoopSessions]);
 
   // --- Mosaic Creator helpers ---
   const resetCreator = useCallback(() => {
@@ -3000,6 +3062,13 @@ export default function Pattrn() {
         ...mosaic,
         sharedByUsername: username || "",
       });
+      // Send notification to recipient
+      sendNotification(target.uid, {
+        type: "mosaic_shared",
+        fromUid: firebaseUser.uid,
+        fromUsername: username || firebaseUser.email,
+        data: { mosaicId: mosaic.id, title: mosaic.title || "Untitled" },
+      }).catch(() => {});
       setMosaicMsg("Shared!");
       setShareTargetMosaic(null);
       setShareEmailInput("");
@@ -4470,13 +4539,14 @@ export default function Pattrn() {
   }, []);
 
   // Create a coop session for the current puzzle
-  const startCoopSession = useCallback(async () => {
+  const startCoopSession = useCallback(async (inviteFriendUid = null, inviteFriendUsername = null) => {
     if (!firebaseUser || !puzzle) return;
     const sessionId = await createCoopSession(firebaseUser.uid, {
       mode: difficulty,
       level: currentPuzzle,
       dailyDate: isDaily ? currentDailyDate : null,
       hostTheme: activeThemeId,
+      hostUsername: username,
     });
     if (!sessionId) return;
     setCoopSessionId(sessionId);
@@ -4487,6 +4557,7 @@ export default function Pattrn() {
     setCoopPartnerCorrect(false);
     setCoopPartnerConnected(false);
     setCoopPartnerFills({});
+    prevCoopPartnerLockedRef.current = false;
     // Split blanks
     const { hostBlanks, guestBlanks } = splitBlanksForCoop(puzzle.blanks, puzzle.gridSize);
     setCoopMyBlanks(hostBlanks);
@@ -4506,8 +4577,20 @@ export default function Pattrn() {
     timerInterval.current = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
     }, 1000);
-    setShowCoopInvite(true);
-  }, [firebaseUser, puzzle, difficulty, currentPuzzle, isDaily, currentDailyDate, splitBlanksForCoop, stopTimer, activeThemeId]);
+    // If inviting a friend, send notification instead of showing link modal
+    if (inviteFriendUid) {
+      const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${sessionId}` : "";
+      await sendNotification(inviteFriendUid, {
+        type: "coop_invite",
+        fromUid: firebaseUser.uid,
+        fromUsername: username || firebaseUser.email,
+        data: { sessionId, mode: difficulty, level: currentPuzzle, dailyDate: isDaily ? currentDailyDate : null, url: coopUrl },
+      }).catch(() => {});
+      setShowCoopFriendPicker(false);
+    } else {
+      setShowCoopInvite(true);
+    }
+  }, [firebaseUser, puzzle, difficulty, currentPuzzle, isDaily, currentDailyDate, splitBlanksForCoop, stopTimer, activeThemeId, username]);
 
   // Auto-start coop after login if user clicked Co-op while logged out
   useEffect(() => {
@@ -4518,13 +4601,20 @@ export default function Pattrn() {
   }, [firebaseUser, coopSessionId, puzzle, startCoopSession]);
 
   // Leave coop session and clean up
+  // Host leaving: session persists (goes back to "waiting"), host disconnects locally
+  // Guest leaving: guest removed from session, session goes back to "waiting"
   const leaveCoopSession = useCallback(() => {
     if (coopUnsubRef.current) {
       coopUnsubRef.current();
       coopUnsubRef.current = null;
     }
     if (coopSessionId && firebaseUser) {
-      deleteCoopSession(coopSessionId).catch(() => {});
+      if (coopRole === "guest") {
+        // Guest leaving: remove guest from session, session persists for host
+        guestLeaveCoopSession(coopSessionId, firebaseUser.uid).catch(() => {});
+      }
+      // Host leaving: session persists in "waiting" state, host just disconnects locally
+      // (Host can rejoin from the active sessions panel on the menu)
     }
     // Restore guest's original theme (don't persist the host's theme)
     if (coopOriginalThemeRef.current !== null) {
@@ -4543,9 +4633,64 @@ export default function Pattrn() {
     setCoopPartnerConnected(false);
     setCoopStatus(null);
     setShowCoopInvite(false);
+    setShowLeaveConfirm(false);
     coopWriteThrottleRef.current = {};
     coopHostTimerStartRef.current = null;
-  }, [coopSessionId, firebaseUser]);
+    prevCoopPartnerLockedRef.current = false;
+  }, [coopSessionId, firebaseUser, coopRole]);
+
+  // Close coop session permanently (owner only)
+  const closeCoopSessionPermanently = useCallback(async (sessionId, session) => {
+    if (!firebaseUser) return;
+    await closeCoopSession(sessionId, session?.hostUid, session?.guestUid).catch(() => {});
+    // If we're currently in this session, leave it
+    if (coopSessionId === sessionId) {
+      leaveCoopSession();
+    }
+    // Refresh active sessions list
+    loadActiveCoopSessions();
+  }, [firebaseUser, coopSessionId, leaveCoopSession, loadActiveCoopSessions]);
+
+  // Rejoin an existing coop session from the active sessions panel
+  const rejoinCoopSession = useCallback(async (session) => {
+    if (!firebaseUser || !session) return;
+    const isHost = session.hostUid === firebaseUser.uid;
+    const mode = session.mode;
+    const level = session.level;
+    if (mode) setDifficulty(mode);
+    if (level != null) setCurrentPuzzle(level);
+    if (session.dailyDate) setCurrentDailyDate(session.dailyDate);
+    setCoopSessionId(session.id);
+    setCoopRole(isHost ? "host" : "guest");
+    setCoopStatus(session.status || "waiting");
+    setCoopMyLockedIn(false);
+    setCoopPartnerLockedIn(false);
+    setCoopPartnerCorrect(false);
+    setCoopPartnerConnected(isHost ? !!session.guestUid : true);
+    setCoopPartnerFills({});
+    prevCoopPartnerLockedRef.current = false;
+    // Clear blanks so the effect can re-split once puzzle is loaded
+    setCoopMyBlanks(null);
+    setCoopPartnerBlanks(null);
+    setFills({});
+    setAttempts(session.attempts || 0);
+    setGameState("playing");
+    setWrongCells(new Set());
+    setLockedCells(new Set());
+    setShowParticles(false);
+    setSelectedCell(null);
+    setSelectedToken(null);
+    // Timer
+    stopTimer();
+    const remoteStart = session.hostTimerStart || Date.now();
+    timerStart.current = remoteStart;
+    setElapsedTime(Math.max(0, Math.floor((Date.now() - remoteStart) / 1000)));
+    timerInterval.current = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+    }, 1000);
+    coopHostTimerStartRef.current = remoteStart;
+    setView("play");
+  }, [firebaseUser, stopTimer]);
 
   // Retry coop session: reset Firebase state and local state, keep same session/players
   const retryCoop = useCallback(async () => {
@@ -4588,6 +4733,13 @@ export default function Pattrn() {
         return;
       }
       const isHost = data.hostUid === firebaseUser.uid;
+      // If guest was removed from the session (kicked or left), handle it
+      if (!isHost && !data.guestUid) {
+        // Guest has been removed - leave the session locally
+        leaveCoopSession();
+        setView("menu");
+        return;
+      }
       const partnerConnected = isHost ? !!data.guestUid : true;
       setCoopPartnerConnected(partnerConnected);
       setCoopStatus(data.status);
@@ -4642,7 +4794,10 @@ export default function Pattrn() {
         }
       }
 
-      // Update partner lock-in status
+      // Update partner lock-in status + show notification toast
+      const partnerLocked = isHost ? !!data.guestLockedIn : !!data.hostLockedIn;
+      const partnerCorrect = isHost ? !!data.guestCorrect : !!data.hostCorrect;
+      const partnerName = isHost ? (data.guestUsername || "Partner") : (data.hostUsername || "Partner");
       if (isHost) {
         setCoopPartnerLockedIn(!!data.guestLockedIn);
         setCoopPartnerCorrect(!!data.guestCorrect);
@@ -4650,6 +4805,19 @@ export default function Pattrn() {
         setCoopPartnerLockedIn(!!data.hostLockedIn);
         setCoopPartnerCorrect(!!data.hostCorrect);
       }
+      // Detect partner just locked in (transition from false → true)
+      if (partnerLocked && !prevCoopPartnerLockedRef.current) {
+        const toastMsg = partnerCorrect
+          ? `${partnerName} locked in \u2713`
+          : `${partnerName} submitted`;
+        setCoopPartnerLockToast(toastMsg);
+        if (coopPartnerLockToastTimer.current) clearTimeout(coopPartnerLockToastTimer.current);
+        coopPartnerLockToastTimer.current = setTimeout(() => {
+          setCoopPartnerLockToast(null);
+          coopPartnerLockToastTimer.current = null;
+        }, 3000);
+      }
+      prevCoopPartnerLockedRef.current = partnerLocked;
 
       // Sync fills from Firebase
       const remoteFills = data.fills || {};
@@ -4682,7 +4850,7 @@ export default function Pattrn() {
     if (coopRole !== "guest" || coopStatus !== "joining" || !firebaseUser || !coopSessionId) return;
     let cancelled = false;
     (async () => {
-      const session = await joinCoopSession(coopSessionId, firebaseUser.uid);
+      const session = await joinCoopSession(coopSessionId, firebaseUser.uid, username);
       if (cancelled || !session) {
         if (!cancelled) {
           // Session doesn't exist or is full
@@ -4705,12 +4873,20 @@ export default function Pattrn() {
     return () => { cancelled = true; };
   }, [coopRole, coopStatus, firebaseUser, coopSessionId]);
 
-  // Once guest has joined and puzzle is loaded, split blanks and assign guest side
+  // Once player has joined/rejoined and puzzle is loaded, split blanks and assign sides
   useEffect(() => {
-    if (coopRole !== "guest" || coopStatus !== "playing" || !puzzle || coopMyBlanks) return;
+    if (!coopRole || !puzzle || coopMyBlanks) return;
+    // Guest waits until status is "playing" before splitting
+    if (coopRole === "guest" && coopStatus !== "playing") return;
+    // Host can split immediately (status may be "waiting")
     const { hostBlanks, guestBlanks } = splitBlanksForCoop(puzzle.blanks, puzzle.gridSize);
-    setCoopMyBlanks(guestBlanks);
-    setCoopPartnerBlanks(hostBlanks);
+    if (coopRole === "host") {
+      setCoopMyBlanks(hostBlanks);
+      setCoopPartnerBlanks(guestBlanks);
+    } else {
+      setCoopMyBlanks(guestBlanks);
+      setCoopPartnerBlanks(hostBlanks);
+    }
     // Timer is synced from host's hostTimerStart via the subscription handler
   }, [coopRole, coopStatus, puzzle, coopMyBlanks, splitBlanksForCoop]);
 
@@ -6832,26 +7008,59 @@ export default function Pattrn() {
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} }`}</style>
 
         <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease", position: "relative", width: "100%", maxWidth: 360 }}>
-          {/* Menu button */}
-          <button
-            onClick={() => setShowGameMenu(true)}
-            style={{
-              position: "absolute", top: 2, right: 0,
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 10,
-              width: 38, height: 38, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-            aria-label="Menu"
-          >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-              <rect x="2" y="3" width="14" height="2" rx="1" fill={C.textDim} />
-              <rect x="2" y="8" width="14" height="2" rx="1" fill={C.textDim} />
-              <rect x="2" y="13" width="14" height="2" rx="1" fill={C.textDim} />
-            </svg>
-          </button>
+          {/* Top-right buttons: notification bell + menu */}
+          <div style={{ position: "absolute", top: 2, right: 0, display: "flex", gap: 6, alignItems: "center" }}>
+            {/* Notification bell */}
+            {firebaseConfigured && firebaseUser && (
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                style={{
+                  background: "none", border: `1px solid ${notifications.length > 0 ? "#54A0FF55" : C.border}`, borderRadius: 10,
+                  width: 38, height: 38, cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  transition: "all 0.15s", position: "relative",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = notifications.length > 0 ? "#54A0FF55" : C.border; }}
+                aria-label="Notifications"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={notifications.length > 0 ? "#54A0FF" : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                {notifications.length > 0 && (
+                  <span style={{
+                    position: "absolute", top: -2, right: -2,
+                    width: 16, height: 16, borderRadius: "50%",
+                    backgroundColor: "#f87171", color: "#fff",
+                    fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontFamily: "'Space Mono', monospace",
+                  }}>
+                    {notifications.length > 9 ? "9+" : notifications.length}
+                  </span>
+                )}
+              </button>
+            )}
+            {/* Menu button */}
+            <button
+              onClick={() => setShowGameMenu(true)}
+              style={{
+                background: "none", border: `1px solid ${C.border}`, borderRadius: 10,
+                width: 38, height: 38, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.15s",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+              aria-label="Menu"
+            >
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <rect x="2" y="3" width="14" height="2" rx="1" fill={C.textDim} />
+                <rect x="2" y="8" width="14" height="2" rx="1" fill={C.textDim} />
+                <rect x="2" y="13" width="14" height="2" rx="1" fill={C.textDim} />
+              </svg>
+            </button>
+          </div>
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: 4, margin: 0, color: C.accent }}>
             Agnus
           </h1>
@@ -6943,6 +7152,198 @@ export default function Pattrn() {
             </div>
           );
         })()}
+
+        {/* Notification panel - dropdown when bell is clicked */}
+        {showNotifications && firebaseUser && notifications.length > 0 && (
+          <div style={{
+            width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.3s ease both",
+            borderRadius: 12, overflow: "hidden", border: `1px solid #54A0FF44`,
+            backgroundColor: C.surface, padding: "12px 16px",
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10,
+            }}>
+              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: "#54A0FF", letterSpacing: 1, textTransform: "uppercase" }}>
+                Notifications
+              </span>
+              <button
+                onClick={() => setShowNotifications(false)}
+                style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 14, padding: "0 4px" }}
+              >{"\u2715"}</button>
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 240, overflowY: "auto" }}>
+              {notifications.map(notif => (
+                <div key={notif.id} style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
+                  borderRadius: 8, backgroundColor: C.bg, border: `1px solid ${C.border}`,
+                }}>
+                  <div style={{
+                    width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                    backgroundColor: notif.type === "coop_invite" ? "#54A0FF22" : C.accent + "22",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    border: `1.5px solid ${notif.type === "coop_invite" ? "#54A0FF44" : C.accent + "44"}`,
+                  }}>
+                    <span style={{ fontSize: 12, color: notif.type === "coop_invite" ? "#54A0FF" : C.accent }}>
+                      {notif.type === "coop_invite" ? "\u2694" : "\u25A6"}
+                    </span>
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontFamily: "'Space Mono', monospace", fontWeight: 600, color: C.text, lineHeight: 1.3 }}>
+                      {notif.type === "coop_invite"
+                        ? `${notif.fromUsername || "Someone"} invited you to co-op`
+                        : `${notif.fromUsername || "Someone"} shared a mosaic`
+                      }
+                    </div>
+                    {notif.type === "coop_invite" && notif.data?.mode && (
+                      <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
+                        {notif.data.mode} #{(notif.data.level ?? 0) + 1}
+                      </div>
+                    )}
+                    {notif.type === "mosaic_shared" && notif.data?.title && (
+                      <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
+                        &ldquo;{notif.data.title}&rdquo;
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    {notif.type === "coop_invite" && notif.data?.sessionId && (
+                      <button
+                        onClick={async () => {
+                          // Join the coop session
+                          const session = await loadCoopSession(notif.data.sessionId);
+                          if (session && session.status !== "complete") {
+                            setDifficulty(session.mode);
+                            setCurrentPuzzle(session.level ?? 0);
+                            if (session.dailyDate) setCurrentDailyDate(session.dailyDate);
+                            setCoopSessionId(session.id);
+                            setCoopRole("guest");
+                            setCoopStatus("joining");
+                            setFills({});
+                            setAttempts(0);
+                            setGameState("playing");
+                            setWrongCells(new Set());
+                            setLockedCells(new Set());
+                            setShowParticles(false);
+                            setSelectedCell(null);
+                            setSelectedToken(null);
+                            setView("play");
+                          }
+                          dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
+                          setShowNotifications(false);
+                        }}
+                        style={{
+                          background: "#54A0FF", border: "none", borderRadius: 6,
+                          padding: "4px 8px", color: "#fff", cursor: "pointer", fontSize: 9,
+                          fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                        }}
+                      >
+                        Join
+                      </button>
+                    )}
+                    {notif.type === "mosaic_shared" && (
+                      <button
+                        onClick={() => {
+                          dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
+                          setMosaicGalleryTab("shared");
+                          loadMosaicData("shared");
+                          setView("gallery");
+                          setShowNotifications(false);
+                        }}
+                        style={{
+                          background: C.accent, border: "none", borderRadius: 6,
+                          padding: "4px 8px", color: C.bg, cursor: "pointer", fontSize: 9,
+                          fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                        }}
+                      >
+                        View
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { dismissNotification(firebaseUser.uid, notif.id).catch(() => {}); }}
+                      style={{
+                        background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
+                        padding: "4px 6px", color: C.textDim, cursor: "pointer", fontSize: 9,
+                      }}
+                      title="Dismiss"
+                    >{"\u2715"}</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Active co-op sessions panel */}
+        {firebaseUser && activeCoopSessions.length > 0 && (
+          <div style={{
+            width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
+            borderRadius: 12, overflow: "hidden", border: `1px solid #54A0FF33`,
+            backgroundColor: C.surface, padding: "12px 16px",
+          }}>
+            <div style={{
+              fontSize: 9, color: "#54A0FF", textTransform: "uppercase",
+              letterSpacing: 1.5, marginBottom: 10,
+              fontFamily: "'Space Mono', monospace", fontWeight: 700,
+            }}>Active Co-op Sessions</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              {activeCoopSessions.map(session => {
+                const isHost = session.hostUid === firebaseUser.uid;
+                const partnerName = isHost ? (session.guestUsername || null) : (session.hostUsername || null);
+                const modeLabel = (DIFFICULTIES.find(d => d.key === session.mode)?.label) || session.mode;
+                const statusLabel = session.status === "waiting" ? "Waiting for partner" : session.status === "playing" ? "In progress" : session.status === "complete" ? "Complete" : session.status;
+                const statusColor = session.status === "waiting" ? C.textDim : session.status === "playing" ? "#54A0FF" : session.status === "complete" ? C.correct : C.textDim;
+                return (
+                  <div key={session.id} style={{
+                    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                    borderRadius: 10, backgroundColor: C.bg, border: `1px solid ${C.border}`,
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text }}>
+                          {modeLabel} #{(session.level ?? 0) + 1}
+                        </span>
+                        <span style={{ fontSize: 9, color: isHost ? "#54A0FF" : "#FF9FF3", fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                          {isHost ? "Host" : "Guest"}
+                        </span>
+                      </div>
+                      <div style={{ fontSize: 10, color: statusColor, fontFamily: "'Space Mono', monospace" }}>
+                        {statusLabel}
+                        {partnerName && <span style={{ color: C.textDim }}> {"\u2022"} with {partnerName}</span>}
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                      {session.status !== "complete" && (
+                        <button
+                          onClick={() => rejoinCoopSession(session)}
+                          style={{
+                            background: "#54A0FF", border: "none", borderRadius: 8,
+                            padding: "6px 12px", color: "#fff", cursor: "pointer", fontSize: 10,
+                            fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
+                          }}
+                        >
+                          Rejoin
+                        </button>
+                      )}
+                      {isHost && (
+                        <button
+                          onClick={() => closeCoopSessionPermanently(session.id, session)}
+                          style={{
+                            background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+                            padding: "6px 8px", color: C.textDim, cursor: "pointer", fontSize: 10,
+                            fontFamily: "'Space Mono', monospace",
+                          }}
+                          title="Close session"
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.color = "#f87171"; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                        >{"\u2715"}</button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         {/* Mode selector: categorized auto-wrapping grid */}
         <div style={{
@@ -8983,7 +9384,7 @@ export default function Pattrn() {
       }}>
         <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridSize >= 7 ? 380 : 360, animation: "fadeUp 0.3s ease" }}>
         <button onClick={() => {
-          if (isCoop) leaveCoopSession();
+          if (isCoop) { setShowLeaveConfirm(true); return; }
           if (difficulty === "cascade") {
             const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
             const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
@@ -9057,7 +9458,9 @@ export default function Pattrn() {
                   setShowAccountModal(true);
                   return;
                 }
-                startCoopSession();
+                // Load friends list and show friend picker
+                loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {});
+                setShowCoopFriendPicker(true);
               }}
               style={{
                 background: "none", border: `1px solid #54A0FF55`, borderRadius: 8, padding: "6px 10px",
@@ -9071,10 +9474,10 @@ export default function Pattrn() {
               Co-op
             </button>
           )}
-          {/* Coop leave button when in coop */}
+          {/* Coop leave button when in coop - requires confirmation */}
           {isCoop && (
             <button
-              onClick={() => { leaveCoopSession(); }}
+              onClick={() => { setShowLeaveConfirm(true); }}
               style={{
                 background: "none", border: `1px solid #f8717188`, borderRadius: 8, padding: "6px 10px",
                 color: "#f87171", cursor: "pointer", fontSize: 11, transition: "all 0.15s",
@@ -9099,14 +9502,61 @@ export default function Pattrn() {
           animation: "fadeUp 0.2s ease both",
         }}>
           <div onClick={e => e.stopPropagation()} style={{
-            backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 340, width: "90%",
+            backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 360, width: "90%",
             border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+            maxHeight: "80vh", display: "flex", flexDirection: "column",
           }}>
             <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>
               Co-op Invite
             </div>
             <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
-              Share this link with a friend to solve together
+              Share a link or invite a friend directly
+            </div>
+            {/* Friends quick-invite */}
+            {friendsList.length > 0 && (
+              <div style={{ marginBottom: 14, maxHeight: 140, overflowY: "auto" }}>
+                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+                  Invite Friend
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  {friendsList.map(friend => (
+                    <button
+                      key={friend.uid}
+                      onClick={async () => {
+                        const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : "";
+                        await sendNotification(friend.uid, {
+                          type: "coop_invite",
+                          fromUid: firebaseUser.uid,
+                          fromUsername: username || firebaseUser.email,
+                          data: { sessionId: coopSessionId, mode: difficulty, level: currentPuzzle, url: coopUrl },
+                        }).catch(() => {});
+                        setShowCoopInvite(false);
+                      }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
+                        borderRadius: 8, backgroundColor: C.bg, border: `1px solid ${C.border}`,
+                        cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+                    >
+                      {friend.profilePicture ? (
+                        <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: "#54A0FF33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#54A0FF", fontWeight: 700, flexShrink: 0 }}>
+                          {(friend.username || "?")[0].toUpperCase()}
+                        </div>
+                      )}
+                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                      <span style={{ fontSize: 9, color: "#54A0FF", fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>Invite</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Link section */}
+            <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+              Or share link
             </div>
             <div style={{
               backgroundColor: C.bg, borderRadius: 8, padding: "10px 12px", marginBottom: 12,
@@ -9155,6 +9605,172 @@ export default function Pattrn() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Coop friend picker modal - shown when clicking Co-op button */}
+      {showCoopFriendPicker && (
+        <div onClick={() => setShowCoopFriendPicker(false)} style={{
+          position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          animation: "fadeUp 0.2s ease both",
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 360, width: "90%",
+            border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+            maxHeight: "80vh", display: "flex", flexDirection: "column",
+          }}>
+            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+              Start Co-op
+            </div>
+            <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
+              Invite a friend or share a link
+            </div>
+            {/* Friends list */}
+            {friendsList.length > 0 && (
+              <div style={{ marginBottom: 16, maxHeight: 200, overflowY: "auto" }}>
+                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                  Your Friends
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {friendsList.map(friend => (
+                    <button
+                      key={friend.uid}
+                      onClick={async () => {
+                        await startCoopSession(friend.uid, friend.username);
+                      }}
+                      style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
+                        borderRadius: 10, backgroundColor: C.bg, border: `1px solid ${C.border}`,
+                        cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                      }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.backgroundColor = C.bg; }}
+                    >
+                      {friend.profilePicture ? (
+                        <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                      ) : (
+                        <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: "#54A0FF33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#54A0FF", fontWeight: 700, flexShrink: 0 }}>
+                          {(friend.username || "?")[0].toUpperCase()}
+                        </div>
+                      )}
+                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>
+                        {friend.username}
+                      </span>
+                      <span style={{ fontSize: 10, color: "#54A0FF", fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
+                        Invite
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {friendsList.length === 0 && (
+              <div style={{ marginBottom: 16, textAlign: "center", padding: "12px 0", color: C.textDim, fontSize: 11, fontFamily: "'Space Mono', monospace" }}>
+                No friends added yet. You can add friends in the Mosaic gallery.
+              </div>
+            )}
+            {/* Generate link button */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => {
+                  setShowCoopFriendPicker(false);
+                  startCoopSession();
+                }}
+                style={{
+                  flex: 1, backgroundColor: "#54A0FF", color: "#fff", border: "none",
+                  padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase",
+                }}
+              >
+                Share Link
+              </button>
+              <button
+                onClick={() => setShowCoopFriendPicker(false)}
+                style={{
+                  backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                  padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase",
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Leave coop confirmation dialog */}
+      {showLeaveConfirm && (
+        <div onClick={() => setShowLeaveConfirm(false)} style={{
+          position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          animation: "fadeUp 0.2s ease both",
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 320, width: "90%",
+            border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+          }}>
+            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+              Leave Co-op?
+            </div>
+            <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
+              {coopRole === "host"
+                ? "The session will stay active. You can rejoin from the main menu."
+                : "You will leave this session and your partner will need to invite you again to rejoin."
+              }
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={() => {
+                  leaveCoopSession();
+                  if (customMosaicPuzzlesRef.current && isMosaic) {
+                    setView("custom-mosaic");
+                  } else {
+                    setView("menu");
+                  }
+                }}
+                style={{
+                  flex: 1, backgroundColor: "#f87171", color: "#fff", border: "none",
+                  padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase",
+                }}
+              >
+                Leave
+              </button>
+              <button
+                onClick={() => setShowLeaveConfirm(false)}
+                style={{
+                  flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                  padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase",
+                }}
+              >
+                Stay
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Partner lock-in toast notification */}
+      {coopPartnerLockToast && (
+        <div style={{
+          position: "fixed",
+          top: "calc(130px + env(safe-area-inset-top, 0px))",
+          left: "50%", transform: "translateX(-50%)", zIndex: 25,
+          backgroundColor: "#54A0FF", borderRadius: 10,
+          padding: "8px 16px", boxShadow: "0 4px 16px rgba(84,160,255,0.4)",
+          fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
+          color: "#fff", textAlign: "center",
+          animation: "fadeUp 0.3s ease both",
+          pointerEvents: "none",
+        }}>
+          {coopPartnerLockToast}
         </div>
       )}
 
