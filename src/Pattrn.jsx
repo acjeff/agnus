@@ -5804,6 +5804,118 @@ export default function Pattrn() {
     </div>
   );
 
+  // --- Load Friend Activity (presence data) ---
+  const loadFriendActivity = useCallback(async () => {
+    if (!firebaseUser || friendsList.length === 0) return;
+    setFriendPresenceLoading(true);
+    try {
+      const presenceData = await loadFriendPresence(friendsList.map(f => f.uid));
+      setFriendPresence(presenceData);
+    } catch { /* ignore */ }
+    finally { setFriendPresenceLoading(false); }
+  }, [firebaseUser, friendsList]);
+
+  // --- Load Admin Metrics ---
+  const loadAdminMetricsData = useCallback(async () => {
+    if (!isAdmin) return;
+    setAdminMetricsLoading(true);
+    try {
+      const allStats = await loadAllPublicStats();
+      const userEntries = Object.entries(allStats);
+      const totalUsers = userEntries.length;
+      const activeUsers = userEntries.filter(([, s]) => s.updatedAt && (Date.now() - s.updatedAt) < 7 * 86400000).length;
+      const modes = ["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"];
+
+      // Per-mode aggregate stats
+      const modeStats = {};
+      let globalTotalSolved = 0;
+      let globalTotalAchievements = 0;
+      const solvedDistribution = []; // array of totalSolved per user
+
+      for (const [, stats] of userEntries) {
+        const ts = stats.totalSolved || 0;
+        globalTotalSolved += ts;
+        globalTotalAchievements += stats.achievements || 0;
+        solvedDistribution.push(ts);
+        const prog = stats.progress || {};
+        for (const mode of modes) {
+          if (!modeStats[mode]) modeStats[mode] = { totalSolved: 0, players: 0, solvedCounts: [] };
+          const count = prog[mode] || 0;
+          modeStats[mode].totalSolved += count;
+          if (count > 0) modeStats[mode].players++;
+          modeStats[mode].solvedCounts.push(count);
+        }
+      }
+
+      // Calculate averages, medians, and difficulty indicators
+      for (const mode of modes) {
+        const ms = modeStats[mode];
+        ms.avgSolved = totalUsers > 0 ? (ms.totalSolved / totalUsers).toFixed(1) : 0;
+        const activeCounts = ms.solvedCounts.filter(c => c > 0);
+        ms.avgSolvedActive = activeCounts.length > 0 ? (activeCounts.reduce((a, b) => a + b, 0) / activeCounts.length).toFixed(1) : 0;
+        ms.completionRate = totalUsers > 0 ? ((ms.players / totalUsers) * 100).toFixed(0) : 0;
+      }
+
+      // Load per-puzzle completion data for difficulty analysis (easy, medium, hard modes)
+      const difficultyAnalysis = {};
+      for (const mode of ["easy", "medium", "hard"]) {
+        try {
+          const completions = await loadAllPuzzleCompletionsForMode(mode);
+          const puzzleKeys = Object.keys(completions);
+          const puzzleStats = [];
+          for (const pk of puzzleKeys) {
+            const entries = Object.values(completions[pk]);
+            if (entries.length === 0) continue;
+            const attempts = entries.map(e => e.attempts || 0).filter(a => a > 0);
+            const timesArr = entries.map(e => e.time || 0).filter(t => t > 0);
+            const avgAttempts = attempts.length > 0 ? (attempts.reduce((a, b) => a + b, 0) / attempts.length) : 0;
+            const avgTime = timesArr.length > 0 ? (timesArr.reduce((a, b) => a + b, 0) / timesArr.length) : 0;
+            const goldRate = attempts.length > 0 ? (attempts.filter(a => a === 1).length / attempts.length * 100) : 0;
+            puzzleStats.push({
+              puzzleKey: pk,
+              players: entries.length,
+              avgAttempts: avgAttempts.toFixed(1),
+              avgTime: avgTime.toFixed(0),
+              goldRate: goldRate.toFixed(0),
+            });
+          }
+          puzzleStats.sort((a, b) => parseFloat(b.avgAttempts) - parseFloat(a.avgAttempts));
+          difficultyAnalysis[mode] = puzzleStats;
+        } catch { difficultyAnalysis[mode] = []; }
+      }
+
+      // Engagement: users by total solved ranges
+      const engagementBuckets = [
+        { label: "0 puzzles", min: 0, max: 0, count: 0 },
+        { label: "1-10", min: 1, max: 10, count: 0 },
+        { label: "11-50", min: 11, max: 50, count: 0 },
+        { label: "51-100", min: 51, max: 100, count: 0 },
+        { label: "101-200", min: 101, max: 200, count: 0 },
+        { label: "200+", min: 201, max: Infinity, count: 0 },
+      ];
+      for (const ts of solvedDistribution) {
+        for (const b of engagementBuckets) {
+          if (ts >= b.min && ts <= b.max) { b.count++; break; }
+        }
+      }
+
+      setAdminMetrics({
+        totalUsers,
+        activeUsers,
+        globalTotalSolved,
+        globalTotalAchievements,
+        modeStats,
+        difficultyAnalysis,
+        engagementBuckets,
+        avgSolvedPerUser: totalUsers > 0 ? (globalTotalSolved / totalUsers).toFixed(1) : 0,
+      });
+    } catch (e) {
+      console.error("Admin metrics load failed:", e);
+    } finally {
+      setAdminMetricsLoading(false);
+    }
+  }, [isAdmin]);
+
   // --- CUSTOM MOSAIC PLAY VIEW (puzzle selection for user-created mosaics) ---
   if (view === "custom-mosaic" && customMosaicPlay) {
     const cPuzzles = customMosaicPuzzlesRef.current || [];
@@ -7701,17 +7813,6 @@ export default function Pattrn() {
     </div>
   );
 
-  // --- Load Friend Activity (presence data) ---
-  const loadFriendActivity = useCallback(async () => {
-    if (!firebaseUser || friendsList.length === 0) return;
-    setFriendPresenceLoading(true);
-    try {
-      const presenceData = await loadFriendPresence(friendsList.map(f => f.uid));
-      setFriendPresence(presenceData);
-    } catch { /* ignore */ }
-    finally { setFriendPresenceLoading(false); }
-  }, [firebaseUser, friendsList]);
-
   // Helper: format "time ago" from a timestamp
   const formatTimeAgo = (ts) => {
     if (!ts) return "Unknown";
@@ -7738,107 +7839,6 @@ export default function Pattrn() {
     if (mode === "cascade") return `Cascade #${(parseInt(puzzleKey) || 0) + 1}`;
     return `${modeLabel} #${(parseInt(puzzleKey) || 0) + 1}`;
   };
-
-  // --- Load Admin Metrics ---
-  const loadAdminMetricsData = useCallback(async () => {
-    if (!isAdmin) return;
-    setAdminMetricsLoading(true);
-    try {
-      const allStats = await loadAllPublicStats();
-      const userEntries = Object.entries(allStats);
-      const totalUsers = userEntries.length;
-      const activeUsers = userEntries.filter(([, s]) => s.updatedAt && (Date.now() - s.updatedAt) < 7 * 86400000).length;
-      const modes = ["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"];
-
-      // Per-mode aggregate stats
-      const modeStats = {};
-      let globalTotalSolved = 0;
-      let globalTotalAchievements = 0;
-      const solvedDistribution = []; // array of totalSolved per user
-
-      for (const [, stats] of userEntries) {
-        const ts = stats.totalSolved || 0;
-        globalTotalSolved += ts;
-        globalTotalAchievements += stats.achievements || 0;
-        solvedDistribution.push(ts);
-        const prog = stats.progress || {};
-        for (const mode of modes) {
-          if (!modeStats[mode]) modeStats[mode] = { totalSolved: 0, players: 0, solvedCounts: [] };
-          const count = prog[mode] || 0;
-          modeStats[mode].totalSolved += count;
-          if (count > 0) modeStats[mode].players++;
-          modeStats[mode].solvedCounts.push(count);
-        }
-      }
-
-      // Calculate averages, medians, and difficulty indicators
-      for (const mode of modes) {
-        const ms = modeStats[mode];
-        ms.avgSolved = totalUsers > 0 ? (ms.totalSolved / totalUsers).toFixed(1) : 0;
-        const activeCounts = ms.solvedCounts.filter(c => c > 0);
-        ms.avgSolvedActive = activeCounts.length > 0 ? (activeCounts.reduce((a, b) => a + b, 0) / activeCounts.length).toFixed(1) : 0;
-        ms.completionRate = totalUsers > 0 ? ((ms.players / totalUsers) * 100).toFixed(0) : 0;
-      }
-
-      // Load per-puzzle completion data for difficulty analysis (easy, medium, hard modes)
-      const difficultyAnalysis = {};
-      for (const mode of ["easy", "medium", "hard"]) {
-        try {
-          const completions = await loadAllPuzzleCompletionsForMode(mode);
-          const puzzleKeys = Object.keys(completions);
-          const puzzleStats = [];
-          for (const pk of puzzleKeys) {
-            const entries = Object.values(completions[pk]);
-            if (entries.length === 0) continue;
-            const attempts = entries.map(e => e.attempts || 0).filter(a => a > 0);
-            const timesArr = entries.map(e => e.time || 0).filter(t => t > 0);
-            const avgAttempts = attempts.length > 0 ? (attempts.reduce((a, b) => a + b, 0) / attempts.length) : 0;
-            const avgTime = timesArr.length > 0 ? (timesArr.reduce((a, b) => a + b, 0) / timesArr.length) : 0;
-            const goldRate = attempts.length > 0 ? (attempts.filter(a => a === 1).length / attempts.length * 100) : 0;
-            puzzleStats.push({
-              puzzleKey: pk,
-              players: entries.length,
-              avgAttempts: avgAttempts.toFixed(1),
-              avgTime: avgTime.toFixed(0),
-              goldRate: goldRate.toFixed(0),
-            });
-          }
-          puzzleStats.sort((a, b) => parseFloat(b.avgAttempts) - parseFloat(a.avgAttempts));
-          difficultyAnalysis[mode] = puzzleStats;
-        } catch { difficultyAnalysis[mode] = []; }
-      }
-
-      // Engagement: users by total solved ranges
-      const engagementBuckets = [
-        { label: "0 puzzles", min: 0, max: 0, count: 0 },
-        { label: "1-10", min: 1, max: 10, count: 0 },
-        { label: "11-50", min: 11, max: 50, count: 0 },
-        { label: "51-100", min: 51, max: 100, count: 0 },
-        { label: "101-200", min: 101, max: 200, count: 0 },
-        { label: "200+", min: 201, max: Infinity, count: 0 },
-      ];
-      for (const ts of solvedDistribution) {
-        for (const b of engagementBuckets) {
-          if (ts >= b.min && ts <= b.max) { b.count++; break; }
-        }
-      }
-
-      setAdminMetrics({
-        totalUsers,
-        activeUsers,
-        globalTotalSolved,
-        globalTotalAchievements,
-        modeStats,
-        difficultyAnalysis,
-        engagementBuckets,
-        avgSolvedPerUser: totalUsers > 0 ? (globalTotalSolved / totalUsers).toFixed(1) : 0,
-      });
-    } catch (e) {
-      console.error("Admin metrics load failed:", e);
-    } finally {
-      setAdminMetricsLoading(false);
-    }
-  }, [isAdmin]);
 
   // --- Friends Modal ---
   const friendsModalEl = showFriendsModal && firebaseUser && firebaseConfigured && (
