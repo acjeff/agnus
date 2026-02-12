@@ -921,3 +921,61 @@ export async function loadFriendPuzzleCompletions(friendUids, mode, puzzleKey) {
   );
   return results;
 }
+
+// --- Presence / Activity Tracking ---
+
+// Update the current user's presence (online status + what they're doing)
+// Called on page load, when starting a puzzle, returning to menu, etc.
+export async function updatePresence(uid, activity) {
+  if (!db) return;
+  await set(ref(db, `presence/${uid}`), {
+    ...removeUndefined(activity),
+    lastSeen: serverTimestamp(),
+  });
+}
+
+// Load presence/activity for a single user
+export async function loadPresence(uid) {
+  if (!db) return null;
+  const snap = await get(ref(db, `presence/${uid}`));
+  return snap.exists() ? snap.val() : null;
+}
+
+// Load presence/activity for multiple friends at once
+export async function loadFriendPresence(friendUids) {
+  if (!db || !friendUids.length) return {};
+  const results = {};
+  await Promise.all(
+    friendUids.map(async (fUid) => {
+      const snap = await get(ref(db, `presence/${fUid}`));
+      if (snap.exists()) results[fUid] = snap.val();
+    })
+  );
+  return results;
+}
+
+// Subscribe to a friend's presence changes in real-time
+export function subscribeToFriendPresence(friendUid, callback) {
+  if (!db) return () => {};
+  const presRef = ref(db, `presence/${friendUid}`);
+  const handler = onValue(presRef, (snap) => {
+    callback(snap.exists() ? snap.val() : null);
+  });
+  return () => off(presRef, "value", handler);
+}
+
+// --- Admin: Global Metrics ---
+
+// Load all public stats (admin only — reads entire publicStats node)
+export async function loadAllPublicStats() {
+  if (!db) return {};
+  const snap = await get(ref(db, "publicStats"));
+  return snap.exists() ? snap.val() : {};
+}
+
+// Load all puzzle completions for a specific mode (admin analytics)
+export async function loadAllPuzzleCompletionsForMode(mode) {
+  if (!db) return {};
+  const snap = await get(ref(db, `puzzleCompletions/${mode}`));
+  return snap.exists() ? snap.val() : {};
+}

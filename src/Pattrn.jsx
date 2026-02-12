@@ -61,6 +61,10 @@ import {
   savePuzzleCompletion,
   loadPuzzleCompletions,
   loadFriendPuzzleCompletions,
+  updatePresence,
+  loadFriendPresence,
+  loadAllPublicStats,
+  loadAllPuzzleCompletionsForMode,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2765,7 +2769,7 @@ export default function Pattrn() {
 
   // --- Friends Modal & Comparison state ---
   const [showFriendsModal, setShowFriendsModal] = useState(false);
-  const [friendsModalTab, setFriendsModalTab] = useState("list"); // "list" | "compare"
+  const [friendsModalTab, setFriendsModalTab] = useState("list"); // "list" | "compare" | "activity"
   const [compareFriend, setCompareFriend] = useState(null); // friend object being compared
   const [compareFriendStats, setCompareFriendStats] = useState(null); // loaded public stats for comparison
   const [compareFriendLoading, setCompareFriendLoading] = useState(false);
@@ -2773,6 +2777,16 @@ export default function Pattrn() {
   const [friendsPuzzleLoading, setFriendsPuzzleLoading] = useState(false);
   const [puzzleRanking, setPuzzleRanking] = useState(null); // { rank, total } for current puzzle
   const [puzzleRankingLoading, setPuzzleRankingLoading] = useState(false);
+
+  // --- Friend Activity / Presence state ---
+  const [friendPresence, setFriendPresence] = useState({}); // { uid: { online, lastSeen, currentMode, currentPuzzle, lastSolvedMode, lastSolvedPuzzle, lastSolvedAt } }
+  const [friendPresenceLoading, setFriendPresenceLoading] = useState(false);
+  const presenceIntervalRef = useRef(null);
+
+  // --- Admin Metrics state ---
+  const [adminMetrics, setAdminMetrics] = useState(null); // computed metrics object
+  const [adminMetricsLoading, setAdminMetricsLoading] = useState(false);
+  const [adminMetricsTab, setAdminMetricsTab] = useState("overview"); // "overview" | "difficulty" | "engagement"
 
   // --- Notifications & Active Sessions state ---
   const [notifications, setNotifications] = useState([]); // array of notification objects
@@ -2820,6 +2834,30 @@ export default function Pattrn() {
       saveUserEmail(firebaseUser.uid, firebaseUser.email).catch(() => {});
     }
   }, [firebaseUser, firebaseConfigured]);
+
+  // Presence heartbeat: update online status every 60s while logged in
+  useEffect(() => {
+    if (!firebaseUser || !firebaseConfigured) {
+      if (presenceIntervalRef.current) { clearInterval(presenceIntervalRef.current); presenceIntervalRef.current = null; }
+      return;
+    }
+    const sendHeartbeat = () => {
+      updatePresence(firebaseUser.uid, { online: true, status: "active" }).catch(() => {});
+    };
+    sendHeartbeat();
+    presenceIntervalRef.current = setInterval(sendHeartbeat, 60000);
+    return () => {
+      if (presenceIntervalRef.current) { clearInterval(presenceIntervalRef.current); presenceIntervalRef.current = null; }
+    };
+  }, [firebaseUser, firebaseConfigured]);
+
+  // Update presence status when view changes (menu = idle, play = playing)
+  useEffect(() => {
+    if (!firebaseUser || !firebaseConfigured) return;
+    if (view === "menu" || view === "gallery" || view === "creator" || view === "profile") {
+      updatePresence(firebaseUser.uid, { online: true, status: "idle", currentMode: null, currentPuzzle: null }).catch(() => {});
+    }
+  }, [view, firebaseUser, firebaseConfigured]);
 
   // Load username and profile picture when user logs in, prompt if missing
   useEffect(() => {
@@ -4418,6 +4456,14 @@ export default function Pattrn() {
         .catch(() => {})
         .finally(() => setFriendsPuzzleLoading(false));
     }
+    // Update presence: currently playing this puzzle
+    if (firebaseUser) {
+      updatePresence(firebaseUser.uid, {
+        online: true, status: "playing",
+        currentMode: effectiveDiff,
+        currentPuzzle: effectiveDiff === "daily" ? (dailyDate || "") : String(idx),
+      }).catch(() => {});
+    }
     setView("play");
   };
 
@@ -5178,6 +5224,14 @@ export default function Pattrn() {
               attempts: newAttempts,
               time: finalTime,
               username: username || null,
+            }).catch(() => {});
+            // Update presence: last solved puzzle
+            updatePresence(firebaseUser.uid, {
+              online: true, status: "idle",
+              lastSolvedMode: difficulty,
+              lastSolvedPuzzle: compKey,
+              lastSolvedAt: Date.now(),
+              currentMode: null, currentPuzzle: null,
             }).catch(() => {});
             // Load global ranking
             setPuzzleRankingLoading(true);
@@ -6840,6 +6894,299 @@ export default function Pattrn() {
     );
   }
 
+  // --- ADMIN METRICS DASHBOARD VIEW ---
+  if (view === "admin-metrics") {
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+
+        {/* Header */}
+        <div style={{ width: "100%", maxWidth: 520, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
+          <button onClick={() => setView("menu")}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            &larr; Back
+          </button>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+            Game Metrics
+          </h2>
+          <button onClick={loadAdminMetricsData}
+            style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
+              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
+            }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+          >
+            Refresh
+          </button>
+        </div>
+
+        {/* Tab bar */}
+        <div style={{ width: "100%", maxWidth: 520, display: "flex", gap: 4, marginBottom: 20, animation: "fadeUp 0.3s 0.02s ease both" }}>
+          {[{ key: "overview", label: "Overview" }, { key: "difficulty", label: "Difficulty" }, { key: "engagement", label: "Engagement" }].map(tab => (
+            <button key={tab.key}
+              onClick={() => setAdminMetricsTab(tab.key)}
+              style={{
+                flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                textTransform: "uppercase", cursor: "pointer", transition: "all 0.15s",
+                background: adminMetricsTab === tab.key ? C.accent : "transparent",
+                color: adminMetricsTab === tab.key ? C.bg : C.textDim,
+                border: `1px solid ${adminMetricsTab === tab.key ? C.accent : C.border}`,
+              }}
+            >{tab.label}</button>
+          ))}
+        </div>
+
+        {adminMetricsLoading && !adminMetrics ? (
+          <div style={{ textAlign: "center", padding: "40px 0", color: C.textDim, fontSize: 13 }}>Loading metrics...</div>
+        ) : !adminMetrics ? (
+          <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, animation: "fadeUp 0.3s ease" }}>
+            No metrics available yet
+          </div>
+        ) : (
+          <div style={{ width: "100%", maxWidth: 520, animation: "fadeUp 0.3s 0.04s ease both" }}>
+
+            {/* OVERVIEW TAB */}
+            {adminMetricsTab === "overview" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {/* Top-line stats */}
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {[
+                    { label: "Total Users", value: adminMetrics.totalUsers, color: C.accent },
+                    { label: "Active (7d)", value: adminMetrics.activeUsers, color: C.correct },
+                    { label: "Total Solved", value: adminMetrics.globalTotalSolved.toLocaleString(), color: C.accent },
+                    { label: "Avg / User", value: adminMetrics.avgSolvedPerUser, color: C.text },
+                  ].map((stat, i) => (
+                    <div key={i} style={{
+                      padding: "16px 14px", borderRadius: 12,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      textAlign: "center",
+                    }}>
+                      <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+                        {stat.label}
+                      </div>
+                      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: stat.color }}>
+                        {stat.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Per-mode breakdown */}
+                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginTop: 8 }}>
+                  Puzzles Solved by Mode
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"].map(mode => {
+                    const ms = adminMetrics.modeStats[mode] || {};
+                    const maxSolved = Math.max(...Object.values(adminMetrics.modeStats).map(m => m.totalSolved || 0), 1);
+                    const barWidth = ((ms.totalSolved || 0) / maxSolved * 100);
+                    return (
+                      <div key={mode} style={{
+                        padding: "10px 14px", borderRadius: 10,
+                        backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.text, textTransform: "capitalize" }}>
+                            {mode}
+                          </span>
+                          <span style={{ fontSize: 11, fontFamily: "'Space Mono', monospace", color: C.textDim }}>
+                            {ms.totalSolved || 0} solved &middot; {ms.players || 0} players &middot; {ms.completionRate || 0}% played
+                          </span>
+                        </div>
+                        {/* Bar */}
+                        <div style={{ height: 4, borderRadius: 2, backgroundColor: C.surfaceLight, overflow: "hidden" }}>
+                          <div style={{ height: "100%", borderRadius: 2, backgroundColor: C.accent, width: `${barWidth}%`, transition: "width 0.4s ease" }} />
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
+                          <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                            Avg: {ms.avgSolved || 0}/user
+                          </span>
+                          <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                            Avg active: {ms.avgSolvedActive || 0}/player
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* DIFFICULTY TAB */}
+            {adminMetricsTab === "difficulty" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", lineHeight: 1.6 }}>
+                  Per-puzzle stats showing average attempts and gold rate. High avg attempts + low gold rate = harder puzzles. Look for outliers that may be too hard or too easy.
+                </div>
+                {["easy", "medium", "hard"].map(mode => {
+                  const puzzles = adminMetrics.difficultyAnalysis[mode] || [];
+                  if (puzzles.length === 0) return (
+                    <div key={mode} style={{ padding: 16, borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}` }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.text, textTransform: "capitalize", marginBottom: 6 }}>{mode}</div>
+                      <div style={{ fontSize: 11, color: C.textDim }}>No completion data yet</div>
+                    </div>
+                  );
+                  // Identify outliers
+                  const avgAttemptValues = puzzles.map(p => parseFloat(p.avgAttempts));
+                  const overallAvg = avgAttemptValues.reduce((a, b) => a + b, 0) / avgAttemptValues.length;
+                  return (
+                    <div key={mode}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.text, textTransform: "capitalize" }}>{mode}</span>
+                        <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                          Avg attempts across all: {overallAvg.toFixed(1)}
+                        </span>
+                      </div>
+                      {/* Table header */}
+                      <div style={{
+                        display: "grid", gridTemplateColumns: "50px 1fr 70px 70px 60px", gap: 4, padding: "6px 10px",
+                        fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace",
+                      }}>
+                        <span>#</span><span>Status</span><span style={{ textAlign: "right" }}>Avg Att.</span><span style={{ textAlign: "right" }}>Avg Time</span><span style={{ textAlign: "right" }}>Gold %</span>
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 3 }}>
+                        {puzzles.slice(0, 20).map(p => {
+                          const att = parseFloat(p.avgAttempts);
+                          const gold = parseFloat(p.goldRate);
+                          const isTooHard = att > overallAvg * 1.5 && gold < 30;
+                          const isTooEasy = att < 1.3 && gold > 80;
+                          const statusColor = isTooHard ? C.incorrect : isTooEasy ? C.coop : C.textDim;
+                          const statusLabel = isTooHard ? "HARD" : isTooEasy ? "EASY" : "OK";
+                          return (
+                            <div key={p.puzzleKey} style={{
+                              display: "grid", gridTemplateColumns: "50px 1fr 70px 70px 60px", gap: 4, padding: "8px 10px",
+                              borderRadius: 8, backgroundColor: isTooHard ? C.incorrect + "08" : isTooEasy ? C.coop + "08" : C.surface,
+                              border: `1px solid ${isTooHard ? C.incorrect + "22" : isTooEasy ? C.coop + "22" : C.border}`,
+                              alignItems: "center",
+                            }}>
+                              <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text }}>
+                                {parseInt(p.puzzleKey) + 1}
+                              </span>
+                              <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: statusColor }}>
+                                {statusLabel} <span style={{ fontWeight: 400, color: C.textDim }}>({p.players} plays)</span>
+                              </span>
+                              <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, textAlign: "right" }}>
+                                {p.avgAttempts}
+                              </span>
+                              <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", color: C.textDim, textAlign: "right" }}>
+                                {formatTime(parseInt(p.avgTime))}
+                              </span>
+                              <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: parseFloat(p.goldRate) > 60 ? C.gold : parseFloat(p.goldRate) < 20 ? C.incorrect : C.text, textAlign: "right" }}>
+                                {p.goldRate}%
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                      {puzzles.length > 20 && (
+                        <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", textAlign: "center", marginTop: 6 }}>
+                          Showing top 20 hardest of {puzzles.length} puzzles
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* ENGAGEMENT TAB */}
+            {adminMetricsTab === "engagement" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+                {/* User distribution by puzzles solved */}
+                <div>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 10 }}>
+                    Users by Total Puzzles Solved
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {adminMetrics.engagementBuckets.map((bucket, i) => {
+                      const maxCount = Math.max(...adminMetrics.engagementBuckets.map(b => b.count), 1);
+                      const barWidth = (bucket.count / maxCount) * 100;
+                      const pct = adminMetrics.totalUsers > 0 ? ((bucket.count / adminMetrics.totalUsers) * 100).toFixed(0) : 0;
+                      return (
+                        <div key={i} style={{
+                          padding: "10px 14px", borderRadius: 10,
+                          backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                        }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.text }}>
+                              {bucket.label}
+                            </span>
+                            <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", color: C.accent, fontWeight: 700 }}>
+                              {bucket.count} <span style={{ color: C.textDim, fontWeight: 400 }}>({pct}%)</span>
+                            </span>
+                          </div>
+                          <div style={{ height: 4, borderRadius: 2, backgroundColor: C.surfaceLight, overflow: "hidden" }}>
+                            <div style={{
+                              height: "100%", borderRadius: 2, width: `${barWidth}%`,
+                              backgroundColor: i === 0 ? C.incorrect : i < 3 ? C.accent : C.correct,
+                              transition: "width 0.4s ease",
+                            }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Retention signals */}
+                <div>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 10 }}>
+                    Key Signals
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {(() => {
+                      const zeroPct = adminMetrics.totalUsers > 0 ? ((adminMetrics.engagementBuckets[0].count / adminMetrics.totalUsers) * 100).toFixed(0) : 0;
+                      const highEngaged = adminMetrics.engagementBuckets.filter(b => b.min > 50).reduce((a, b) => a + b.count, 0);
+                      const highPct = adminMetrics.totalUsers > 0 ? ((highEngaged / adminMetrics.totalUsers) * 100).toFixed(0) : 0;
+                      const activePct = adminMetrics.totalUsers > 0 ? ((adminMetrics.activeUsers / adminMetrics.totalUsers) * 100).toFixed(0) : 0;
+                      const signals = [
+                        { label: "Drop-off rate (0 puzzles)", value: `${zeroPct}%`, color: parseInt(zeroPct) > 40 ? C.incorrect : C.correct, note: parseInt(zeroPct) > 40 ? "High — many users leave without solving" : "Healthy" },
+                        { label: "Deep engagement (50+ solved)", value: `${highPct}%`, color: parseInt(highPct) > 15 ? C.correct : C.inProgress, note: parseInt(highPct) > 15 ? "Strong retention" : "Could improve — consider onboarding" },
+                        { label: "7-day active rate", value: `${activePct}%`, color: parseInt(activePct) > 20 ? C.correct : C.inProgress, note: parseInt(activePct) > 20 ? "Good weekly engagement" : "Low — consider push notifications" },
+                        { label: "Total achievements earned", value: adminMetrics.globalTotalAchievements.toLocaleString(), color: C.accent, note: `${adminMetrics.totalUsers > 0 ? (adminMetrics.globalTotalAchievements / adminMetrics.totalUsers).toFixed(1) : 0} avg per user` },
+                      ];
+                      return signals.map((s, i) => (
+                        <div key={i} style={{
+                          padding: "12px 14px", borderRadius: 10,
+                          backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                          display: "flex", alignItems: "center", justifyContent: "space-between",
+                        }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", color: C.text, marginBottom: 2 }}>{s.label}</div>
+                            <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>{s.note}</div>
+                          </div>
+                          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: s.color, minWidth: 50, textAlign: "right" }}>
+                            {s.value}
+                          </div>
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {coopInviteToastEl}
+      </div>
+    );
+  }
+
   // --- Account modal (shared across views) ---
   const accountModalEl = showAccountModal && firebaseConfigured && (
     <div onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)} style={{
@@ -7354,6 +7701,145 @@ export default function Pattrn() {
     </div>
   );
 
+  // --- Load Friend Activity (presence data) ---
+  const loadFriendActivity = useCallback(async () => {
+    if (!firebaseUser || friendsList.length === 0) return;
+    setFriendPresenceLoading(true);
+    try {
+      const presenceData = await loadFriendPresence(friendsList.map(f => f.uid));
+      setFriendPresence(presenceData);
+    } catch { /* ignore */ }
+    finally { setFriendPresenceLoading(false); }
+  }, [firebaseUser, friendsList]);
+
+  // Helper: format "time ago" from a timestamp
+  const formatTimeAgo = (ts) => {
+    if (!ts) return "Unknown";
+    const now = Date.now();
+    const diff = now - ts;
+    if (diff < 60000) return "Just now";
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
+    return new Date(ts).toLocaleDateString();
+  };
+
+  // Helper: check if a friend is considered "online" (seen within last 2 minutes)
+  const isFriendOnline = (presence) => {
+    if (!presence || !presence.lastSeen) return false;
+    return (Date.now() - presence.lastSeen) < 120000;
+  };
+
+  // Helper: format puzzle label from mode + puzzle key
+  const formatPuzzleLabel = (mode, puzzleKey) => {
+    if (!mode) return null;
+    const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
+    if (mode === "daily") return `Daily (${puzzleKey || "today"})`;
+    if (mode === "cascade") return `Cascade #${(parseInt(puzzleKey) || 0) + 1}`;
+    return `${modeLabel} #${(parseInt(puzzleKey) || 0) + 1}`;
+  };
+
+  // --- Load Admin Metrics ---
+  const loadAdminMetricsData = useCallback(async () => {
+    if (!isAdmin) return;
+    setAdminMetricsLoading(true);
+    try {
+      const allStats = await loadAllPublicStats();
+      const userEntries = Object.entries(allStats);
+      const totalUsers = userEntries.length;
+      const activeUsers = userEntries.filter(([, s]) => s.updatedAt && (Date.now() - s.updatedAt) < 7 * 86400000).length;
+      const modes = ["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"];
+
+      // Per-mode aggregate stats
+      const modeStats = {};
+      let globalTotalSolved = 0;
+      let globalTotalAchievements = 0;
+      const solvedDistribution = []; // array of totalSolved per user
+
+      for (const [, stats] of userEntries) {
+        const ts = stats.totalSolved || 0;
+        globalTotalSolved += ts;
+        globalTotalAchievements += stats.achievements || 0;
+        solvedDistribution.push(ts);
+        const prog = stats.progress || {};
+        for (const mode of modes) {
+          if (!modeStats[mode]) modeStats[mode] = { totalSolved: 0, players: 0, solvedCounts: [] };
+          const count = prog[mode] || 0;
+          modeStats[mode].totalSolved += count;
+          if (count > 0) modeStats[mode].players++;
+          modeStats[mode].solvedCounts.push(count);
+        }
+      }
+
+      // Calculate averages, medians, and difficulty indicators
+      for (const mode of modes) {
+        const ms = modeStats[mode];
+        ms.avgSolved = totalUsers > 0 ? (ms.totalSolved / totalUsers).toFixed(1) : 0;
+        const activeCounts = ms.solvedCounts.filter(c => c > 0);
+        ms.avgSolvedActive = activeCounts.length > 0 ? (activeCounts.reduce((a, b) => a + b, 0) / activeCounts.length).toFixed(1) : 0;
+        ms.completionRate = totalUsers > 0 ? ((ms.players / totalUsers) * 100).toFixed(0) : 0;
+      }
+
+      // Load per-puzzle completion data for difficulty analysis (easy, medium, hard modes)
+      const difficultyAnalysis = {};
+      for (const mode of ["easy", "medium", "hard"]) {
+        try {
+          const completions = await loadAllPuzzleCompletionsForMode(mode);
+          const puzzleKeys = Object.keys(completions);
+          const puzzleStats = [];
+          for (const pk of puzzleKeys) {
+            const entries = Object.values(completions[pk]);
+            if (entries.length === 0) continue;
+            const attempts = entries.map(e => e.attempts || 0).filter(a => a > 0);
+            const timesArr = entries.map(e => e.time || 0).filter(t => t > 0);
+            const avgAttempts = attempts.length > 0 ? (attempts.reduce((a, b) => a + b, 0) / attempts.length) : 0;
+            const avgTime = timesArr.length > 0 ? (timesArr.reduce((a, b) => a + b, 0) / timesArr.length) : 0;
+            const goldRate = attempts.length > 0 ? (attempts.filter(a => a === 1).length / attempts.length * 100) : 0;
+            puzzleStats.push({
+              puzzleKey: pk,
+              players: entries.length,
+              avgAttempts: avgAttempts.toFixed(1),
+              avgTime: avgTime.toFixed(0),
+              goldRate: goldRate.toFixed(0),
+            });
+          }
+          puzzleStats.sort((a, b) => parseFloat(b.avgAttempts) - parseFloat(a.avgAttempts));
+          difficultyAnalysis[mode] = puzzleStats;
+        } catch { difficultyAnalysis[mode] = []; }
+      }
+
+      // Engagement: users by total solved ranges
+      const engagementBuckets = [
+        { label: "0 puzzles", min: 0, max: 0, count: 0 },
+        { label: "1-10", min: 1, max: 10, count: 0 },
+        { label: "11-50", min: 11, max: 50, count: 0 },
+        { label: "51-100", min: 51, max: 100, count: 0 },
+        { label: "101-200", min: 101, max: 200, count: 0 },
+        { label: "200+", min: 201, max: Infinity, count: 0 },
+      ];
+      for (const ts of solvedDistribution) {
+        for (const b of engagementBuckets) {
+          if (ts >= b.min && ts <= b.max) { b.count++; break; }
+        }
+      }
+
+      setAdminMetrics({
+        totalUsers,
+        activeUsers,
+        globalTotalSolved,
+        globalTotalAchievements,
+        modeStats,
+        difficultyAnalysis,
+        engagementBuckets,
+        avgSolvedPerUser: totalUsers > 0 ? (globalTotalSolved / totalUsers).toFixed(1) : 0,
+      });
+    } catch (e) {
+      console.error("Admin metrics load failed:", e);
+    } finally {
+      setAdminMetricsLoading(false);
+    }
+  }, [isAdmin]);
+
   // --- Friends Modal ---
   const friendsModalEl = showFriendsModal && firebaseUser && firebaseConfigured && (
     <div onClick={() => setShowFriendsModal(false)} style={{
@@ -7367,7 +7853,7 @@ export default function Pattrn() {
         maxHeight: "85vh", overflowY: "auto",
       }}>
         {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
           <h2 style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, margin: 0 }}>
             {friendsModalTab === "compare" && compareFriend ? `vs ${compareFriend.username}` : "Friends"}
           </h2>
@@ -7385,7 +7871,126 @@ export default function Pattrn() {
           </div>
         </div>
 
-        {/* Tabs (only on list view) */}
+        {/* Tab bar (List | Activity) — hidden during compare */}
+        {friendsModalTab !== "compare" && (
+          <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
+            {[{ key: "list", label: "List" }, { key: "activity", label: "Activity" }].map(tab => (
+              <button key={tab.key}
+                onClick={() => {
+                  setFriendsModalTab(tab.key);
+                  if (tab.key === "activity") loadFriendActivity();
+                }}
+                style={{
+                  flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                  textTransform: "uppercase", cursor: "pointer", transition: "all 0.15s",
+                  background: friendsModalTab === tab.key ? C.accent : "transparent",
+                  color: friendsModalTab === tab.key ? C.bg : C.textDim,
+                  border: `1px solid ${friendsModalTab === tab.key ? C.accent : C.border}`,
+                }}
+              >{tab.label}</button>
+            ))}
+          </div>
+        )}
+
+        {/* Activity tab */}
+        {friendsModalTab === "activity" && (
+          <div style={{ animation: "fadeUp 0.25s ease" }}>
+            {friendPresenceLoading ? (
+              <div style={{ textAlign: "center", padding: "30px 20px", color: C.textDim, fontSize: 13 }}>
+                Loading activity...
+              </div>
+            ) : friendsList.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "30px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
+                No friends added yet.<br/>Add friends to see their activity.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {/* Sort: online first, then by lastSeen */}
+                {friendsList
+                  .slice()
+                  .sort((a, b) => {
+                    const pa = friendPresence[a.uid];
+                    const pb = friendPresence[b.uid];
+                    const onlineA = isFriendOnline(pa) ? 1 : 0;
+                    const onlineB = isFriendOnline(pb) ? 1 : 0;
+                    if (onlineA !== onlineB) return onlineB - onlineA;
+                    return ((pb?.lastSeen || 0) - (pa?.lastSeen || 0));
+                  })
+                  .map(friend => {
+                    const presence = friendPresence[friend.uid];
+                    const online = isFriendOnline(presence);
+                    const lastSolvedLabel = presence ? formatPuzzleLabel(presence.lastSolvedMode, presence.lastSolvedPuzzle) : null;
+                    const currentLabel = (online && presence?.status === "playing") ? formatPuzzleLabel(presence.currentMode, presence.currentPuzzle) : null;
+                    return (
+                      <div key={friend.uid} style={{
+                        padding: "12px 14px", borderRadius: 12,
+                        backgroundColor: C.surface,
+                        border: `1px solid ${online ? C.correct + "33" : C.border}`,
+                        transition: "border-color 0.2s",
+                      }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
+                          {/* Avatar with online dot */}
+                          <div style={{ position: "relative", flexShrink: 0 }}>
+                            {friend.profilePicture ? (
+                              <img src={friend.profilePicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
+                            ) : (
+                              <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: C.accent, fontWeight: 700 }}>
+                                {(friend.username || "?")[0].toUpperCase()}
+                              </div>
+                            )}
+                            {/* Online indicator dot */}
+                            <div style={{
+                              position: "absolute", bottom: -1, right: -1, width: 12, height: 12,
+                              borderRadius: "50%", border: `2px solid ${C.surface}`,
+                              backgroundColor: online ? C.correct : C.textDim,
+                            }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ fontSize: 14, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {friend.username}
+                              </span>
+                              <span style={{ fontSize: 10, color: online ? C.correct : C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
+                                {online ? "ONLINE" : "OFFLINE"}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 2 }}>
+                              {online ? (
+                                currentLabel ? `Playing ${currentLabel}` : "In menus"
+                              ) : (
+                                presence?.lastSeen ? `Last seen ${formatTimeAgo(presence.lastSeen)}` : "No activity yet"
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {/* Activity details */}
+                        <div style={{ display: "flex", gap: 8, marginLeft: 48 }}>
+                          {lastSolvedLabel && (
+                            <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.surfaceLight, border: `1px solid ${C.border}` }}>
+                              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Last Solved</div>
+                              <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{lastSolvedLabel}</div>
+                              {presence?.lastSolvedAt && (
+                                <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 1 }}>{formatTimeAgo(presence.lastSolvedAt)}</div>
+                              )}
+                            </div>
+                          )}
+                          {currentLabel && (
+                            <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.correct + "0a", border: `1px solid ${C.correct}22` }}>
+                              <div style={{ fontSize: 9, color: C.correct, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Now Playing</div>
+                              <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{currentLabel}</div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* List tab (add friends + friend list) */}
         {friendsModalTab === "list" && (
           <div style={{ marginBottom: 16 }}>
             {/* Add friend input */}
@@ -9325,6 +9930,40 @@ export default function Pattrn() {
                           </div>
                           <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
                             Admin: order, staff pick, unpublish
+                          </div>
+                        </div>
+                        <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                      </button>
+                    )}
+
+                    {/* Admin Game Metrics (only for admins) */}
+                    {isAdmin && (
+                      <button onClick={() => { setShowGameMenu(false); setView("admin-metrics"); loadAdminMetricsData(); }} style={{
+                        width: "100%", padding: "14px 16px", borderRadius: 12,
+                        backgroundColor: C.surface, border: `1px solid #8B5CF633`,
+                        cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                        transition: "all 0.15s",
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#8B5CF6"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = "#8B5CF633"; }}
+                      >
+                        <div style={{
+                          width: 32, height: 32, borderRadius: 8,
+                          backgroundColor: "#8B5CF622", display: "flex", alignItems: "center", justifyContent: "center",
+                          border: "1.5px solid #8B5CF644", flexShrink: 0,
+                        }}>
+                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <rect x="2" y="9" width="3" height="5" rx="0.5" fill="#8B5CF6"/>
+                            <rect x="6.5" y="5" width="3" height="9" rx="0.5" fill="#8B5CF6"/>
+                            <rect x="11" y="2" width="3" height="12" rx="0.5" fill="#8B5CF6"/>
+                          </svg>
+                        </div>
+                        <div style={{ flex: 1, textAlign: "left" }}>
+                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                            Game Metrics
+                          </div>
+                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                            Admin: player stats, difficulty analysis
                           </div>
                         </div>
                         <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
