@@ -2916,12 +2916,13 @@ export default function Pattrn() {
 
   const handleSaveMosaic = useCallback(async () => {
     if (!firebaseUser) { setMosaicMsg("Sign in to save mosaics"); setTimeout(() => setMosaicMsg(""), 2500); return; }
-    const hasContent = creatorGrid.some(row => row.some(c => c !== null));
-    if (!hasContent) { setMosaicMsg("Paint something first!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    if (!creatorTitle.trim()) { setMosaicMsg("Give your mosaic a name first!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    const allFilled = creatorGrid.every(row => row.every(c => c !== null));
+    if (!allFilled) { setMosaicMsg("Fill in all cells before saving!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
     setMosaicLoading(true);
     try {
       const mosaicData = {
-        title: creatorTitle || "Untitled",
+        title: creatorTitle.trim(),
         grid: creatorGrid,
         gridSize: 25,
         authorUsername: username || "",
