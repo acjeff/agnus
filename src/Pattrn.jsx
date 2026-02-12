@@ -33,6 +33,11 @@ import {
   completeCoopSession,
   deleteCoopSession,
   loadCoopSession,
+  checkUsernameAvailability,
+  saveUsername,
+  loadUserProfile,
+  saveProfilePicture,
+  lookupUserByUsername,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2667,6 +2672,19 @@ export default function Pattrn() {
   const [showSyncChoice, setShowSyncChoice] = useState(false);
   const [syncChoiceData, setSyncChoiceData] = useState(null); // { uid, localData, cloudData, localSummary, cloudSummary }
 
+  // --- Username & Profile state ---
+  const [username, setUsername] = useState(null); // current user's username
+  const [profilePicture, setProfilePicture] = useState(null); // base64 data URL
+  const [showUsernameModal, setShowUsernameModal] = useState(false); // mandatory username prompt
+  const [usernameInput, setUsernameInput] = useState("");
+  const [usernameError, setUsernameError] = useState("");
+  const [usernameLoading, setUsernameLoading] = useState(false);
+  const [usernameAvailable, setUsernameAvailable] = useState(null); // null | true | false
+  const [showProfilePage, setShowProfilePage] = useState(false);
+  const [profilePictureLoading, setProfilePictureLoading] = useState(false);
+  const usernameCheckTimer = useRef(null);
+  const hasCheckedUsername = useRef(false);
+
   // --- Coop mode state ---
   const [coopSessionId, setCoopSessionId] = useState(null);
   const [coopRole, setCoopRole] = useState(null); // "host" | "guest" | null
@@ -2725,6 +2743,30 @@ export default function Pattrn() {
     if (firebaseUser.email) {
       saveUserEmail(firebaseUser.uid, firebaseUser.email).catch(() => {});
     }
+  }, [firebaseUser, firebaseConfigured]);
+
+  // Load username and profile picture when user logs in, prompt if missing
+  useEffect(() => {
+    if (!firebaseUser || !firebaseConfigured) {
+      setUsername(null);
+      setProfilePicture(null);
+      hasCheckedUsername.current = false;
+      return;
+    }
+    if (hasCheckedUsername.current) return;
+    hasCheckedUsername.current = true;
+    loadUserProfile(firebaseUser.uid).then(profile => {
+      if (profile?.username) {
+        setUsername(profile.username);
+        setProfilePicture(profile.profilePicture || null);
+      } else {
+        // User has no username — show mandatory modal
+        setShowUsernameModal(true);
+        setProfilePicture(profile?.profilePicture || null);
+      }
+    }).catch(() => {
+      setShowUsernameModal(true);
+    });
   }, [firebaseUser, firebaseConfigured]);
 
   // --- Mosaic Creator helpers ---
@@ -2858,6 +2900,7 @@ export default function Pattrn() {
         grid: creatorGrid,
         gridSize: 25,
         authorEmail: firebaseUser.email || "",
+        authorUsername: username || "",
       };
       if (creatorEditingId) {
         await updateMosaicDesign(firebaseUser.uid, creatorEditingId, mosaicData);
@@ -2917,14 +2960,21 @@ export default function Pattrn() {
     }
   }, [firebaseUser]);
 
-  const handleShareMosaic = useCallback(async (mosaic, email) => {
-    if (!firebaseUser || !email) return;
+  const handleShareMosaic = useCallback(async (mosaic, identifier) => {
+    if (!firebaseUser || !identifier) return;
     setMosaicLoading(true);
     try {
-      const target = await lookupUserByEmail(email.trim());
+      // Try lookup by username first, then by email
+      let target = await lookupUserByUsername(identifier.trim());
+      if (!target) {
+        target = await lookupUserByEmail(identifier.trim());
+      }
       if (!target) { setMosaicMsg("User not found"); setMosaicLoading(false); setTimeout(() => setMosaicMsg(""), 2500); return; }
       if (target.uid === firebaseUser.uid) { setMosaicMsg("Can't share with yourself"); setMosaicLoading(false); setTimeout(() => setMosaicMsg(""), 2500); return; }
-      await shareMosaicWithUser(firebaseUser.uid, firebaseUser.email, target.uid, mosaic.id, mosaic);
+      await shareMosaicWithUser(firebaseUser.uid, firebaseUser.email, target.uid, mosaic.id, {
+        ...mosaic,
+        sharedByUsername: username || "",
+      });
       setMosaicMsg("Shared!");
       setShareTargetMosaic(null);
       setShareEmailInput("");
@@ -2936,7 +2986,7 @@ export default function Pattrn() {
       setMosaicLoading(false);
       setTimeout(() => setMosaicMsg(""), 4000);
     }
-  }, [firebaseUser]);
+  }, [firebaseUser, username]);
 
   const handleApproveMosaic = useCallback(async (mosaic) => {
     setMosaicLoading(true);
@@ -3119,7 +3169,7 @@ export default function Pattrn() {
     }
   }, []);
 
-  // Handle sign up: create account, merge local->cloud, push to cloud
+  // Handle sign up: create account, merge local->cloud, push to cloud, then prompt username
   const handleSignUp = useCallback(async (email, password) => {
     setAccountLoading(true);
     setAccountError("");
@@ -3134,6 +3184,8 @@ export default function Pattrn() {
       setAccountPassword("");
       setSyncStatus("synced");
       setTimeout(() => setSyncStatus(""), 2000);
+      // New account has no username yet — show the mandatory modal
+      setShowUsernameModal(true);
     } catch (e) {
       setAccountError(friendlyAuthError(e.code));
     } finally {
@@ -3239,11 +3291,125 @@ export default function Pattrn() {
     try {
       await logOut();
       setShowAccountModal(false);
+      setShowProfilePage(false);
       setSyncStatus("");
+      setUsername(null);
+      setProfilePicture(null);
+      hasCheckedUsername.current = false;
     } catch (e) {
       console.error("Sign out failed:", e);
     }
   }, []);
+
+  // Debounced username availability check
+  const checkUsernameDebounced = useCallback((value) => {
+    if (usernameCheckTimer.current) clearTimeout(usernameCheckTimer.current);
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.length < 3) {
+      setUsernameAvailable(null);
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      setUsernameAvailable(null);
+      setUsernameError("Only letters, numbers, and underscores");
+      return;
+    }
+    if (trimmed.length > 20) {
+      setUsernameAvailable(null);
+      setUsernameError("Max 20 characters");
+      return;
+    }
+    setUsernameError("");
+    usernameCheckTimer.current = setTimeout(async () => {
+      try {
+        const available = await checkUsernameAvailability(trimmed);
+        setUsernameAvailable(available);
+        if (!available) setUsernameError("Username already taken");
+        else setUsernameError("");
+      } catch {
+        setUsernameAvailable(null);
+      }
+    }, 400);
+  }, []);
+
+  // Handle saving username from the mandatory modal
+  const handleSaveUsername = useCallback(async () => {
+    if (!firebaseUser || !usernameInput.trim()) return;
+    const trimmed = usernameInput.trim();
+    if (trimmed.length < 3 || trimmed.length > 20 || !/^[a-zA-Z0-9_]+$/.test(trimmed)) {
+      setUsernameError("Username must be 3-20 characters (letters, numbers, underscores)");
+      return;
+    }
+    setUsernameLoading(true);
+    setUsernameError("");
+    try {
+      await saveUsername(firebaseUser.uid, trimmed);
+      setUsername(trimmed);
+      setShowUsernameModal(false);
+      setUsernameInput("");
+      setUsernameAvailable(null);
+    } catch (e) {
+      setUsernameError(e.message || "Failed to save username");
+    } finally {
+      setUsernameLoading(false);
+    }
+  }, [firebaseUser, usernameInput]);
+
+  // Handle profile picture upload
+  const handleProfilePictureUpload = useCallback((e) => {
+    const file = e.target.files?.[0];
+    if (!file || !firebaseUser) return;
+    if (!file.type.startsWith("image/")) return;
+    // Limit to 500KB for Firebase Realtime Database
+    if (file.size > 512000) {
+      setUsernameError("Image must be under 500KB");
+      setTimeout(() => setUsernameError(""), 3000);
+      return;
+    }
+    setProfilePictureLoading(true);
+    const reader = new FileReader();
+    reader.onload = async () => {
+      // Resize to 128x128 for storage efficiency
+      const img = new Image();
+      img.onload = async () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = 128;
+        canvas.height = 128;
+        const ctx = canvas.getContext("2d");
+        // Center-crop to square
+        const size = Math.min(img.width, img.height);
+        const sx = (img.width - size) / 2;
+        const sy = (img.height - size) / 2;
+        ctx.drawImage(img, sx, sy, size, size, 0, 0, 128, 128);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.8);
+        try {
+          await saveProfilePicture(firebaseUser.uid, dataUrl);
+          setProfilePicture(dataUrl);
+        } catch {
+          setUsernameError("Failed to save profile picture");
+          setTimeout(() => setUsernameError(""), 3000);
+        } finally {
+          setProfilePictureLoading(false);
+        }
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  }, [firebaseUser]);
+
+  // Handle removing profile picture
+  const handleRemoveProfilePicture = useCallback(async () => {
+    if (!firebaseUser) return;
+    setProfilePictureLoading(true);
+    try {
+      await saveProfilePicture(firebaseUser.uid, null);
+      setProfilePicture(null);
+    } catch {
+      // ignore
+    } finally {
+      setProfilePictureLoading(false);
+    }
+  }, [firebaseUser]);
 
   // Show a toast hint that login is available via the menu button
   const showLoginHint = useCallback(() => {
@@ -4911,8 +5077,8 @@ export default function Pattrn() {
             <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent }}>
               {customMosaicPlay.title || "Untitled"}
             </h2>
-            {customMosaicPlay.authorEmail && (
-              <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorEmail}</div>
+            {(customMosaicPlay.authorUsername || customMosaicPlay.authorEmail) && (
+              <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorUsername || customMosaicPlay.authorEmail}</div>
             )}
           </div>
         </div>
@@ -5297,13 +5463,13 @@ export default function Pattrn() {
                 Share Mosaic
               </h3>
               <p style={{ fontSize: 11, color: C.textDim, textAlign: "center", marginBottom: 16 }}>
-                Enter the email of the user you want to share "{shareTargetMosaic.title}" with
+                Enter the username or email of the user you want to share "{shareTargetMosaic.title}" with
               </p>
               <input
-                type="email"
+                type="text"
                 value={shareEmailInput}
                 onChange={e => setShareEmailInput(e.target.value)}
-                placeholder="user@example.com"
+                placeholder="Username or email"
                 style={{
                   width: "100%", padding: "10px 14px", borderRadius: 10,
                   backgroundColor: C.surface, border: `1px solid ${C.border}`,
@@ -5375,8 +5541,8 @@ export default function Pattrn() {
                     {mosaic.title || "Untitled"}
                   </div>
                   <div style={{ fontSize: 10, color: C.textDim }}>
-                    {mosaicGalleryTab === "shared" && mosaic.sharedByEmail ? `From ${mosaic.sharedByEmail}` :
-                     mosaicGalleryTab === "public" && mosaic.authorEmail ? `By ${mosaic.authorEmail}` :
+                    {mosaicGalleryTab === "shared" && (mosaic.sharedByUsername || mosaic.sharedByEmail) ? `From ${mosaic.sharedByUsername || mosaic.sharedByEmail}` :
+                     mosaicGalleryTab === "public" && (mosaic.authorUsername || mosaic.authorEmail) ? `By ${mosaic.authorUsername || mosaic.authorEmail}` :
                      mosaic.publicStatus === "approved" ? "Published" :
                      mosaic.publicStatus === "pending" ? "Pending review" :
                      mosaic.publicStatus === "rejected" ? "Not approved" : ""}
@@ -5496,7 +5662,7 @@ export default function Pattrn() {
                       {mosaic.title || "Untitled"}
                     </div>
                     <div style={{ fontSize: 11, color: C.textDim, marginBottom: 2 }}>
-                      By: {mosaic.authorEmail || "Unknown"}
+                      By: {mosaic.authorUsername || mosaic.authorEmail || "Unknown"}
                     </div>
                     <div style={{ fontSize: 10, color: C.textDim }}>
                       {mosaic.gridSize || 8}x{mosaic.gridSize || 8} grid
@@ -5551,23 +5717,28 @@ export default function Pattrn() {
         animation: "fadeUp 0.25s ease",
       }}>
         {firebaseUser ? (
-          // Signed in view
+          // Signed in: redirect to profile page
           <>
             <div style={{ textAlign: "center", marginBottom: 20 }}>
+              {/* Profile picture */}
               <div style={{
-                width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
-                backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
-                border: "2px solid #60A5FA44",
+                width: 56, height: 56, borderRadius: "50%", margin: "0 auto 12px",
+                backgroundColor: C.surface, display: "flex", alignItems: "center", justifyContent: "center",
+                border: `2px solid ${C.border}`, overflow: "hidden",
               }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
-                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                </svg>
+                {profilePicture ? (
+                  <img src={profilePicture} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                ) : (
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
+                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                  </svg>
+                )}
               </div>
               <h3 style={{
                 fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
               }}>
-                Signed In
+                {username || "Signed In"}
               </h3>
               <p style={{ color: C.textDim, fontSize: 12, margin: 0, wordBreak: "break-all" }}>
                 {firebaseUser.email}
@@ -5576,16 +5747,25 @@ export default function Pattrn() {
 
             <div style={{
               padding: "12px 16px", borderRadius: 10, backgroundColor: C.surface,
-              border: `1px solid ${C.border}`, marginBottom: 16, textAlign: "center",
+              border: `1px solid ${C.border}`, marginBottom: 12, textAlign: "center",
             }}>
               <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
               <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct }}>
                 {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
               </div>
-              <div style={{ fontSize: 10, color: C.textDim, marginTop: 4 }}>
-                Your progress syncs automatically
-              </div>
             </div>
+
+            <button
+              onClick={() => { setShowAccountModal(false); setShowProfilePage(true); }}
+              style={{
+                width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                background: C.accent, color: C.bg, border: "none", cursor: "pointer",
+                textTransform: "uppercase", transition: "all 0.15s", marginBottom: 8,
+              }}
+            >
+              Edit Profile
+            </button>
 
             <button
               onClick={handleSignOut}
@@ -5773,6 +5953,270 @@ export default function Pattrn() {
     </div>
   );
 
+  // --- Username modal (non-dismissible when logged in without username, dismissible when changing) ---
+  const usernameModalEl = showUsernameModal && firebaseUser && firebaseConfigured && (
+    <div onClick={username ? () => { setShowUsernameModal(false); setUsernameError(""); } : undefined} style={{
+      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.92)", zIndex: 1200,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: 24,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
+        padding: "24px", maxWidth: 380, width: "100%",
+        boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
+        animation: "fadeUp 0.25s ease",
+      }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
+            backgroundColor: C.accent + "22", display: "flex", alignItems: "center", justifyContent: "center",
+            border: `2px solid ${C.accent}44`,
+          }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="8" r="4" stroke={C.accent} strokeWidth="2" fill="none"/>
+              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={C.accent} strokeWidth="2" fill="none" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <h3 style={{
+            fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
+          }}>
+            Choose a Username
+          </h3>
+          <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5 }}>
+            Pick a unique username. This will be your public identity for sharing and invites.
+          </p>
+        </div>
+
+        <div style={{ position: "relative", marginBottom: 12 }}>
+          <input
+            type="text"
+            placeholder="Username"
+            value={usernameInput}
+            onChange={e => {
+              const v = e.target.value.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20);
+              setUsernameInput(v);
+              checkUsernameDebounced(v);
+            }}
+            autoComplete="username"
+            style={{
+              width: "100%", padding: "11px 14px", paddingRight: 40, borderRadius: 10, fontSize: 16,
+              fontFamily: "'Space Mono', monospace",
+              background: C.surface, border: `1px solid ${usernameError ? C.incorrect : usernameAvailable === true ? C.correct : C.border}`,
+              color: C.text, outline: "none", boxSizing: "border-box",
+              transition: "border-color 0.15s",
+            }}
+          />
+          {usernameInput.trim().length >= 3 && usernameAvailable !== null && (
+            <div style={{
+              position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
+              fontSize: 16, lineHeight: 1,
+            }}>
+              {usernameAvailable ? (
+                <span style={{ color: C.correct }}>{"\u2713"}</span>
+              ) : (
+                <span style={{ color: C.incorrect }}>{"\u2717"}</span>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div style={{ fontSize: 10, color: C.textDim, marginBottom: 8, paddingLeft: 2 }}>
+          3-20 characters. Letters, numbers, and underscores only.
+        </div>
+
+        {usernameError && (
+          <div style={{
+            padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+            backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
+            fontSize: 11, color: C.incorrect, textAlign: "center",
+          }}>
+            {usernameError}
+          </div>
+        )}
+
+        <button
+          onClick={handleSaveUsername}
+          disabled={usernameLoading || !usernameInput.trim() || usernameInput.trim().length < 3 || usernameAvailable !== true}
+          style={{
+            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+            background: (usernameAvailable === true && usernameInput.trim().length >= 3) ? C.accent : C.surfaceLight,
+            color: (usernameAvailable === true && usernameInput.trim().length >= 3) ? C.bg : C.textDim,
+            border: "none",
+            cursor: (usernameAvailable === true && usernameInput.trim().length >= 3 && !usernameLoading) ? "pointer" : "not-allowed",
+            opacity: usernameLoading ? 0.5 : 1,
+            textTransform: "uppercase", transition: "all 0.15s",
+          }}
+        >
+          {usernameLoading ? "Saving..." : username ? "Update Username" : "Set Username"}
+        </button>
+
+        {/* Close button only when user already has a username (changing it) */}
+        {username && (
+          <button
+            onClick={() => { setShowUsernameModal(false); setUsernameError(""); }}
+            style={{
+              width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
+              fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+              background: "none", border: "none", color: C.textDim, cursor: "pointer",
+              textTransform: "uppercase", transition: "all 0.15s", marginTop: 8,
+            }}
+          >
+            Cancel
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
+  // --- Profile page modal ---
+  const profilePageEl = showProfilePage && firebaseUser && firebaseConfigured && (
+    <div onClick={() => setShowProfilePage(false)} style={{
+      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: 24,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
+        padding: "24px", maxWidth: 400, width: "100%",
+        boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
+        animation: "fadeUp 0.25s ease",
+        maxHeight: "85vh", overflowY: "auto",
+      }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          {/* Profile picture */}
+          <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
+            <div style={{
+              width: 80, height: 80, borderRadius: "50%", margin: "0 auto",
+              backgroundColor: C.surface, display: "flex", alignItems: "center", justifyContent: "center",
+              border: `2px solid ${C.border}`, overflow: "hidden", position: "relative",
+            }}>
+              {profilePicture ? (
+                <img src={profilePicture} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="8" r="4" stroke={C.textDim} strokeWidth="2" fill="none"/>
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={C.textDim} strokeWidth="2" fill="none" strokeLinecap="round"/>
+                </svg>
+              )}
+            </div>
+            <label style={{
+              position: "absolute", bottom: -2, right: -2,
+              width: 28, height: 28, borderRadius: "50%",
+              backgroundColor: C.accent, display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: profilePictureLoading ? "not-allowed" : "pointer",
+              border: `2px solid ${C.bg}`,
+              opacity: profilePictureLoading ? 0.5 : 1,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke={C.bg} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePictureUpload}
+                disabled={profilePictureLoading}
+                style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
+              />
+            </label>
+          </div>
+
+          {profilePicture && (
+            <button
+              onClick={handleRemoveProfilePicture}
+              disabled={profilePictureLoading}
+              style={{
+                display: "block", margin: "4px auto 0", background: "none", border: "none",
+                color: C.textDim, fontSize: 10, cursor: "pointer", textDecoration: "underline",
+              }}
+            >
+              Remove photo
+            </button>
+          )}
+
+          <h3 style={{
+            fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent,
+            margin: profilePicture ? "8px 0 4px" : "0 0 4px",
+          }}>
+            Profile
+          </h3>
+          <p style={{ color: C.textDim, fontSize: 12, margin: 0, wordBreak: "break-all" }}>
+            {firebaseUser.email}
+          </p>
+        </div>
+
+        {/* Username section */}
+        <div style={{
+          padding: "14px 16px", borderRadius: 10, backgroundColor: C.surface,
+          border: `1px solid ${C.border}`, marginBottom: 12,
+        }}>
+          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>Username</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{
+              flex: 1, fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700,
+              color: username ? C.text : C.textDim,
+            }}>
+              {username || "Not set"}
+            </div>
+            <button
+              onClick={() => {
+                setUsernameInput(username || "");
+                setUsernameError("");
+                setUsernameAvailable(null);
+                setShowProfilePage(false);
+                setShowUsernameModal(true);
+              }}
+              style={{
+                padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace",
+                background: "none", border: `1px solid ${C.border}`, color: C.textDim,
+                cursor: "pointer", textTransform: "uppercase", letterSpacing: 0.5,
+              }}
+            >
+              {username ? "Change" : "Set"}
+            </button>
+          </div>
+        </div>
+
+        {/* Cloud sync section */}
+        <div style={{
+          padding: "12px 16px", borderRadius: 10, backgroundColor: C.surface,
+          border: `1px solid ${C.border}`, marginBottom: 16, textAlign: "center",
+        }}>
+          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
+          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct }}>
+            {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
+          </div>
+        </div>
+
+        {/* Sign out */}
+        <button
+          onClick={handleSignOut}
+          style={{
+            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+            textTransform: "uppercase", transition: "all 0.15s", marginBottom: 8,
+          }}
+        >
+          Sign out
+        </button>
+
+        <button
+          onClick={() => setShowProfilePage(false)}
+          style={{
+            width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            background: "none", border: "none", color: C.textDim, cursor: "pointer",
+            textTransform: "uppercase", transition: "all 0.15s",
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+
   // --- MENU VIEW ---
   if (view === "menu") {
     return (
@@ -5821,7 +6265,7 @@ export default function Pattrn() {
                 backgroundColor: syncStatus === "syncing" ? C.inProgress : syncStatus === "error" ? C.incorrect : C.correct,
                 transition: "background-color 0.3s",
               }} />
-              <span>Signed in as {firebaseUser.email}</span>
+              <span>Signed in as {username || firebaseUser.email}</span>
             </div>
           )}
         </div>
@@ -6607,7 +7051,7 @@ export default function Pattrn() {
                     <div style={{
                       fontSize: 8, color: C.textDim, letterSpacing: 0.5,
                     }}>
-                      {mosaic._source === "mine" ? "You" : mosaic.authorEmail ? mosaic.authorEmail.split("@")[0] : ""}
+                      {mosaic._source === "mine" ? "You" : mosaic.authorUsername ? mosaic.authorUsername : mosaic.authorEmail ? mosaic.authorEmail.split("@")[0] : ""}
                     </div>
                   </button>
                 ))}
@@ -7109,9 +7553,16 @@ export default function Pattrn() {
                       </button>
                     )}
 
-                    {/* Account */}
+                    {/* Account / Profile */}
                     {firebaseConfigured && (
-                      <button onClick={() => { setShowGameMenu(false); setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }} style={{
+                      <button onClick={() => {
+                        setShowGameMenu(false);
+                        if (firebaseUser) {
+                          setShowProfilePage(true);
+                        } else {
+                          setShowAccountModal(true); setAutoLoginModal(false); setAccountError("");
+                        }
+                      }} style={{
                         width: "100%", padding: "14px 16px", borderRadius: 12,
                         backgroundColor: C.surface, border: `1px solid ${C.border}`,
                         cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -7123,16 +7574,20 @@ export default function Pattrn() {
                         <div style={{
                           width: 32, height: 32, borderRadius: 8,
                           backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
-                          border: "1.5px solid #60A5FA44", flexShrink: 0,
+                          border: "1.5px solid #60A5FA44", flexShrink: 0, overflow: "hidden",
                         }}>
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <circle cx="8" cy="5" r="3" stroke="#60A5FA" strokeWidth="1.5" fill="none"/>
-                            <path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5" stroke="#60A5FA" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-                          </svg>
+                          {firebaseUser && profilePicture ? (
+                            <img src={profilePicture} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          ) : (
+                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                              <circle cx="8" cy="5" r="3" stroke="#60A5FA" strokeWidth="1.5" fill="none"/>
+                              <path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5" stroke="#60A5FA" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                            </svg>
+                          )}
                         </div>
                         <div style={{ flex: 1, textAlign: "left" }}>
                           <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                            Account
+                            {firebaseUser ? (username || "Profile") : "Account"}
                           </div>
                           <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
                             {firebaseUser ? firebaseUser.email : "Sign in to sync progress"}
@@ -7286,6 +7741,8 @@ export default function Pattrn() {
         )}
 
         {accountModalEl}
+        {usernameModalEl}
+        {profilePageEl}
 
         {/* Sync choice prompt (local vs cloud data on login) */}
         {showSyncChoice && syncChoiceData && (() => {
@@ -8454,6 +8911,8 @@ export default function Pattrn() {
 
       {themePickerEl}
       {accountModalEl}
+      {usernameModalEl}
+      {profilePageEl}
     </div>
   );
 }

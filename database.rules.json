@@ -9,7 +9,20 @@
         },
         "email": {
           ".read": "auth != null"
+        },
+        "username": {
+          ".read": "auth != null"
+        },
+        "profilePicture": {
+          ".read": "auth != null"
         }
+      }
+    },
+    "usernameIndex": {
+      "$usernameKey": {
+        ".read": "auth != null",
+        ".write": "auth != null",
+        ".validate": "newData.isString()"
       }
     },
     "emailIndex": {
