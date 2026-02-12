@@ -3231,9 +3231,26 @@ export default function Pattrn() {
   }, [difficulty, view, firebaseUser, buildCustomMosaicPuzzles]);
 
   // Helper: render a mosaic grid thumbnail (using canvas-like div grid)
-  const MosaicThumbnail = useCallback(({ grid, size = 80 }) => {
+  // When hidden=true, renders an obscured placeholder instead of the actual image
+  const MosaicThumbnail = useCallback(({ grid, size = 80, hidden = false }) => {
     const gs = grid?.length || 25;
     const cellSz = size / gs;
+    if (hidden) {
+      return (
+        <div style={{
+          width: size, height: size, borderRadius: 6, overflow: "hidden", flexShrink: 0,
+          border: `1px solid ${C.border}`, position: "relative",
+          backgroundColor: C.surface,
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div style={{
+            fontSize: Math.max(size * 0.35, 16), fontWeight: 700,
+            color: C.textDim, fontFamily: "'Space Mono', monospace",
+            opacity: 0.5, userSelect: "none",
+          }}>?</div>
+        </div>
+      );
+    }
     return (
       <div style={{ width: size, height: size, borderRadius: 6, overflow: "hidden", flexShrink: 0, border: `1px solid ${C.border}`, position: "relative" }}>
         <canvas ref={el => {
@@ -5915,7 +5932,7 @@ export default function Pattrn() {
                 backgroundColor: C.surface, border: `1px solid ${C.border}`, alignItems: "center",
               }}>
                 <div style={{ cursor: "pointer" }} onClick={() => mosaic.grid && startCustomMosaicPlay(mosaic)}>
-                  <MosaicThumbnail grid={mosaic.grid} size={64} />
+                  <MosaicThumbnail grid={mosaic.grid} size={64} hidden={!isAdmin && mosaicGalleryTab !== "mine" && mosaic.authorUid !== firebaseUser?.uid} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -7613,7 +7630,7 @@ export default function Pattrn() {
                     onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.transform = "translateY(-2px)"; }}
                     onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; }}
                   >
-                    <MosaicThumbnail grid={mosaic.grid} size={72} />
+                    <MosaicThumbnail grid={mosaic.grid} size={72} hidden={!isAdmin && mosaic._source !== "mine" && mosaic.authorUid !== firebaseUser?.uid} />
                     <div style={{
                       fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 600,
                       color: C.text, textAlign: "center", lineHeight: 1.2,
