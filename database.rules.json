@@ -19,6 +19,12 @@
         ".validate": "newData.isString()"
       }
     },
+    "coopSessions": {
+      "$sessionId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
     "mosaics": {
       "pending": {
         ".read": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true",

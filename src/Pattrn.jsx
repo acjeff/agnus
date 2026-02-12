@@ -4117,11 +4117,17 @@ export default function Pattrn() {
   // Create a coop session for the current puzzle
   const startCoopSession = useCallback(async () => {
     if (!firebaseUser || !puzzle) return;
-    const sessionId = await createCoopSession(firebaseUser.uid, {
-      mode: difficulty,
-      level: currentPuzzle,
-      dailyDate: isDaily ? currentDailyDate : null,
-    });
+    let sessionId;
+    try {
+      sessionId = await createCoopSession(firebaseUser.uid, {
+        mode: difficulty,
+        level: currentPuzzle,
+        dailyDate: isDaily ? currentDailyDate : null,
+      });
+    } catch (e) {
+      console.error("Failed to create coop session:", e);
+      return;
+    }
     if (!sessionId) return;
     setCoopSessionId(sessionId);
     setCoopRole("host");
