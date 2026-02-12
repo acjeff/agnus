@@ -1674,6 +1674,7 @@ function countModeFailed(mp) { return Object.values(mp || {}).filter(v => v === 
 function countModeGold(mp) { return Object.values(mp || {}).filter(v => v >= 1 && v <= 2).length; }
 function countModeFirstTry(mp) { return Object.values(mp || {}).filter(v => v === 1).length; }
 function countCascadeClears(cp) { return Object.values(cp || {}).filter(v => v === CASCADE_LEVELS.length).length; }
+function countCoopSolved(cp) { return Object.values(cp || {}).filter(v => v > 0).length; }
 function countTimesUnder(mt, mp, maxSec) {
   let c = 0;
   for (const [k, t] of Object.entries(mt || {})) { if ((mp || {})[k] > 0 && t < maxSec) c++; }
@@ -1738,6 +1739,7 @@ const ACHIEVEMENTS = [
   { id: "total_100", cat: "special", label: "Centurion", desc: "Solve 100 puzzles total", tier: 3, check: (p) => [...SOLVE_MODES, "daily"].reduce((s, m) => s + countModeSolved(p[m]), 0) + countCascadeClears(p.cascade) >= 100 },
   { id: "birthday_puzzle", cat: "special", label: "Birthday Bash", desc: "Solve your birthday puzzle", tier: 2, check: (p) => { try { const bd = localStorage.getItem(BIRTHDAY_KEY); if (!bd) return false; const seed = getDailySeedForDate(bd); return (p.daily || {})[seed] > 0; } catch { return false; } } },
   { id: "first_fail", cat: "special", label: "Trial & Error", desc: "Fail a puzzle for the first time", tier: 1, check: (p) => SOLVE_MODES.some(m => countModeFailed(p[m]) >= 1) },
+  { id: "coop_1", cat: "special", label: "Better Together", desc: "Complete a puzzle in Co-op mode", tier: 1, check: (p) => countCoopSolved(p.coop) >= 1 },
   { id: "cheat_turing", cat: "special", label: "Welcome Back, Alan", desc: "Born on the day the father of computing was born", tier: 3, check: () => false },
 ];
 
@@ -4573,7 +4575,9 @@ export default function Pattrn() {
     const newTimes = { ...freshTimes, coop: newCoopTimes };
     setTimes(newTimes);
     saveTimes(newTimes);
-  }, [coopComplete, puzzle, stopTimer, elapsedTime, difficulty, progressKey, attempts]);
+
+    showNewAchievements(newProgress, newTimes);
+  }, [coopComplete, puzzle, stopTimer, elapsedTime, difficulty, progressKey, attempts, showNewAchievements]);
 
   // For blind mode: all non-locked blanks must be filled
   const activeBlanks = puzzle ? [...puzzle.blanks].filter(k => !lockedCells.has(k)) : [];
