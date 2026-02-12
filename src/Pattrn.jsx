@@ -12,15 +12,11 @@ import {
   summariseGameData,
   saveMosaicDesign,
   updateMosaicDesign,
-  loadUserMosaics,
   deleteMosaicDesign,
   submitMosaicForReview,
-  loadPendingMosaics,
   approveMosaic,
   rejectMosaic,
-  loadPublicMosaics,
   shareMosaicWithUser,
-  loadSharedMosaics,
   saveUserEmail,
   checkIsAdmin,
   createCoopSession,
@@ -50,23 +46,26 @@ import {
   unpublishMosaic,
   setStaffPick,
   clearStaffPick,
-  loadStaffPickMosaic,
   addFriend,
   removeFriend,
-  loadFriends,
   registerAdminIndex,
   loadAdminUids,
   savePublicStats,
   loadPublicStats,
   savePuzzleCompletion,
-  loadPuzzleCompletions,
-  loadFriendPuzzleCompletions,
   updatePresence,
-  loadFriendPresence,
   subscribeToFriendPresence,
   loadAllPublicStats,
+  subscribeToAllPublicStats,
+  subscribeToAllPresence,
   loadAllPuzzleCompletionsForMode,
-  loadAllPresence,
+  subscribeToFriends,
+  subscribeToUserMosaics,
+  subscribeToPublicMosaics,
+  subscribeToPendingMosaics,
+  subscribeToSharedMosaics,
+  subscribeToStaffPick,
+  subscribeToPuzzleCompletions,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2818,7 +2817,6 @@ export default function Pattrn() {
   // --- Staff Pick & Admin Manage state ---
   const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
   const staffPickPuzzlesRef = useRef(null); // puzzles built from staff pick grid
-  const staffPickLoadedRef = useRef(false);
   const [showMosaicPreviewOverlay, setShowMosaicPreviewOverlay] = useState(false); // magnifying glass preview overlay
   const customMosaicReturnViewRef = useRef("gallery"); // where to go when leaving custom-mosaic view
 
@@ -2866,6 +2864,15 @@ export default function Pattrn() {
       updatePresence(firebaseUser.uid, { online: true, status: "idle", currentMode: null, currentPuzzle: null }).catch(() => {});
     }
   }, [view, firebaseUser, firebaseConfigured]);
+
+  // Real-time friends list subscription
+  useEffect(() => {
+    if (!firebaseUser || !firebaseConfigured) return;
+    const unsub = subscribeToFriends(firebaseUser.uid, (friends) => {
+      setFriendsList(friends);
+    });
+    return unsub;
+  }, [firebaseUser, firebaseConfigured]);
 
   // Real-time friend presence subscriptions: subscribe to each friend's presence
   const friendPresenceUnsubsRef = useRef([]);
@@ -3145,9 +3152,6 @@ export default function Pattrn() {
         setCreatorEditingId(id);
         setMosaicMsg("Mosaic saved!");
       }
-      // Refresh list
-      const list = await loadUserMosaics(firebaseUser.uid);
-      setMyMosaics(list);
     } catch (e) {
       console.error("Save mosaic failed:", e);
       const isPermErr = e?.message?.includes("PERMISSION_DENIED");
@@ -3163,8 +3167,6 @@ export default function Pattrn() {
     setMosaicLoading(true);
     try {
       await deleteMosaicDesign(firebaseUser.uid, mosaicId);
-      const list = await loadUserMosaics(firebaseUser.uid);
-      setMyMosaics(list);
       setMosaicMsg("Mosaic deleted");
     } catch (e) {
       console.error("Delete mosaic failed:", e);
@@ -3182,8 +3184,6 @@ export default function Pattrn() {
     setMosaicLoading(true);
     try {
       await submitMosaicForReview(firebaseUser.uid, mosaic.id, mosaic);
-      const list = await loadUserMosaics(firebaseUser.uid);
-      setMyMosaics(list);
       setMosaicMsg("Submitted for review!");
       // Notify all admins about the new pending mosaic
       loadAdminUids().then((adminUids) => {
@@ -3249,8 +3249,6 @@ export default function Pattrn() {
       if (target.uid === firebaseUser.uid) { setAddFriendMsg("Can't add yourself"); return; }
       if (friendsList.some(f => f.uid === target.uid)) { setAddFriendMsg("Already friends"); return; }
       await addFriend(firebaseUser.uid, target.uid);
-      const updated = await loadFriends(firebaseUser.uid);
-      setFriendsList(updated);
       setAddFriendInput("");
       setAddFriendMsg("Friend added!");
     } catch (e) {
@@ -3266,7 +3264,6 @@ export default function Pattrn() {
     if (!firebaseUser) return;
     try {
       await removeFriend(firebaseUser.uid, friendUid);
-      setFriendsList(prev => prev.filter(f => f.uid !== friendUid));
     } catch (e) {
       console.error("Remove friend failed:", e);
     }
@@ -3276,8 +3273,6 @@ export default function Pattrn() {
     setMosaicLoading(true);
     try {
       await approveMosaic(mosaic.id, mosaic);
-      const list = await loadPendingMosaics();
-      setPendingMosaicsList(list);
       setMosaicMsg("Approved!");
     } catch (e) {
       console.error("Approve failed:", e);
@@ -3292,8 +3287,6 @@ export default function Pattrn() {
     setMosaicLoading(true);
     try {
       await rejectMosaic(mosaic.id, mosaic);
-      const list = await loadPendingMosaics();
-      setPendingMosaicsList(list);
       setMosaicMsg("Rejected");
     } catch (e) {
       console.error("Reject failed:", e);
@@ -3308,13 +3301,6 @@ export default function Pattrn() {
     setMosaicLoading(true);
     try {
       await unpublishMosaic(mosaic.id, mosaic);
-      const list = await loadPublicMosaics();
-      setPublicMosaicsList(list);
-      // Clear staff pick if this was it
-      if (staffPickMosaic && staffPickMosaic.id === mosaic.id) {
-        setStaffPickMosaic(null);
-        staffPickPuzzlesRef.current = null;
-      }
       setMosaicMsg("Unpublished");
     } catch (e) {
       console.error("Unpublish failed:", e);
@@ -3329,8 +3315,6 @@ export default function Pattrn() {
     setMosaicLoading(true);
     try {
       await setStaffPick(mosaic.id);
-      setStaffPickMosaic(mosaic);
-      staffPickPuzzlesRef.current = buildCustomMosaicPuzzles(mosaic.grid);
       setMosaicMsg("Staff pick set!");
     } catch (e) {
       console.error("Set staff pick failed:", e);
@@ -3345,8 +3329,6 @@ export default function Pattrn() {
     setMosaicLoading(true);
     try {
       await clearStaffPick();
-      setStaffPickMosaic(null);
-      staffPickPuzzlesRef.current = null;
       setMosaicMsg("Staff pick cleared");
     } catch (e) {
       console.error("Clear staff pick failed:", e);
@@ -3371,8 +3353,6 @@ export default function Pattrn() {
         updatePublicMosaicFields(publicMosaicsList[idx].id, { displayOrder: orderB }),
         updatePublicMosaicFields(publicMosaicsList[swapIdx].id, { displayOrder: orderA }),
       ]);
-      const list = await loadPublicMosaics();
-      setPublicMosaicsList(list);
     } catch (e) {
       console.error("Reorder failed:", e);
       setMosaicMsg("Reorder failed");
@@ -3382,52 +3362,8 @@ export default function Pattrn() {
     }
   }, [publicMosaicsList]);
 
-  const loadMosaicData = useCallback(async (tab) => {
-    setMosaicLoading(true);
-    try {
-      if (tab === "mine" && firebaseUser) {
-        const [userResult, sharedResult, friendsResult] = await Promise.allSettled([
-          loadUserMosaics(firebaseUser.uid),
-          loadSharedMosaics(firebaseUser.uid),
-          loadFriends(firebaseUser.uid),
-        ]);
-        setMyMosaics(userResult.status === "fulfilled" ? userResult.value : []);
-        setSharedMosaics(sharedResult.status === "fulfilled" ? sharedResult.value : []);
-        if (friendsResult.status === "fulfilled") setFriendsList(friendsResult.value);
-        const failed = [userResult, sharedResult].filter(r => r.status === "rejected");
-        if (failed.length > 0) {
-          const isPermErr = failed.some(r => r.reason?.message?.includes("PERMISSION_DENIED") || r.reason?.message?.includes("Permission denied"));
-          setMosaicMsg(isPermErr ? "Load failed — database rules need to be deployed (see database.rules.json)" : "Failed to load some mosaic data");
-          setTimeout(() => setMosaicMsg(""), 4000);
-        }
-      } else if (tab === "shared" && firebaseUser) {
-        const sharedList = await loadSharedMosaics(firebaseUser.uid);
-        setSharedMosaics(sharedList);
-      } else if (tab === "public") {
-        const pubList = await loadPublicMosaics();
-        setPublicMosaicsList(pubList);
-      } else if (tab === "friends" && firebaseUser) {
-        const friends = await loadFriends(firebaseUser.uid);
-        setFriendsList(friends);
-      } else if (tab === "admin" && isAdmin) {
-        const pendList = await loadPendingMosaics();
-        setPendingMosaicsList(pendList);
-      } else if (tab === "manage" && isAdmin) {
-        const pubList = await loadPublicMosaics();
-        setPublicMosaicsList(pubList);
-        // Also load current staff pick
-        const sp = await loadStaffPickMosaic();
-        setStaffPickMosaic(sp);
-      }
-    } catch (e) {
-      console.error("Load mosaic data failed:", e);
-      const isPermErr = e?.message?.includes("PERMISSION_DENIED") || e?.message?.includes("Permission denied");
-      setMosaicMsg(isPermErr ? "Load failed — database rules need to be deployed (see database.rules.json)" : "Failed to load mosaic data");
-      setTimeout(() => setMosaicMsg(""), 4000);
-    } finally {
-      setMosaicLoading(false);
-    }
-  }, [firebaseUser, isAdmin]);
+  // Data is kept fresh via real-time subscriptions — no manual load needed
+  const loadMosaicData = useCallback(async () => {}, []);
 
   const editMosaic = useCallback((mosaic) => {
     setCreatorGrid(mosaic.grid || Array.from({ length: 25 }, () => Array(25).fill(null)));
@@ -3437,29 +3373,36 @@ export default function Pattrn() {
     setView("creator");
   }, []);
 
-  // Load mosaic carousel data and staff pick when mosaic mode is selected on menu
-  const mosaicCarouselLoadedRef = useRef(false);
+  // Real-time mosaic subscriptions
   useEffect(() => {
-    if (difficulty !== "mosaic" || view !== "menu") return;
-    if (mosaicCarouselLoadedRef.current) return;
-    mosaicCarouselLoadedRef.current = true;
-    // Load public mosaics (always) and user mosaics + shared mosaics (if signed in)
-    loadPublicMosaics().then(setPublicMosaicsList).catch(() => {});
-    if (firebaseUser) {
-      loadUserMosaics(firebaseUser.uid).then(setMyMosaics).catch(() => {});
-      loadSharedMosaics(firebaseUser.uid).then(setSharedMosaics).catch(() => {});
-    }
-    // Load staff pick mosaic for the main grid
-    if (!staffPickLoadedRef.current) {
-      staffPickLoadedRef.current = true;
-      loadStaffPickMosaic().then(sp => {
-        if (sp && sp.grid) {
-          setStaffPickMosaic(sp);
-          staffPickPuzzlesRef.current = buildCustomMosaicPuzzles(sp.grid);
-        }
-      }).catch(() => {});
-    }
-  }, [difficulty, view, firebaseUser, buildCustomMosaicPuzzles]);
+    const unsub = subscribeToPublicMosaics(setPublicMosaicsList);
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const unsubUser = subscribeToUserMosaics(firebaseUser.uid, setMyMosaics);
+    const unsubShared = subscribeToSharedMosaics(firebaseUser.uid, setSharedMosaics);
+    return () => { unsubUser(); unsubShared(); };
+  }, [firebaseUser]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    const unsub = subscribeToPendingMosaics(setPendingMosaicsList);
+    return unsub;
+  }, [isAdmin]);
+
+  useEffect(() => {
+    const unsub = subscribeToStaffPick((sp) => {
+      setStaffPickMosaic(sp);
+      if (sp && sp.grid) {
+        staffPickPuzzlesRef.current = buildCustomMosaicPuzzles(sp.grid);
+      } else {
+        staffPickPuzzlesRef.current = null;
+      }
+    });
+    return unsub;
+  }, [buildCustomMosaicPuzzles]);
 
   // Helper: render a mosaic grid thumbnail (using canvas-like div grid)
   // When hidden=true, renders an obscured placeholder instead of the actual image
@@ -3593,7 +3536,7 @@ export default function Pattrn() {
     } finally {
       cloudSyncInFlight.current = false;
     }
-  }, []);
+  }, [username]);
 
   // Handle sign up: create account, merge local->cloud, push to cloud, then prompt username
   const handleSignUp = useCallback(async (email, password) => {
@@ -4481,18 +4424,9 @@ export default function Pattrn() {
         }
       }
     }, 1000);
-    // Reset ranking/friend data for new puzzle
+    // Reset ranking/friend data — real-time subscription handles updates
     setPuzzleRanking(null);
     setFriendsPuzzleData({});
-    // Load friends' completion data for this puzzle
-    if (firebaseUser && friendsList.length > 0) {
-      const pKey = (effectiveDiff === "daily" && dailyDate) ? dailyDate : String(idx);
-      setFriendsPuzzleLoading(true);
-      loadFriendPuzzleCompletions(friendsList.map(f => f.uid), effectiveDiff, pKey)
-        .then(setFriendsPuzzleData)
-        .catch(() => {})
-        .finally(() => setFriendsPuzzleLoading(false));
-    }
     // Update presence: currently playing this puzzle
     if (firebaseUser) {
       updatePresence(firebaseUser.uid, {
@@ -4503,6 +4437,37 @@ export default function Pattrn() {
     }
     setView("play");
   };
+
+  // Real-time puzzle completions subscription (friend indicators + global ranking)
+  useEffect(() => {
+    if (!firebaseUser || view !== "play") return;
+    const isCasc = difficulty === "cascade";
+    const isMos = difficulty === "mosaic";
+    if (isCasc || isMos) return; // cascade/mosaic don't have per-puzzle leaderboards
+    const pKey = (difficulty === "daily" && currentDailyDate) ? currentDailyDate : String(currentPuzzle);
+    const friendUidSet = new Set(friendsList.map(f => f.uid));
+    const unsub = subscribeToPuzzleCompletions(difficulty, pKey, (completions) => {
+      // Extract friend completions
+      const friendData = {};
+      for (const [uid, data] of Object.entries(completions)) {
+        if (friendUidSet.has(uid)) friendData[uid] = data;
+      }
+      setFriendsPuzzleData(friendData);
+      setFriendsPuzzleLoading(false);
+      // Compute ranking
+      const entries = Object.values(completions);
+      const myEntry = completions[firebaseUser.uid];
+      if (myEntry && entries.length > 0) {
+        const sorted = entries.slice().sort((a, b) => (a.time || 9999) - (b.time || 9999) || (a.attempts || 99) - (b.attempts || 99));
+        const myRank = sorted.findIndex(e => e.time === myEntry.time && e.attempts === myEntry.attempts) + 1;
+        setPuzzleRanking({ rank: myRank || entries.length, total: entries.length });
+      } else if (entries.length > 0) {
+        setPuzzleRanking(null); // not yet completed — don't show ranking
+      }
+      setPuzzleRankingLoading(false);
+    });
+    return unsub;
+  }, [firebaseUser, view, difficulty, currentPuzzle, currentDailyDate, friendsList]);
 
   const resetCascadeLevelState = useCallback(() => {
     setFills({});
@@ -5270,19 +5235,7 @@ export default function Pattrn() {
               lastSolvedAt: Date.now(),
               currentMode: null, currentPuzzle: null,
             }).catch(() => {});
-            // Load global ranking
-            setPuzzleRankingLoading(true);
-            loadPuzzleCompletions(difficulty, compKey).then(completions => {
-              const entries = Object.values(completions);
-              const myEntry = completions[firebaseUser.uid];
-              if (myEntry && entries.length > 0) {
-                const sorted = entries.slice().sort((a, b) => (a.time || 9999) - (b.time || 9999) || (a.attempts || 99) - (b.attempts || 99));
-                const myRank = sorted.findIndex(e => e.time === myEntry.time && e.attempts === myEntry.attempts) + 1;
-                setPuzzleRanking({ rank: myRank || entries.length, total: entries.length });
-              } else {
-                setPuzzleRanking({ rank: 1, total: entries.length || 1 });
-              }
-            }).catch(() => {}).finally(() => setPuzzleRankingLoading(false));
+            // Ranking updates via real-time subscription
           }
         }
       }
@@ -5841,16 +5794,7 @@ export default function Pattrn() {
     </div>
   );
 
-  // --- Load Friend Activity (presence data) ---
-  const loadFriendActivity = useCallback(async () => {
-    if (!firebaseUser || friendsList.length === 0) return;
-    setFriendPresenceLoading(true);
-    try {
-      const presenceData = await loadFriendPresence(friendsList.map(f => f.uid));
-      setFriendPresence(presenceData);
-    } catch { /* ignore */ }
-    finally { setFriendPresenceLoading(false); }
-  }, [firebaseUser, friendsList]);
+  // Friend activity is handled by real-time subscriptions (subscribeToFriendPresence)
 
   // --- Load Admin Metrics ---
   const loadAdminMetricsData = useCallback(async () => {
@@ -5953,42 +5897,50 @@ export default function Pattrn() {
     }
   }, [isAdmin]);
 
-  // --- Load Admin User Activity ---
-  const loadAdminUserActivityData = useCallback(async () => {
-    if (!isAdmin) return;
+  // --- Real-time Admin User Activity ---
+  const adminStatsRef = useRef({});
+  const adminPresenceRef = useRef({});
+  const buildAdminActivityList = useCallback((allStats, allPresence) => {
+    const userEntries = Object.entries(allStats);
+    return userEntries.map(([uid, stats]) => {
+      const presence = allPresence[uid] || {};
+      return {
+        uid,
+        username: stats.username || null,
+        totalSolved: stats.totalSolved || 0,
+        achievements: stats.achievements || 0,
+        progress: stats.progress || {},
+        updatedAt: stats.updatedAt || 0,
+        online: presence.online || false,
+        status: presence.status || null,
+        lastSeen: presence.lastSeen || 0,
+        currentMode: presence.currentMode || null,
+        currentPuzzle: presence.currentPuzzle || null,
+        lastSolvedMode: presence.lastSolvedMode || null,
+        lastSolvedPuzzle: presence.lastSolvedPuzzle || null,
+        lastSolvedAt: presence.lastSolvedAt || 0,
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isAdmin || view !== "admin-users") return;
     setAdminUserActivityLoading(true);
-    try {
-      const [allStats, allPresence] = await Promise.all([
-        loadAllPublicStats(),
-        loadAllPresence(),
-      ]);
-      const userEntries = Object.entries(allStats);
-      const activityList = userEntries.map(([uid, stats]) => {
-        const presence = allPresence[uid] || {};
-        return {
-          uid,
-          username: stats.username || null,
-          totalSolved: stats.totalSolved || 0,
-          achievements: stats.achievements || 0,
-          progress: stats.progress || {},
-          updatedAt: stats.updatedAt || 0,
-          online: presence.online || false,
-          status: presence.status || null,
-          lastSeen: presence.lastSeen || 0,
-          currentMode: presence.currentMode || null,
-          currentPuzzle: presence.currentPuzzle || null,
-          lastSolvedMode: presence.lastSolvedMode || null,
-          lastSolvedPuzzle: presence.lastSolvedPuzzle || null,
-          lastSolvedAt: presence.lastSolvedAt || 0,
-        };
-      });
-      setAdminUserActivity(activityList);
-    } catch (e) {
-      console.error("Admin user activity load failed:", e);
-    } finally {
+    const unsubStats = subscribeToAllPublicStats((allStats) => {
+      adminStatsRef.current = allStats;
+      setAdminUserActivity(buildAdminActivityList(allStats, adminPresenceRef.current));
       setAdminUserActivityLoading(false);
-    }
-  }, [isAdmin]);
+    });
+    const unsubPresence = subscribeToAllPresence((allPresence) => {
+      adminPresenceRef.current = allPresence;
+      setAdminUserActivity(buildAdminActivityList(adminStatsRef.current, allPresence));
+      setAdminUserActivityLoading(false);
+    });
+    return () => {
+      unsubStats();
+      unsubPresence();
+    };
+  }, [isAdmin, view, buildAdminActivityList]);
 
   // --- CUSTOM MOSAIC PLAY VIEW (puzzle selection for user-created mosaics) ---
   if (view === "custom-mosaic" && customMosaicPlay) {
@@ -6029,7 +5981,7 @@ export default function Pattrn() {
           </div>
           {firebaseConfigured && firebaseUser && (
             <button
-              onClick={() => { loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {}); setShowFriendsModal(true); setFriendsModalTab("list"); }}
+              onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }}
               style={{
                 background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
                 borderRadius: 8, padding: "5px 8px", cursor: "pointer",
@@ -6278,7 +6230,7 @@ export default function Pattrn() {
           </h2>
           {firebaseConfigured && firebaseUser && (
             <button
-              onClick={() => { loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {}); setShowFriendsModal(true); setFriendsModalTab("list"); }}
+              onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }}
               style={{
                 background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
                 borderRadius: 8, padding: "5px 8px", cursor: "pointer",
@@ -6522,7 +6474,7 @@ export default function Pattrn() {
           </h2>
           {firebaseConfigured && firebaseUser && (
             <button
-              onClick={() => { loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {}); setShowFriendsModal(true); setFriendsModalTab("list"); }}
+              onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }}
               style={{
                 background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
                 borderRadius: 8, padding: "5px 8px", cursor: "pointer",
@@ -7537,17 +7489,13 @@ export default function Pattrn() {
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             User Activity
           </h2>
-          <button onClick={loadAdminUserActivityData}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            Refresh
-          </button>
+          <span style={{
+              fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 0.5,
+              color: "#06B6D4", display: "flex", alignItems: "center", gap: 6,
+            }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#06B6D4", display: "inline-block" }} />
+            Live
+          </span>
         </div>
 
         {/* Summary stats */}
@@ -8293,7 +8241,7 @@ export default function Pattrn() {
               <button key={tab.key}
                 onClick={() => {
                   setFriendsModalTab(tab.key);
-                  if (tab.key === "activity") loadFriendActivity();
+                  // Friend activity data kept fresh via real-time subscriptions
                 }}
                 style={{
                   flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
@@ -8655,7 +8603,6 @@ export default function Pattrn() {
             <div style={{ position: "absolute", top: 2, left: 0, display: "flex", gap: 6, alignItems: "center" }}>
               <button
                 onClick={() => {
-                  loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {});
                   setShowFriendsModal(true);
                   setFriendsModalTab("list");
                 }}
@@ -10387,7 +10334,7 @@ export default function Pattrn() {
 
                     {/* Admin User Activity (only for admins) */}
                     {isAdmin && (
-                      <button onClick={() => { setShowGameMenu(false); setView("admin-users"); loadAdminUserActivityData(); }} style={{
+                      <button onClick={() => { setShowGameMenu(false); setView("admin-users"); }} style={{
                         width: "100%", padding: "14px 16px", borderRadius: 12,
                         backgroundColor: C.surface, border: `1px solid #06B6D433`,
                         cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -11219,7 +11166,6 @@ export default function Pattrn() {
           {firebaseConfigured && firebaseUser && (
             <button
               onClick={() => {
-                loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {});
                 setShowFriendsModal(true);
                 setFriendsModalTab("list");
               }}
@@ -11305,8 +11251,6 @@ export default function Pattrn() {
                   setShowAccountModal(true);
                   return;
                 }
-                // Load friends list and show friend picker
-                loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {});
                 setShowCoopFriendPicker(true);
               }}
               style={{
@@ -11358,7 +11302,6 @@ export default function Pattrn() {
                   onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "44"; }}
                   onClick={() => {
-                    loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {});
                     setShowFriendsModal(true);
                     setFriendsModalTab("list");
                   }}

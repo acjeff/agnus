@@ -308,6 +308,68 @@ export async function loadStaffPickMosaic() {
   return mosaicSnap.val();
 }
 
+// Subscribe to user's mosaics in real-time
+export function subscribeToUserMosaics(uid, callback) {
+  if (!db) return () => {};
+  const mosaicsRef = ref(db, `users/${uid}/data/mosaics`);
+  const handler = onValue(mosaicsRef, (snap) => {
+    if (!snap.exists()) { callback([]); return; }
+    callback(Object.values(snap.val()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)));
+  });
+  return () => off(mosaicsRef, "value", handler);
+}
+
+// Subscribe to public mosaics in real-time
+export function subscribeToPublicMosaics(callback) {
+  if (!db) return () => {};
+  const pubRef = ref(db, "mosaics/public");
+  const handler = onValue(pubRef, (snap) => {
+    if (!snap.exists()) { callback([]); return; }
+    callback(Object.values(snap.val()).sort((a, b) => {
+      const oa = a.displayOrder ?? 999999;
+      const ob = b.displayOrder ?? 999999;
+      if (oa !== ob) return oa - ob;
+      return (b.approvedAt || 0) - (a.approvedAt || 0);
+    }));
+  });
+  return () => off(pubRef, "value", handler);
+}
+
+// Subscribe to pending mosaics in real-time (admin)
+export function subscribeToPendingMosaics(callback) {
+  if (!db) return () => {};
+  const pendRef = ref(db, "mosaics/pending");
+  const handler = onValue(pendRef, (snap) => {
+    if (!snap.exists()) { callback([]); return; }
+    callback(Object.values(snap.val()).sort((a, b) => (a.submittedAt || 0) - (b.submittedAt || 0)));
+  });
+  return () => off(pendRef, "value", handler);
+}
+
+// Subscribe to shared mosaics in real-time
+export function subscribeToSharedMosaics(uid, callback) {
+  if (!db) return () => {};
+  const sharedRef = ref(db, `mosaics/shared/${uid}`);
+  const handler = onValue(sharedRef, (snap) => {
+    if (!snap.exists()) { callback([]); return; }
+    callback(Object.values(snap.val()).sort((a, b) => (b.sharedAt || 0) - (a.sharedAt || 0)));
+  });
+  return () => off(sharedRef, "value", handler);
+}
+
+// Subscribe to staff pick mosaic in real-time
+export function subscribeToStaffPick(callback) {
+  if (!db) return () => {};
+  const metaRef = ref(db, "mosaics/meta/staffPickId");
+  const handler = onValue(metaRef, async (snap) => {
+    if (!snap.exists()) { callback(null); return; }
+    const mosaicId = snap.val();
+    const mosaicSnap = await get(ref(db, `mosaics/public/${mosaicId}`));
+    callback(mosaicSnap.exists() ? mosaicSnap.val() : null);
+  });
+  return () => off(metaRef, "value", handler);
+}
+
 // Share a mosaic with a specific user by username (stores in shared/{recipientUid}/{mosaicId})
 export async function shareMosaicWithUser(fromUid, toUid, mosaicId, mosaic) {
   if (!db) return;
@@ -464,6 +526,28 @@ export async function loadFriends(uid) {
     })
   );
   return profiles.filter(p => p.username); // only return friends who still have profiles
+}
+
+// Subscribe to friends list in real-time (fires callback with array of friend profiles)
+export function subscribeToFriends(uid, callback) {
+  if (!db) return () => {};
+  const friendsRef = ref(db, `friends/${uid}`);
+  const handler = onValue(friendsRef, async (snap) => {
+    if (!snap.exists()) { callback([]); return; }
+    const friendUids = Object.keys(snap.val());
+    const profiles = await Promise.all(
+      friendUids.map(async (fUid) => {
+        const profile = await loadUserProfile(fUid);
+        return {
+          uid: fUid,
+          username: profile?.username || null,
+          profilePicture: profile?.profilePicture || null,
+        };
+      })
+    );
+    callback(profiles.filter(p => p.username));
+  });
+  return () => off(friendsRef, "value", handler);
 }
 
 // Check if two users are friends
@@ -922,6 +1006,16 @@ export async function loadFriendPuzzleCompletions(friendUids, mode, puzzleKey) {
   return results;
 }
 
+// Subscribe to all completions for a puzzle in real-time (global ranking + friend data)
+export function subscribeToPuzzleCompletions(mode, puzzleKey, callback) {
+  if (!db) return () => {};
+  const compRef = ref(db, `puzzleCompletions/${mode}/${puzzleKey}`);
+  const handler = onValue(compRef, (snap) => {
+    callback(snap.exists() ? snap.val() : {});
+  });
+  return () => off(compRef, "value", handler);
+}
+
 // --- Presence / Activity Tracking ---
 
 // Update the current user's presence (online status + what they're doing)
@@ -966,18 +1060,31 @@ export function subscribeToFriendPresence(friendUid, callback) {
 
 // --- Admin: Global Metrics ---
 
-// Load all public stats (admin only — reads entire publicStats node)
+// Load all public stats once (admin metrics — heavy aggregation)
 export async function loadAllPublicStats() {
   if (!db) return {};
   const snap = await get(ref(db, "publicStats"));
   return snap.exists() ? snap.val() : {};
 }
 
-// Load all presence data (admin only — reads entire presence node)
-export async function loadAllPresence() {
-  if (!db) return {};
-  const snap = await get(ref(db, "presence"));
-  return snap.exists() ? snap.val() : {};
+// Subscribe to all public stats in real-time (admin user activity)
+export function subscribeToAllPublicStats(callback) {
+  if (!db) return () => {};
+  const statsRef = ref(db, "publicStats");
+  const handler = onValue(statsRef, (snap) => {
+    callback(snap.exists() ? snap.val() : {});
+  });
+  return () => off(statsRef, "value", handler);
+}
+
+// Subscribe to all presence data in real-time (admin user activity)
+export function subscribeToAllPresence(callback) {
+  if (!db) return () => {};
+  const presRef = ref(db, "presence");
+  const handler = onValue(presRef, (snap) => {
+    callback(snap.exists() ? snap.val() : {});
+  });
+  return () => off(presRef, "value", handler);
 }
 
 // Load all puzzle completions for a specific mode (admin analytics)
