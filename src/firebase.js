@@ -492,6 +492,7 @@ export async function createCoopSession(uid, { mode, level, dailyDate, hostTheme
     guestCorrect: false,
     attempts: 0,
     hostTheme: hostTheme ?? "classic",
+    hostTimerStart: Date.now(),
     createdAt: serverTimestamp(),
   });
   return id;
@@ -558,6 +559,21 @@ export async function updateCoopAttempts(sessionId, attempts) {
 export async function completeCoopSession(sessionId) {
   if (!db) return;
   await update(ref(db, `coopSessions/${sessionId}`), { status: "complete" });
+}
+
+// Reset a coop session for retry (keep players, reset game state)
+export async function resetCoopSession(sessionId) {
+  if (!db) return;
+  await update(ref(db, `coopSessions/${sessionId}`), {
+    status: "playing",
+    fills: {},
+    hostLockedIn: false,
+    guestLockedIn: false,
+    hostCorrect: false,
+    guestCorrect: false,
+    attempts: 0,
+    hostTimerStart: Date.now(),
+  });
 }
 
 // Delete / leave a coop session

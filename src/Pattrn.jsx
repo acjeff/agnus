@@ -32,6 +32,7 @@ import {
   unlockCoopPlayer,
   updateCoopAttempts,
   completeCoopSession,
+  resetCoopSession,
   deleteCoopSession,
   loadCoopSession,
   checkUsernameAvailability,
@@ -2704,6 +2705,7 @@ export default function Pattrn() {
   const coopWriteThrottleRef = useRef({}); // throttle writes to Firebase
   const coopPendingLoginRef = useRef(false); // auto-start coop after login
   const coopOriginalThemeRef = useRef(null); // guest's original theme before coop override
+  const coopHostTimerStartRef = useRef(null); // last known hostTimerStart for sync
   const activeThemeIdRef = useRef(activeThemeId); // current theme ref for coop subscription
   activeThemeIdRef.current = activeThemeId;
   const isCoop = !!coopSessionId;
@@ -4361,7 +4363,36 @@ export default function Pattrn() {
     setCoopStatus(null);
     setShowCoopInvite(false);
     coopWriteThrottleRef.current = {};
+    coopHostTimerStartRef.current = null;
   }, [coopSessionId, firebaseUser]);
+
+  // Retry coop session: reset Firebase state and local state, keep same session/players
+  const retryCoop = useCallback(async () => {
+    if (!coopSessionId || !puzzle) return;
+    // Reset Firebase session state
+    await resetCoopSession(coopSessionId);
+    // Reset local game state
+    setFills({});
+    setAttempts(0);
+    setGameState("playing");
+    setWrongCells(new Set());
+    setLockedCells(new Set());
+    setShowParticles(false);
+    setSelectedCell(null);
+    setClearedBlanks(new Set());
+    setCoopMyLockedIn(false);
+    setCoopPartnerLockedIn(false);
+    setCoopPartnerCorrect(false);
+    setCoopPartnerFills({});
+    coopWriteThrottleRef.current = {};
+    // Restart timer (host writes hostTimerStart via resetCoopSession)
+    stopTimer();
+    setElapsedTime(0);
+    timerStart.current = Date.now();
+    timerInterval.current = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+    }, 1000);
+  }, [coopSessionId, puzzle, stopTimer]);
 
   // Subscribe to coop session changes (real-time sync)
   useEffect(() => {
@@ -4379,6 +4410,35 @@ export default function Pattrn() {
       const partnerConnected = isHost ? !!data.guestUid : true;
       setCoopPartnerConnected(partnerConnected);
       setCoopStatus(data.status);
+
+      // Sync timer from host's hostTimerStart — keeps both players' clocks aligned
+      const remoteTimerStart = data.hostTimerStart;
+      if (remoteTimerStart && remoteTimerStart !== coopHostTimerStartRef.current) {
+        const prevTimerStart = coopHostTimerStartRef.current;
+        coopHostTimerStartRef.current = remoteTimerStart;
+        // Restart local timer based on host's timestamp
+        stopTimer();
+        timerStart.current = remoteTimerStart;
+        setElapsedTime(Math.max(0, Math.floor((Date.now() - remoteTimerStart) / 1000)));
+        timerInterval.current = setInterval(() => {
+          setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+        }, 1000);
+        // If this is a timer reset (retry), also reset local game state for guest
+        if (!isHost && prevTimerStart !== null) {
+          setFills({});
+          setGameState("playing");
+          setWrongCells(new Set());
+          setLockedCells(new Set());
+          setShowParticles(false);
+          setSelectedCell(null);
+          setClearedBlanks(new Set());
+          setCoopMyLockedIn(false);
+          setCoopPartnerLockedIn(false);
+          setCoopPartnerCorrect(false);
+          setCoopPartnerFills({});
+          coopWriteThrottleRef.current = {};
+        }
+      }
 
       // Sync shared attempt counter from Firebase
       const remoteAttempts = data.attempts ?? 0;
@@ -4470,14 +4530,8 @@ export default function Pattrn() {
     const { hostBlanks, guestBlanks } = splitBlanksForCoop(puzzle.blanks, puzzle.gridSize);
     setCoopMyBlanks(guestBlanks);
     setCoopPartnerBlanks(hostBlanks);
-    // Start timer for guest
-    stopTimer();
-    setElapsedTime(0);
-    timerStart.current = Date.now();
-    timerInterval.current = setInterval(() => {
-      setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
-    }, 1000);
-  }, [coopRole, coopStatus, puzzle, coopMyBlanks, splitBlanksForCoop, stopTimer]);
+    // Timer is synced from host's hostTimerStart via the subscription handler
+  }, [coopRole, coopStatus, puzzle, coopMyBlanks, splitBlanksForCoop]);
 
   // Sync my fills to Firebase when they change in coop mode
   useEffect(() => {
@@ -8884,19 +8938,33 @@ export default function Pattrn() {
                 </button>
               )}
               {isCoop ? (
-                <button onClick={() => { leaveCoopSession(); setView("menu"); }}
-                  style={{
-                    backgroundColor: "#54A0FF", color: "#fff", border: "none",
-                    padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.15s",
-                    boxShadow: "0 4px 16px #54A0FF44",
-                  }}
-                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                >
-                  Back to puzzles
-                </button>
+                <>
+                  <button onClick={retryCoop}
+                    style={{
+                      backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
+                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
+                  >
+                    Retry
+                  </button>
+                  <button onClick={() => { leaveCoopSession(); setView("menu"); }}
+                    style={{
+                      backgroundColor: "#54A0FF", color: "#fff", border: "none",
+                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                      textTransform: "uppercase", transition: "all 0.15s",
+                      boxShadow: "0 4px 16px #54A0FF44",
+                    }}
+                    onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
+                    onMouseLeave={e => e.target.style.transform = "translateY(0)"}
+                  >
+                    Back to puzzles
+                  </button>
+                </>
               ) : isCascade ? (
                 <>
                   <button onClick={() => startPuzzle(cascadeRunIndex, "cascade", true)}
