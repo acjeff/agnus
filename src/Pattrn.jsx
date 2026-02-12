@@ -5537,6 +5537,242 @@ export default function Pattrn() {
     );
   }
 
+  // --- Account modal (shared across views) ---
+  const accountModalEl = showAccountModal && firebaseConfigured && (
+    <div onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)} style={{
+      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: 24,
+    }}>
+      <div onClick={e => e.stopPropagation()} style={{
+        backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
+        padding: "24px", maxWidth: 380, width: "100%",
+        boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
+        animation: "fadeUp 0.25s ease",
+      }}>
+        {firebaseUser ? (
+          // Signed in view
+          <>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
+                backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
+                border: "2px solid #60A5FA44",
+              }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <h3 style={{
+                fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
+              }}>
+                Signed In
+              </h3>
+              <p style={{ color: C.textDim, fontSize: 12, margin: 0, wordBreak: "break-all" }}>
+                {firebaseUser.email}
+              </p>
+            </div>
+
+            <div style={{
+              padding: "12px 16px", borderRadius: 10, backgroundColor: C.surface,
+              border: `1px solid ${C.border}`, marginBottom: 16, textAlign: "center",
+            }}>
+              <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
+              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct }}>
+                {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
+              </div>
+              <div style={{ fontSize: 10, color: C.textDim, marginTop: 4 }}>
+                Your progress syncs automatically
+              </div>
+            </div>
+
+            <button
+              onClick={handleSignOut}
+              style={{
+                width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                textTransform: "uppercase", transition: "all 0.15s",
+              }}
+            >
+              Sign out
+            </button>
+          </>
+        ) : (
+          // Sign in / Sign up view
+          <>
+            <div style={{ textAlign: "center", marginBottom: 20 }}>
+              <div style={{
+                width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
+                backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
+                border: "2px solid #60A5FA44",
+              }}>
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
+                </svg>
+              </div>
+              <h3 style={{
+                fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
+              }}>
+                {accountTab === "login" ? "Sign In" : "Create Account"}
+              </h3>
+              <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5 }}>
+                {accountTab === "login"
+                  ? "Sign in to sync your progress across devices"
+                  : "Your current progress will be saved to your new account"}
+              </p>
+            </div>
+
+            {/* Tab toggle */}
+            <div style={{
+              display: "flex", borderRadius: 8, overflow: "hidden",
+              border: `1px solid ${C.border}`, marginBottom: 16,
+            }}>
+              {["login", "signup"].map(tab => (
+                <button key={tab} onClick={() => { setAccountTab(tab); setAccountError(""); }} style={{
+                  flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                  background: accountTab === tab ? C.accent : "transparent",
+                  color: accountTab === tab ? C.bg : C.textDim,
+                  border: "none", cursor: "pointer", textTransform: "uppercase",
+                  transition: "all 0.15s",
+                }}>
+                  {tab === "login" ? "Sign In" : "Sign Up"}
+                </button>
+              ))}
+            </div>
+
+            {/* Google sign in */}
+            <button
+              onClick={handleGoogleSignIn}
+              disabled={accountLoading}
+              style={{
+                width: "100%", padding: "11px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                background: C.surface, border: `1px solid ${C.border}`, color: C.text,
+                cursor: accountLoading ? "not-allowed" : "pointer",
+                opacity: accountLoading ? 0.5 : 1, textTransform: "uppercase",
+                transition: "all 0.15s", marginBottom: 12,
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 48 48">
+                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+              </svg>
+              Continue with Google
+            </button>
+
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
+            }}>
+              <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
+              <span style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1 }}>or</span>
+              <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
+            </div>
+
+            {/* Email / password form */}
+            <form onSubmit={e => {
+              e.preventDefault();
+              if (accountTab === "login") handleSignIn(accountEmail, accountPassword);
+              else handleSignUp(accountEmail, accountPassword);
+            }}>
+              <input
+                type="email"
+                placeholder="Email"
+                value={accountEmail}
+                onChange={e => setAccountEmail(e.target.value)}
+                autoComplete="email"
+                style={{
+                  width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
+                  fontFamily: "'DM Sans', sans-serif",
+                  background: C.surface, border: `1px solid ${C.border}`, color: C.text,
+                  outline: "none", marginBottom: 8, boxSizing: "border-box",
+                  transition: "border-color 0.15s",
+                }}
+                onFocus={e => e.target.style.borderColor = C.accent}
+                onBlur={e => e.target.style.borderColor = C.border}
+              />
+              <input
+                type="password"
+                placeholder="Password"
+                value={accountPassword}
+                onChange={e => setAccountPassword(e.target.value)}
+                autoComplete={accountTab === "login" ? "current-password" : "new-password"}
+                style={{
+                  width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
+                  fontFamily: "'DM Sans', sans-serif",
+                  background: C.surface, border: `1px solid ${C.border}`, color: C.text,
+                  outline: "none", marginBottom: 12, boxSizing: "border-box",
+                  transition: "border-color 0.15s",
+                }}
+                onFocus={e => e.target.style.borderColor = C.accent}
+                onBlur={e => e.target.style.borderColor = C.border}
+              />
+
+              {accountError && (
+                <div style={{
+                  padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+                  backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
+                  fontSize: 11, color: C.incorrect, textAlign: "center",
+                }}>
+                  {accountError}
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={accountLoading || !accountEmail || !accountPassword}
+                style={{
+                  width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+                  background: C.accent, color: C.bg, border: "none",
+                  cursor: (accountLoading || !accountEmail || !accountPassword) ? "not-allowed" : "pointer",
+                  opacity: (accountLoading || !accountEmail || !accountPassword) ? 0.5 : 1,
+                  textTransform: "uppercase", transition: "all 0.15s",
+                }}
+              >
+                {accountLoading ? "..." : accountTab === "login" ? "Sign In" : "Create Account"}
+              </button>
+            </form>
+          </>
+        )}
+
+        {/* Don't ask me again (only shown when modal was auto-opened and user is not signed in) */}
+        {autoLoginModal && !firebaseUser && (
+          <button
+            onClick={dismissAutoLoginPermanently}
+            style={{
+              width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 600,
+              fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3,
+              background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+              transition: "all 0.15s", marginTop: 12,
+            }}
+          >
+            Don't ask me again
+          </button>
+        )}
+
+        {/* Close button */}
+        <button
+          onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)}
+          style={{
+            width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            background: "none", border: "none", color: C.textDim, cursor: "pointer",
+            textTransform: "uppercase", transition: "all 0.15s", marginTop: autoLoginModal && !firebaseUser ? 6 : 12,
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  );
+
   // --- MENU VIEW ---
   if (view === "menu") {
     return (
@@ -7049,241 +7285,7 @@ export default function Pattrn() {
           </div>
         )}
 
-        {/* Account modal */}
-        {showAccountModal && firebaseConfigured && (
-          <div onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)} style={{
-            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 24,
-          }}>
-            <div onClick={e => e.stopPropagation()} style={{
-              backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
-              padding: "24px", maxWidth: 380, width: "100%",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
-              animation: "fadeUp 0.25s ease",
-            }}>
-              {firebaseUser ? (
-                // Signed in view
-                <>
-                  <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
-                      backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
-                      border: "2px solid #60A5FA44",
-                    }}>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
-                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                      </svg>
-                    </div>
-                    <h3 style={{
-                      fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
-                    }}>
-                      Signed In
-                    </h3>
-                    <p style={{ color: C.textDim, fontSize: 12, margin: 0, wordBreak: "break-all" }}>
-                      {firebaseUser.email}
-                    </p>
-                  </div>
-
-                  <div style={{
-                    padding: "12px 16px", borderRadius: 10, backgroundColor: C.surface,
-                    border: `1px solid ${C.border}`, marginBottom: 16, textAlign: "center",
-                  }}>
-                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct }}>
-                      {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
-                    </div>
-                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 4 }}>
-                      Your progress syncs automatically
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleSignOut}
-                    style={{
-                      width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                      background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                  >
-                    Sign out
-                  </button>
-                </>
-              ) : (
-                // Sign in / Sign up view
-                <>
-                  <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <div style={{
-                      width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
-                      backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
-                      border: "2px solid #60A5FA44",
-                    }}>
-                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
-                        <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                      </svg>
-                    </div>
-                    <h3 style={{
-                      fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
-                    }}>
-                      {accountTab === "login" ? "Sign In" : "Create Account"}
-                    </h3>
-                    <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5 }}>
-                      {accountTab === "login"
-                        ? "Sign in to sync your progress across devices"
-                        : "Your current progress will be saved to your new account"}
-                    </p>
-                  </div>
-
-                  {/* Tab toggle */}
-                  <div style={{
-                    display: "flex", borderRadius: 8, overflow: "hidden",
-                    border: `1px solid ${C.border}`, marginBottom: 16,
-                  }}>
-                    {["login", "signup"].map(tab => (
-                      <button key={tab} onClick={() => { setAccountTab(tab); setAccountError(""); }} style={{
-                        flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                        background: accountTab === tab ? C.accent : "transparent",
-                        color: accountTab === tab ? C.bg : C.textDim,
-                        border: "none", cursor: "pointer", textTransform: "uppercase",
-                        transition: "all 0.15s",
-                      }}>
-                        {tab === "login" ? "Sign In" : "Sign Up"}
-                      </button>
-                    ))}
-                  </div>
-
-                  {/* Google sign in */}
-                  <button
-                    onClick={handleGoogleSignIn}
-                    disabled={accountLoading}
-                    style={{
-                      width: "100%", padding: "11px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                      background: C.surface, border: `1px solid ${C.border}`, color: C.text,
-                      cursor: accountLoading ? "not-allowed" : "pointer",
-                      opacity: accountLoading ? 0.5 : 1, textTransform: "uppercase",
-                      transition: "all 0.15s", marginBottom: 12,
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 48 48">
-                      <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                      <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                      <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                      <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-                    </svg>
-                    Continue with Google
-                  </button>
-
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
-                  }}>
-                    <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
-                    <span style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1 }}>or</span>
-                    <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
-                  </div>
-
-                  {/* Email / password form */}
-                  <form onSubmit={e => {
-                    e.preventDefault();
-                    if (accountTab === "login") handleSignIn(accountEmail, accountPassword);
-                    else handleSignUp(accountEmail, accountPassword);
-                  }}>
-                    <input
-                      type="email"
-                      placeholder="Email"
-                      value={accountEmail}
-                      onChange={e => setAccountEmail(e.target.value)}
-                      autoComplete="email"
-                      style={{
-                        width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
-                        fontFamily: "'DM Sans', sans-serif",
-                        background: C.surface, border: `1px solid ${C.border}`, color: C.text,
-                        outline: "none", marginBottom: 8, boxSizing: "border-box",
-                        transition: "border-color 0.15s",
-                      }}
-                      onFocus={e => e.target.style.borderColor = C.accent}
-                      onBlur={e => e.target.style.borderColor = C.border}
-                    />
-                    <input
-                      type="password"
-                      placeholder="Password"
-                      value={accountPassword}
-                      onChange={e => setAccountPassword(e.target.value)}
-                      autoComplete={accountTab === "login" ? "current-password" : "new-password"}
-                      style={{
-                        width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
-                        fontFamily: "'DM Sans', sans-serif",
-                        background: C.surface, border: `1px solid ${C.border}`, color: C.text,
-                        outline: "none", marginBottom: 12, boxSizing: "border-box",
-                        transition: "border-color 0.15s",
-                      }}
-                      onFocus={e => e.target.style.borderColor = C.accent}
-                      onBlur={e => e.target.style.borderColor = C.border}
-                    />
-
-                    {accountError && (
-                      <div style={{
-                        padding: "8px 12px", borderRadius: 8, marginBottom: 12,
-                        backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
-                        fontSize: 11, color: C.incorrect, textAlign: "center",
-                      }}>
-                        {accountError}
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={accountLoading || !accountEmail || !accountPassword}
-                      style={{
-                        width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-                        background: C.accent, color: C.bg, border: "none",
-                        cursor: (accountLoading || !accountEmail || !accountPassword) ? "not-allowed" : "pointer",
-                        opacity: (accountLoading || !accountEmail || !accountPassword) ? 0.5 : 1,
-                        textTransform: "uppercase", transition: "all 0.15s",
-                      }}
-                    >
-                      {accountLoading ? "..." : accountTab === "login" ? "Sign In" : "Create Account"}
-                    </button>
-                  </form>
-                </>
-              )}
-
-              {/* Don't ask me again (only shown when modal was auto-opened and user is not signed in) */}
-              {autoLoginModal && !firebaseUser && (
-                <button
-                  onClick={dismissAutoLoginPermanently}
-                  style={{
-                    width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 600,
-                    fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3,
-                    background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                    transition: "all 0.15s", marginTop: 12,
-                  }}
-                >
-                  Don't ask me again
-                </button>
-              )}
-
-              {/* Close button */}
-              <button
-                onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)}
-                style={{
-                  width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                  background: "none", border: "none", color: C.textDim, cursor: "pointer",
-                  textTransform: "uppercase", transition: "all 0.15s", marginTop: autoLoginModal && !firebaseUser ? 6 : 12,
-                }}
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        )}
+        {accountModalEl}
 
         {/* Sync choice prompt (local vs cloud data on login) */}
         {showSyncChoice && syncChoiceData && (() => {
@@ -8451,6 +8453,7 @@ export default function Pattrn() {
       </div>
 
       {themePickerEl}
+      {accountModalEl}
     </div>
   );
 }
