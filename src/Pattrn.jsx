@@ -3303,10 +3303,11 @@ export default function Pattrn() {
     if (difficulty !== "mosaic" || view !== "menu") return;
     if (mosaicCarouselLoadedRef.current) return;
     mosaicCarouselLoadedRef.current = true;
-    // Load public mosaics (always) and user mosaics (if signed in)
+    // Load public mosaics (always) and user mosaics + shared mosaics (if signed in)
     loadPublicMosaics().then(setPublicMosaicsList).catch(() => {});
     if (firebaseUser) {
       loadUserMosaics(firebaseUser.uid).then(setMyMosaics).catch(() => {});
+      loadSharedMosaics(firebaseUser.uid).then(setSharedMosaics).catch(() => {});
     }
     // Load staff pick mosaic for the main grid
     if (!staffPickLoadedRef.current) {
@@ -8074,6 +8075,60 @@ export default function Pattrn() {
           <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> failed</span>
           <span><span style={{ color: C.coop }}>{"\u25CF"}</span> co-op</span>
         </div>
+
+        {/* Shared mosaics carousel */}
+        {(() => {
+          const sharedCarouselMosaics = (sharedMosaics || []);
+          if (sharedCarouselMosaics.length === 0) return null;
+          return (
+            <div style={{
+              width: "100%", maxWidth: 360, marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
+            }}>
+              <div style={{
+                fontSize: 9, color: C.textDim, textTransform: "uppercase",
+                letterSpacing: 1.5, marginBottom: 8,
+                fontFamily: "'Space Mono', monospace",
+              }}>Shared With You</div>
+              <div className="mosaic-carousel" style={{
+                display: "flex", gap: 10, overflowX: "auto", paddingBottom: 8,
+                scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
+                msOverflowStyle: "none", scrollbarWidth: "none",
+              }}>
+                <style>{`.mosaic-carousel::-webkit-scrollbar { display: none; }`}</style>
+                {sharedCarouselMosaics.map((mosaic) => (
+                  <button
+                    key={mosaic.id}
+                    onClick={() => startCustomMosaicPlay(mosaic)}
+                    style={{
+                      flexShrink: 0, width: 100, scrollSnapAlign: "start",
+                      display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                      padding: "10px 8px", borderRadius: 10,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      cursor: "pointer", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.transform = "translateY(0)"; }}
+                  >
+                    <MosaicThumbnail grid={mosaic.grid} size={72} hidden={true} completedTiles={mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null} />
+                    <div style={{
+                      fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 600,
+                      color: C.text, textAlign: "center", lineHeight: 1.2,
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                      width: "100%",
+                    }}>
+                      {mosaic.title || "Untitled"}
+                    </div>
+                    <div style={{
+                      fontSize: 8, color: C.textDim, letterSpacing: 0.5,
+                    }}>
+                      {mosaic.sharedByUsername || mosaic.authorUsername || ""}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
 
         {/* Community & your mosaics carousel */}
         {(() => {
