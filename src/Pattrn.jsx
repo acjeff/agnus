@@ -63,6 +63,7 @@ import {
   loadFriendPuzzleCompletions,
   updatePresence,
   loadFriendPresence,
+  subscribeToFriendPresence,
   loadAllPublicStats,
   loadAllPuzzleCompletionsForMode,
 } from "./firebase.js";
@@ -2858,6 +2859,34 @@ export default function Pattrn() {
       updatePresence(firebaseUser.uid, { online: true, status: "idle", currentMode: null, currentPuzzle: null }).catch(() => {});
     }
   }, [view, firebaseUser, firebaseConfigured]);
+
+  // Real-time friend presence subscriptions: subscribe to each friend's presence
+  const friendPresenceUnsubsRef = useRef([]);
+  useEffect(() => {
+    // Clean up previous subscriptions
+    friendPresenceUnsubsRef.current.forEach(unsub => unsub());
+    friendPresenceUnsubsRef.current = [];
+    if (!firebaseUser || !firebaseConfigured || friendsList.length === 0) return;
+    const unsubs = friendsList.map(friend =>
+      subscribeToFriendPresence(friend.uid, (presence) => {
+        setFriendPresence(prev => ({ ...prev, [friend.uid]: presence }));
+      })
+    );
+    friendPresenceUnsubsRef.current = unsubs;
+    return () => {
+      unsubs.forEach(unsub => unsub());
+      friendPresenceUnsubsRef.current = [];
+    };
+  }, [firebaseUser, firebaseConfigured, friendsList]);
+
+  // Compute online friends count from real-time presence data
+  const onlineFriendsCount = useMemo(() => {
+    if (friendsList.length === 0) return 0;
+    return friendsList.filter(f => {
+      const p = friendPresence[f.uid];
+      return p && p.lastSeen && (Date.now() - p.lastSeen) < 120000;
+    }).length;
+  }, [friendsList, friendPresence]);
 
   // Load username and profile picture when user logs in, prompt if missing
   useEffect(() => {
@@ -5953,6 +5982,37 @@ export default function Pattrn() {
               <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorUsername}</div>
             )}
           </div>
+          {firebaseConfigured && firebaseUser && (
+            <button
+              onClick={() => { loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {}); setShowFriendsModal(true); setFriendsModalTab("list"); }}
+              style={{
+                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
+                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
+                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
+                position: "relative", minWidth: 32, height: 30,
+              }}
+              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
+              aria-label="Friends"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              {onlineFriendsCount > 0 && (
+                <span style={{
+                  position: "absolute", top: -4, right: -4,
+                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
+                  backgroundColor: C.correct, color: "#fff",
+                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: "'Space Mono', monospace",
+                }}>
+                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Space Mono', monospace", marginBottom: 10, animation: "fadeUp 0.3s 0.02s ease both" }}>
@@ -6171,6 +6231,37 @@ export default function Pattrn() {
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             {creatorEditingId ? "Edit Mosaic" : "Create Mosaic"}
           </h2>
+          {firebaseConfigured && firebaseUser && (
+            <button
+              onClick={() => { loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {}); setShowFriendsModal(true); setFriendsModalTab("list"); }}
+              style={{
+                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
+                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
+                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
+                position: "relative", minWidth: 32, height: 30,
+              }}
+              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
+              aria-label="Friends"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              {onlineFriendsCount > 0 && (
+                <span style={{
+                  position: "absolute", top: -4, right: -4,
+                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
+                  backgroundColor: C.correct, color: "#fff",
+                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: "'Space Mono', monospace",
+                }}>
+                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
+                </span>
+              )}
+            </button>
+          )}
         </div>
 
         {/* Title input */}
@@ -6384,6 +6475,37 @@ export default function Pattrn() {
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             Mosaics
           </h2>
+          {firebaseConfigured && firebaseUser && (
+            <button
+              onClick={() => { loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {}); setShowFriendsModal(true); setFriendsModalTab("list"); }}
+              style={{
+                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
+                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
+                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
+                position: "relative", minWidth: 32, height: 30,
+              }}
+              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
+              aria-label="Friends"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              {onlineFriendsCount > 0 && (
+                <span style={{
+                  position: "absolute", top: -4, right: -4,
+                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
+                  backgroundColor: C.correct, color: "#fff",
+                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: "'Space Mono', monospace",
+                }}>
+                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
+                </span>
+              )}
+            </button>
+          )}
           {firebaseUser && (
             <button onClick={() => { resetCreator(); setCreatorReturnView("gallery"); setView("creator"); }}
               style={{
@@ -8260,15 +8382,15 @@ export default function Pattrn() {
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
                   <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
                 </svg>
-                {friendsList.length > 0 && (
+                {onlineFriendsCount > 0 && (
                   <span style={{
                     position: "absolute", top: -2, right: -2,
-                    width: 16, height: 16, borderRadius: "50%",
-                    backgroundColor: C.accent, color: C.bg,
+                    minWidth: 16, height: 16, borderRadius: 8, padding: "0 3px", boxSizing: "border-box",
+                    backgroundColor: C.correct, color: "#fff",
                     fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
                     fontFamily: "'Space Mono', monospace",
                   }}>
-                    {friendsList.length > 9 ? "9+" : friendsList.length}
+                    {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
                   </span>
                 )}
               </button>
@@ -10767,6 +10889,44 @@ export default function Pattrn() {
           >
             {activeTheme.icon || <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>}
           </button>
+          {/* Friends button */}
+          {firebaseConfigured && firebaseUser && (
+            <button
+              onClick={() => {
+                loadFriends(firebaseUser.uid).then(setFriendsList).catch(() => {});
+                setShowFriendsModal(true);
+                setFriendsModalTab("list");
+              }}
+              style={{
+                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
+                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
+                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
+                position: "relative", minWidth: 32, height: 30,
+              }}
+              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
+              aria-label="Friends"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              {onlineFriendsCount > 0 && (
+                <span style={{
+                  position: "absolute", top: -4, right: -4,
+                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
+                  backgroundColor: C.correct, color: "#fff",
+                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                  fontFamily: "'Space Mono', monospace",
+                }}>
+                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
+                </span>
+              )}
+            </button>
+          )}
           <button
             onClick={async () => {
               const url = typeof window !== "undefined" ? window.location.href : "";
