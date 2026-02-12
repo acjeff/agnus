@@ -962,7 +962,7 @@ export async function loadCoopSession(sessionId) {
 // Save a summary of game stats to a publicly-readable path
 export async function savePublicStats(uid, stats) {
   if (!db) return;
-  await set(ref(db, `publicStats/${uid}`), {
+  await update(ref(db, `publicStats/${uid}`), {
     ...removeUndefined(stats),
     updatedAt: serverTimestamp(),
   });
