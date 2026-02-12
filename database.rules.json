@@ -69,6 +69,7 @@
       }
     },
     "presence": {
+      ".read": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true",
       "$uid": {
         ".read": "auth != null",
         ".write": "auth != null && auth.uid === $uid"
