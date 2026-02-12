@@ -30,6 +30,7 @@ import {
   updateCoopFill,
   lockInCoopPlayer,
   unlockCoopPlayer,
+  updateCoopAttempts,
   completeCoopSession,
   deleteCoopSession,
   loadCoopSession,
@@ -2682,6 +2683,9 @@ export default function Pattrn() {
   const coopUnsubRef = useRef(null); // unsubscribe function for Firebase listener
   const coopWriteThrottleRef = useRef({}); // throttle writes to Firebase
   const coopPendingLoginRef = useRef(false); // auto-start coop after login
+  const coopOriginalThemeRef = useRef(null); // guest's original theme before coop override
+  const activeThemeIdRef = useRef(activeThemeId); // current theme ref for coop subscription
+  activeThemeIdRef.current = activeThemeId;
   const isCoop = !!coopSessionId;
 
   // --- Mosaic Creator state ---
@@ -3072,7 +3076,7 @@ export default function Pattrn() {
       cascade: times.cascade || {},
     },
     achievements: [...savedAchievementIds],
-    theme: activeThemeId,
+    theme: coopOriginalThemeRef.current ?? activeThemeId,
     birthday,
   }), [progress, times, savedAchievementIds, activeThemeId, birthday]);
 
@@ -4121,6 +4125,7 @@ export default function Pattrn() {
       mode: difficulty,
       level: currentPuzzle,
       dailyDate: isDaily ? currentDailyDate : null,
+      hostTheme: activeThemeId,
     });
     if (!sessionId) return;
     setCoopSessionId(sessionId);
@@ -4151,7 +4156,7 @@ export default function Pattrn() {
       setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
     }, 1000);
     setShowCoopInvite(true);
-  }, [firebaseUser, puzzle, difficulty, currentPuzzle, isDaily, currentDailyDate, splitBlanksForCoop, stopTimer]);
+  }, [firebaseUser, puzzle, difficulty, currentPuzzle, isDaily, currentDailyDate, splitBlanksForCoop, stopTimer, activeThemeId]);
 
   // Auto-start coop after login if user clicked Co-op while logged out
   useEffect(() => {
@@ -4169,6 +4174,12 @@ export default function Pattrn() {
     }
     if (coopSessionId && firebaseUser) {
       deleteCoopSession(coopSessionId).catch(() => {});
+    }
+    // Restore guest's original theme (don't persist the host's theme)
+    if (coopOriginalThemeRef.current !== null) {
+      setActiveThemeId(coopOriginalThemeRef.current);
+      saveTheme(coopOriginalThemeRef.current);
+      coopOriginalThemeRef.current = null;
     }
     setCoopSessionId(null);
     setCoopRole(null);
@@ -4200,6 +4211,27 @@ export default function Pattrn() {
       const partnerConnected = isHost ? !!data.guestUid : true;
       setCoopPartnerConnected(partnerConnected);
       setCoopStatus(data.status);
+
+      // Sync shared attempt counter from Firebase
+      const remoteAttempts = data.attempts ?? 0;
+      setAttempts(remoteAttempts);
+
+      // Shared fail: if shared attempts exhausted, both players lose
+      if (remoteAttempts >= 5 && data.status !== "complete") {
+        setGameState("lost");
+        stopTimer();
+      }
+
+      // Sync host theme to guest: apply the host's theme for this coop session
+      if (!isHost && data.hostTheme) {
+        if (coopOriginalThemeRef.current === null) {
+          // Save the guest's original theme on first sync so we can restore it later
+          coopOriginalThemeRef.current = activeThemeIdRef.current;
+        }
+        if (activeThemeIdRef.current !== data.hostTheme) {
+          setActiveThemeId(data.hostTheme);
+        }
+      }
 
       // Update partner lock-in status
       if (isHost) {
@@ -4234,7 +4266,7 @@ export default function Pattrn() {
       unsub();
       coopUnsubRef.current = null;
     };
-  }, [coopSessionId, firebaseUser, coopMyBlanks]);
+  }, [coopSessionId, firebaseUser, coopMyBlanks, stopTimer]);
 
   // Handle guest joining: once auth is ready and we have a session ID with role=guest, actually join
   useEffect(() => {
@@ -4499,8 +4531,10 @@ export default function Pattrn() {
         wrong.add(key);
       }
     }
+    // Shared attempt counter: increment and sync to Firebase for both players
     const newAttempts = attempts + 1;
     setAttempts(newAttempts);
+    updateCoopAttempts(coopSessionId, newAttempts).catch(() => {});
 
     if (allCorrect) {
       setCoopMyLockedIn(true);
@@ -4514,8 +4548,8 @@ export default function Pattrn() {
       setShowParticles(true);
       setTimeout(() => setShowParticles(false), 1500);
     } else if (newAttempts >= 5) {
-      // Failed all attempts — lock in as incorrect
-      setCoopMyLockedIn(true);
+      // Failed all shared attempts — both players lose (subscription handles partner)
+      setGameState("lost");
       setWrongCells(wrong);
       await lockInCoopPlayer(coopSessionId, coopRole, false);
     } else {
@@ -8353,15 +8387,15 @@ export default function Pattrn() {
         {gameState === "lost" && (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.incorrect, marginBottom: 4, animation: "fadeUp 0.4s ease" }}>
-              {isCascade ? "Run over" : "Not this time"}
+              {isCoop ? "Co-op failed" : isCascade ? "Run over" : "Not this time"}
             </div>
             <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
-              {isCascade ? (
+              {isCoop ? "Out of attempts" : isCascade ? (
                 <div>Reached {puzzle?.gridSize ?? 0}×{puzzle?.gridSize ?? 0}</div>
               ) : "Better luck next time"}
             </div>
             <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              {isCascade && (
+              {isCascade && !isCoop && (
                 <button onClick={async () => {
                   const sz = puzzle?.gridSize ?? 0;
                   const text = `Agnus Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`;
@@ -8388,7 +8422,21 @@ export default function Pattrn() {
                   {shareMsg || "Share"}
                 </button>
               )}
-              {isCascade ? (
+              {isCoop ? (
+                <button onClick={() => { leaveCoopSession(); setView("menu"); }}
+                  style={{
+                    backgroundColor: "#54A0FF", color: "#fff", border: "none",
+                    padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    textTransform: "uppercase", transition: "all 0.15s",
+                    boxShadow: "0 4px 16px #54A0FF44",
+                  }}
+                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
+                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
+                >
+                  Back to puzzles
+                </button>
+              ) : isCascade ? (
                 <>
                   <button onClick={() => startPuzzle(cascadeRunIndex, "cascade", true)}
                     style={{
