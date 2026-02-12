@@ -7871,16 +7871,7 @@ export default function Pattrn() {
         >
           &larr; {customMosaicPuzzlesRef.current && isMosaic ? "MOSAIC" : "PUZZLES"}
         </button>
-        <div style={{ flex: 1, textAlign: "center" }}>
-          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
-            {isCoop ? "Co-op " : ""}{diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
-          </span>
-          {!isDaily && !isCascade && (
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700, color: C.accent, letterSpacing: 3 }}>
-              #{currentPuzzle + 1}
-            </span>
-          )}
-        </div>
+        <div style={{ flex: 1 }} />
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4, flexShrink: 0 }}>
           <button
             onClick={() => setShowThemePicker(true)}
@@ -8040,6 +8031,16 @@ export default function Pattrn() {
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: gridSize >= 7 ? 380 : 360 }}>
           <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 18, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, letterSpacing: 2 }}>
             {formatTime(elapsedTime)}
+          </div>
+          <div style={{ textAlign: "center" }}>
+            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
+              {isCoop ? "Co-op " : ""}{diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
+            </span>
+            {!isDaily && !isCascade && (
+              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.accent, letterSpacing: 2 }}>
+                #{currentPuzzle + 1}
+              </span>
+            )}
           </div>
           <AttemptDots max={isCoop ? 5 : maxAttempts} used={attempts} won={gameState === "won"} />
         </div>
