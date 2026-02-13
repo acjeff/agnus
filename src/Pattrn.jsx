@@ -4421,7 +4421,8 @@ export default function Pattrn() {
       const dProg = isCustomMosaic ? customMosaicProgress : (prog[effectiveDiff] || {});
       const dTimes = isCustomMosaic ? ((tms.mosaicCompletionTimes || {})[customMosaicPlay?.id] || {}) : (tms[effectiveDiff] || {});
       const savedAttempts = dProg[lookupKey] ?? 0;
-      const savedTime = dTimes[lookupKey];
+      // In coop mosaic, also check shared tile times from Firebase for partner-completed tiles
+      const savedTime = dTimes[lookupKey] ?? (isCoopMosaic ? coopMosaicSharedTileTimes[lookupKey] : undefined);
       const alreadyCompleted = !forceRestart && savedAttempts > 0 && savedTime != null && puz;
       if (alreadyCompleted) {
         setFills(solutionFillsFromPuzzle(puz));
@@ -5170,6 +5171,9 @@ export default function Pattrn() {
     if (coopMosaicSessionId && firebaseUser) {
       if (coopMosaicRole === "guest") {
         guestLeaveCoopMosaicSession(coopMosaicSessionId, firebaseUser.uid).catch(() => {});
+      } else if (coopMosaicRole === "host") {
+        // Signal host is offline by setting hostCurrentTile to null
+        updateCoopMosaicCurrentTile(coopMosaicSessionId, "host", null).catch(() => {});
       }
     }
     setCoopMosaicSessionId(null);
@@ -5208,7 +5212,7 @@ export default function Pattrn() {
     setCoopMosaicSessionId(session.id);
     setCoopMosaicRole(isHost ? "host" : "guest");
     setCoopMosaicStatus(session.status || "waiting");
-    setCoopMosaicPartnerConnected(isHost ? !!session.guestUid : true);
+    setCoopMosaicPartnerConnected(isHost ? !!session.guestUid : (session.hostCurrentTile != null));
     setCoopMosaicPartnerUsername(isHost ? (session.guestUsername || null) : (session.hostUsername || null));
     setCoopMosaicSharedProgress(session.tileProgress || {});
     setCoopMosaicSharedTileTimes(session.tileTimes || {});
@@ -5217,6 +5221,8 @@ export default function Pattrn() {
     coopMosaicCurrentTileRef.current = -1;
     coopMosaicGuestJoinedRef.current = !isHost;
     coopMosaicWriteThrottleRef.current = {};
+    // Signal we're back online by updating our current tile to -1 (overview)
+    updateCoopMosaicCurrentTile(session.id, isHost ? "host" : "guest", -1).catch(() => {});
     setView("custom-mosaic");
   }, [firebaseUser, buildCustomMosaicPuzzles]);
 
@@ -5253,7 +5259,8 @@ export default function Pattrn() {
         return;
       }
 
-      const partnerConnected = isHost ? !!data.guestUid : true;
+      // Host is connected when hostCurrentTile is not null (null = host left the session view)
+      const partnerConnected = isHost ? !!data.guestUid : (data.hostCurrentTile != null);
       setCoopMosaicPartnerConnected(partnerConnected);
       setCoopMosaicStatus(data.status);
       setCoopMosaicPartnerUsername(isHost ? (data.guestUsername || null) : (data.hostUsername || null));
@@ -5264,8 +5271,9 @@ export default function Pattrn() {
 
       // Sync shared progress and update local customMosaicProgress with partner's completions
       const tp = data.tileProgress || {};
+      const tt = data.tileTimes || {};
       setCoopMosaicSharedProgress(tp);
-      setCoopMosaicSharedTileTimes(data.tileTimes || {});
+      setCoopMosaicSharedTileTimes(tt);
       // Merge shared progress into local so startPuzzle sees partner-completed tiles
       setCustomMosaicProgress(prev => {
         const merged = { ...prev };
@@ -6452,7 +6460,9 @@ export default function Pattrn() {
                   coopMosaicCurrentTileRef.current = i;
                   updateCoopMosaicCurrentTile(coopMosaicSessionId, coopMosaicRole, i).catch(() => {});
                 }
-                startPuzzle(i, "mosaic", true);
+                // Don't force restart if tile is already completed (show completed state)
+                const tileCompleted = (effectiveMosaicProgress[i] || 0) > 0;
+                startPuzzle(i, "mosaic", !tileCompleted);
               }}
                 style={{
                   width: tileSzCm, height: tileSzCm, borderRadius: 6,
