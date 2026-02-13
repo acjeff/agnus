@@ -5184,6 +5184,48 @@ export default function Pattrn() {
     coopMosaicGuestJoinedRef.current = false;
   }, [coopMosaicSessionId, firebaseUser, coopMosaicRole]);
 
+  // Rejoin an existing coop mosaic session from the active sessions panel
+  const rejoinCoopMosaicSession = useCallback(async (session) => {
+    if (!firebaseUser || !session) return;
+    // Normalize grid from Firebase (may have been stored as object with numeric keys)
+    const rawGrid = session.mosaicGrid;
+    const grid = Array.isArray(rawGrid)
+      ? rawGrid.map(row => Array.isArray(row) ? row : Object.values(row || {}))
+      : Object.values(rawGrid || {}).map(row => Array.isArray(row) ? row : Object.values(row || {}));
+    // Build mosaic puzzles from session grid
+    const puzzles = buildCustomMosaicPuzzles(grid);
+    customMosaicPuzzlesRef.current = puzzles;
+    setCustomMosaicPlay({
+      id: session.mosaicId,
+      title: session.mosaicTitle,
+      grid: grid,
+      authorUsername: session.hostUsername,
+    });
+    const isHost = session.hostUid === firebaseUser.uid;
+    setCoopMosaicSessionId(session.id);
+    setCoopMosaicRole(isHost ? "host" : "guest");
+    setCoopMosaicStatus(session.status || "waiting");
+    setCoopMosaicPartnerConnected(isHost ? !!session.guestUid : true);
+    setCoopMosaicPartnerUsername(isHost ? (session.guestUsername || null) : (session.hostUsername || null));
+    setCoopMosaicSharedProgress(session.tileProgress || {});
+    setCoopMosaicSharedTileTimes(session.tileTimes || {});
+    setCustomMosaicProgress(session.tileProgress || {});
+    setCoopMosaicPartnerFills({});
+    coopMosaicCurrentTileRef.current = -1;
+    coopMosaicGuestJoinedRef.current = !isHost;
+    coopMosaicWriteThrottleRef.current = {};
+    setView("custom-mosaic");
+  }, [firebaseUser, buildCustomMosaicPuzzles]);
+
+  // Close a coop mosaic session permanently (from active sessions panel)
+  const closeCoopMosaicSessionPermanently = useCallback(async (sessionId, session) => {
+    if (!firebaseUser) return;
+    await closeCoopMosaicSession(sessionId, session?.hostUid, session?.guestUid).catch(() => {});
+    if (coopMosaicSessionId === sessionId) {
+      leaveCoopMosaicSession();
+    }
+  }, [firebaseUser, coopMosaicSessionId, leaveCoopMosaicSession]);
+
   // Subscribe to coop mosaic session changes
   useEffect(() => {
     if (!coopMosaicSessionId || !firebaseUser) return;
@@ -5278,13 +5320,18 @@ export default function Pattrn() {
         }
         return;
       }
+      // Normalize grid from Firebase (may have been stored as object with numeric keys)
+      const rawGrid = session.mosaicGrid;
+      const grid = Array.isArray(rawGrid)
+        ? rawGrid.map(row => Array.isArray(row) ? row : Object.values(row || {}))
+        : Object.values(rawGrid || {}).map(row => Array.isArray(row) ? row : Object.values(row || {}));
       // Build mosaic puzzles from session grid
-      const puzzles = buildCustomMosaicPuzzles(session.mosaicGrid);
+      const puzzles = buildCustomMosaicPuzzles(grid);
       customMosaicPuzzlesRef.current = puzzles;
       setCustomMosaicPlay({
         id: session.mosaicId,
         title: session.mosaicTitle,
-        grid: session.mosaicGrid,
+        grid: grid,
         authorUsername: session.hostUsername,
       });
       // Restore shared progress
@@ -9029,6 +9076,48 @@ export default function Pattrn() {
     </div>
   );
 
+  // --- Coop Mosaic joining overlay (shown while waiting for auth + session load) ---
+  if (coopMosaicStatus === "joining") {
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        paddingTop: "calc(32px + env(safe-area-inset-top, 0px))", paddingBottom: 32,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }`}</style>
+        <div style={{ textAlign: "center", animation: "fadeUp 0.4s ease" }}>
+          <div style={{ fontSize: 28, marginBottom: 16 }}>{"\u25A6"}</div>
+          <div style={{
+            fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700,
+            color: C.coop, letterSpacing: 2, textTransform: "uppercase", marginBottom: 8,
+          }}>
+            Joining Co-op Mosaic
+          </div>
+          <div style={{
+            fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.textDim,
+            animation: "coopPulse 1.5s ease-in-out infinite",
+          }}>
+            {!firebaseUser ? "Signing in..." : "Loading mosaic..."}
+          </div>
+          <button onClick={() => {
+            setCoopMosaicSessionId(null);
+            setCoopMosaicRole(null);
+            setCoopMosaicStatus(null);
+          }}
+            style={{
+              marginTop: 24, background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+              padding: "8px 20px", color: C.textDim, cursor: "pointer",
+              fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1,
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // --- MENU VIEW ---
   if (view === "menu") {
     return (
@@ -9404,34 +9493,45 @@ export default function Pattrn() {
               {activeCoopSessions.map(session => {
                 const isHost = session.hostUid === firebaseUser.uid;
                 const partnerName = isHost ? (session.guestUsername || null) : (session.hostUsername || null);
-                const modeLabel = (DIFFICULTIES.find(d => d.key === session.mode)?.label) || session.mode;
+                const isMosaicSession = session._type === "mosaic";
+                const modeLabel = isMosaicSession ? "Mosaic" : ((DIFFICULTIES.find(d => d.key === session.mode)?.label) || session.mode);
+                const titleLabel = isMosaicSession
+                  ? (session.mosaicTitle || "Untitled")
+                  : `${modeLabel} #${(session.level ?? 0) + 1}`;
                 const statusLabel = session.status === "waiting" ? "Waiting for partner" : session.status === "playing" ? "In progress" : session.status === "complete" ? "Complete" : session.status;
-                const statusColor = session.status === "waiting" ? C.textDim : session.status === "playing" ? "#54A0FF" : session.status === "complete" ? C.correct : C.textDim;
+                const statusColor = session.status === "waiting" ? C.textDim : session.status === "playing" ? C.coop : session.status === "complete" ? C.correct : C.textDim;
+                const mosaicSolved = isMosaicSession ? Object.values(session.tileProgress || {}).filter(v => v > 0).length : 0;
                 return (
                   <div key={session.id} style={{
                     display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
-                    borderRadius: 10, backgroundColor: C.bg, border: `1px solid ${C.border}`,
+                    borderRadius: 10, backgroundColor: C.bg, border: `1px solid ${isMosaicSession ? C.coop + "22" : C.border}`,
                   }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text }}>
-                          {modeLabel} #{(session.level ?? 0) + 1}
+                        {isMosaicSession && (
+                          <span style={{ fontSize: 9, color: C.coop, fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                            Co-op Mosaic
+                          </span>
+                        )}
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>
+                          {titleLabel}
                         </span>
-                        <span style={{ fontSize: 9, color: isHost ? "#54A0FF" : "#FF9FF3", fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                        <span style={{ fontSize: 9, color: isHost ? C.coop : "#FF9FF3", fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
                           {isHost ? "Host" : "Guest"}
                         </span>
                       </div>
                       <div style={{ fontSize: 10, color: statusColor, fontFamily: "'Space Mono', monospace" }}>
                         {statusLabel}
+                        {isMosaicSession && session.status === "playing" && <span style={{ color: C.textDim }}> {"\u2022"} {mosaicSolved}/25 tiles</span>}
                         {partnerName && <span style={{ color: C.textDim }}> {"\u2022"} with {partnerName}</span>}
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
                       {session.status !== "complete" && (
                         <button
-                          onClick={() => rejoinCoopSession(session)}
+                          onClick={() => isMosaicSession ? rejoinCoopMosaicSession(session) : rejoinCoopSession(session)}
                           style={{
-                            background: "#54A0FF", border: "none", borderRadius: 8,
+                            background: C.coop, border: "none", borderRadius: 8,
                             padding: "6px 12px", color: "#fff", cursor: "pointer", fontSize: 10,
                             fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
                           }}
@@ -9441,7 +9541,7 @@ export default function Pattrn() {
                       )}
                       {isHost && (
                         <button
-                          onClick={() => closeCoopSessionPermanently(session.id, session)}
+                          onClick={() => isMosaicSession ? closeCoopMosaicSessionPermanently(session.id, session) : closeCoopSessionPermanently(session.id, session)}
                           style={{
                             background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
                             padding: "6px 8px", color: C.textDim, cursor: "pointer", fontSize: 10,
