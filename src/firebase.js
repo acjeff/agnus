@@ -923,17 +923,24 @@ export async function loadUserCoopSessions(uid) {
   if (!db) return [];
   const indexSnap = await get(ref(db, `userCoopSessions/${uid}`));
   if (!indexSnap.exists()) return [];
-  const sessionIds = Object.keys(indexSnap.val());
-  // Load each session individually (respects per-session read rules)
+  const indexEntries = indexSnap.val();
+  const sessionIds = Object.keys(indexEntries);
+  // Load each session individually, routing to the correct path based on type
   const sessions = await Promise.all(
     sessionIds.map(async (sid) => {
-      const snap = await get(ref(db, `coopSessions/${sid}`));
+      const entry = indexEntries[sid];
+      const isMosaic = entry && entry.type === "mosaic";
+      const path = isMosaic ? `coopMosaicSessions/${sid}` : `coopSessions/${sid}`;
+      const snap = await get(ref(db, path));
       if (!snap.exists()) {
         // Session was deleted, clean up stale index
         remove(ref(db, `userCoopSessions/${uid}/${sid}`)).catch(() => {});
         return null;
       }
-      return snap.val();
+      const data = snap.val();
+      // Tag mosaic sessions so the UI can distinguish them
+      if (isMosaic) data._type = "mosaic";
+      return data;
     })
   );
   return sessions.filter(Boolean).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
