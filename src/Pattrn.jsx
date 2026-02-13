@@ -74,7 +74,7 @@ import {
   updateCoopMosaicTileProgress,
   clearCoopMosaicTileFills,
   completeCoopMosaicSession,
-  guestLeaveCoopMosaicSession,
+  playerLeaveCoopMosaicSession,
   closeCoopMosaicSession,
   loadCoopMosaicSession,
 } from "./firebase.js";
@@ -2828,23 +2828,24 @@ export default function Pattrn() {
   const seenNotifIdsRef = useRef(new Set()); // track previously seen notification IDs
   const notifInitialLoadRef = useRef(true); // skip toasting on initial load
 
-  // --- Coop Mosaic state ---
+  // --- Coop Mosaic state (n-player) ---
   const [coopMosaicSessionId, setCoopMosaicSessionId] = useState(null);
   const [coopMosaicRole, setCoopMosaicRole] = useState(null); // "host" | "guest"
   const [coopMosaicStatus, setCoopMosaicStatus] = useState(null); // "waiting" | "playing" | "complete"
-  const [coopMosaicPartnerTile, setCoopMosaicPartnerTile] = useState(null); // partner's current tile index (-1 = overview, 0-24 = tile, null = offline)
-  const [coopMosaicPartnerConnected, setCoopMosaicPartnerConnected] = useState(false);
-  const [coopMosaicPartnerUsername, setCoopMosaicPartnerUsername] = useState(null);
+  const [coopMosaicPlayers, setCoopMosaicPlayers] = useState({}); // { uid: { username, currentTile } } — all OTHER players
   const [coopMosaicSharedProgress, setCoopMosaicSharedProgress] = useState({}); // { tileIdx: attempts } synced from Firebase
   const [coopMosaicSharedTileTimes, setCoopMosaicSharedTileTimes] = useState({}); // { tileIdx: seconds }
-  const [coopMosaicPartnerFills, setCoopMosaicPartnerFills] = useState({}); // partner fills for current tile { "r-c": token }
+  const [coopMosaicOtherFills, setCoopMosaicOtherFills] = useState({}); // merged fills from all other players for current tile { "r-c": token }
   const [showCoopMosaicInvite, setShowCoopMosaicInvite] = useState(false);
-  const [showCoopMosaicNavigate, setShowCoopMosaicNavigate] = useState(false); // modal to navigate to partner's tile
+  const [showCoopMosaicNavigate, setShowCoopMosaicNavigate] = useState(false); // modal to navigate to a player's tile
   const coopMosaicUnsubRef = useRef(null);
   const coopMosaicWriteThrottleRef = useRef({});
   const coopMosaicCurrentTileRef = useRef(null); // tracks which tile index the local player is in (-1 for overview)
-  const coopMosaicGuestJoinedRef = useRef(false);
+  const coopMosaicJoinedRef = useRef(false); // tracks whether we've actually joined (prevents false kick detection)
   const isCoopMosaic = !!coopMosaicSessionId;
+  // Derived: number of other connected players (currentTile != null means connected)
+  const coopMosaicOtherPlayerCount = Object.keys(coopMosaicPlayers).length;
+  const coopMosaicAnyConnected = coopMosaicOtherPlayerCount > 0;
 
   // --- Staff Pick & Admin Manage state ---
   const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
@@ -5141,17 +5142,15 @@ export default function Pattrn() {
     setCoopMosaicSessionId(sessionId);
     setCoopMosaicRole("host");
     setCoopMosaicStatus("waiting");
-    setCoopMosaicPartnerConnected(false);
-    setCoopMosaicPartnerUsername(null);
-    setCoopMosaicPartnerTile(null);
-    setCoopMosaicPartnerFills({});
+    setCoopMosaicPlayers({});
+    setCoopMosaicOtherFills({});
     setCoopMosaicSharedProgress({});
     setCoopMosaicSharedTileTimes({});
     // Reset local mosaic progress so the coop session starts fresh
     // (don't carry over the player's personal solo progress)
     setCustomMosaicProgress({});
     coopMosaicCurrentTileRef.current = -1;
-    coopMosaicGuestJoinedRef.current = false;
+    coopMosaicJoinedRef.current = true;
     // Ensure the session appears in the Active Co-op Sessions panel on the menu
     loadActiveCoopSessions();
     // If inviting a friend, send notification
@@ -5177,25 +5176,23 @@ export default function Pattrn() {
     }
     if (coopMosaicSessionId && firebaseUser) {
       if (coopMosaicRole === "guest") {
-        guestLeaveCoopMosaicSession(coopMosaicSessionId, firebaseUser.uid).catch(() => {});
+        playerLeaveCoopMosaicSession(coopMosaicSessionId, firebaseUser.uid).catch(() => {});
       } else if (coopMosaicRole === "host") {
-        // Signal host is offline by setting hostCurrentTile to null
-        updateCoopMosaicCurrentTile(coopMosaicSessionId, "host", null).catch(() => {});
+        // Signal host is offline by setting currentTile to null
+        updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, null).catch(() => {});
       }
     }
     setCoopMosaicSessionId(null);
     setCoopMosaicRole(null);
     setCoopMosaicStatus(null);
-    setCoopMosaicPartnerTile(null);
-    setCoopMosaicPartnerConnected(false);
-    setCoopMosaicPartnerUsername(null);
+    setCoopMosaicPlayers({});
     setCoopMosaicSharedProgress({});
     setCoopMosaicSharedTileTimes({});
-    setCoopMosaicPartnerFills({});
+    setCoopMosaicOtherFills({});
     setShowCoopMosaicInvite(false);
     coopMosaicWriteThrottleRef.current = {};
     coopMosaicCurrentTileRef.current = null;
-    coopMosaicGuestJoinedRef.current = false;
+    coopMosaicJoinedRef.current = false;
   }, [coopMosaicSessionId, firebaseUser, coopMosaicRole]);
 
   // Rejoin an existing coop mosaic session from the active sessions panel
@@ -5218,27 +5215,34 @@ export default function Pattrn() {
     // Build mosaic puzzles from session grid
     const puzzles = buildCustomMosaicPuzzles(grid);
     customMosaicPuzzlesRef.current = puzzles;
+    // Resolve host username from players map
+    const players = session.players || {};
+    const hostPlayer = players[session.hostUid];
     setCustomMosaicPlay({
       id: session.mosaicId,
       title: session.mosaicTitle,
       grid: grid,
-      authorUsername: session.hostUsername,
+      authorUsername: hostPlayer?.username || session.hostUsername || null,
     });
     const isHost = session.hostUid === firebaseUser.uid;
+    // Build other players map (everyone except me)
+    const otherPlayers = {};
+    for (const [uid, p] of Object.entries(players)) {
+      if (uid !== firebaseUser.uid) otherPlayers[uid] = p;
+    }
     setCoopMosaicSessionId(session.id);
     setCoopMosaicRole(isHost ? "host" : "guest");
     setCoopMosaicStatus(session.status || "waiting");
-    setCoopMosaicPartnerConnected(isHost ? !!session.guestUid : (session.hostCurrentTile != null));
-    setCoopMosaicPartnerUsername(isHost ? (session.guestUsername || null) : (session.hostUsername || null));
+    setCoopMosaicPlayers(otherPlayers);
     setCoopMosaicSharedProgress(session.tileProgress || {});
     setCoopMosaicSharedTileTimes(session.tileTimes || {});
     setCustomMosaicProgress(session.tileProgress || {});
-    setCoopMosaicPartnerFills({});
+    setCoopMosaicOtherFills({});
     coopMosaicCurrentTileRef.current = -1;
-    coopMosaicGuestJoinedRef.current = !isHost;
+    coopMosaicJoinedRef.current = true;
     coopMosaicWriteThrottleRef.current = {};
     // Signal we're back online by updating our current tile to -1 (overview)
-    updateCoopMosaicCurrentTile(session.id, isHost ? "host" : "guest", -1).catch(() => {});
+    updateCoopMosaicCurrentTile(session.id, firebaseUser.uid, -1).catch(() => {});
     customMosaicReturnViewRef.current = "menu";
     setView("custom-mosaic");
   }, [firebaseUser, buildCustomMosaicPuzzles]);
@@ -5246,7 +5250,8 @@ export default function Pattrn() {
   // Close a coop mosaic session permanently (from active sessions panel)
   const closeCoopMosaicSessionPermanently = useCallback(async (sessionId, session) => {
     if (!firebaseUser) return;
-    await closeCoopMosaicSession(sessionId, session?.hostUid, session?.guestUid).catch(() => {});
+    const playerUids = session?.players ? Object.keys(session.players) : [session?.hostUid].filter(Boolean);
+    await closeCoopMosaicSession(sessionId, playerUids).catch(() => {});
     if (coopMosaicSessionId === sessionId) {
       leaveCoopMosaicSession();
     }
@@ -5262,36 +5267,37 @@ export default function Pattrn() {
         leaveCoopMosaicSession();
         return;
       }
-      const isHost = data.hostUid === firebaseUser.uid;
+      const myUid = firebaseUser.uid;
+      const players = data.players || {};
 
-      // Track guest joining
-      if (!isHost && data.guestUid === firebaseUser.uid) {
-        coopMosaicGuestJoinedRef.current = true;
+      // Track that we've joined
+      if (players[myUid]) {
+        coopMosaicJoinedRef.current = true;
       }
-      // Detect guest kick
-      if (!isHost && !data.guestUid && coopMosaicGuestJoinedRef.current) {
-        coopMosaicGuestJoinedRef.current = false;
+      // Detect kick (we were in but are no longer in the players map)
+      if (!players[myUid] && coopMosaicJoinedRef.current) {
+        coopMosaicJoinedRef.current = false;
         leaveCoopMosaicSession();
         setView("menu");
         return;
       }
 
-      // Host is connected when hostCurrentTile is not null (null = host left the session view)
-      const partnerConnected = isHost ? !!data.guestUid : (data.hostCurrentTile != null);
-      setCoopMosaicPartnerConnected(partnerConnected);
+      // Build other players map (everyone except me, with currentTile != null = connected)
+      const otherPlayers = {};
+      for (const [uid, p] of Object.entries(players)) {
+        if (uid !== myUid) {
+          otherPlayers[uid] = { username: p.username || null, currentTile: p.currentTile ?? null };
+        }
+      }
+      setCoopMosaicPlayers(otherPlayers);
       setCoopMosaicStatus(data.status);
-      setCoopMosaicPartnerUsername(isHost ? (data.guestUsername || null) : (data.hostUsername || null));
 
-      // Sync partner's current tile
-      const partnerTile = isHost ? data.guestCurrentTile : data.hostCurrentTile;
-      setCoopMosaicPartnerTile(partnerTile);
-
-      // Sync shared progress and update local customMosaicProgress with partner's completions
+      // Sync shared progress and update local customMosaicProgress
       const tp = data.tileProgress || {};
       const tt = data.tileTimes || {};
       setCoopMosaicSharedProgress(tp);
       setCoopMosaicSharedTileTimes(tt);
-      // Merge shared progress into local so startPuzzle sees partner-completed tiles
+      // Merge shared progress into local so startPuzzle sees completed tiles
       setCustomMosaicProgress(prev => {
         const merged = { ...prev };
         let changed = false;
@@ -5301,21 +5307,21 @@ export default function Pattrn() {
         return changed ? merged : prev;
       });
 
-      // Sync partner fills for the current tile
+      // Sync other players' fills for the current tile
       const myTile = coopMosaicCurrentTileRef.current;
       if (myTile != null && myTile >= 0) {
         const prefix = `${myTile}_`;
-        const partnerFills = {};
+        const otherFills = {};
         const allFills = data.fills || {};
         for (const [key, val] of Object.entries(allFills)) {
           if (key.startsWith(prefix)) {
             const cellKey = key.slice(prefix.length);
-            partnerFills[cellKey] = val;
+            otherFills[cellKey] = val;
           }
         }
-        setCoopMosaicPartnerFills(partnerFills);
+        setCoopMosaicOtherFills(otherFills);
       } else {
-        setCoopMosaicPartnerFills({});
+        setCoopMosaicOtherFills({});
       }
 
       // Check if all 25 tiles are solved
@@ -5365,21 +5371,28 @@ export default function Pattrn() {
       // Build mosaic puzzles from session grid
       const puzzles = buildCustomMosaicPuzzles(grid);
       customMosaicPuzzlesRef.current = puzzles;
+      // Resolve host username from players map
+      const players = session.players || {};
+      const hostPlayer = players[session.hostUid];
       setCustomMosaicPlay({
         id: session.mosaicId,
         title: session.mosaicTitle,
         grid: grid,
-        authorUsername: session.hostUsername,
+        authorUsername: hostPlayer?.username || null,
       });
+      // Build other players map
+      const otherPlayers = {};
+      for (const [uid, p] of Object.entries(players)) {
+        if (uid !== firebaseUser.uid) otherPlayers[uid] = { username: p.username || null, currentTile: p.currentTile ?? null };
+      }
       // Restore shared progress
       setCoopMosaicSharedProgress(session.tileProgress || {});
       setCoopMosaicSharedTileTimes(session.tileTimes || {});
       setCustomMosaicProgress(session.tileProgress || {});
       setCoopMosaicStatus("playing");
-      setCoopMosaicPartnerConnected(true);
-      setCoopMosaicPartnerUsername(session.hostUsername || null);
+      setCoopMosaicPlayers(otherPlayers);
       coopMosaicCurrentTileRef.current = -1;
-      coopMosaicGuestJoinedRef.current = true;
+      coopMosaicJoinedRef.current = true;
       coopMosaicWriteThrottleRef.current = {};
       customMosaicReturnViewRef.current = "menu";
       setView("custom-mosaic");
@@ -5464,7 +5477,7 @@ export default function Pattrn() {
     const newLocked = new Set(lockedCells);
 
     // In coop mosaic mode, merge partner fills with my fills for checking
-    const checkFills = isCoopMosaic ? { ...coopMosaicPartnerFills, ...fills } : fills;
+    const checkFills = isCoopMosaic ? { ...coopMosaicOtherFills, ...fills } : fills;
 
     // Check which blanks are still active (not locked)
     const activeBlanks = [...puzzle.blanks].filter(k => !lockedCells.has(k));
@@ -5767,7 +5780,7 @@ export default function Pattrn() {
   const allFilled = isCoop
     ? coopMyBlanksArr.every(k => fills[k])
     : isCoopMosaic
-      ? puzzle ? [...puzzle.blanks].every(k => fills[k] || coopMosaicPartnerFills[k]) : false
+      ? puzzle ? [...puzzle.blanks].every(k => fills[k] || coopMosaicOtherFills[k]) : false
       : isBlind
         ? activeBlanks.every(k => fills[k])
         : puzzle ? [...puzzle.blanks].every(k => fills[k]) : false;
@@ -6398,8 +6411,8 @@ export default function Pattrn() {
     // Track that we're on the overview when this view renders
     if (isCoopMosaic && coopMosaicCurrentTileRef.current !== -1) {
       coopMosaicCurrentTileRef.current = -1;
-      if (coopMosaicSessionId && coopMosaicRole) {
-        updateCoopMosaicCurrentTile(coopMosaicSessionId, coopMosaicRole, -1).catch(() => {});
+      if (coopMosaicSessionId && firebaseUser) {
+        updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
       }
     }
     const coopMosaicInviteUrl = isCoopMosaic && coopMosaicSessionId ? `${typeof window !== "undefined" ? window.location.origin + window.location.pathname : ""}?coopMosaic=${coopMosaicSessionId}` : "";
@@ -6493,46 +6506,74 @@ export default function Pattrn() {
           )}
         </div>
 
-        {/* Coop mosaic status bar */}
+        {/* Coop mosaic status bar — n-player */}
         {isCoopMosaic && (
           <div style={{
             width: "100%", maxWidth: 400, marginBottom: 12,
             padding: "8px 14px", borderRadius: 10,
             backgroundColor: C.coop + "11", border: `1px solid ${C.coop}33`,
-            display: "flex", alignItems: "center", gap: 10,
             animation: "fadeUp 0.3s 0.01s ease both",
             fontFamily: "'Space Mono', monospace", fontSize: 11,
           }}>
-            <div style={{
-              width: 8, height: 8, borderRadius: "50%",
-              backgroundColor: coopMosaicPartnerConnected ? C.correct : C.textDim,
-              animation: coopMosaicPartnerConnected ? "coopPulse 2s ease-in-out infinite" : "none",
-            }} />
-            <div style={{ flex: 1, color: C.text }}>
-              {coopMosaicStatus === "waiting" ? (
-                <span>Waiting for partner...</span>
-              ) : coopMosaicPartnerConnected ? (
-                <span>
-                  <span style={{ color: C.coop, fontWeight: 700 }}>{coopMosaicPartnerUsername || "Partner"}</span>
-                  {coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0
-                    ? <span style={{ color: C.textDim }}> — solving tile {coopMosaicPartnerTile + 1}</span>
-                    : <span style={{ color: C.textDim }}> — viewing mosaic</span>
-                  }
-                </span>
-              ) : (
-                <span style={{ color: C.textDim }}>Partner disconnected</span>
-              )}
-            </div>
-            {coopMosaicStatus !== "complete" && coopMosaicRole === "host" && (
-              <button onClick={() => setShowCoopMosaicInvite(true)}
-                style={{
-                  background: "none", border: `1px solid ${C.coop}55`, borderRadius: 6, padding: "3px 8px",
-                  color: C.coop, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-                  fontSize: 9, letterSpacing: 1, textTransform: "uppercase",
-                }}
-              >
-                Invite
-              </button>
+            {coopMosaicStatus === "waiting" ? (
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", backgroundColor: C.textDim }} />
+                <span style={{ color: C.text }}>Waiting for players...</span>
+                <button onClick={() => setShowCoopMosaicInvite(true)}
+                  style={{
+                    marginLeft: "auto", background: "none", border: `1px solid ${C.coop}55`, borderRadius: 6, padding: "3px 8px",
+                    color: C.coop, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                    fontSize: 9, letterSpacing: 1, textTransform: "uppercase",
+                  }}
+                >
+                  Invite
+                </button>
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{
+                    width: 8, height: 8, borderRadius: "50%",
+                    backgroundColor: coopMosaicAnyConnected ? C.correct : C.textDim,
+                    animation: coopMosaicAnyConnected ? "coopPulse 2s ease-in-out infinite" : "none",
+                    flexShrink: 0,
+                  }} />
+                  <span style={{ color: C.text, fontWeight: 700 }}>
+                    {coopMosaicOtherPlayerCount + 1} players
+                  </span>
+                  {coopMosaicStatus !== "complete" && (
+                    <button onClick={() => setShowCoopMosaicInvite(true)}
+                      style={{
+                        marginLeft: "auto", background: "none", border: `1px solid ${C.coop}55`, borderRadius: 6, padding: "3px 8px",
+                        color: C.coop, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                        fontSize: 9, letterSpacing: 1, textTransform: "uppercase", flexShrink: 0,
+                      }}
+                    >
+                      Invite
+                    </button>
+                  )}
+                </div>
+                {coopMosaicOtherPlayerCount > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", marginTop: 6 }}>
+                    {Object.entries(coopMosaicPlayers).map(([uid, p]) => (
+                      <span key={uid} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                        <span style={{
+                          width: 5, height: 5, borderRadius: "50%",
+                          backgroundColor: p.currentTile != null ? C.correct : C.textDim,
+                          display: "inline-block",
+                        }} />
+                        <span style={{ color: C.coop, fontWeight: 600, fontSize: 10 }}>{p.username || "Player"}</span>
+                        {p.currentTile != null && p.currentTile >= 0
+                          ? <span style={{ color: C.textDim, fontSize: 9 }}>tile {p.currentTile + 1}</span>
+                          : p.currentTile === -1
+                            ? <span style={{ color: C.textDim, fontSize: 9 }}>overview</span>
+                            : null
+                        }
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
@@ -6549,12 +6590,16 @@ export default function Pattrn() {
         }}>
           {cPuzzles.map((p, i) => {
             const solved = (effectiveMosaicProgress[i] || 0) > 0;
-            const isPartnerHere = isCoopMosaic && coopMosaicPartnerTile === i;
+            // Count how many other players are on this tile
+            const playersOnTile = isCoopMosaic
+              ? Object.values(coopMosaicPlayers).filter(pl => pl.currentTile === i)
+              : [];
+            const anyPlayerHere = playersOnTile.length > 0;
             return (
               <button key={i} onClick={() => {
                 if (isCoopMosaic) {
                   coopMosaicCurrentTileRef.current = i;
-                  updateCoopMosaicCurrentTile(coopMosaicSessionId, coopMosaicRole, i).catch(() => {});
+                  updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser?.uid, i).catch(() => {});
                 }
                 // Don't force restart if tile is already completed (show completed state)
                 const tileCompleted = (effectiveMosaicProgress[i] || 0) > 0;
@@ -6562,15 +6607,15 @@ export default function Pattrn() {
               }}
                 style={{
                   width: tileSzCm, height: tileSzCm, borderRadius: 6,
-                  border: `1.5px solid ${isPartnerHere ? C.coop : solved ? C.correct + "66" : C.border}`,
-                  backgroundColor: solved ? C.correct + "10" : isPartnerHere ? C.coop + "08" : C.surface,
+                  border: `1.5px solid ${anyPlayerHere ? C.coop : solved ? C.correct + "66" : C.border}`,
+                  backgroundColor: solved ? C.correct + "10" : anyPlayerHere ? C.coop + "08" : C.surface,
                   cursor: "pointer", padding: 2, position: "relative",
                   display: "flex", flexDirection: "column", gap: 0.5, alignItems: "center", justifyContent: "center",
                   transition: "all 0.15s", overflow: "hidden",
-                  boxShadow: isPartnerHere ? `0 0 8px ${C.coop}44` : "none",
+                  boxShadow: anyPlayerHere ? `0 0 8px ${C.coop}44` : "none",
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = isPartnerHere ? C.coop : solved ? C.correct + "66" : C.border; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = anyPlayerHere ? C.coop : solved ? C.correct + "66" : C.border; }}
               >
                 {solved ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
@@ -6586,18 +6631,24 @@ export default function Pattrn() {
                 ) : (
                   <span style={{
                     fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
-                    color: isPartnerHere ? C.coop : C.textDim, lineHeight: 1,
+                    color: anyPlayerHere ? C.coop : C.textDim, lineHeight: 1,
                   }}>
                     {i + 1}
                   </span>
                 )}
-                {/* Partner indicator badge */}
-                {isPartnerHere && (
-                  <div style={{
-                    position: "absolute", top: 2, right: 2,
-                    width: 7, height: 7, borderRadius: "50%",
-                    backgroundColor: C.coop, animation: "coopPulse 2s ease-in-out infinite",
-                  }} />
+                {/* Player indicator badges — show up to 3 dots for players on this tile */}
+                {anyPlayerHere && (
+                  <div style={{ position: "absolute", top: 2, right: 2, display: "flex", gap: 2 }}>
+                    {playersOnTile.slice(0, 3).map((_, idx) => (
+                      <div key={idx} style={{
+                        width: 5, height: 5, borderRadius: "50%",
+                        backgroundColor: C.coop, animation: "coopPulse 2s ease-in-out infinite",
+                      }} />
+                    ))}
+                    {playersOnTile.length > 3 && (
+                      <span style={{ fontSize: 6, color: C.coop, fontWeight: 700, lineHeight: "5px" }}>+{playersOnTile.length - 3}</span>
+                    )}
+                  </div>
                 )}
               </button>
             );
@@ -6663,7 +6714,7 @@ export default function Pattrn() {
                 Start Co-op Mosaic
               </div>
               <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
-                Invite a friend or share a link
+                Invite friends or share a link — anyone can join!
               </div>
               {friendsList.length > 0 && (
                 <div style={{ marginBottom: 16, maxHeight: 200, overflowY: "auto" }}>
@@ -6756,7 +6807,7 @@ export default function Pattrn() {
                 Co-op Mosaic
               </h3>
               <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace" }}>
-                Share this link to invite a friend to solve this mosaic together.
+                Share this link to invite friends to solve this mosaic together. Anyone with the link can join!
               </div>
               <div style={{
                 padding: "10px 12px", borderRadius: 8, backgroundColor: C.bg, border: `1px solid ${C.border}`,
@@ -9681,8 +9732,12 @@ export default function Pattrn() {
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {activeCoopSessions.map(session => {
                 const isHost = session.hostUid === firebaseUser.uid;
-                const partnerName = isHost ? (session.guestUsername || null) : (session.hostUsername || null);
                 const isMosaicSession = session._type === "mosaic";
+                // For mosaic sessions, count players from the players map; for regular coop, use guestUsername
+                const mosaicPlayerCount = isMosaicSession ? Object.keys(session.players || {}).length : 0;
+                const partnerName = isMosaicSession
+                  ? (mosaicPlayerCount > 1 ? `${mosaicPlayerCount} players` : null)
+                  : (isHost ? (session.guestUsername || null) : (session.hostUsername || null));
                 const modeLabel = isMosaicSession ? "Mosaic" : ((DIFFICULTIES.find(d => d.key === session.mode)?.label) || session.mode);
                 const titleLabel = isMosaicSession
                   ? (session.mosaicTitle || "Untitled")
@@ -11888,10 +11943,10 @@ export default function Pattrn() {
           setShowMosaicPreviewOverlay(false);
           if (customMosaicPuzzlesRef.current && isMosaic) {
             // In coop mosaic mode, update current tile to -1 (overview)
-            if (isCoopMosaic && coopMosaicSessionId && coopMosaicRole) {
+            if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
               coopMosaicCurrentTileRef.current = -1;
-              updateCoopMosaicCurrentTile(coopMosaicSessionId, coopMosaicRole, -1).catch(() => {});
-              setCoopMosaicPartnerFills({});
+              updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
+              setCoopMosaicOtherFills({});
               coopMosaicWriteThrottleRef.current = {};
             }
             setView("custom-mosaic");
@@ -12350,27 +12405,50 @@ export default function Pattrn() {
         </div>
       )}
 
-      {/* Navigate to partner's tile modal */}
-      {showCoopMosaicNavigate && coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0 && (
-        <div onClick={() => setShowCoopMosaicNavigate(false)} style={{
-          position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            backgroundColor: C.surface, borderRadius: 16, padding: "24px 28px",
-            border: `1px solid ${C.border}`, maxWidth: 300, width: "90%",
-            textAlign: "center", animation: "fadeUp 0.25s ease",
+      {/* Navigate to player's tile modal */}
+      {showCoopMosaicNavigate && (() => {
+        const playersOnTiles = Object.entries(coopMosaicPlayers)
+          .filter(([, p]) => p.currentTile != null && p.currentTile >= 0 && p.currentTile !== currentPuzzle);
+        return playersOnTiles.length > 0 ? (
+          <div onClick={() => setShowCoopMosaicNavigate(false)} style={{
+            position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
+            display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>
-              Go to partner
-            </div>
-            <div style={{ fontSize: 14, color: C.text, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
-              <span style={{ color: C.coop, fontWeight: 700 }}>{coopMosaicPartnerUsername || "Partner"}</span> is on tile {coopMosaicPartnerTile + 1}
-            </div>
-            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 20 }}>
-              Navigate there to solve it together?
-            </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              backgroundColor: C.surface, borderRadius: 16, padding: "24px 28px",
+              border: `1px solid ${C.border}`, maxWidth: 320, width: "90%",
+              textAlign: "center", animation: "fadeUp 0.25s ease",
+            }}>
+              <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>
+                Go to player
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+                {playersOnTiles.map(([uid, p]) => (
+                  <button key={uid} onClick={() => {
+                    const targetTile = p.currentTile;
+                    setShowCoopMosaicNavigate(false);
+                    coopMosaicCurrentTileRef.current = targetTile;
+                    updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser?.uid, targetTile).catch(() => {});
+                    coopMosaicWriteThrottleRef.current = {};
+                    startPuzzle(targetTile, "mosaic", true);
+                  }}
+                    style={{
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      background: C.coop + "11", border: `1px solid ${C.coop}44`, borderRadius: 8,
+                      padding: "10px 16px", cursor: "pointer", transition: "all 0.15s",
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.coop + "22"; }}
+                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = C.coop + "11"; }}
+                  >
+                    <span style={{ color: C.coop, fontWeight: 700, fontFamily: "'Space Mono', monospace", fontSize: 12 }}>
+                      {p.username || "Player"}
+                    </span>
+                    <span style={{ color: C.textDim, fontFamily: "'Space Mono', monospace", fontSize: 11 }}>
+                      tile {p.currentTile + 1}
+                    </span>
+                  </button>
+                ))}
+              </div>
               <button onClick={() => setShowCoopMosaicNavigate(false)}
                 style={{
                   background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
@@ -12380,26 +12458,10 @@ export default function Pattrn() {
               >
                 Stay
               </button>
-              <button onClick={() => {
-                const targetTile = coopMosaicPartnerTile;
-                setShowCoopMosaicNavigate(false);
-                coopMosaicCurrentTileRef.current = targetTile;
-                updateCoopMosaicCurrentTile(coopMosaicSessionId, coopMosaicRole, targetTile).catch(() => {});
-                coopMosaicWriteThrottleRef.current = {};
-                startPuzzle(targetTile, "mosaic", true);
-              }}
-                style={{
-                  background: C.coop, border: "none", borderRadius: 8,
-                  padding: "8px 18px", color: "#fff", cursor: "pointer",
-                  fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, letterSpacing: 1,
-                }}
-              >
-                Go
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        ) : null;
+      })()}
 
       {/* Mosaic preview overlay — shows full mosaic with current tile highlighted */}
       {showMosaicPreviewOverlay && customMosaicPlay && customMosaicPuzzlesRef.current && (
@@ -12596,34 +12658,43 @@ export default function Pattrn() {
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(88px + env(safe-area-inset-top, 0px))", paddingBottom: "calc(140px + env(safe-area-inset-bottom, 0px))", width: "calc(100% + 32px)", margin: "0 -16px", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, position: "relative", boxSizing: "border-box" }}>
         <GridDecoration decoration={activeTheme.decoration} />
-        {/* Coop mosaic partner indicator — positioned top-left of puzzle panel */}
-        {isCoopMosaic && coopMosaicPartnerConnected && gameState === "playing" && (
+        {/* Coop mosaic players indicator — positioned top-left of puzzle panel */}
+        {isCoopMosaic && coopMosaicAnyConnected && gameState === "playing" && (
           <div
             onClick={() => {
-              if (coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0 && coopMosaicPartnerTile !== currentPuzzle) {
-                setShowCoopMosaicNavigate(true);
-              }
+              const anyOnOtherTile = Object.values(coopMosaicPlayers).some(p => p.currentTile != null && p.currentTile >= 0 && p.currentTile !== currentPuzzle);
+              if (anyOnOtherTile) setShowCoopMosaicNavigate(true);
             }}
             style={{
               position: "absolute", top: "calc(88px + env(safe-area-inset-top, 0px) + 8px)", left: 12, zIndex: 10,
-              display: "flex", alignItems: "center", gap: 4,
+              display: "flex", flexDirection: "column", gap: 3,
               padding: "4px 10px", borderRadius: 8,
               backgroundColor: C.coop + "18", border: `1px solid ${C.coop}44`,
               fontSize: 10, fontFamily: "'Space Mono', monospace",
-              cursor: (coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0 && coopMosaicPartnerTile !== currentPuzzle) ? "pointer" : "default",
-              transition: "all 0.15s",
+              cursor: "pointer", transition: "all 0.15s", maxWidth: 160,
             }}
           >
-            <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: C.coop, animation: "coopPulse 2s ease-in-out infinite" }} />
-            <span style={{ color: C.coop, fontWeight: 700, maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {coopMosaicPartnerUsername || "Partner"}
-            </span>
-            {coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0 && coopMosaicPartnerTile === currentPuzzle
-              ? <span style={{ color: C.correct, fontSize: 8 }}>here</span>
-              : coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0
-                ? <span style={{ color: C.textDim, fontSize: 8 }}>tile {coopMosaicPartnerTile + 1}</span>
-                : <span style={{ color: C.textDim, fontSize: 8 }}>overview</span>
-            }
+            {Object.entries(coopMosaicPlayers).slice(0, 4).map(([uid, p]) => (
+              <div key={uid} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <div style={{
+                  width: 5, height: 5, borderRadius: "50%",
+                  backgroundColor: p.currentTile != null ? C.coop : C.textDim,
+                  animation: p.currentTile != null ? "coopPulse 2s ease-in-out infinite" : "none", flexShrink: 0,
+                }} />
+                <span style={{ color: C.coop, fontWeight: 700, maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {p.username || "Player"}
+                </span>
+                {p.currentTile != null && p.currentTile >= 0 && p.currentTile === currentPuzzle
+                  ? <span style={{ color: C.correct, fontSize: 8 }}>here</span>
+                  : p.currentTile != null && p.currentTile >= 0
+                    ? <span style={{ color: C.textDim, fontSize: 8 }}>tile {p.currentTile + 1}</span>
+                    : <span style={{ color: C.textDim, fontSize: 8 }}>overview</span>
+                }
+              </div>
+            ))}
+            {Object.keys(coopMosaicPlayers).length > 4 && (
+              <span style={{ color: C.textDim, fontSize: 8 }}>+{Object.keys(coopMosaicPlayers).length - 4} more</span>
+            )}
           </div>
         )}
       <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
@@ -12644,7 +12715,7 @@ export default function Pattrn() {
                 // In coop mode, show partner fills for their blanks
                 const partnerFill = isCoop && coopPartnerBlanks?.has(key) ? coopPartnerFills[key] : null;
                 // In coop mosaic mode, show partner fills for any blank cell (no splitting)
-                const mosaicPartnerFill = isCoopMosaic && isBlankCell ? coopMosaicPartnerFills[key] : null;
+                const mosaicPartnerFill = isCoopMosaic && isBlankCell ? coopMosaicOtherFills[key] : null;
                 const myFill = fills[key];
                 const effectiveFill = isBlankCell ? (isLockedCell ? token : (myFill || partnerFill || mosaicPartnerFill)) : null;
                 const fillToken = isBlankCell ? (effectiveFill || null) : token;
@@ -12921,10 +12992,10 @@ export default function Pattrn() {
               ) : (isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) ? (
                 <button onClick={() => {
                   if (customMosaicPuzzlesRef.current && isMosaic) {
-                    if (isCoopMosaic && coopMosaicSessionId && coopMosaicRole) {
+                    if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
                       coopMosaicCurrentTileRef.current = -1;
-                      updateCoopMosaicCurrentTile(coopMosaicSessionId, coopMosaicRole, -1).catch(() => {});
-                      setCoopMosaicPartnerFills({});
+                      updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
+                      setCoopMosaicOtherFills({});
                       coopMosaicWriteThrottleRef.current = {};
                     }
                     setView("custom-mosaic");
