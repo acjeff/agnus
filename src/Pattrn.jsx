@@ -6393,6 +6393,8 @@ export default function Pattrn() {
             Cancel
           </button>
         </div>
+        {accountModalEl}
+        {usernameModalEl}
       </div>
     );
   }
