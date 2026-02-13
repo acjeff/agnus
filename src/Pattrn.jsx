@@ -6393,6 +6393,10 @@ export default function Pattrn() {
     else setShowAccountModal(false);
   }, [autoLoginModal]);
 
+  // Declared here so they're available in all view early-returns; assigned after the view blocks.
+  let accountModalEl = null;
+  let usernameModalEl = null;
+
   // --- Coop Mosaic joining overlay (shown while waiting for auth + session load) ---
   // Must be before all view checks so it takes priority when accepting an invite
   if (coopMosaicStatus === "joining") {
@@ -8551,7 +8555,7 @@ export default function Pattrn() {
   }
 
   // --- Account modal (shared across views) ---
-  const accountModalEl = showAccountModal && firebaseConfigured && (
+  accountModalEl = showAccountModal && firebaseConfigured && (
     <div
       role="dialog"
       aria-modal="true"
@@ -8821,7 +8825,7 @@ export default function Pattrn() {
   );
 
   // --- Username modal (non-dismissible when logged in without username, dismissible when changing) ---
-  const usernameModalEl = showUsernameModal && firebaseUser && firebaseConfigured && (
+  usernameModalEl = showUsernameModal && firebaseUser && firebaseConfigured && (
     <div onClick={username ? () => { setShowUsernameModal(false); setUsernameError(""); } : undefined} style={{
       position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.92)", zIndex: 1200,
       display: "flex", alignItems: "center", justifyContent: "center",
