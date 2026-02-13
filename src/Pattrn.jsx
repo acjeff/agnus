@@ -5145,8 +5145,15 @@ export default function Pattrn() {
     setCoopMosaicPartnerUsername(null);
     setCoopMosaicPartnerTile(null);
     setCoopMosaicPartnerFills({});
+    setCoopMosaicSharedProgress({});
+    setCoopMosaicSharedTileTimes({});
+    // Reset local mosaic progress so the coop session starts fresh
+    // (don't carry over the player's personal solo progress)
+    setCustomMosaicProgress({});
     coopMosaicCurrentTileRef.current = -1;
     coopMosaicGuestJoinedRef.current = false;
+    // Ensure the session appears in the Active Co-op Sessions panel on the menu
+    loadActiveCoopSessions();
     // If inviting a friend, send notification
     if (inviteFriendUid) {
       const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?coopMosaic=${sessionId}` : "";
@@ -5160,7 +5167,7 @@ export default function Pattrn() {
     } else {
       setShowCoopMosaicInvite(true);
     }
-  }, [firebaseUser, customMosaicPlay, activeThemeId, username]);
+  }, [firebaseUser, customMosaicPlay, activeThemeId, username, loadActiveCoopSessions]);
 
   // Leave coop mosaic session
   const leaveCoopMosaicSession = useCallback(() => {
@@ -6453,7 +6460,7 @@ export default function Pattrn() {
               Co-op
             </button>
           )}
-          {firebaseConfigured && firebaseUser && (
+          {firebaseConfigured && firebaseUser && !isCoopMosaic && (
             <button
               onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }}
               style={{
