@@ -933,8 +933,12 @@ export async function loadUserCoopSessions(uid) {
       const path = isMosaic ? `coopMosaicSessions/${sid}` : `coopSessions/${sid}`;
       const snap = await get(ref(db, path));
       if (!snap.exists()) {
-        // Session was deleted, clean up stale index
-        remove(ref(db, `userCoopSessions/${uid}/${sid}`)).catch(() => {});
+        // Session may have been deleted — only clean up stale entries older than 30s
+        // to avoid race conditions with newly created sessions
+        const createdAt = entry?.createdAt;
+        if (createdAt && typeof createdAt === "number" && Date.now() - createdAt > 30000) {
+          remove(ref(db, `userCoopSessions/${uid}/${sid}`)).catch(() => {});
+        }
         return null;
       }
       const data = snap.val();
