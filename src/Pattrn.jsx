@@ -66,6 +66,17 @@ import {
   subscribeToSharedMosaics,
   subscribeToStaffPick,
   subscribeToPuzzleCompletions,
+  createCoopMosaicSession,
+  joinCoopMosaicSession,
+  subscribeToCoopMosaicSession,
+  updateCoopMosaicFill,
+  updateCoopMosaicCurrentTile,
+  updateCoopMosaicTileProgress,
+  clearCoopMosaicTileFills,
+  completeCoopMosaicSession,
+  guestLeaveCoopMosaicSession,
+  closeCoopMosaicSession,
+  loadCoopMosaicSession,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2571,12 +2582,14 @@ function getSearchParams() {
   const date = params.get("date");
   const viewParam = params.get("view");
   const coop = params.get("coop");
+  const coopMosaic = params.get("coopMosaic");
   return {
     mode: mode && VALID_MODES.has(mode) ? mode : null,
     level: level != null ? Math.max(0, Math.min(49, parseInt(level, 10) || 0)) : null,
     date: date && /^\d{2}-\d{2}-\d{4}$/.test(date) ? date : null,
     view: viewParam && VALID_VIEWS.has(viewParam) ? viewParam : null,
     coop: coop || null,
+    coopMosaic: coopMosaic || null,
   };
 }
 
@@ -2814,6 +2827,23 @@ export default function Pattrn() {
   const seenNotifIdsRef = useRef(new Set()); // track previously seen notification IDs
   const notifInitialLoadRef = useRef(true); // skip toasting on initial load
 
+  // --- Coop Mosaic state ---
+  const [coopMosaicSessionId, setCoopMosaicSessionId] = useState(null);
+  const [coopMosaicRole, setCoopMosaicRole] = useState(null); // "host" | "guest"
+  const [coopMosaicStatus, setCoopMosaicStatus] = useState(null); // "waiting" | "playing" | "complete"
+  const [coopMosaicPartnerTile, setCoopMosaicPartnerTile] = useState(null); // partner's current tile index (-1 = overview, 0-24 = tile, null = offline)
+  const [coopMosaicPartnerConnected, setCoopMosaicPartnerConnected] = useState(false);
+  const [coopMosaicPartnerUsername, setCoopMosaicPartnerUsername] = useState(null);
+  const [coopMosaicSharedProgress, setCoopMosaicSharedProgress] = useState({}); // { tileIdx: attempts } synced from Firebase
+  const [coopMosaicSharedTileTimes, setCoopMosaicSharedTileTimes] = useState({}); // { tileIdx: seconds }
+  const [coopMosaicPartnerFills, setCoopMosaicPartnerFills] = useState({}); // partner fills for current tile { "r-c": token }
+  const [showCoopMosaicInvite, setShowCoopMosaicInvite] = useState(false);
+  const coopMosaicUnsubRef = useRef(null);
+  const coopMosaicWriteThrottleRef = useRef({});
+  const coopMosaicCurrentTileRef = useRef(null); // tracks which tile index the local player is in (-1 for overview)
+  const coopMosaicGuestJoinedRef = useRef(false);
+  const isCoopMosaic = !!coopMosaicSessionId;
+
   // --- Staff Pick & Admin Manage state ---
   const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
   const staffPickPuzzlesRef = useRef(null); // puzzles built from staff pick grid
@@ -2949,7 +2979,7 @@ export default function Pattrn() {
       } else {
         // Find new co-op invites that weren't in the previous set
         for (const notif of notifs) {
-          if (notif.type === "coop_invite" && !seenNotifIdsRef.current.has(notif.id)) {
+          if ((notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") && !seenNotifIdsRef.current.has(notif.id)) {
             // Show toast for this new co-op invite
             setCoopInviteToast(notif);
             if (coopInviteToastTimer.current) clearTimeout(coopInviteToastTimer.current);
@@ -3901,10 +3931,23 @@ export default function Pattrn() {
 
   // Initial load: read URL or restore saved cascade run
   useEffect(() => {
-    const { mode, level, date, view: viewParam, coop: coopParam } = getSearchParams();
+    const { mode, level, date, view: viewParam, coop: coopParam, coopMosaic: coopMosaicParam } = getSearchParams();
     const levelNum = level != null ? parseInt(level, 10) : null;
     const hasDailyDeepLink = mode === "daily" && date;
     const hasDeepLink = hasDailyDeepLink || (mode && levelNum != null && !Number.isNaN(levelNum));
+
+    // Handle coop mosaic join link — defer until Firebase auth is ready
+    if (coopMosaicParam) {
+      setCoopMosaicSessionId(coopMosaicParam);
+      setCoopMosaicRole("guest");
+      setCoopMosaicStatus("joining");
+      // Clear param from URL
+      const cleanParams = new URLSearchParams(window.location.search);
+      cleanParams.delete("coopMosaic");
+      const cleanUrl = cleanParams.toString() ? `${window.location.pathname}?${cleanParams}` : window.location.pathname;
+      window.history.replaceState({}, "", cleanUrl);
+      return;
+    }
 
     // Handle coop join link — defer until Firebase auth is ready
     if (coopParam && mode && levelNum != null) {
@@ -5078,6 +5121,221 @@ export default function Pattrn() {
     };
   }, []);
 
+  // --- Coop Mosaic session management ---
+
+  // Start a coop mosaic session from the custom-mosaic view
+  const startCoopMosaicSession = useCallback(async (inviteFriendUid = null, inviteFriendUsername = null) => {
+    if (!firebaseUser || !customMosaicPlay) return;
+    const sessionId = await createCoopMosaicSession(firebaseUser.uid, {
+      mosaicId: customMosaicPlay.id,
+      mosaicTitle: customMosaicPlay.title || "Untitled",
+      mosaicGrid: customMosaicPlay.grid,
+      hostTheme: activeThemeId,
+      hostUsername: username,
+    });
+    if (!sessionId) return;
+    setCoopMosaicSessionId(sessionId);
+    setCoopMosaicRole("host");
+    setCoopMosaicStatus("waiting");
+    setCoopMosaicPartnerConnected(false);
+    setCoopMosaicPartnerUsername(null);
+    setCoopMosaicPartnerTile(null);
+    setCoopMosaicPartnerFills({});
+    coopMosaicCurrentTileRef.current = -1;
+    coopMosaicGuestJoinedRef.current = false;
+    // If inviting a friend, send notification
+    if (inviteFriendUid) {
+      const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?coopMosaic=${sessionId}` : "";
+      await sendNotification(inviteFriendUid, {
+        type: "coop_mosaic_invite",
+        fromUid: firebaseUser.uid,
+        fromUsername: username || firebaseUser.email,
+        data: { sessionId, mosaicTitle: customMosaicPlay.title || "Untitled", url: coopUrl },
+      }).catch(() => {});
+      setShowCoopFriendPicker(false);
+    } else {
+      setShowCoopMosaicInvite(true);
+    }
+  }, [firebaseUser, customMosaicPlay, activeThemeId, username]);
+
+  // Leave coop mosaic session
+  const leaveCoopMosaicSession = useCallback(() => {
+    if (coopMosaicUnsubRef.current) {
+      coopMosaicUnsubRef.current();
+      coopMosaicUnsubRef.current = null;
+    }
+    if (coopMosaicSessionId && firebaseUser) {
+      if (coopMosaicRole === "guest") {
+        guestLeaveCoopMosaicSession(coopMosaicSessionId, firebaseUser.uid).catch(() => {});
+      }
+    }
+    setCoopMosaicSessionId(null);
+    setCoopMosaicRole(null);
+    setCoopMosaicStatus(null);
+    setCoopMosaicPartnerTile(null);
+    setCoopMosaicPartnerConnected(false);
+    setCoopMosaicPartnerUsername(null);
+    setCoopMosaicSharedProgress({});
+    setCoopMosaicSharedTileTimes({});
+    setCoopMosaicPartnerFills({});
+    setShowCoopMosaicInvite(false);
+    coopMosaicWriteThrottleRef.current = {};
+    coopMosaicCurrentTileRef.current = null;
+    coopMosaicGuestJoinedRef.current = false;
+  }, [coopMosaicSessionId, firebaseUser, coopMosaicRole]);
+
+  // Subscribe to coop mosaic session changes
+  useEffect(() => {
+    if (!coopMosaicSessionId || !firebaseUser) return;
+    if (coopMosaicUnsubRef.current) coopMosaicUnsubRef.current();
+
+    const unsub = subscribeToCoopMosaicSession(coopMosaicSessionId, (data) => {
+      if (!data) {
+        leaveCoopMosaicSession();
+        return;
+      }
+      const isHost = data.hostUid === firebaseUser.uid;
+
+      // Track guest joining
+      if (!isHost && data.guestUid === firebaseUser.uid) {
+        coopMosaicGuestJoinedRef.current = true;
+      }
+      // Detect guest kick
+      if (!isHost && !data.guestUid && coopMosaicGuestJoinedRef.current) {
+        coopMosaicGuestJoinedRef.current = false;
+        leaveCoopMosaicSession();
+        setView("menu");
+        return;
+      }
+
+      const partnerConnected = isHost ? !!data.guestUid : true;
+      setCoopMosaicPartnerConnected(partnerConnected);
+      setCoopMosaicStatus(data.status);
+      setCoopMosaicPartnerUsername(isHost ? (data.guestUsername || null) : (data.hostUsername || null));
+
+      // Sync partner's current tile
+      const partnerTile = isHost ? data.guestCurrentTile : data.hostCurrentTile;
+      setCoopMosaicPartnerTile(partnerTile);
+
+      // Sync shared progress and update local customMosaicProgress with partner's completions
+      const tp = data.tileProgress || {};
+      setCoopMosaicSharedProgress(tp);
+      setCoopMosaicSharedTileTimes(data.tileTimes || {});
+      // Merge shared progress into local so startPuzzle sees partner-completed tiles
+      setCustomMosaicProgress(prev => {
+        const merged = { ...prev };
+        let changed = false;
+        for (const [k, v] of Object.entries(tp)) {
+          if (v > 0 && !(merged[k] > 0)) { merged[k] = v; changed = true; }
+        }
+        return changed ? merged : prev;
+      });
+
+      // Sync partner fills for the current tile
+      const myTile = coopMosaicCurrentTileRef.current;
+      if (myTile != null && myTile >= 0) {
+        const prefix = `${myTile}_`;
+        const partnerFills = {};
+        const allFills = data.fills || {};
+        for (const [key, val] of Object.entries(allFills)) {
+          if (key.startsWith(prefix)) {
+            const cellKey = key.slice(prefix.length);
+            partnerFills[cellKey] = val;
+          }
+        }
+        setCoopMosaicPartnerFills(partnerFills);
+      } else {
+        setCoopMosaicPartnerFills({});
+      }
+
+      // Check if all 25 tiles are solved
+      const allTp = data.tileProgress || {};
+      const allSolvedCount = Object.values(allTp).filter(v => v > 0).length;
+      if (allSolvedCount === 25 && data.status !== "complete") {
+        completeCoopMosaicSession(coopMosaicSessionId).catch(() => {});
+      }
+    });
+
+    coopMosaicUnsubRef.current = unsub;
+    return () => {
+      unsub();
+      coopMosaicUnsubRef.current = null;
+    };
+  }, [coopMosaicSessionId, firebaseUser, leaveCoopMosaicSession]);
+
+  // Handle guest joining coop mosaic: once auth ready + session ID set with role=guest, join
+  useEffect(() => {
+    if (coopMosaicRole !== "guest" || coopMosaicStatus !== "joining" || !firebaseUser || !coopMosaicSessionId) return;
+    let cancelled = false;
+    (async () => {
+      const session = await joinCoopMosaicSession(coopMosaicSessionId, firebaseUser.uid, username);
+      if (cancelled || !session) {
+        if (!cancelled) {
+          setCoopMosaicSessionId(null);
+          setCoopMosaicRole(null);
+          setCoopMosaicStatus(null);
+          setView("menu");
+        }
+        return;
+      }
+      // Build mosaic puzzles from session grid
+      const puzzles = buildCustomMosaicPuzzles(session.mosaicGrid);
+      customMosaicPuzzlesRef.current = puzzles;
+      setCustomMosaicPlay({
+        id: session.mosaicId,
+        title: session.mosaicTitle,
+        grid: session.mosaicGrid,
+        authorUsername: session.hostUsername,
+      });
+      // Restore shared progress
+      setCoopMosaicSharedProgress(session.tileProgress || {});
+      setCoopMosaicSharedTileTimes(session.tileTimes || {});
+      setCustomMosaicProgress(session.tileProgress || {});
+      setCoopMosaicStatus("playing");
+      setCoopMosaicPartnerUsername(session.hostUsername || null);
+      coopMosaicCurrentTileRef.current = -1;
+      setView("custom-mosaic");
+    })();
+    return () => { cancelled = true; };
+  }, [coopMosaicRole, coopMosaicStatus, firebaseUser, coopMosaicSessionId, username, buildCustomMosaicPuzzles]);
+
+  // Sync my fills to Firebase in coop mosaic mode when they change
+  useEffect(() => {
+    if (!isCoopMosaic || !coopMosaicSessionId) return;
+    const tileIdx = coopMosaicCurrentTileRef.current;
+    if (tileIdx == null || tileIdx < 0) return;
+    // Write fills for current tile
+    for (const [key, val] of Object.entries(fills)) {
+      const fillKey = `${tileIdx}_${key}`;
+      const prev = coopMosaicWriteThrottleRef.current[fillKey];
+      if (prev !== val) {
+        coopMosaicWriteThrottleRef.current[fillKey] = val;
+        updateCoopMosaicFill(coopMosaicSessionId, fillKey, val).catch(() => {});
+      }
+    }
+    // Also handle removals: if a key was previously written but is no longer in fills
+    const prefix = `${tileIdx}_`;
+    for (const prevKey of Object.keys(coopMosaicWriteThrottleRef.current)) {
+      if (prevKey.startsWith(prefix)) {
+        const cellKey = prevKey.slice(prefix.length);
+        if (!(cellKey in fills)) {
+          delete coopMosaicWriteThrottleRef.current[prevKey];
+          updateCoopMosaicFill(coopMosaicSessionId, prevKey, null).catch(() => {});
+        }
+      }
+    }
+  }, [isCoopMosaic, fills, coopMosaicSessionId]);
+
+  // Clean up coop mosaic on unmount
+  useEffect(() => {
+    return () => {
+      if (coopMosaicUnsubRef.current) {
+        coopMosaicUnsubRef.current();
+        coopMosaicUnsubRef.current = null;
+      }
+    };
+  }, []);
+
   const handleTokenSelect = useCallback((token) => {
     setSelectedToken(token);
     if (selectedCell && puzzle?.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
@@ -5108,7 +5366,7 @@ export default function Pattrn() {
     return () => window.removeEventListener("keydown", handler);
   }, [view, gameState, puzzle, selectedToken, handleTokenSelect]);
 
-  const maxAttempts = isCascade ? 11 : isBlind ? 6 : 5;
+  const maxAttempts = isCoopMosaic ? Infinity : isCascade ? 11 : isBlind ? 6 : 5;
 
   const checkSolution = () => {
     if (!puzzle) return;
@@ -5117,12 +5375,15 @@ export default function Pattrn() {
     const wrong = new Set();
     const newLocked = new Set(lockedCells);
 
+    // In coop mosaic mode, merge partner fills with my fills for checking
+    const checkFills = isCoopMosaic ? { ...coopMosaicPartnerFills, ...fills } : fills;
+
     // Check which blanks are still active (not locked)
     const activeBlanks = [...puzzle.blanks].filter(k => !lockedCells.has(k));
 
     for (const key of activeBlanks) {
       const [r, c] = key.split("-").map(Number);
-      if (fills[key] === puzzle.solution[r][c]) {
+      if (checkFills[key] === puzzle.solution[r][c]) {
         if (isBlind) newLocked.add(key); // lock correct cells in blind mode
       } else {
         allCorrect = false;
@@ -5211,6 +5472,11 @@ export default function Pattrn() {
             const newTimes = { ...times, mosaicCompletionTimes: { ...mct, [mosaicId]: newMosaicTimes } };
             setTimes(newTimes);
             saveTimes(newTimes);
+          }
+          // Coop mosaic: sync tile completion to Firebase session
+          if (isCoopMosaic && coopMosaicSessionId) {
+            updateCoopMosaicTileProgress(coopMosaicSessionId, progressKey, newAttempts, finalTime).catch(() => {});
+            clearCoopMosaicTileFills(coopMosaicSessionId, progressKey).catch(() => {});
           }
         } else {
           const newDiffProgress = { ...diffProgress, [progressKey]: newAttempts };
@@ -5412,9 +5678,11 @@ export default function Pattrn() {
   const coopMyBlanksArr = isCoop && coopMyBlanks ? [...coopMyBlanks] : [];
   const allFilled = isCoop
     ? coopMyBlanksArr.every(k => fills[k])
-    : isBlind
-      ? activeBlanks.every(k => fills[k])
-      : puzzle ? [...puzzle.blanks].every(k => fills[k]) : false;
+    : isCoopMosaic
+      ? puzzle ? [...puzzle.blanks].every(k => fills[k] || coopMosaicPartnerFills[k]) : false
+      : isBlind
+        ? activeBlanks.every(k => fills[k])
+        : puzzle ? [...puzzle.blanks].every(k => fills[k]) : false;
 
   const completedCount = isCascade
     ? Object.keys(diffProgress).filter(k => /^\d+$/.test(k) && diffProgress[k] === CASCADE_LEVELS.length).length
@@ -5711,7 +5979,9 @@ export default function Pattrn() {
   })() : null;
 
   // --- Global co-op invite toast (appears on any view) ---
-  const coopInviteToastEl = coopInviteToast && firebaseUser && (
+  const coopInviteToastEl = coopInviteToast && firebaseUser && (() => {
+    const isMosaicInvite = coopInviteToast.type === "coop_mosaic_invite";
+    return (
     <div style={{
       position: "fixed",
       top: "calc(16px + env(safe-area-inset-top, 0px))",
@@ -5724,57 +5994,72 @@ export default function Pattrn() {
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
         padding: "12px 14px", borderRadius: 14,
-        backgroundColor: C.surface, border: `1.5px solid #54A0FF`,
-        boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px #54A0FF33`,
+        backgroundColor: C.surface, border: `1.5px solid ${C.coop}`,
+        boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${C.coop}33`,
       }}>
         <div style={{
           width: 36, height: 36, borderRadius: 9, flexShrink: 0,
-          backgroundColor: "#54A0FF22", display: "flex", alignItems: "center", justifyContent: "center",
-          border: `2px solid #54A0FF44`,
+          backgroundColor: C.coop + "22", display: "flex", alignItems: "center", justifyContent: "center",
+          border: `2px solid ${C.coop}44`,
         }}>
-          <span style={{ fontSize: 16, color: "#54A0FF" }}>{"\u2694"}</span>
+          <span style={{ fontSize: 16, color: C.coop }}>{isMosaicInvite ? "\u25A6" : "\u2694"}</span>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
             color: C.text, lineHeight: 1.3,
           }}>
-            {coopInviteToast.fromUsername || "Someone"} invited you to co-op!
+            {coopInviteToast.fromUsername || "Someone"} invited you to {isMosaicInvite ? "co-op mosaic!" : "co-op!"}
           </div>
-          {coopInviteToast.data?.mode && (
-            <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, fontFamily: "'Space Mono', monospace" }}>
-              {coopInviteToast.data.mode} #{(coopInviteToast.data.level ?? 0) + 1}
-            </div>
+          {isMosaicInvite ? (
+            coopInviteToast.data?.mosaicTitle && (
+              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, fontFamily: "'Space Mono', monospace" }}>
+                {coopInviteToast.data.mosaicTitle}
+              </div>
+            )
+          ) : (
+            coopInviteToast.data?.mode && (
+              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, fontFamily: "'Space Mono', monospace" }}>
+                {coopInviteToast.data.mode} #{(coopInviteToast.data.level ?? 0) + 1}
+              </div>
+            )
           )}
         </div>
         <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
           {coopInviteToast.data?.sessionId && (
             <button
               onClick={async () => {
-                const session = await loadCoopSession(coopInviteToast.data.sessionId);
-                if (session && session.status !== "complete") {
-                  setDifficulty(session.mode);
-                  setCurrentPuzzle(session.level ?? 0);
-                  if (session.dailyDate) setCurrentDailyDate(session.dailyDate);
-                  setCoopSessionId(session.id);
-                  setCoopRole("guest");
-                  setCoopStatus("joining");
-                  setFills({});
-                  setAttempts(0);
-                  setGameState("playing");
-                  setWrongCells(new Set());
-                  setLockedCells(new Set());
-                  setShowParticles(false);
-                  setSelectedCell(null);
-                  setSelectedToken(null);
-                  setView("play");
+                if (isMosaicInvite) {
+                  // Join coop mosaic session
+                  setCoopMosaicSessionId(coopInviteToast.data.sessionId);
+                  setCoopMosaicRole("guest");
+                  setCoopMosaicStatus("joining");
+                } else {
+                  const session = await loadCoopSession(coopInviteToast.data.sessionId);
+                  if (session && session.status !== "complete") {
+                    setDifficulty(session.mode);
+                    setCurrentPuzzle(session.level ?? 0);
+                    if (session.dailyDate) setCurrentDailyDate(session.dailyDate);
+                    setCoopSessionId(session.id);
+                    setCoopRole("guest");
+                    setCoopStatus("joining");
+                    setFills({});
+                    setAttempts(0);
+                    setGameState("playing");
+                    setWrongCells(new Set());
+                    setLockedCells(new Set());
+                    setShowParticles(false);
+                    setSelectedCell(null);
+                    setSelectedToken(null);
+                    setView("play");
+                  }
                 }
                 dismissNotification(firebaseUser.uid, coopInviteToast.id).catch(() => {});
                 setCoopInviteToast(null);
                 if (coopInviteToastTimer.current) { clearTimeout(coopInviteToastTimer.current); coopInviteToastTimer.current = null; }
               }}
               style={{
-                background: "#54A0FF", border: "none", borderRadius: 8,
+                background: C.coop, border: "none", borderRadius: 8,
                 padding: "6px 14px", color: "#fff", cursor: "pointer", fontSize: 11,
                 fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
               }}
@@ -5796,7 +6081,8 @@ export default function Pattrn() {
         </div>
       </div>
     </div>
-  );
+    );
+  })();
 
   // Friend activity is handled by real-time subscriptions (subscribeToFriendPresence)
 
@@ -5952,7 +6238,19 @@ export default function Pattrn() {
     const gridPxCm = Math.min(340, typeof window !== "undefined" ? window.innerWidth - 40 : 340);
     const tileSzCm = Math.floor((gridPxCm - 20) / 5);
     const miniCellSzCm = Math.floor((tileSzCm - 8) / 5);
-    const solvedCount = Object.values(customMosaicProgress).filter(v => v > 0).length;
+    // In coop mosaic mode, merge shared progress with local progress
+    const effectiveMosaicProgress = isCoopMosaic
+      ? (() => { const merged = { ...customMosaicProgress }; for (const [k, v] of Object.entries(coopMosaicSharedProgress)) { if (v > 0 && !(merged[k] > 0)) merged[k] = v; } return merged; })()
+      : customMosaicProgress;
+    const solvedCount = Object.values(effectiveMosaicProgress).filter(v => v > 0).length;
+    // Track that we're on the overview when this view renders
+    if (isCoopMosaic && coopMosaicCurrentTileRef.current !== -1) {
+      coopMosaicCurrentTileRef.current = -1;
+      if (coopMosaicSessionId && coopMosaicRole) {
+        updateCoopMosaicCurrentTile(coopMosaicSessionId, coopMosaicRole, -1).catch(() => {});
+      }
+    }
+    const coopMosaicInviteUrl = isCoopMosaic && coopMosaicSessionId ? `${typeof window !== "undefined" ? window.location.origin + window.location.pathname : ""}?coopMosaic=${coopMosaicSessionId}` : "";
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
@@ -5960,11 +6258,14 @@ export default function Pattrn() {
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes coopPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }`}</style>
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => { const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; }}
+          <button onClick={() => {
+            if (isCoopMosaic) { leaveCoopMosaicSession(); }
+            const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
+          }}
             style={{
               background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
               color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
@@ -5976,13 +6277,35 @@ export default function Pattrn() {
             &larr; Back
           </button>
           <div style={{ flex: 1 }}>
-            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent }}>
+            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, margin: 0, color: isCoopMosaic ? C.coop : C.accent }}>
               {customMosaicPlay.title || "Untitled"}
             </h2>
             {customMosaicPlay.authorUsername && (
               <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorUsername}</div>
             )}
           </div>
+          {/* Co-op button */}
+          {firebaseConfigured && firebaseUser && !isCoopMosaic && (
+            <button
+              onClick={() => startCoopMosaicSession()}
+              style={{
+                background: "none", border: `1px solid ${C.coop}55`,
+                borderRadius: 8, padding: "5px 10px", cursor: "pointer",
+                transition: "all 0.15s", display: "flex", alignItems: "center", gap: 4, height: 30,
+                fontFamily: "'Space Mono', monospace", fontSize: 10, fontWeight: 700,
+                color: C.coop, letterSpacing: 1, textTransform: "uppercase",
+              }}
+              title="Start co-op mosaic session"
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.coop; e.currentTarget.style.backgroundColor = C.coop + "11"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.coop + "55"; e.currentTarget.style.backgroundColor = "transparent"; }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.coop} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              Co-op
+            </button>
+          )}
           {firebaseConfigured && firebaseUser && (
             <button
               onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }}
@@ -6016,8 +6339,52 @@ export default function Pattrn() {
           )}
         </div>
 
+        {/* Coop mosaic status bar */}
+        {isCoopMosaic && (
+          <div style={{
+            width: "100%", maxWidth: 400, marginBottom: 12,
+            padding: "8px 14px", borderRadius: 10,
+            backgroundColor: C.coop + "11", border: `1px solid ${C.coop}33`,
+            display: "flex", alignItems: "center", gap: 10,
+            animation: "fadeUp 0.3s 0.01s ease both",
+            fontFamily: "'Space Mono', monospace", fontSize: 11,
+          }}>
+            <div style={{
+              width: 8, height: 8, borderRadius: "50%",
+              backgroundColor: coopMosaicPartnerConnected ? C.correct : C.textDim,
+              animation: coopMosaicPartnerConnected ? "coopPulse 2s ease-in-out infinite" : "none",
+            }} />
+            <div style={{ flex: 1, color: C.text }}>
+              {coopMosaicStatus === "waiting" ? (
+                <span>Waiting for partner...</span>
+              ) : coopMosaicPartnerConnected ? (
+                <span>
+                  <span style={{ color: C.coop, fontWeight: 700 }}>{coopMosaicPartnerUsername || "Partner"}</span>
+                  {coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0
+                    ? <span style={{ color: C.textDim }}> — solving tile {coopMosaicPartnerTile + 1}</span>
+                    : <span style={{ color: C.textDim }}> — viewing mosaic</span>
+                  }
+                </span>
+              ) : (
+                <span style={{ color: C.textDim }}>Partner disconnected</span>
+              )}
+            </div>
+            {coopMosaicStatus === "waiting" && (
+              <button onClick={() => setShowCoopMosaicInvite(true)}
+                style={{
+                  background: "none", border: `1px solid ${C.coop}55`, borderRadius: 6, padding: "3px 8px",
+                  color: C.coop, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                  fontSize: 9, letterSpacing: 1, textTransform: "uppercase",
+                }}
+              >
+                Invite
+              </button>
+            )}
+          </div>
+        )}
+
         <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Space Mono', monospace", marginBottom: 10, animation: "fadeUp 0.3s 0.02s ease both" }}>
-          Solve all 25 tiles to reveal the picture
+          {isCoopMosaic ? "Solve tiles together to reveal the picture" : "Solve all 25 tiles to reveal the picture"}
         </div>
 
         {/* 5x5 tile grid */}
@@ -6027,21 +6394,27 @@ export default function Pattrn() {
           animation: "fadeUp 0.3s 0.04s ease both",
         }}>
           {cPuzzles.map((p, i) => {
-            const solved = (customMosaicProgress[i] || 0) > 0;
+            const solved = (effectiveMosaicProgress[i] || 0) > 0;
+            const isPartnerHere = isCoopMosaic && coopMosaicPartnerTile === i;
             return (
               <button key={i} onClick={() => {
+                if (isCoopMosaic) {
+                  coopMosaicCurrentTileRef.current = i;
+                  updateCoopMosaicCurrentTile(coopMosaicSessionId, coopMosaicRole, i).catch(() => {});
+                }
                 startPuzzle(i, "mosaic", true);
               }}
                 style={{
                   width: tileSzCm, height: tileSzCm, borderRadius: 6,
-                  border: `1.5px solid ${solved ? C.correct + "66" : C.border}`,
-                  backgroundColor: solved ? C.correct + "10" : C.surface,
+                  border: `1.5px solid ${isPartnerHere ? C.coop : solved ? C.correct + "66" : C.border}`,
+                  backgroundColor: solved ? C.correct + "10" : isPartnerHere ? C.coop + "08" : C.surface,
                   cursor: "pointer", padding: 2, position: "relative",
                   display: "flex", flexDirection: "column", gap: 0.5, alignItems: "center", justifyContent: "center",
                   transition: "all 0.15s", overflow: "hidden",
+                  boxShadow: isPartnerHere ? `0 0 8px ${C.coop}44` : "none",
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = solved ? C.correct + "66" : C.border; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = isPartnerHere ? C.coop : solved ? C.correct + "66" : C.border; }}
               >
                 {solved ? (
                   <div style={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
@@ -6057,10 +6430,18 @@ export default function Pattrn() {
                 ) : (
                   <span style={{
                     fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
-                    color: C.textDim, lineHeight: 1,
+                    color: isPartnerHere ? C.coop : C.textDim, lineHeight: 1,
                   }}>
                     {i + 1}
                   </span>
+                )}
+                {/* Partner indicator badge */}
+                {isPartnerHere && (
+                  <div style={{
+                    position: "absolute", top: 2, right: 2,
+                    width: 7, height: 7, borderRadius: "50%",
+                    backgroundColor: C.coop, animation: "coopPulse 2s ease-in-out infinite",
+                  }} />
                 )}
               </button>
             );
@@ -6076,9 +6457,67 @@ export default function Pattrn() {
         {solvedCount > 0 && (
           <div style={{ marginTop: 20, animation: "fadeUp 0.4s ease both", textAlign: "center" }}>
             <div style={{ fontSize: solvedCount === 25 ? 18 : 11, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: solvedCount === 25 ? C.correct : C.textDim, marginBottom: 12, letterSpacing: solvedCount === 25 ? 0 : 1, textTransform: solvedCount === 25 ? "none" : "uppercase" }}>
-              {solvedCount === 25 ? "Picture revealed!" : "Preview"}
+              {solvedCount === 25 ? (isCoopMosaic ? "Picture revealed together!" : "Picture revealed!") : "Preview"}
             </div>
-            <MosaicThumbnail grid={customMosaicPlay.grid} size={Math.min(280, typeof window !== "undefined" ? window.innerWidth - 80 : 280)} completedTiles={solvedCount === 25 ? null : customMosaicProgress} />
+            <MosaicThumbnail grid={customMosaicPlay.grid} size={Math.min(280, typeof window !== "undefined" ? window.innerWidth - 80 : 280)} completedTiles={solvedCount === 25 ? null : effectiveMosaicProgress} />
+          </div>
+        )}
+
+        {/* Coop mosaic invite modal */}
+        {showCoopMosaicInvite && (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            backgroundColor: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+          }} onClick={() => setShowCoopMosaicInvite(false)}>
+            <div style={{
+              backgroundColor: C.surface, borderRadius: 16, padding: 24,
+              width: "100%", maxWidth: 360, border: `1px solid ${C.border}`,
+              animation: "fadeUp 0.3s ease",
+            }} onClick={e => e.stopPropagation()}>
+              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.coop, margin: "0 0 8px 0", letterSpacing: 1 }}>
+                Co-op Mosaic
+              </h3>
+              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace" }}>
+                Share this link to invite a friend to solve this mosaic together.
+              </div>
+              <div style={{
+                padding: "10px 12px", borderRadius: 8, backgroundColor: C.bg, border: `1px solid ${C.border}`,
+                fontSize: 11, fontFamily: "'Space Mono', monospace", color: C.text,
+                wordBreak: "break-all", marginBottom: 12, userSelect: "all",
+              }}>
+                {coopMosaicInviteUrl}
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={async () => {
+                  const result = await tryNativeShare({ text: `Join me on this mosaic puzzle!\n${coopMosaicInviteUrl}` });
+                  if (result === "shared") { setShowCoopMosaicInvite(false); return; }
+                  if (result === "cancelled") return;
+                  try { await navigator.clipboard.writeText(coopMosaicInviteUrl); } catch {}
+                  setShowCoopMosaicInvite(false);
+                }}
+                  style={{
+                    flex: 1, padding: "10px 16px", borderRadius: 10,
+                    backgroundColor: C.coop, color: "#fff", border: "none",
+                    fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
+                    letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+                  }}
+                >
+                  Copy Link
+                </button>
+                <button onClick={() => setShowCoopMosaicInvite(false)}
+                  style={{
+                    padding: "10px 16px", borderRadius: 10,
+                    backgroundColor: "transparent", color: C.textDim,
+                    border: `1px solid ${C.border}`,
+                    fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
+                    letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+                  }}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -8811,18 +9250,20 @@ export default function Pattrn() {
                 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-                    backgroundColor: notif.type === "coop_invite" ? "#54A0FF22" : notif.type === "mosaic_pending_review" ? "#FFE66D22" : C.accent + "22",
+                    backgroundColor: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "22" : notif.type === "mosaic_pending_review" ? "#FFE66D22" : C.accent + "22",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    border: `1.5px solid ${notif.type === "coop_invite" ? "#54A0FF44" : notif.type === "mosaic_pending_review" ? "#FFE66D44" : C.accent + "44"}`,
+                    border: `1.5px solid ${(notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "44" : notif.type === "mosaic_pending_review" ? "#FFE66D44" : C.accent + "44"}`,
                   }}>
-                    <span style={{ fontSize: 12, color: notif.type === "coop_invite" ? "#54A0FF" : notif.type === "mosaic_pending_review" ? "#FFE66D" : C.accent }}>
-                      {notif.type === "coop_invite" ? "\u2694" : notif.type === "mosaic_pending_review" ? "\u2691" : "\u25A6"}
+                    <span style={{ fontSize: 12, color: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop : notif.type === "mosaic_pending_review" ? "#FFE66D" : C.accent }}>
+                      {notif.type === "coop_invite" ? "\u2694" : notif.type === "coop_mosaic_invite" ? "\u25A6" : notif.type === "mosaic_pending_review" ? "\u2691" : "\u25A6"}
                     </span>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, fontFamily: "'Space Mono', monospace", fontWeight: 600, color: C.text, lineHeight: 1.3 }}>
                       {notif.type === "coop_invite"
                         ? `${notif.fromUsername || "Someone"} invited you to co-op`
+                        : notif.type === "coop_mosaic_invite"
+                        ? `${notif.fromUsername || "Someone"} invited you to co-op mosaic`
                         : notif.type === "mosaic_pending_review"
                         ? `${notif.fromUsername || "Someone"} submitted a mosaic for review`
                         : `${notif.fromUsername || "Someone"} shared a mosaic`
@@ -8831,6 +9272,11 @@ export default function Pattrn() {
                     {notif.type === "coop_invite" && notif.data?.mode && (
                       <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
                         {notif.data.mode} #{(notif.data.level ?? 0) + 1}
+                      </div>
+                    )}
+                    {notif.type === "coop_mosaic_invite" && notif.data?.mosaicTitle && (
+                      <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
+                        &ldquo;{notif.data.mosaicTitle}&rdquo;
                       </div>
                     )}
                     {(notif.type === "mosaic_shared" || notif.type === "mosaic_pending_review") && notif.data?.title && (
@@ -8866,7 +9312,25 @@ export default function Pattrn() {
                           setShowNotifications(false);
                         }}
                         style={{
-                          background: "#54A0FF", border: "none", borderRadius: 6,
+                          background: C.coop, border: "none", borderRadius: 6,
+                          padding: "4px 8px", color: "#fff", cursor: "pointer", fontSize: 9,
+                          fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                        }}
+                      >
+                        Join
+                      </button>
+                    )}
+                    {notif.type === "coop_mosaic_invite" && notif.data?.sessionId && (
+                      <button
+                        onClick={() => {
+                          setCoopMosaicSessionId(notif.data.sessionId);
+                          setCoopMosaicRole("guest");
+                          setCoopMosaicStatus("joining");
+                          dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
+                          setShowNotifications(false);
+                        }}
+                        style={{
+                          background: C.coop, border: "none", borderRadius: 6,
                           padding: "4px 8px", color: "#fff", cursor: "pointer", fontSize: 9,
                           fontFamily: "'Space Mono', monospace", fontWeight: 700,
                         }}
@@ -10978,7 +11442,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; touch-action: manipulation; } @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} } @keyframes enigmaRotor { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} } @keyframes enigmaBgDrift { 0%{transform:translate(0%,0%) rotate(0deg)} 33%{transform:translate(5%,-3%) rotate(1deg)} 66%{transform:translate(-3%,5%) rotate(-1deg)} 100%{transform:translate(2%,2%) rotate(0.5deg)} } @keyframes enigmaWireDrift { 0%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(3%,-2%) scale(1.02)} 100%{transform:translate(-2%,3%) scale(0.98)} } @keyframes enigmaGlow { 0%,100%{box-shadow:inset 0 0 20px rgba(201,168,76,0.04),inset 0 0 60px rgba(140,107,30,0.02)} 50%{box-shadow:inset 0 0 30px rgba(201,168,76,0.08),inset 0 0 80px rgba(140,107,30,0.04)} } @keyframes enigmaDecrypt { 0%{transform:rotateY(0deg) scale(1);opacity:0.4;filter:brightness(0.5)} 25%{transform:rotateY(90deg) scale(0.9);opacity:0.6;filter:brightness(0.7)} 50%{transform:rotateY(180deg) scale(0.95);opacity:0.8;filter:brightness(1.3)} 75%{transform:rotateY(270deg) scale(1.02);filter:brightness(1.1)} 100%{transform:rotateY(360deg) scale(1);opacity:1;filter:brightness(1)} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; touch-action: manipulation; } @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} } @keyframes enigmaRotor { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} } @keyframes enigmaBgDrift { 0%{transform:translate(0%,0%) rotate(0deg)} 33%{transform:translate(5%,-3%) rotate(1deg)} 66%{transform:translate(-3%,5%) rotate(-1deg)} 100%{transform:translate(2%,2%) rotate(0.5deg)} } @keyframes enigmaWireDrift { 0%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(3%,-2%) scale(1.02)} 100%{transform:translate(-2%,3%) scale(0.98)} } @keyframes enigmaGlow { 0%,100%{box-shadow:inset 0 0 20px rgba(201,168,76,0.04),inset 0 0 60px rgba(140,107,30,0.02)} 50%{box-shadow:inset 0 0 30px rgba(201,168,76,0.08),inset 0 0 80px rgba(140,107,30,0.04)} } @keyframes enigmaDecrypt { 0%{transform:rotateY(0deg) scale(1);opacity:0.4;filter:brightness(0.5)} 25%{transform:rotateY(90deg) scale(0.9);opacity:0.6;filter:brightness(0.7)} 50%{transform:rotateY(180deg) scale(0.95);opacity:0.8;filter:brightness(1.3)} 75%{transform:rotateY(270deg) scale(1.02);filter:brightness(1.1)} 100%{transform:rotateY(360deg) scale(1);opacity:1;filter:brightness(1)} } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }`}</style>
 
       <Particles show={showParticles} />
 
@@ -11134,6 +11598,13 @@ export default function Pattrn() {
           stopTimer();
           setShowMosaicPreviewOverlay(false);
           if (customMosaicPuzzlesRef.current && isMosaic) {
+            // In coop mosaic mode, update current tile to -1 (overview)
+            if (isCoopMosaic && coopMosaicSessionId && coopMosaicRole) {
+              coopMosaicCurrentTileRef.current = -1;
+              updateCoopMosaicCurrentTile(coopMosaicSessionId, coopMosaicRole, -1).catch(() => {});
+              setCoopMosaicPartnerFills({});
+              coopMosaicWriteThrottleRef.current = {};
+            }
             setView("custom-mosaic");
           } else {
             setView("menu");
@@ -11149,6 +11620,26 @@ export default function Pattrn() {
         >
           &larr; {customMosaicPuzzlesRef.current && isMosaic ? "MOSAIC" : "PUZZLES"}
         </button>
+        {/* Coop mosaic partner indicator in play view */}
+        {isCoopMosaic && coopMosaicPartnerConnected && gameState === "playing" && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 4, marginLeft: 8,
+            padding: "3px 8px", borderRadius: 6,
+            backgroundColor: C.coop + "11", border: `1px solid ${C.coop}33`,
+            fontSize: 9, fontFamily: "'Space Mono', monospace",
+          }}>
+            <div style={{ width: 5, height: 5, borderRadius: "50%", backgroundColor: C.coop, animation: "coopPulse 2s ease-in-out infinite" }} />
+            <span style={{ color: C.coop, fontWeight: 700, maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {coopMosaicPartnerUsername || "Partner"}
+            </span>
+            {coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0 && coopMosaicPartnerTile === currentPuzzle
+              ? <span style={{ color: C.correct, fontSize: 8 }}>here</span>
+              : coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0
+                ? <span style={{ color: C.textDim, fontSize: 8 }}>tile {coopMosaicPartnerTile + 1}</span>
+                : <span style={{ color: C.textDim, fontSize: 8 }}>overview</span>
+            }
+          </div>
+        )}
         <div style={{ flex: 1 }} />
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4, flexShrink: 0 }}>
           <button
@@ -11802,8 +12293,10 @@ export default function Pattrn() {
                 const isLockedCell = lockedCells.has(key);
                 // In coop mode, show partner fills for their blanks
                 const partnerFill = isCoop && coopPartnerBlanks?.has(key) ? coopPartnerFills[key] : null;
+                // In coop mosaic mode, show partner fills for any blank cell (no splitting)
+                const mosaicPartnerFill = isCoopMosaic && isBlankCell ? coopMosaicPartnerFills[key] : null;
                 const myFill = fills[key];
-                const effectiveFill = isBlankCell ? (isLockedCell ? token : (myFill || partnerFill)) : null;
+                const effectiveFill = isBlankCell ? (isLockedCell ? token : (myFill || partnerFill || mosaicPartnerFill)) : null;
                 const fillToken = isBlankCell ? (effectiveFill || null) : token;
                 const isRevealed = false;
                 const displayToken = fillToken;
@@ -11819,11 +12312,13 @@ export default function Pattrn() {
                 // Coop ownership visual hints
                 const isCoopMine = isCoop && coopMyBlanks?.has(key);
                 const isCoopPartner = isCoop && coopPartnerBlanks?.has(key);
+                // Mosaic coop: show if cell was filled by partner (not by me)
+                const isMosaicCoopPartnerFill = isCoopMosaic && isBlankCell && !myFill && !!mosaicPartnerFill;
                 return (
                   <div key={key} style={{ position: "relative" }}>
                     <Cell token={displayToken} isBlank={isBlankCell}
                       isSelected={selectedCell === key}
-                      isFilled={!!(myFill || partnerFill) || isLockedCell}
+                      isFilled={!!(myFill || partnerFill || mosaicPartnerFill) || isLockedCell}
                       isCorrect={isWon && isBlankCell}
                       isWrong={isWrongCell}
                       isRevealed={isRevealed}
@@ -11854,6 +12349,15 @@ export default function Pattrn() {
                         width: 5, height: 5, borderRadius: "50%",
                         backgroundColor: isCoopMine ? "#54A0FF" : "#FF9FF3",
                         opacity: 0.7, pointerEvents: "none",
+                      }} />
+                    )}
+                    {/* Mosaic coop: partner fill indicator */}
+                    {isMosaicCoopPartnerFill && gameState === "playing" && !isWon && (
+                      <div style={{
+                        position: "absolute", top: 2, right: 2,
+                        width: 5, height: 5, borderRadius: "50%",
+                        backgroundColor: C.coop,
+                        opacity: 0.8, pointerEvents: "none",
                       }} />
                     )}
                   </div>
@@ -12065,13 +12569,25 @@ export default function Pattrn() {
                   Done
                 </button>
               ) : (isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) ? (
-                <button onClick={() => { setView(customMosaicPuzzlesRef.current && isMosaic ? "custom-mosaic" : "menu"); }}
+                <button onClick={() => {
+                  if (customMosaicPuzzlesRef.current && isMosaic) {
+                    if (isCoopMosaic && coopMosaicSessionId && coopMosaicRole) {
+                      coopMosaicCurrentTileRef.current = -1;
+                      updateCoopMosaicCurrentTile(coopMosaicSessionId, coopMosaicRole, -1).catch(() => {});
+                      setCoopMosaicPartnerFills({});
+                      coopMosaicWriteThrottleRef.current = {};
+                    }
+                    setView("custom-mosaic");
+                  } else {
+                    setView("menu");
+                  }
+                }}
                   style={{
-                    backgroundColor: C.accent, color: C.bg, border: "none",
+                    backgroundColor: isCoopMosaic ? C.coop : C.accent, color: isCoopMosaic ? "#fff" : C.bg, border: "none",
                     padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
                     fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
                     textTransform: "uppercase", transition: "all 0.2s",
-                    boxShadow: `0 4px 20px ${C.accent}44`,
+                    boxShadow: `0 4px 20px ${isCoopMosaic ? C.coop : C.accent}44`,
                   }}
                   onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
                   onMouseLeave={e => e.target.style.transform = "translateY(0)"}
