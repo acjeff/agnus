@@ -6359,6 +6359,40 @@ export default function Pattrn() {
     };
   }, [isAdmin, view, buildAdminActivityList]);
 
+  // --- Account modal accessibility hooks (must be before early returns) ---
+  const accountModalRef = useRef(null);
+
+  useEffect(() => {
+    if (!showAccountModal) return;
+    const el = accountModalRef.current;
+    if (!el) return;
+    const prev = document.activeElement;
+    // Focus the first focusable element inside the modal
+    const focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length) focusable[0].focus();
+
+    const trap = (e) => {
+      if (e.key !== "Tab" || !focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    el.addEventListener("keydown", trap);
+    return () => {
+      el.removeEventListener("keydown", trap);
+      if (prev && prev.focus) prev.focus();
+    };
+  }, [showAccountModal]);
+
+  const accountModalDismiss = useCallback(() => {
+    if (autoLoginModal) dismissAutoLogin();
+    else setShowAccountModal(false);
+  }, [autoLoginModal]);
+
   // --- Coop Mosaic joining overlay (shown while waiting for auth + session load) ---
   // Must be before all view checks so it takes priority when accepting an invite
   if (coopMosaicStatus === "joining") {
@@ -8517,39 +8551,6 @@ export default function Pattrn() {
   }
 
   // --- Account modal (shared across views) ---
-  const accountModalRef = useRef(null);
-
-  useEffect(() => {
-    if (!showAccountModal) return;
-    const el = accountModalRef.current;
-    if (!el) return;
-    const prev = document.activeElement;
-    // Focus the first focusable element inside the modal
-    const focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-    if (focusable.length) focusable[0].focus();
-
-    const trap = (e) => {
-      if (e.key !== "Tab" || !focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-      }
-    };
-    el.addEventListener("keydown", trap);
-    return () => {
-      el.removeEventListener("keydown", trap);
-      if (prev && prev.focus) prev.focus();
-    };
-  }, [showAccountModal]);
-
-  const accountModalDismiss = useCallback(() => {
-    if (autoLoginModal) dismissAutoLogin();
-    else setShowAccountModal(false);
-  }, [autoLoginModal]);
-
   const accountModalEl = showAccountModal && firebaseConfigured && (
     <div
       role="dialog"
