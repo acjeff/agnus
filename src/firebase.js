@@ -19,6 +19,9 @@ import {
   serverTimestamp,
   onValue,
   off,
+  query,
+  orderByChild,
+  equalTo,
 } from "firebase/database";
 
 const firebaseConfig = {
@@ -918,12 +921,11 @@ export async function deleteCoopSession(sessionId) {
   await remove(ref(db, `coopSessions/${sessionId}`));
 }
 
-// Load all active coop sessions for a user (via session index)
+// Load all active coop sessions for a user (via session index + hostUid/guestUid query fallback)
 export async function loadUserCoopSessions(uid) {
   if (!db) return [];
   const indexSnap = await get(ref(db, `userCoopSessions/${uid}`));
-  if (!indexSnap.exists()) return [];
-  const indexEntries = indexSnap.val();
+  const indexEntries = indexSnap.exists() ? indexSnap.val() : {};
   const sessionIds = Object.keys(indexEntries);
   // Load each session individually, routing to the correct path based on type
   const sessions = await Promise.all(
@@ -947,7 +949,34 @@ export async function loadUserCoopSessions(uid) {
       return data;
     })
   );
-  return sessions.filter(Boolean).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  const indexResults = sessions.filter(Boolean);
+  const indexSessionIds = new Set(indexResults.map(s => s.id));
+
+  // Also query coopMosaicSessions by hostUid and guestUid to catch sessions
+  // missing from the index (e.g. if the index entry was lost)
+  let mosaicQueryResults = [];
+  try {
+    const [hostSnap, guestSnap] = await Promise.all([
+      get(query(ref(db, "coopMosaicSessions"), orderByChild("hostUid"), equalTo(uid))),
+      get(query(ref(db, "coopMosaicSessions"), orderByChild("guestUid"), equalTo(uid))),
+    ]);
+    const found = {};
+    if (hostSnap.exists()) Object.assign(found, hostSnap.val());
+    if (guestSnap.exists()) Object.assign(found, guestSnap.val());
+    for (const [sid, data] of Object.entries(found)) {
+      if (!indexSessionIds.has(sid) && data.status !== "closed") {
+        data._type = "mosaic";
+        mosaicQueryResults.push(data);
+        // Repair the missing index entry
+        const role = data.hostUid === uid ? "host" : "guest";
+        set(ref(db, `userCoopSessions/${uid}/${sid}`), { createdAt: data.createdAt || Date.now(), role, type: "mosaic" }).catch(() => {});
+      }
+    }
+  } catch {
+    // Query fallback is best-effort; don't fail the whole load
+  }
+
+  return [...indexResults, ...mosaicQueryResults].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
 }
 
 // Subscribe to user's coop session index changes (triggers reload)
