@@ -3014,7 +3014,7 @@ export default function Pattrn() {
       const sessions = await loadUserCoopSessions(firebaseUser.uid);
       setActiveCoopSessions(sessions.filter(s => s.status !== "closed"));
     } catch {
-      setActiveCoopSessions([]);
+      // Don't clear sessions on error — preserve any optimistically-added sessions
     } finally {
       setActiveSessionsLoading(false);
     }
@@ -5152,8 +5152,28 @@ export default function Pattrn() {
     setCustomMosaicProgress({});
     coopMosaicCurrentTileRef.current = -1;
     coopMosaicGuestJoinedRef.current = false;
-    // Ensure the session appears in the Active Co-op Sessions panel on the menu
-    loadActiveCoopSessions();
+    // Optimistically add the new session to activeCoopSessions so it appears
+    // immediately on the menu, without waiting for async Firebase reads
+    setActiveCoopSessions(prev => {
+      if (prev.some(s => s.id === sessionId)) return prev;
+      return [{
+        id: sessionId,
+        hostUid: firebaseUser.uid,
+        hostUsername: username || null,
+        guestUid: null,
+        guestUsername: null,
+        mosaicId: customMosaicPlay.id || null,
+        mosaicTitle: customMosaicPlay.title || "Untitled",
+        status: "waiting",
+        tileProgress: {},
+        tileTimes: {},
+        hostCurrentTile: -1,
+        guestCurrentTile: null,
+        fills: {},
+        _type: "mosaic",
+        createdAt: Date.now(),
+      }, ...prev];
+    });
     // If inviting a friend, send notification
     if (inviteFriendUid) {
       const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?coopMosaic=${sessionId}` : "";
@@ -5167,7 +5187,7 @@ export default function Pattrn() {
     } else {
       setShowCoopMosaicInvite(true);
     }
-  }, [firebaseUser, customMosaicPlay, activeThemeId, username, loadActiveCoopSessions]);
+  }, [firebaseUser, customMosaicPlay, activeThemeId, username]);
 
   // Leave coop mosaic session
   const leaveCoopMosaicSession = useCallback(() => {
