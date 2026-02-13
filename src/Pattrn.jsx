@@ -6313,6 +6313,70 @@ export default function Pattrn() {
     };
   }, [isAdmin, view, buildAdminActivityList]);
 
+  // --- Coop Mosaic joining overlay (shown while waiting for auth + session load) ---
+  // Must be before all view checks so it takes priority when accepting an invite
+  if (coopMosaicStatus === "joining") {
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        paddingTop: "calc(32px + env(safe-area-inset-top, 0px))", paddingBottom: 32,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }`}</style>
+        <div style={{ textAlign: "center", animation: "fadeUp 0.4s ease" }}>
+          <div style={{ fontSize: 28, marginBottom: 16 }}>{"\u25A6"}</div>
+          <div style={{
+            fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700,
+            color: C.coop, letterSpacing: 2, textTransform: "uppercase", marginBottom: 8,
+          }}>
+            Joining Co-op Mosaic
+          </div>
+          {firebaseAuthReady && !firebaseUser ? (
+            <>
+              <div style={{
+                fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.textDim,
+                marginBottom: 16,
+              }}>
+                Sign in to join this session
+              </div>
+              <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
+                style={{
+                  marginBottom: 8, background: C.coop, border: "none", borderRadius: 8,
+                  padding: "10px 24px", color: "#fff", cursor: "pointer",
+                  fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, letterSpacing: 1,
+                  textTransform: "uppercase",
+                }}
+              >
+                Sign In
+              </button>
+            </>
+          ) : (
+            <div style={{
+              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.textDim,
+              animation: "coopPulse 1.5s ease-in-out infinite",
+            }}>
+              {!firebaseUser ? "Signing in..." : "Loading mosaic..."}
+            </div>
+          )}
+          <button onClick={() => {
+            setCoopMosaicSessionId(null);
+            setCoopMosaicRole(null);
+            setCoopMosaicStatus(null);
+          }}
+            style={{
+              marginTop: 24, background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+              padding: "8px 20px", color: C.textDim, cursor: "pointer",
+              fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1,
+            }}
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // --- CUSTOM MOSAIC PLAY VIEW (puzzle selection for user-created mosaics) ---
   if (view === "custom-mosaic" && customMosaicPlay) {
     const cPuzzles = customMosaicPuzzlesRef.current || [];
@@ -6452,7 +6516,7 @@ export default function Pattrn() {
                 <span style={{ color: C.textDim }}>Partner disconnected</span>
               )}
             </div>
-            {coopMosaicStatus === "waiting" && (
+            {coopMosaicStatus !== "complete" && coopMosaicRole === "host" && (
               <button onClick={() => setShowCoopMosaicInvite(true)}
                 style={{
                   background: "none", border: `1px solid ${C.coop}55`, borderRadius: 6, padding: "3px 8px",
@@ -9235,69 +9299,6 @@ export default function Pattrn() {
       </div>
     </div>
   );
-
-  // --- Coop Mosaic joining overlay (shown while waiting for auth + session load) ---
-  if (coopMosaicStatus === "joining") {
-    return (
-      <div style={{
-        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
-        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-        paddingTop: "calc(32px + env(safe-area-inset-top, 0px))", paddingBottom: 32,
-      }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }`}</style>
-        <div style={{ textAlign: "center", animation: "fadeUp 0.4s ease" }}>
-          <div style={{ fontSize: 28, marginBottom: 16 }}>{"\u25A6"}</div>
-          <div style={{
-            fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700,
-            color: C.coop, letterSpacing: 2, textTransform: "uppercase", marginBottom: 8,
-          }}>
-            Joining Co-op Mosaic
-          </div>
-          {firebaseAuthReady && !firebaseUser ? (
-            <>
-              <div style={{
-                fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.textDim,
-                marginBottom: 16,
-              }}>
-                Sign in to join this session
-              </div>
-              <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
-                style={{
-                  marginBottom: 8, background: C.coop, border: "none", borderRadius: 8,
-                  padding: "10px 24px", color: "#fff", cursor: "pointer",
-                  fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, letterSpacing: 1,
-                  textTransform: "uppercase",
-                }}
-              >
-                Sign In
-              </button>
-            </>
-          ) : (
-            <div style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.textDim,
-              animation: "coopPulse 1.5s ease-in-out infinite",
-            }}>
-              {!firebaseUser ? "Signing in..." : "Loading mosaic..."}
-            </div>
-          )}
-          <button onClick={() => {
-            setCoopMosaicSessionId(null);
-            setCoopMosaicRole(null);
-            setCoopMosaicStatus(null);
-          }}
-            style={{
-              marginTop: 24, background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
-              padding: "8px 20px", color: C.textDim, cursor: "pointer",
-              fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1,
-            }}
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   // --- MENU VIEW ---
   if (view === "menu") {
