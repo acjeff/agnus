@@ -985,7 +985,7 @@ export function subscribeToUserCoopSessionIndex(uid, callback) {
   const indexRef = ref(db, `userCoopSessions/${uid}`);
   const handler = onValue(indexRef, () => {
     // When the index changes, reload all sessions
-    loadUserCoopSessions(uid).then(callback).catch(() => callback([]));
+    loadUserCoopSessions(uid).then(callback).catch(() => {});
   });
   return () => off(indexRef, "value", handler);
 }
