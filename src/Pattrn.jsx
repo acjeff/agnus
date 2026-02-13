@@ -5232,6 +5232,7 @@ export default function Pattrn() {
     coopMosaicWriteThrottleRef.current = {};
     // Signal we're back online by updating our current tile to -1 (overview)
     updateCoopMosaicCurrentTile(session.id, isHost ? "host" : "guest", -1).catch(() => {});
+    customMosaicReturnViewRef.current = "menu";
     setView("custom-mosaic");
   }, [firebaseUser, buildCustomMosaicPuzzles]);
 
@@ -5373,6 +5374,7 @@ export default function Pattrn() {
       coopMosaicCurrentTileRef.current = -1;
       coopMosaicGuestJoinedRef.current = true;
       coopMosaicWriteThrottleRef.current = {};
+      customMosaicReturnViewRef.current = "menu";
       setView("custom-mosaic");
     })();
     return () => { cancelled = true; };
@@ -6342,8 +6344,10 @@ export default function Pattrn() {
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
           <button onClick={() => {
+            const wasCoop = isCoopMosaic;
             if (isCoopMosaic) { leaveCoopMosaicSession(); loadActiveCoopSessions(); }
-            const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
+            // If leaving a coop session, always return to menu so host can see/rejoin the session
+            const returnTo = wasCoop ? "menu" : (customMosaicReturnViewRef.current || "gallery"); setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
           }}
             style={{
               background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
