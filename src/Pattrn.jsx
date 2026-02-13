@@ -6393,6 +6393,8 @@ export default function Pattrn() {
             Cancel
           </button>
         </div>
+        {accountModalEl}
+        {usernameModalEl}
       </div>
     );
   }
@@ -8435,13 +8437,53 @@ export default function Pattrn() {
   }
 
   // --- Account modal (shared across views) ---
+  const accountModalRef = useRef(null);
+
+  useEffect(() => {
+    if (!showAccountModal) return;
+    const el = accountModalRef.current;
+    if (!el) return;
+    const prev = document.activeElement;
+    // Focus the first focusable element inside the modal
+    const focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+    if (focusable.length) focusable[0].focus();
+
+    const trap = (e) => {
+      if (e.key !== "Tab" || !focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey) {
+        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+      } else {
+        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
+      }
+    };
+    el.addEventListener("keydown", trap);
+    return () => {
+      el.removeEventListener("keydown", trap);
+      if (prev && prev.focus) prev.focus();
+    };
+  }, [showAccountModal]);
+
+  const accountModalDismiss = useCallback(() => {
+    if (autoLoginModal) dismissAutoLogin();
+    else setShowAccountModal(false);
+  }, [autoLoginModal]);
+
   const accountModalEl = showAccountModal && firebaseConfigured && (
-    <div onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)} style={{
-      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 24,
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="account-modal-title"
+      onKeyDown={e => { if (e.key === "Escape") accountModalDismiss(); }}
+      onClick={accountModalDismiss}
+      style={{
+        position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: 24,
+      }}
+    >
+      <div ref={accountModalRef} onClick={e => e.stopPropagation()} style={{
         backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
         padding: "24px", maxWidth: 380, width: "100%",
         boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
@@ -8466,7 +8508,7 @@ export default function Pattrn() {
                   </svg>
                 )}
               </div>
-              <h3 style={{
+              <h3 id="account-modal-title" style={{
                 fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
               }}>
                 {username || "Signed In"}
@@ -8519,12 +8561,12 @@ export default function Pattrn() {
                 backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
                 border: "2px solid #60A5FA44",
               }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none">
                   <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
                   <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
                 </svg>
               </div>
-              <h3 style={{
+              <h3 id="account-modal-title" style={{
                 fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
               }}>
                 {accountTab === "login" ? "Sign In" : "Create Account"}
@@ -8537,19 +8579,25 @@ export default function Pattrn() {
             </div>
 
             {/* Tab toggle */}
-            <div style={{
+            <div role="tablist" aria-label="Account action" style={{
               display: "flex", borderRadius: 8, overflow: "hidden",
               border: `1px solid ${C.border}`, marginBottom: 16,
             }}>
               {["login", "signup"].map(tab => (
-                <button key={tab} onClick={() => { setAccountTab(tab); setAccountError(""); }} style={{
-                  flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                  background: accountTab === tab ? C.accent : "transparent",
-                  color: accountTab === tab ? C.bg : C.textDim,
-                  border: "none", cursor: "pointer", textTransform: "uppercase",
-                  transition: "all 0.15s",
-                }}>
+                <button
+                  key={tab}
+                  role="tab"
+                  aria-selected={accountTab === tab}
+                  onClick={() => { setAccountTab(tab); setAccountError(""); }}
+                  style={{
+                    flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                    background: accountTab === tab ? C.accent : "transparent",
+                    color: accountTab === tab ? C.bg : C.textDim,
+                    border: "none", cursor: "pointer", textTransform: "uppercase",
+                    transition: "all 0.15s",
+                  }}
+                >
                   {tab === "login" ? "Sign In" : "Sign Up"}
                 </button>
               ))}
@@ -8569,7 +8617,7 @@ export default function Pattrn() {
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
               }}
             >
-              <svg width="14" height="14" viewBox="0 0 48 48">
+              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 48 48">
                 <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
                 <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
                 <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
@@ -8595,6 +8643,7 @@ export default function Pattrn() {
               <input
                 type="email"
                 placeholder="Email"
+                aria-label="Email address"
                 value={accountEmail}
                 onChange={e => setAccountEmail(e.target.value)}
                 autoComplete="email"
@@ -8611,6 +8660,8 @@ export default function Pattrn() {
               <input
                 type="password"
                 placeholder="Password"
+                aria-label="Password"
+                aria-describedby={accountError ? "account-modal-error" : undefined}
                 value={accountPassword}
                 onChange={e => setAccountPassword(e.target.value)}
                 autoComplete={accountTab === "login" ? "current-password" : "new-password"}
@@ -8625,19 +8676,22 @@ export default function Pattrn() {
                 onBlur={e => e.target.style.borderColor = C.border}
               />
 
-              {accountError && (
-                <div style={{
-                  padding: "8px 12px", borderRadius: 8, marginBottom: 12,
-                  backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
-                  fontSize: 11, color: C.incorrect, textAlign: "center",
-                }}>
-                  {accountError}
-                </div>
-              )}
+              <div id="account-modal-error" role="alert" aria-live="assertive" aria-atomic="true">
+                {accountError && (
+                  <div style={{
+                    padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+                    backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
+                    fontSize: 11, color: C.incorrect, textAlign: "center",
+                  }}>
+                    {accountError}
+                  </div>
+                )}
+              </div>
 
               <button
                 type="submit"
                 disabled={accountLoading || !accountEmail || !accountPassword}
+                aria-busy={accountLoading}
                 style={{
                   width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
                   fontFamily: "'Space Mono', monospace", letterSpacing: 2,
@@ -8647,7 +8701,7 @@ export default function Pattrn() {
                   textTransform: "uppercase", transition: "all 0.15s",
                 }}
               >
-                {accountLoading ? "..." : accountTab === "login" ? "Sign In" : "Create Account"}
+                {accountLoading ? "Loading\u2026" : accountTab === "login" ? "Sign In" : "Create Account"}
               </button>
             </form>
           </>
@@ -8671,6 +8725,7 @@ export default function Pattrn() {
         {/* Close button */}
         <button
           onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)}
+          aria-label="Close account dialog"
           style={{
             width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
             fontFamily: "'Space Mono', monospace", letterSpacing: 1,
