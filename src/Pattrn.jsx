@@ -2700,6 +2700,7 @@ export default function Pattrn() {
   const themedShapes = activeTheme.shapes || SHAPES;
 
   // --- Account / Firebase state ---
+  const [firebaseAuthReady, setFirebaseAuthReady] = useState(false);
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [accountTab, setAccountTab] = useState("login"); // "login" | "signup"
@@ -2838,6 +2839,7 @@ export default function Pattrn() {
   const [coopMosaicSharedTileTimes, setCoopMosaicSharedTileTimes] = useState({}); // { tileIdx: seconds }
   const [coopMosaicPartnerFills, setCoopMosaicPartnerFills] = useState({}); // partner fills for current tile { "r-c": token }
   const [showCoopMosaicInvite, setShowCoopMosaicInvite] = useState(false);
+  const [showCoopMosaicNavigate, setShowCoopMosaicNavigate] = useState(false); // modal to navigate to partner's tile
   const coopMosaicUnsubRef = useRef(null);
   const coopMosaicWriteThrottleRef = useRef({});
   const coopMosaicCurrentTileRef = useRef(null); // tracks which tile index the local player is in (-1 for overview)
@@ -2855,6 +2857,7 @@ export default function Pattrn() {
     if (!firebaseConfigured) return;
     const unsub = subscribeToAuthChanges((user) => {
       setFirebaseUser(user);
+      setFirebaseAuthReady(true);
     });
     return unsub;
   }, [firebaseConfigured]);
@@ -9094,12 +9097,33 @@ export default function Pattrn() {
           }}>
             Joining Co-op Mosaic
           </div>
-          <div style={{
-            fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.textDim,
-            animation: "coopPulse 1.5s ease-in-out infinite",
-          }}>
-            {!firebaseUser ? "Signing in..." : "Loading mosaic..."}
-          </div>
+          {firebaseAuthReady && !firebaseUser ? (
+            <>
+              <div style={{
+                fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.textDim,
+                marginBottom: 16,
+              }}>
+                Sign in to join this session
+              </div>
+              <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
+                style={{
+                  marginBottom: 8, background: C.coop, border: "none", borderRadius: 8,
+                  padding: "10px 24px", color: "#fff", cursor: "pointer",
+                  fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, letterSpacing: 1,
+                  textTransform: "uppercase",
+                }}
+              >
+                Sign In
+              </button>
+            </>
+          ) : (
+            <div style={{
+              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.textDim,
+              animation: "coopPulse 1.5s ease-in-out infinite",
+            }}>
+              {!firebaseUser ? "Signing in..." : "Loading mosaic..."}
+            </div>
+          )}
           <button onClick={() => {
             setCoopMosaicSessionId(null);
             setCoopMosaicRole(null);
@@ -11720,26 +11744,6 @@ export default function Pattrn() {
         >
           &larr; {customMosaicPuzzlesRef.current && isMosaic ? "MOSAIC" : "PUZZLES"}
         </button>
-        {/* Coop mosaic partner indicator in play view */}
-        {isCoopMosaic && coopMosaicPartnerConnected && gameState === "playing" && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 4, marginLeft: 8,
-            padding: "3px 8px", borderRadius: 6,
-            backgroundColor: C.coop + "11", border: `1px solid ${C.coop}33`,
-            fontSize: 9, fontFamily: "'Space Mono', monospace",
-          }}>
-            <div style={{ width: 5, height: 5, borderRadius: "50%", backgroundColor: C.coop, animation: "coopPulse 2s ease-in-out infinite" }} />
-            <span style={{ color: C.coop, fontWeight: 700, maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {coopMosaicPartnerUsername || "Partner"}
-            </span>
-            {coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0 && coopMosaicPartnerTile === currentPuzzle
-              ? <span style={{ color: C.correct, fontSize: 8 }}>here</span>
-              : coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0
-                ? <span style={{ color: C.textDim, fontSize: 8 }}>tile {coopMosaicPartnerTile + 1}</span>
-                : <span style={{ color: C.textDim, fontSize: 8 }}>overview</span>
-            }
-          </div>
-        )}
         <div style={{ flex: 1 }} />
         <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4, flexShrink: 0 }}>
           <button
@@ -12181,6 +12185,57 @@ export default function Pattrn() {
         </div>
       )}
 
+      {/* Navigate to partner's tile modal */}
+      {showCoopMosaicNavigate && coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0 && (
+        <div onClick={() => setShowCoopMosaicNavigate(false)} style={{
+          position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            backgroundColor: C.surface, borderRadius: 16, padding: "24px 28px",
+            border: `1px solid ${C.border}`, maxWidth: 300, width: "90%",
+            textAlign: "center", animation: "fadeUp 0.25s ease",
+          }}>
+            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>
+              Go to partner
+            </div>
+            <div style={{ fontSize: 14, color: C.text, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+              <span style={{ color: C.coop, fontWeight: 700 }}>{coopMosaicPartnerUsername || "Partner"}</span> is on tile {coopMosaicPartnerTile + 1}
+            </div>
+            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 20 }}>
+              Navigate there to solve it together?
+            </div>
+            <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+              <button onClick={() => setShowCoopMosaicNavigate(false)}
+                style={{
+                  background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+                  padding: "8px 18px", color: C.textDim, cursor: "pointer",
+                  fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1,
+                }}
+              >
+                Stay
+              </button>
+              <button onClick={() => {
+                const targetTile = coopMosaicPartnerTile;
+                setShowCoopMosaicNavigate(false);
+                coopMosaicCurrentTileRef.current = targetTile;
+                updateCoopMosaicCurrentTile(coopMosaicSessionId, coopMosaicRole, targetTile).catch(() => {});
+                coopMosaicWriteThrottleRef.current = {};
+                startPuzzle(targetTile, "mosaic", true);
+              }}
+                style={{
+                  background: C.coop, border: "none", borderRadius: 8,
+                  padding: "8px 18px", color: "#fff", cursor: "pointer",
+                  fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, letterSpacing: 1,
+                }}
+              >
+                Go
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Mosaic preview overlay — shows full mosaic with current tile highlighted */}
       {showMosaicPreviewOverlay && customMosaicPlay && customMosaicPuzzlesRef.current && (
         <div onClick={() => setShowMosaicPreviewOverlay(false)} style={{
@@ -12376,6 +12431,36 @@ export default function Pattrn() {
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
       <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(88px + env(safe-area-inset-top, 0px))", paddingBottom: "calc(140px + env(safe-area-inset-bottom, 0px))", width: "calc(100% + 32px)", margin: "0 -16px", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, position: "relative", boxSizing: "border-box" }}>
         <GridDecoration decoration={activeTheme.decoration} />
+        {/* Coop mosaic partner indicator — positioned top-left of puzzle panel */}
+        {isCoopMosaic && coopMosaicPartnerConnected && gameState === "playing" && (
+          <div
+            onClick={() => {
+              if (coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0 && coopMosaicPartnerTile !== currentPuzzle) {
+                setShowCoopMosaicNavigate(true);
+              }
+            }}
+            style={{
+              position: "absolute", top: "calc(88px + env(safe-area-inset-top, 0px) + 8px)", left: 12, zIndex: 10,
+              display: "flex", alignItems: "center", gap: 4,
+              padding: "4px 10px", borderRadius: 8,
+              backgroundColor: C.coop + "18", border: `1px solid ${C.coop}44`,
+              fontSize: 10, fontFamily: "'Space Mono', monospace",
+              cursor: (coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0 && coopMosaicPartnerTile !== currentPuzzle) ? "pointer" : "default",
+              transition: "all 0.15s",
+            }}
+          >
+            <div style={{ width: 6, height: 6, borderRadius: "50%", backgroundColor: C.coop, animation: "coopPulse 2s ease-in-out infinite" }} />
+            <span style={{ color: C.coop, fontWeight: 700, maxWidth: 70, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+              {coopMosaicPartnerUsername || "Partner"}
+            </span>
+            {coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0 && coopMosaicPartnerTile === currentPuzzle
+              ? <span style={{ color: C.correct, fontSize: 8 }}>here</span>
+              : coopMosaicPartnerTile != null && coopMosaicPartnerTile >= 0
+                ? <span style={{ color: C.textDim, fontSize: 8 }}>tile {coopMosaicPartnerTile + 1}</span>
+                : <span style={{ color: C.textDim, fontSize: 8 }}>overview</span>
+            }
+          </div>
+        )}
       <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
       <div style={{
         transform: isSpin ? `rotate(${spinAngle}deg)` : undefined,
