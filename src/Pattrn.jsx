@@ -2817,6 +2817,7 @@ export default function Pattrn() {
   const [activeSessionsLoading, setActiveSessionsLoading] = useState(false);
   const [showCoopFriendPicker, setShowCoopFriendPicker] = useState(false); // friend picker for coop
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false); // leave coop confirmation
+  const [showMosaicLeaveConfirm, setShowMosaicLeaveConfirm] = useState(false); // leave coop mosaic confirmation
   const [coopPartnerLockToast, setCoopPartnerLockToast] = useState(null); // toast when partner locks in
   const coopPartnerLockToastTimer = useRef(null);
   const prevCoopPartnerLockedRef = useRef(false); // track partner lock state changes
@@ -5279,6 +5280,7 @@ export default function Pattrn() {
 
     const unsub = subscribeToCoopMosaicSession(coopMosaicSessionId, (data) => {
       if (!data) {
+        setShowMosaicLeaveConfirm(false);
         leaveCoopMosaicSession();
         return;
       }
@@ -5291,6 +5293,7 @@ export default function Pattrn() {
       // Detect guest kick
       if (!isHost && !data.guestUid && coopMosaicGuestJoinedRef.current) {
         coopMosaicGuestJoinedRef.current = false;
+        setShowMosaicLeaveConfirm(false);
         leaveCoopMosaicSession();
         setView("menu");
         return;
@@ -6435,10 +6438,8 @@ export default function Pattrn() {
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
           <button onClick={() => {
-            const wasCoop = isCoopMosaic;
-            if (isCoopMosaic) { leaveCoopMosaicSession(); loadActiveCoopSessions(); }
-            // If leaving a coop session, always return to menu so host can see/rejoin the session
-            const returnTo = wasCoop ? "menu" : (customMosaicReturnViewRef.current || "gallery"); setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
+            if (isCoopMosaic) { setShowMosaicLeaveConfirm(true); return; }
+            const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
           }}
             style={{
               background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
@@ -6926,6 +6927,62 @@ export default function Pattrn() {
           );
         })()}
         {coopInviteToastEl}
+
+        {/* Leave coop mosaic confirmation dialog */}
+        {showMosaicLeaveConfirm && (
+          <div onClick={() => setShowMosaicLeaveConfirm(false)} style={{
+            position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "fadeUp 0.2s ease both",
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 320, width: "90%",
+              border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+            }}>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+                Leave Co-op?
+              </div>
+              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
+                {coopMosaicRole === "host"
+                  ? "The session will stay active. You can rejoin from the main menu."
+                  : "You will leave this session and your partner will need to invite you again to rejoin."
+                }
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => {
+                    setShowMosaicLeaveConfirm(false);
+                    leaveCoopMosaicSession();
+                    loadActiveCoopSessions();
+                    setView("menu");
+                    setCustomMosaicPlay(null);
+                    customMosaicPuzzlesRef.current = null;
+                    customMosaicReturnViewRef.current = "gallery";
+                  }}
+                  style={{
+                    flex: 1, backgroundColor: "#f87171", color: "#fff", border: "none",
+                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Leave
+                </button>
+                <button
+                  onClick={() => setShowMosaicLeaveConfirm(false)}
+                  style={{
+                    flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Stay
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
