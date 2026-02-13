@@ -12301,7 +12301,7 @@ export default function Pattrn() {
           </div>
           <div style={{ textAlign: "center" }}>
             <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
-              {isCoop ? "Co-op " : ""}{diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
+              {isCoop ? "Co-op " : isCoopMosaic ? "Co-op " : ""}{diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
             </span>
             {!isDaily && !isCascade && (
               <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.accent, letterSpacing: 2 }}>
@@ -12309,7 +12309,7 @@ export default function Pattrn() {
               </span>
             )}
           </div>
-          <AttemptDots max={isCoop ? 5 : maxAttempts} used={attempts} won={gameState === "won"} />
+          {!isCoopMosaic && <AttemptDots max={isCoop ? 5 : maxAttempts} used={attempts} won={gameState === "won"} />}
         </div>
         {/* Coop status bar */}
         {isCoop && (
