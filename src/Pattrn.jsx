@@ -5196,9 +5196,18 @@ export default function Pattrn() {
     if (!firebaseUser || !session) return;
     // Normalize grid from Firebase (may have been stored as object with numeric keys)
     const rawGrid = session.mosaicGrid;
-    const grid = Array.isArray(rawGrid)
-      ? rawGrid.map(row => Array.isArray(row) ? row : Object.values(row || {}))
-      : Object.values(rawGrid || {}).map(row => Array.isArray(row) ? row : Object.values(row || {}));
+    const normalizeRow = (row) => {
+      if (Array.isArray(row)) return row;
+      const arr = [];
+      for (let i = 0; i < 25; i++) arr.push((row && row[i]) ?? null);
+      return arr;
+    };
+    const gridArr = Array.isArray(rawGrid) ? rawGrid : (() => {
+      const arr = [];
+      for (let i = 0; i < 25; i++) arr.push(rawGrid?.[i] ?? null);
+      return arr;
+    })();
+    const grid = gridArr.map(normalizeRow);
     // Build mosaic puzzles from session grid
     const puzzles = buildCustomMosaicPuzzles(grid);
     customMosaicPuzzlesRef.current = puzzles;
@@ -5333,9 +5342,18 @@ export default function Pattrn() {
       }
       // Normalize grid from Firebase (may have been stored as object with numeric keys)
       const rawGrid = session.mosaicGrid;
-      const grid = Array.isArray(rawGrid)
-        ? rawGrid.map(row => Array.isArray(row) ? row : Object.values(row || {}))
-        : Object.values(rawGrid || {}).map(row => Array.isArray(row) ? row : Object.values(row || {}));
+      const normalizeRow = (row) => {
+        if (Array.isArray(row)) return row;
+        const arr = [];
+        for (let i = 0; i < 25; i++) arr.push((row && row[i]) ?? null);
+        return arr;
+      };
+      const gridArr = Array.isArray(rawGrid) ? rawGrid : (() => {
+        const arr = [];
+        for (let i = 0; i < 25; i++) arr.push(rawGrid?.[i] ?? null);
+        return arr;
+      })();
+      const grid = gridArr.map(normalizeRow);
       // Build mosaic puzzles from session grid
       const puzzles = buildCustomMosaicPuzzles(grid);
       customMosaicPuzzlesRef.current = puzzles;
@@ -5350,8 +5368,11 @@ export default function Pattrn() {
       setCoopMosaicSharedTileTimes(session.tileTimes || {});
       setCustomMosaicProgress(session.tileProgress || {});
       setCoopMosaicStatus("playing");
+      setCoopMosaicPartnerConnected(true);
       setCoopMosaicPartnerUsername(session.hostUsername || null);
       coopMosaicCurrentTileRef.current = -1;
+      coopMosaicGuestJoinedRef.current = true;
+      coopMosaicWriteThrottleRef.current = {};
       setView("custom-mosaic");
     })();
     return () => { cancelled = true; };
@@ -5510,11 +5531,16 @@ export default function Pattrn() {
         if (isBlind) setLockedCells(new Set([...puzzle.blanks]));
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
-        // Custom mosaic: track progress locally and persist to mosaicCompletions
+        // Custom mosaic: track progress
         if (customMosaicPuzzlesRef.current && isMosaic) {
           setCustomMosaicProgress(prev => ({ ...prev, [progressKey]: newAttempts }));
-          // Persist completion to progress.mosaicCompletions keyed by mosaic ID
-          if (customMosaicPlay?.id) {
+          if (isCoopMosaic && coopMosaicSessionId) {
+            // Coop mosaic: write ONLY to Firebase session (single source of truth)
+            // Local progress will be synced via subscription; personal save happens after mosaic completion
+            updateCoopMosaicTileProgress(coopMosaicSessionId, progressKey, newAttempts, finalTime).catch(() => {});
+            clearCoopMosaicTileFills(coopMosaicSessionId, progressKey).catch(() => {});
+          } else if (customMosaicPlay?.id) {
+            // Solo mosaic: persist to local progress.mosaicCompletions
             const mosaicId = customMosaicPlay.id;
             const prevCompletions = progress.mosaicCompletions || {};
             const prevMosaic = prevCompletions[mosaicId] || {};
@@ -5530,11 +5556,6 @@ export default function Pattrn() {
             const newTimes = { ...times, mosaicCompletionTimes: { ...mct, [mosaicId]: newMosaicTimes } };
             setTimes(newTimes);
             saveTimes(newTimes);
-          }
-          // Coop mosaic: sync tile completion to Firebase session
-          if (isCoopMosaic && coopMosaicSessionId) {
-            updateCoopMosaicTileProgress(coopMosaicSessionId, progressKey, newAttempts, finalTime).catch(() => {});
-            clearCoopMosaicTileFills(coopMosaicSessionId, progressKey).catch(() => {});
           }
         } else {
           const newDiffProgress = { ...diffProgress, [progressKey]: newAttempts };
@@ -6321,7 +6342,7 @@ export default function Pattrn() {
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
           <button onClick={() => {
-            if (isCoopMosaic) { leaveCoopMosaicSession(); }
+            if (isCoopMosaic) { leaveCoopMosaicSession(); loadActiveCoopSessions(); }
             const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
           }}
             style={{
@@ -6345,7 +6366,7 @@ export default function Pattrn() {
           {/* Co-op button */}
           {firebaseConfigured && firebaseUser && !isCoopMosaic && (
             <button
-              onClick={() => startCoopMosaicSession()}
+              onClick={() => setShowCoopFriendPicker(true)}
               style={{
                 background: "none", border: `1px solid ${C.coop}55`,
                 borderRadius: 8, padding: "5px 10px", cursor: "pointer",
@@ -6520,6 +6541,127 @@ export default function Pattrn() {
               {solvedCount === 25 ? (isCoopMosaic ? "Picture revealed together!" : "Picture revealed!") : "Preview"}
             </div>
             <MosaicThumbnail grid={customMosaicPlay.grid} size={Math.min(280, typeof window !== "undefined" ? window.innerWidth - 80 : 280)} completedTiles={solvedCount === 25 ? null : effectiveMosaicProgress} />
+            {/* Save to personal progress button — coop mosaic completion */}
+            {solvedCount === 25 && isCoopMosaic && customMosaicPlay?.id && (
+              <button
+                onClick={() => {
+                  const mosaicId = customMosaicPlay.id;
+                  // Save tile progress to local mosaicCompletions
+                  const prevCompletions = progress.mosaicCompletions || {};
+                  const newCompletions = { ...prevCompletions, [mosaicId]: { ...effectiveMosaicProgress } };
+                  const newProgress = { ...progress, mosaicCompletions: newCompletions };
+                  setProgress(newProgress);
+                  saveProgress(newProgress);
+                  // Save tile times from session
+                  const mct = times.mosaicCompletionTimes || {};
+                  const newMosaicTimes = { ...mct[mosaicId], ...coopMosaicSharedTileTimes };
+                  const newTimes = { ...times, mosaicCompletionTimes: { ...mct, [mosaicId]: newMosaicTimes } };
+                  setTimes(newTimes);
+                  saveTimes(newTimes);
+                }}
+                style={{
+                  marginTop: 12, padding: "10px 20px", borderRadius: 10,
+                  backgroundColor: C.correct, color: "#fff", border: "none",
+                  fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
+                  letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+                }}
+              >
+                Save to My Progress
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Coop mosaic friend picker */}
+        {showCoopFriendPicker && (
+          <div onClick={() => setShowCoopFriendPicker(false)} style={{
+            position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            animation: "fadeUp 0.2s ease both",
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 360, width: "90%",
+              border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+              maxHeight: "80vh", display: "flex", flexDirection: "column",
+            }}>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.coop, marginBottom: 4 }}>
+                Start Co-op Mosaic
+              </div>
+              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
+                Invite a friend or share a link
+              </div>
+              {friendsList.length > 0 && (
+                <div style={{ marginBottom: 16, maxHeight: 200, overflowY: "auto" }}>
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                    Your Friends
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                    {friendsList.map(friend => (
+                      <button
+                        key={friend.uid}
+                        onClick={async () => {
+                          setShowCoopFriendPicker(false);
+                          await startCoopMosaicSession(friend.uid, friend.username);
+                        }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
+                          borderRadius: 10, backgroundColor: C.bg, border: `1px solid ${C.border}`,
+                          cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = C.coop; e.currentTarget.style.backgroundColor = C.coop + "11"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.backgroundColor = C.bg; }}
+                      >
+                        {friend.profilePicture ? (
+                          <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: C.coop + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: C.coop, fontWeight: 700, flexShrink: 0 }}>
+                            {(friend.username || "?")[0].toUpperCase()}
+                          </div>
+                        )}
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>
+                          {friend.username}
+                        </span>
+                        <span style={{ fontSize: 10, color: C.coop, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
+                          Invite
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {friendsList.length === 0 && (
+                <div style={{ marginBottom: 16, textAlign: "center", padding: "12px 0", color: C.textDim, fontSize: 11, fontFamily: "'Space Mono', monospace" }}>
+                  No friends added yet. You can add friends in the Mosaic gallery.
+                </div>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => {
+                    setShowCoopFriendPicker(false);
+                    startCoopMosaicSession();
+                  }}
+                  style={{
+                    flex: 1, backgroundColor: C.coop, color: "#fff", border: "none",
+                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Share Link
+                </button>
+                <button
+                  onClick={() => setShowCoopFriendPicker(false)}
+                  style={{
+                    backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
@@ -6583,8 +6725,9 @@ export default function Pattrn() {
 
         {/* Mosaic stats section */}
         {solvedCount > 0 && (() => {
-          const mosaicTimes = customMosaicPlay?.id ? ((times.mosaicCompletionTimes || {})[customMosaicPlay.id] || {}) : {};
-          const solvedTiles = Object.entries(customMosaicProgress).filter(([, v]) => typeof v === "number" && v > 0);
+          const localTimes = customMosaicPlay?.id ? ((times.mosaicCompletionTimes || {})[customMosaicPlay.id] || {}) : {};
+          const mosaicTimes = isCoopMosaic ? { ...localTimes, ...coopMosaicSharedTileTimes } : localTimes;
+          const solvedTiles = Object.entries(effectiveMosaicProgress).filter(([, v]) => typeof v === "number" && v > 0);
           const totalAttempts = solvedTiles.reduce((sum, [, v]) => sum + v, 0);
           const perfectCount = solvedTiles.filter(([, v]) => v === 1).length;
           const timedTiles = solvedTiles.filter(([k]) => mosaicTimes[k] != null);
