@@ -5151,7 +5151,7 @@ export default function Pattrn() {
     // (don't carry over the player's personal solo progress)
     setCustomMosaicProgress({});
     coopMosaicCurrentTileRef.current = -1;
-    coopMosaicGuestJoinedRef.current = false;
+    coopMosaicJoinedRef.current = false;
     // Optimistically add the new session to activeCoopSessions so it appears
     // immediately on the menu, without waiting for async Firebase reads
     setActiveCoopSessions(prev => {
@@ -5299,9 +5299,9 @@ export default function Pattrn() {
       if (players[myUid]) {
         coopMosaicJoinedRef.current = true;
       }
-      // Detect guest kick
-      if (!isHost && !data.guestUid && coopMosaicGuestJoinedRef.current) {
-        coopMosaicGuestJoinedRef.current = false;
+      // Detect player removal (kicked from session)
+      if (!players[myUid] && coopMosaicJoinedRef.current) {
+        coopMosaicJoinedRef.current = false;
         setShowMosaicLeaveConfirm(false);
         leaveCoopMosaicSession();
         setView("menu");
