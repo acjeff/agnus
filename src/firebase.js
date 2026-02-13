@@ -1093,3 +1093,135 @@ export async function loadAllPuzzleCompletionsForMode(mode) {
   const snap = await get(ref(db, `puzzleCompletions/${mode}`));
   return snap.exists() ? snap.val() : {};
 }
+
+// --- Coop Mosaic Mode ---
+
+// Create a new coop mosaic session. Returns the session ID.
+export async function createCoopMosaicSession(uid, { mosaicId, mosaicTitle, mosaicGrid, hostTheme, hostUsername }) {
+  if (!db) return null;
+  const sessionsRef = ref(db, "coopMosaicSessions");
+  const newRef = push(sessionsRef);
+  const id = newRef.key;
+  await set(newRef, {
+    id,
+    hostUid: uid,
+    hostUsername: hostUsername || null,
+    guestUid: null,
+    guestUsername: null,
+    mosaicId: mosaicId || null,
+    mosaicTitle: mosaicTitle || "Untitled",
+    mosaicGrid: mosaicGrid,
+    status: "waiting",
+    tileProgress: {},
+    tileTimes: {},
+    hostCurrentTile: -1,
+    guestCurrentTile: null,
+    fills: {},
+    hostTheme: hostTheme ?? "classic",
+    createdAt: serverTimestamp(),
+  });
+  await set(ref(db, `userCoopSessions/${uid}/${id}`), { createdAt: serverTimestamp(), role: "host", type: "mosaic" });
+  return id;
+}
+
+// Join an existing coop mosaic session as guest
+export async function joinCoopMosaicSession(sessionId, uid, guestUsername) {
+  if (!db) return null;
+  const sessionRef = ref(db, `coopMosaicSessions/${sessionId}`);
+  const snap = await get(sessionRef);
+  if (!snap.exists()) return null;
+  const data = snap.val();
+  if (data.guestUid && data.guestUid !== uid) return null;
+  if (data.hostUid === uid) return data;
+  await update(sessionRef, { guestUid: uid, guestUsername: guestUsername || null, status: "playing" });
+  await set(ref(db, `userCoopSessions/${uid}/${sessionId}`), { createdAt: serverTimestamp(), role: "guest", type: "mosaic" });
+  const updated = await get(sessionRef);
+  return updated.val();
+}
+
+// Subscribe to real-time changes on a coop mosaic session
+export function subscribeToCoopMosaicSession(sessionId, callback) {
+  if (!db) return () => {};
+  const sessionRef = ref(db, `coopMosaicSessions/${sessionId}`);
+  const handler = onValue(sessionRef, (snap) => {
+    callback(snap.exists() ? snap.val() : null);
+  });
+  return () => off(sessionRef, "value", handler);
+}
+
+// Update a fill in the coop mosaic session (keyed as "tileIdx_row-col")
+export async function updateCoopMosaicFill(sessionId, fillKey, token) {
+  if (!db) return;
+  if (token === null || token === undefined) {
+    await remove(ref(db, `coopMosaicSessions/${sessionId}/fills/${fillKey}`));
+  } else {
+    await set(ref(db, `coopMosaicSessions/${sessionId}/fills/${fillKey}`), token);
+  }
+}
+
+// Update which tile a player is currently viewing
+export async function updateCoopMosaicCurrentTile(sessionId, role, tileIndex) {
+  if (!db) return;
+  const key = role === "host" ? "hostCurrentTile" : "guestCurrentTile";
+  await update(ref(db, `coopMosaicSessions/${sessionId}`), { [key]: tileIndex });
+}
+
+// Mark a tile as solved in the session
+export async function updateCoopMosaicTileProgress(sessionId, tileIndex, attempts, time) {
+  if (!db) return;
+  const updates = {};
+  updates[`tileProgress/${tileIndex}`] = attempts;
+  if (time != null) updates[`tileTimes/${tileIndex}`] = time;
+  await update(ref(db, `coopMosaicSessions/${sessionId}`), updates);
+}
+
+// Clear fills for a specific tile (after it's been solved)
+export async function clearCoopMosaicTileFills(sessionId, tileIndex) {
+  if (!db) return;
+  const fillsSnap = await get(ref(db, `coopMosaicSessions/${sessionId}/fills`));
+  if (!fillsSnap.exists()) return;
+  const fills = fillsSnap.val();
+  const prefix = `${tileIndex}_`;
+  const updates = {};
+  for (const key of Object.keys(fills)) {
+    if (key.startsWith(prefix)) updates[`fills/${key}`] = null;
+  }
+  if (Object.keys(updates).length > 0) {
+    await update(ref(db, `coopMosaicSessions/${sessionId}`), updates);
+  }
+}
+
+// Mark a coop mosaic session as complete
+export async function completeCoopMosaicSession(sessionId) {
+  if (!db) return;
+  await update(ref(db, `coopMosaicSessions/${sessionId}`), { status: "complete" });
+}
+
+// Guest leaves a coop mosaic session
+export async function guestLeaveCoopMosaicSession(sessionId, guestUid) {
+  if (!db) return;
+  await update(ref(db, `coopMosaicSessions/${sessionId}`), {
+    guestUid: null,
+    guestUsername: null,
+    guestCurrentTile: null,
+    status: "waiting",
+  });
+  if (guestUid) {
+    await remove(ref(db, `userCoopSessions/${guestUid}/${sessionId}`)).catch(() => {});
+  }
+}
+
+// Close/delete a coop mosaic session
+export async function closeCoopMosaicSession(sessionId, hostUid, guestUid) {
+  if (!db) return;
+  await remove(ref(db, `coopMosaicSessions/${sessionId}`));
+  if (hostUid) await remove(ref(db, `userCoopSessions/${hostUid}/${sessionId}`)).catch(() => {});
+  if (guestUid) await remove(ref(db, `userCoopSessions/${guestUid}/${sessionId}`)).catch(() => {});
+}
+
+// Load a coop mosaic session by ID
+export async function loadCoopMosaicSession(sessionId) {
+  if (!db) return null;
+  const snap = await get(ref(db, `coopMosaicSessions/${sessionId}`));
+  return snap.exists() ? snap.val() : null;
+}
