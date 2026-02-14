@@ -4043,11 +4043,30 @@ export default function Pattrn() {
 
   // Viewport size tracking for dynamic grid sizing
   const [viewportSize, setViewportSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  const [headerHeight, setHeaderHeight] = useState(88);
+  const [footerHeight, setFooterHeight] = useState(140);
+  const headerRef = useRef(null);
+  const footerRef = useRef(null);
   useEffect(() => {
     const onResize = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
+  const barObserverRef = useRef(null);
+  useEffect(() => {
+    if (barObserverRef.current) barObserverRef.current.disconnect();
+    const hEl = headerRef.current;
+    const fEl = footerRef.current;
+    if (!hEl && !fEl) return;
+    const ro = new ResizeObserver(() => {
+      if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight);
+      if (footerRef.current) setFooterHeight(footerRef.current.offsetHeight);
+    });
+    if (hEl) { ro.observe(hEl); setHeaderHeight(hEl.offsetHeight); }
+    if (fEl) { ro.observe(fEl); setFooterHeight(fEl.offsetHeight); }
+    barObserverRef.current = ro;
+    return () => ro.disconnect();
+  }, [view, gameState]);
 
   // Scroll play view to top when entering or changing puzzle
   useEffect(() => {
@@ -6511,7 +6530,7 @@ export default function Pattrn() {
   const gridGap = gridSize >= 7 ? (isMobile ? 2 : 3) : 4;
   const gridPad = gridSize >= 7 ? (isMobile ? 6 : 10) : (isMobile ? 10 : 14);
   const availW = viewportSize.w - (isMobile ? 24 : 50) - (gridSize - 1) * gridGap - 2 * gridPad;
-  const availH = viewportSize.h - (isMobile ? 290 : 320) - (gridSize - 1) * gridGap - 2 * gridPad;
+  const availH = viewportSize.h - headerHeight - footerHeight - 24 - (gridSize - 1) * gridGap - 2 * gridPad;
   const dynamicCell = Math.min(Math.floor(availW / gridSize), Math.floor(availH / gridSize));
   const cellSize = Math.max(28, Math.min(dynamicCell, 80));
   const iconSize = Math.max(14, Math.round(cellSize * 0.5));
@@ -13243,7 +13262,7 @@ export default function Pattrn() {
       )}
 
       {/* Top bar - fixed at top so it always stays visible */}
-      <div style={{
+      <div ref={headerRef} style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg,
         paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
         display: "flex", justifyContent: "center", boxSizing: "border-box",
@@ -14226,7 +14245,7 @@ export default function Pattrn() {
       )}
 
       {/* Grid area: fills available space between fixed header and footer, centers grid */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: "calc(88px + env(safe-area-inset-top, 0px))", paddingBottom: "calc(140px + env(safe-area-inset-bottom, 0px))", width: "calc(100% + 32px)", margin: "0 -16px", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, position: "relative", boxSizing: "border-box" }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: headerHeight, paddingBottom: footerHeight, width: "calc(100% + 32px)", margin: "0 -16px", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, position: "relative", boxSizing: "border-box" }}>
         <GridDecoration decoration={activeTheme.decoration} />
         {/* Coop mosaic players indicator — positioned top-left of puzzle panel */}
         {isCoopMosaic && coopMosaicAnyConnected && gameState === "playing" && (
@@ -14236,7 +14255,7 @@ export default function Pattrn() {
               if (anyOnOtherTile) setShowCoopMosaicNavigate(true);
             }}
             style={{
-              position: "absolute", top: "calc(88px + env(safe-area-inset-top, 0px) + 8px)", left: 12, zIndex: 10,
+              position: "absolute", top: headerHeight + 8, left: 12, zIndex: 10,
               display: "flex", flexDirection: "column", gap: 3,
               padding: "4px 10px", borderRadius: 8,
               backgroundColor: C.coop + "18", border: `1px solid ${C.coop}44`,
@@ -14432,7 +14451,7 @@ export default function Pattrn() {
       </div>
 
       {/* Fixed bottom bar: token picker + actions */}
-      <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
+      <div ref={footerRef} style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
         {/* Token picker row */}
         {gameState === "playing" && (
           <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId}
