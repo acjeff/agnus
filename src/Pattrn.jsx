@@ -4933,7 +4933,7 @@ export default function Pattrn() {
     timerInterval.current = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
     }, 1000);
-    // If inviting friends, send notifications instead of showing link modal
+    // If inviting friends, send notifications
     if (inviteFriendUids.length > 0) {
       const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${sessionId}` : "";
       await Promise.all(inviteFriendUids.map(uid =>
@@ -4944,11 +4944,10 @@ export default function Pattrn() {
           data: { sessionId, mode: difficulty, level: currentPuzzle, dailyDate: isDaily ? currentDailyDate : null, url: coopUrl },
         }).catch(() => {})
       ));
-      setShowCoopFriendPicker(false);
       setCoopSelectedFriends(new Set());
-    } else {
-      setShowCoopInvite(true);
     }
+    setShowCoopFriendPicker(false);
+    setShowCoopInvite(true);
   }, [firebaseUser, puzzle, difficulty, currentPuzzle, isDaily, currentDailyDate, splitBlanksForCoop, stopTimer, activeThemeId, username]);
 
   // Auto-start coop after login if user clicked Co-op while logged out
@@ -13171,7 +13170,6 @@ export default function Pattrn() {
                         }).catch(() => {})
                       ));
                       setCoopSelectedFriends(new Set());
-                      setShowCoopInvite(false);
                     }}
                     style={{
                       marginTop: 8, width: "100%", padding: "8px 12px", borderRadius: 8,
