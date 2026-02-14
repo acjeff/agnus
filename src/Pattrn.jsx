@@ -79,6 +79,9 @@ import {
   playerLeaveCoopMosaicSession,
   closeCoopMosaicSession,
   loadCoopMosaicSession,
+  updateCoopMosaicTileLockedCells,
+  addCoopInvitedUid,
+  addCoopMosaicInvitedUid,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2764,6 +2767,9 @@ export default function Pattrn() {
   const activeThemeIdRef = useRef(activeThemeId); // current theme ref for coop subscription
   activeThemeIdRef.current = activeThemeId;
   const isCoop = !!coopSessionId;
+  const [coopPlayers, setCoopPlayers] = useState({}); // { uid: { username, lockedIn, correct, ... } } — all OTHER players in normal coop
+  const [coopInvitedUids, setCoopInvitedUids] = useState(new Set()); // UIDs invited to normal coop session
+  const coopPlayerUidsRef = useRef(""); // serialized sorted player UIDs for detecting changes
 
   // --- Mosaic Creator state ---
   const CREATOR_GRID_SIZE = 25; // 25x25 grid → 25 tiles of 5x5, matching mosaic mode
@@ -2862,6 +2868,7 @@ export default function Pattrn() {
   const coopMosaicJoinedRef = useRef(false); // tracks whether we've actually joined (prevents false kick detection)
   const coopMosaicPrevSolvedRef = useRef(new Set()); // tracks tiles already seen as solved to detect partner completions
   const isCoopMosaic = !!coopMosaicSessionId;
+  const [coopMosaicInvitedUids, setCoopMosaicInvitedUids] = useState(new Set()); // UIDs invited to coop mosaic session
   // Derived: number of other connected players (currentTile != null means connected)
   const coopMosaicOtherPlayerCount = Object.keys(coopMosaicPlayers).length;
   const coopMosaicAnyConnected = coopMosaicOtherPlayerCount > 0;
@@ -4894,6 +4901,23 @@ export default function Pattrn() {
     return { hostBlanks: new Set(left), guestBlanks: new Set(right) };
   }, []);
 
+  // Split blanks for N players (deterministic based on sorted UIDs)
+  const splitBlanksForNPlayers = useCallback((blanksSet, sortedPlayerUids) => {
+    const blanksArr = [...blanksSet].sort();
+    const n = sortedPlayerUids.length;
+    if (n === 0) return {};
+    const result = {};
+    sortedPlayerUids.forEach(uid => { result[uid] = []; });
+    blanksArr.forEach((key, i) => {
+      result[sortedPlayerUids[i % n]].push(key);
+    });
+    const sets = {};
+    for (const uid of sortedPlayerUids) {
+      sets[uid] = new Set(result[uid]);
+    }
+    return sets;
+  }, []);
+
   // Create a coop session for the current puzzle
   const startCoopSession = useCallback(async ({ inviteFriendUids = [] } = {}) => {
     if (!firebaseUser || !puzzle) return;
@@ -4913,11 +4937,13 @@ export default function Pattrn() {
     setCoopPartnerCorrect(false);
     setCoopPartnerConnected(false);
     setCoopPartnerFills({});
+    setCoopPlayers({});
+    setCoopInvitedUids(new Set());
+    coopPlayerUidsRef.current = "";
     prevCoopPartnerLockedRef.current = false;
-    // Split blanks
-    const { hostBlanks, guestBlanks } = splitBlanksForCoop(puzzle.blanks, puzzle.gridSize);
-    setCoopMyBlanks(hostBlanks);
-    setCoopPartnerBlanks(guestBlanks);
+    // Split blanks — host starts with all blanks, will re-split when players join
+    setCoopMyBlanks(new Set(puzzle.blanks));
+    setCoopPartnerBlanks(new Set());
     // Reset game state for coop
     setFills({});
     setAttempts(0);
@@ -4933,22 +4959,25 @@ export default function Pattrn() {
     timerInterval.current = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
     }, 1000);
-    // If inviting friends, send notifications
+    // If inviting friends, send notifications and track invited UIDs
     if (inviteFriendUids.length > 0) {
       const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${sessionId}` : "";
       await Promise.all(inviteFriendUids.map(uid =>
-        sendNotification(uid, {
-          type: "coop_invite",
-          fromUid: firebaseUser.uid,
-          fromUsername: username || firebaseUser.email,
-          data: { sessionId, mode: difficulty, level: currentPuzzle, dailyDate: isDaily ? currentDailyDate : null, url: coopUrl },
-        }).catch(() => {})
+        Promise.all([
+          sendNotification(uid, {
+            type: "coop_invite",
+            fromUid: firebaseUser.uid,
+            fromUsername: username || firebaseUser.email,
+            data: { sessionId, mode: difficulty, level: currentPuzzle, dailyDate: isDaily ? currentDailyDate : null, url: coopUrl },
+          }).catch(() => {}),
+          addCoopInvitedUid(sessionId, uid).catch(() => {}),
+        ])
       ));
       setCoopSelectedFriends(new Set());
     }
     setShowCoopFriendPicker(false);
     setShowCoopInvite(true);
-  }, [firebaseUser, puzzle, difficulty, currentPuzzle, isDaily, currentDailyDate, splitBlanksForCoop, stopTimer, activeThemeId, username]);
+  }, [firebaseUser, puzzle, difficulty, currentPuzzle, isDaily, currentDailyDate, stopTimer, activeThemeId, username]);
 
   // Auto-start coop after login if user clicked Co-op while logged out
   useEffect(() => {
@@ -4991,6 +5020,9 @@ export default function Pattrn() {
     setCoopPartnerConnected(false);
     setCoopStatus(null);
     setShowCoopInvite(false);
+    setCoopPlayers({});
+    setCoopInvitedUids(new Set());
+    coopPlayerUidsRef.current = "";
     setShowLeaveConfirm(false);
     coopWriteThrottleRef.current = {};
     coopHostTimerStartRef.current = null;
@@ -5001,7 +5033,8 @@ export default function Pattrn() {
   // Close coop session permanently (owner only)
   const closeCoopSessionPermanently = useCallback(async (sessionId, session) => {
     if (!firebaseUser) return;
-    await closeCoopSession(sessionId, session?.hostUid, session?.guestUid).catch(() => {});
+    const playerUids = session?.players ? Object.keys(session.players) : undefined;
+    await closeCoopSession(sessionId, session?.hostUid, session?.guestUid, playerUids).catch(() => {});
     // If we're currently in this session, leave it
     if (coopSessionId === sessionId) {
       leaveCoopSession();
@@ -5025,8 +5058,12 @@ export default function Pattrn() {
     setCoopMyLockedIn(false);
     setCoopPartnerLockedIn(false);
     setCoopPartnerCorrect(false);
-    setCoopPartnerConnected(isHost ? !!session.guestUid : true);
+    const otherPlayers = session.players ? Object.keys(session.players).filter(uid => uid !== firebaseUser.uid).length : 0;
+    setCoopPartnerConnected(otherPlayers > 0 || (isHost ? !!session.guestUid : true));
     setCoopPartnerFills({});
+    setCoopPlayers({});
+    setCoopInvitedUids(new Set());
+    coopPlayerUidsRef.current = "";
     prevCoopPartnerLockedRef.current = false;
     // Clear blanks so the effect can re-split once puzzle is loaded
     setCoopMyBlanks(null);
@@ -5079,7 +5116,7 @@ export default function Pattrn() {
     }, 1000);
   }, [coopSessionId, puzzle, stopTimer]);
 
-  // Subscribe to coop session changes (real-time sync)
+  // Subscribe to coop session changes (real-time sync — supports N players)
   useEffect(() => {
     if (!coopSessionId || !firebaseUser) return;
     // Clean up previous subscription
@@ -5091,24 +5128,41 @@ export default function Pattrn() {
         leaveCoopSession();
         return;
       }
-      const isHost = data.hostUid === firebaseUser.uid;
-      // Track whether the guest has actually joined the session
-      if (!isHost && data.guestUid === firebaseUser.uid) {
+      const myUid = firebaseUser.uid;
+      const isHost = data.hostUid === myUid;
+      const players = data.players || {};
+
+      // Track whether this player has joined the session
+      if (players[myUid]) {
         coopGuestJoinedRef.current = true;
       }
-      // If guest was removed from the session (kicked or session reset), handle it
-      // Only applies AFTER the guest has successfully joined — not during initial "joining" phase
-      if (!isHost && !data.guestUid && coopGuestJoinedRef.current) {
+      // Legacy check: also track via guestUid for backward compat
+      if (!isHost && data.guestUid === myUid) {
+        coopGuestJoinedRef.current = true;
+      }
+      // If player was removed from the session (kicked), handle it
+      if (!isHost && !players[myUid] && coopGuestJoinedRef.current) {
         coopGuestJoinedRef.current = false;
         leaveCoopSession();
         setView("menu");
         return;
       }
-      const partnerConnected = isHost ? !!data.guestUid : true;
-      setCoopPartnerConnected(partnerConnected);
+
+      // Build other players map
+      const otherPlayers = {};
+      for (const [uid, p] of Object.entries(players)) {
+        if (uid !== myUid) otherPlayers[uid] = p;
+      }
+      setCoopPlayers(otherPlayers);
+      const otherPlayerCount = Object.keys(otherPlayers).length;
+      setCoopPartnerConnected(otherPlayerCount > 0);
       setCoopStatus(data.status);
 
-      // Sync timer from host's hostTimerStart — keeps both players' clocks aligned
+      // Sync invited UIDs
+      const invited = data.invitedUids || {};
+      setCoopInvitedUids(new Set(Object.keys(invited)));
+
+      // Sync timer from host's hostTimerStart — keeps all players' clocks aligned
       const remoteTimerStart = data.hostTimerStart;
       if (remoteTimerStart && remoteTimerStart !== coopHostTimerStartRef.current) {
         const prevTimerStart = coopHostTimerStartRef.current;
@@ -5120,7 +5174,7 @@ export default function Pattrn() {
         timerInterval.current = setInterval(() => {
           setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
         }, 1000);
-        // If this is a timer reset (retry), also reset local game state for the other player
+        // If this is a timer reset (retry or new player joined), reset local game state
         if (prevTimerStart !== null) {
           setFills({});
           setGameState("playing");
@@ -5141,16 +5195,15 @@ export default function Pattrn() {
       const remoteAttempts = data.attempts ?? 0;
       setAttempts(remoteAttempts);
 
-      // Shared fail: if shared attempts exhausted, both players lose
+      // Shared fail: if shared attempts exhausted, all players lose
       if (remoteAttempts >= 5 && data.status !== "complete") {
         setGameState("lost");
         stopTimer();
       }
 
-      // Sync host theme to guest: apply the host's theme for this coop session
+      // Sync host theme to non-host players
       if (!isHost && data.hostTheme) {
         if (coopOriginalThemeRef.current === null) {
-          // Save the guest's original theme on first sync so we can restore it later
           coopOriginalThemeRef.current = activeThemeIdRef.current;
         }
         if (activeThemeIdRef.current !== data.hostTheme) {
@@ -5158,29 +5211,27 @@ export default function Pattrn() {
         }
       }
 
-      // Update partner lock-in status + show notification toast
-      const partnerLocked = isHost ? !!data.guestLockedIn : !!data.hostLockedIn;
-      const partnerCorrect = isHost ? !!data.guestCorrect : !!data.hostCorrect;
-      const partnerName = isHost ? (data.guestUsername || "Partner") : (data.hostUsername || "Partner");
+      // Multi-player lock-in status: check all other players via players map
+      const allOthersLocked = otherPlayerCount > 0 && Object.values(otherPlayers).every(p => !!p.lockedIn);
+      const allOthersCorrect = otherPlayerCount > 0 && Object.values(otherPlayers).every(p => !!p.correct);
+      // For partner name display, show first partner or "N players"
+      const otherNames = Object.values(otherPlayers).map(p => p.username || "Player").filter(Boolean);
+      const partnerName = otherPlayerCount > 1 ? `${otherPlayerCount} players` : (otherNames[0] || "Partner");
       setCoopPartnerName(partnerName);
-      // Load partner profile picture (once per partner UID)
-      const partnerUid = isHost ? data.guestUid : data.hostUid;
-      if (partnerUid && coopPartnerPicFetchedRef.current !== partnerUid) {
-        coopPartnerPicFetchedRef.current = partnerUid;
-        loadUserProfile(partnerUid).then(p => {
+      // Load first partner's profile picture
+      const firstPartnerUid = Object.keys(otherPlayers)[0];
+      if (firstPartnerUid && coopPartnerPicFetchedRef.current !== firstPartnerUid) {
+        coopPartnerPicFetchedRef.current = firstPartnerUid;
+        loadUserProfile(firstPartnerUid).then(p => {
           setCoopPartnerPic(p?.profilePicture || null);
         }).catch(() => {});
       }
-      if (isHost) {
-        setCoopPartnerLockedIn(!!data.guestLockedIn);
-        setCoopPartnerCorrect(!!data.guestCorrect);
-      } else {
-        setCoopPartnerLockedIn(!!data.hostLockedIn);
-        setCoopPartnerCorrect(!!data.hostCorrect);
-      }
-      // Detect partner just locked in (transition from false → true)
-      if (partnerLocked && !prevCoopPartnerLockedRef.current) {
-        const toastMsg = partnerCorrect
+      setCoopPartnerLockedIn(allOthersLocked);
+      setCoopPartnerCorrect(allOthersCorrect);
+      // Detect any partner just locked in (transition from false → true)
+      const anyLocked = allOthersLocked;
+      if (anyLocked && !prevCoopPartnerLockedRef.current) {
+        const toastMsg = allOthersCorrect
           ? `${partnerName} locked in \u2713`
           : `${partnerName} submitted`;
         setCoopPartnerLockToast(toastMsg);
@@ -5190,12 +5241,11 @@ export default function Pattrn() {
           coopPartnerLockToastTimer.current = null;
         }, 3000);
       }
-      prevCoopPartnerLockedRef.current = partnerLocked;
+      prevCoopPartnerLockedRef.current = anyLocked;
 
       // Sync fills from Firebase
       const remoteFills = data.fills || {};
       if (coopMyBlanks) {
-        // Extract partner fills (fills for cells NOT in my blanks)
         const partnerFillsObj = {};
         for (const [key, val] of Object.entries(remoteFills)) {
           if (!coopMyBlanks.has(key)) {
@@ -5205,8 +5255,10 @@ export default function Pattrn() {
         setCoopPartnerFills(partnerFillsObj);
       }
 
-      // Check if both locked in correctly → complete
-      if (data.hostLockedIn && data.guestLockedIn && data.hostCorrect && data.guestCorrect && data.status !== "complete") {
+      // Check if ALL players locked in correctly → complete
+      const allPlayersLocked = Object.keys(players).length >= 2 && Object.values(players).every(p => !!p.lockedIn);
+      const allPlayersCorrect = Object.values(players).every(p => !!p.correct);
+      if (allPlayersLocked && allPlayersCorrect && data.status !== "complete") {
         completeCoopSession(coopSessionId).catch(() => {});
       }
     });
@@ -5246,22 +5298,31 @@ export default function Pattrn() {
     return () => { cancelled = true; };
   }, [coopRole, coopStatus, firebaseUser, coopSessionId]);
 
-  // Once player has joined/rejoined and puzzle is loaded, split blanks and assign sides
+  // Once player has joined/rejoined and puzzle is loaded, split blanks among N players
   useEffect(() => {
-    if (!coopRole || !puzzle || coopMyBlanks) return;
-    // Guest waits until status is "playing" before splitting
-    if (coopRole === "guest" && coopStatus !== "playing") return;
-    // Host can split immediately (status may be "waiting")
-    const { hostBlanks, guestBlanks } = splitBlanksForCoop(puzzle.blanks, puzzle.gridSize);
-    if (coopRole === "host") {
-      setCoopMyBlanks(hostBlanks);
-      setCoopPartnerBlanks(guestBlanks);
-    } else {
-      setCoopMyBlanks(guestBlanks);
-      setCoopPartnerBlanks(hostBlanks);
+    if (!coopRole || !puzzle || !firebaseUser) return;
+    // Non-host waits until status is "playing" before splitting
+    if (coopRole !== "host" && coopStatus !== "playing") return;
+    const myUid = firebaseUser.uid;
+    // Build sorted player UID list (myself + other players)
+    const playerMap = { [myUid]: true, ...coopPlayers };
+    const sortedUids = Object.keys(playerMap).sort();
+    const uidsKey = sortedUids.join(",");
+    // Only re-split if player list changed or blanks haven't been set yet
+    if (coopMyBlanks && uidsKey === coopPlayerUidsRef.current) return;
+    coopPlayerUidsRef.current = uidsKey;
+    // Split blanks evenly among all players
+    const blanksMap = splitBlanksForNPlayers(puzzle.blanks, sortedUids);
+    setCoopMyBlanks(blanksMap[myUid] || new Set());
+    const otherBlanks = new Set();
+    for (const [uid, blanks] of Object.entries(blanksMap)) {
+      if (uid !== myUid) {
+        for (const k of blanks) otherBlanks.add(k);
+      }
     }
+    setCoopPartnerBlanks(otherBlanks);
     // Timer is synced from host's hostTimerStart via the subscription handler
-  }, [coopRole, coopStatus, puzzle, coopMyBlanks, splitBlanksForCoop]);
+  }, [coopRole, coopStatus, puzzle, coopMyBlanks, coopPlayers, firebaseUser, splitBlanksForNPlayers]);
 
   // Sync my fills to Firebase when they change in coop mode
   useEffect(() => {
@@ -5347,16 +5408,19 @@ export default function Pattrn() {
     coopMosaicJoinedRef.current = true;
     // Ensure the session appears in the Active Co-op Sessions panel on the menu
     loadActiveCoopSessions();
-    // If inviting friends, send notifications
+    // If inviting friends, send notifications and track invited UIDs
     if (inviteFriendUids.length > 0) {
       const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?coopMosaic=${sessionId}` : "";
       await Promise.all(inviteFriendUids.map(uid =>
-        sendNotification(uid, {
-          type: "coop_mosaic_invite",
-          fromUid: firebaseUser.uid,
-          fromUsername: username || firebaseUser.email,
-          data: { sessionId, mosaicTitle: mosaic.title || "Untitled", url: coopUrl },
-        }).catch(() => {})
+        Promise.all([
+          sendNotification(uid, {
+            type: "coop_mosaic_invite",
+            fromUid: firebaseUser.uid,
+            fromUsername: username || firebaseUser.email,
+            data: { sessionId, mosaicTitle: mosaic.title || "Untitled", url: coopUrl },
+          }).catch(() => {}),
+          addCoopMosaicInvitedUid(sessionId, uid).catch(() => {}),
+        ])
       ));
       setShowCoopFriendPicker(false);
       setCoopSelectedFriends(new Set());
@@ -5383,6 +5447,7 @@ export default function Pattrn() {
     setCoopMosaicRole(null);
     setCoopMosaicStatus(null);
     setCoopMosaicPlayers({});
+    setCoopMosaicInvitedUids(new Set());
     setCoopMosaicSharedProgress({});
     setCoopMosaicSharedTileTimes({});
     setCoopMosaicOtherFills({});
@@ -5497,6 +5562,49 @@ export default function Pattrn() {
       }
       setCoopMosaicPlayers(otherPlayers);
       setCoopMosaicStatus(data.status);
+
+      // Sync invited UIDs
+      const mosaicInvited = data.invitedUids || {};
+      setCoopMosaicInvitedUids(new Set(Object.keys(mosaicInvited)));
+
+      // Sync locked cells for current tile from Firebase
+      const myTileForLock = coopMosaicCurrentTileRef.current;
+      if (myTileForLock != null && myTileForLock >= 0) {
+        const tlc = data.tileLockedCells || {};
+        const tileLockedObj = tlc[myTileForLock] || {};
+        const lockedForTile = Object.keys(tileLockedObj);
+        if (lockedForTile.length > 0) {
+          setLockedCells(prev => {
+            const next = new Set(prev);
+            let changed = false;
+            for (const k of lockedForTile) {
+              if (!next.has(k)) { next.add(k); changed = true; }
+            }
+            return changed ? next : prev;
+          });
+          // Clear local fills for cells that are no longer in Firebase
+          // (cells that were wrong and cleared by another player's check)
+          const allFillsInFirebase = {};
+          const allFills = data.fills || {};
+          const lockPrefix = `${myTileForLock}_`;
+          for (const [fk, fv] of Object.entries(allFills)) {
+            if (fk.startsWith(lockPrefix)) allFillsInFirebase[fk.slice(lockPrefix.length)] = fv;
+          }
+          const lockedSet = new Set(lockedForTile);
+          setFills(prev => {
+            let changed = false;
+            const next = {};
+            for (const [k, v] of Object.entries(prev)) {
+              if (lockedSet.has(k) || allFillsInFirebase[k] != null) {
+                next[k] = v;
+              } else {
+                changed = true;
+              }
+            }
+            return changed ? next : prev;
+          });
+        }
+      }
 
       // Sync shared progress and update local customMosaicProgress
       const tp = data.tileProgress || {};
@@ -5752,6 +5860,7 @@ export default function Pattrn() {
       const [r, c] = key.split("-").map(Number);
       if (checkFills[key] === puzzle.solution[r][c]) {
         if (isBlind) newLocked.add(key); // lock correct cells in blind mode
+        if (isCoopMosaic) newLocked.add(key); // lock correct cells in coop mosaic mode
       } else {
         allCorrect = false;
         wrong.add(key);
@@ -5903,8 +6012,18 @@ export default function Pattrn() {
       }
     } else {
       setWrongCells(wrong);
-      if (isBlind) {
+      if (isBlind || isCoopMosaic) {
         setLockedCells(newLocked);
+      }
+      // In coop mosaic mode, write locked cells to Firebase so other players see them
+      if (isCoopMosaic && coopMosaicSessionId) {
+        const tileIdx = coopMosaicCurrentTileRef.current;
+        if (tileIdx != null && tileIdx >= 0) {
+          const correctCells = activeBlanks.filter(k => !wrong.has(k));
+          if (correctCells.length > 0) {
+            updateCoopMosaicTileLockedCells(coopMosaicSessionId, tileIdx, correctCells).catch(() => {});
+          }
+        }
       }
       // Wait for all wrong-cell fall-off animations to finish (staggered delay + duration) before clearing
       if (wrongCellClearTimeoutRef.current) {
@@ -5925,6 +6044,15 @@ export default function Pattrn() {
           return next;
         });
         setWrongCells(new Set());
+        // In coop mosaic mode, also clear wrong fills from Firebase for all players
+        if (isCoopMosaic && coopMosaicSessionId) {
+          const tileIdx = coopMosaicCurrentTileRef.current;
+          if (tileIdx != null && tileIdx >= 0) {
+            for (const k of wrongSet) {
+              updateCoopMosaicFill(coopMosaicSessionId, `${tileIdx}_${k}`, null).catch(() => {});
+            }
+          }
+        }
       }, clearDelayMs);
     }
   };
@@ -5956,14 +6084,14 @@ export default function Pattrn() {
         for (const k of coopMyBlanks) next.add(k);
         return next;
       });
-      await lockInCoopPlayer(coopSessionId, coopRole, true);
+      await lockInCoopPlayer(coopSessionId, coopRole, true, firebaseUser?.uid);
       setShowParticles(true);
       setTimeout(() => setShowParticles(false), 1500);
     } else if (newAttempts >= 5) {
-      // Failed all shared attempts — both players lose (subscription handles partner)
+      // Failed all shared attempts — all players lose (subscription handles others)
       setGameState("lost");
       setWrongCells(wrong);
-      await lockInCoopPlayer(coopSessionId, coopRole, false);
+      await lockInCoopPlayer(coopSessionId, coopRole, false, firebaseUser?.uid);
     } else {
       // Show wrong cells, allow retry
       setWrongCells(wrong);
@@ -6046,7 +6174,7 @@ export default function Pattrn() {
   const allFilled = isCoop
     ? coopMyBlanksArr.every(k => fills[k])
     : isCoopMosaic
-      ? puzzle ? [...puzzle.blanks].every(k => fills[k] || coopMosaicOtherFills[k]) : false
+      ? puzzle ? [...puzzle.blanks].every(k => lockedCells.has(k) || fills[k] || coopMosaicOtherFills[k]) : false
       : isBlind
         ? activeBlanks.every(k => fills[k])
         : puzzle ? [...puzzle.blanks].every(k => fills[k]) : false;
@@ -7564,10 +7692,14 @@ export default function Pattrn() {
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                     {friendsList.map(friend => {
+                      const isMosaicActive = !!coopMosaicPlayers[friend.uid];
+                      const isMosaicInvited = coopMosaicInvitedUids.has(friend.uid);
+                      const isMosaicHandled = isMosaicActive || isMosaicInvited;
                       const isSelected = coopSelectedFriends.has(friend.uid);
                       return (
                         <button key={friend.uid}
                           onClick={() => {
+                            if (isMosaicHandled) return;
                             setCoopSelectedFriends(prev => {
                               const next = new Set(prev);
                               if (next.has(friend.uid)) next.delete(friend.uid);
@@ -7577,20 +7709,25 @@ export default function Pattrn() {
                           }}
                           style={{
                             display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
-                            borderRadius: 8, backgroundColor: isSelected ? C.coop + "18" : C.bg,
-                            border: `1px solid ${isSelected ? C.coop : C.border}`,
-                            cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                            borderRadius: 8,
+                            backgroundColor: isMosaicActive ? C.correct + "12" : isMosaicInvited ? C.coop + "12" : isSelected ? C.coop + "18" : C.bg,
+                            border: `1px solid ${isMosaicActive ? C.correct + "55" : isMosaicInvited ? C.coop + "55" : isSelected ? C.coop : C.border}`,
+                            cursor: isMosaicHandled ? "default" : "pointer",
+                            opacity: isMosaicHandled ? 0.8 : 1,
+                            transition: "all 0.15s", width: "100%", textAlign: "left",
                           }}
-                          onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = C.coop; }}
-                          onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = C.border; }}
+                          onMouseEnter={e => { if (!isSelected && !isMosaicHandled) e.currentTarget.style.borderColor = C.coop; }}
+                          onMouseLeave={e => { if (!isSelected && !isMosaicHandled) e.currentTarget.style.borderColor = C.border; }}
                         >
-                          <div style={{
-                            width: 16, height: 16, borderRadius: 3, border: `2px solid ${isSelected ? C.coop : C.border}`,
-                            backgroundColor: isSelected ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
-                            flexShrink: 0, transition: "all 0.15s",
-                          }}>
-                            {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                          </div>
+                          {!isMosaicHandled && (
+                            <div style={{
+                              width: 16, height: 16, borderRadius: 3, border: `2px solid ${isSelected ? C.coop : C.border}`,
+                              backgroundColor: isSelected ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                              flexShrink: 0, transition: "all 0.15s",
+                            }}>
+                              {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                            </div>
+                          )}
                           {friend.profilePicture ? (
                             <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                           ) : (
@@ -7599,6 +7736,12 @@ export default function Pattrn() {
                             </div>
                           )}
                           <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                          {isMosaicActive && (
+                            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.correct, letterSpacing: 1, textTransform: "uppercase" }}>Active</span>
+                          )}
+                          {isMosaicInvited && !isMosaicActive && (
+                            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.coop, letterSpacing: 1, textTransform: "uppercase" }}>Invited</span>
+                          )}
                         </button>
                       );
                     })}
@@ -7608,12 +7751,15 @@ export default function Pattrn() {
                       onClick={async () => {
                         const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?coopMosaic=${coopMosaicSessionId}` : "";
                         await Promise.all([...coopSelectedFriends].map(uid =>
-                          sendNotification(uid, {
-                            type: "coop_mosaic_invite",
-                            fromUid: firebaseUser.uid,
-                            fromUsername: username || firebaseUser.email,
-                            data: { sessionId: coopMosaicSessionId, mosaicTitle: customMosaicPlay?.title || "Untitled", url: coopUrl },
-                          }).catch(() => {})
+                          Promise.all([
+                            sendNotification(uid, {
+                              type: "coop_mosaic_invite",
+                              fromUid: firebaseUser.uid,
+                              fromUsername: username || firebaseUser.email,
+                              data: { sessionId: coopMosaicSessionId, mosaicTitle: customMosaicPlay?.title || "Untitled", url: coopUrl },
+                            }).catch(() => {}),
+                            addCoopMosaicInvitedUid(coopMosaicSessionId, uid).catch(() => {}),
+                          ])
                         ));
                         setCoopSelectedFriends(new Set());
                         setShowCoopMosaicInvite(false);
@@ -10030,7 +10176,7 @@ export default function Pattrn() {
                         Rejoin
                       </button>
                     )}
-                    {isHost && (
+                    {isHost && !isCompleted && (
                       <button
                         onClick={() => isMosaicSession ? closeCoopMosaicSessionPermanently(session.id, session) : closeCoopSessionPermanently(session.id, session)}
                         style={{
@@ -13139,11 +13285,15 @@ export default function Pattrn() {
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                   {friendsList.map(friend => {
+                    const isActive = !!coopPlayers[friend.uid];
+                    const isInvited = coopInvitedUids.has(friend.uid);
+                    const isAlreadyHandled = isActive || isInvited;
                     const isSelected = coopSelectedFriends.has(friend.uid);
                     return (
                       <button
                         key={friend.uid}
                         onClick={() => {
+                          if (isAlreadyHandled) return;
                           setCoopSelectedFriends(prev => {
                             const next = new Set(prev);
                             if (next.has(friend.uid)) next.delete(friend.uid);
@@ -13153,20 +13303,25 @@ export default function Pattrn() {
                         }}
                         style={{
                           display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
-                          borderRadius: 8, backgroundColor: isSelected ? "#54A0FF18" : C.bg,
-                          border: `1px solid ${isSelected ? "#54A0FF" : C.border}`,
-                          cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                          borderRadius: 8,
+                          backgroundColor: isActive ? C.correct + "12" : isInvited ? C.coop + "12" : isSelected ? "#54A0FF18" : C.bg,
+                          border: `1px solid ${isActive ? C.correct + "55" : isInvited ? C.coop + "55" : isSelected ? "#54A0FF" : C.border}`,
+                          cursor: isAlreadyHandled ? "default" : "pointer",
+                          opacity: isAlreadyHandled ? 0.8 : 1,
+                          transition: "all 0.15s", width: "100%", textAlign: "left",
                         }}
-                        onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = "#54A0FF"; }}
-                        onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = C.border; }}
+                        onMouseEnter={e => { if (!isSelected && !isAlreadyHandled) e.currentTarget.style.borderColor = "#54A0FF"; }}
+                        onMouseLeave={e => { if (!isSelected && !isAlreadyHandled) e.currentTarget.style.borderColor = C.border; }}
                       >
-                        <div style={{
-                          width: 16, height: 16, borderRadius: 3, border: `2px solid ${isSelected ? "#54A0FF" : C.border}`,
-                          backgroundColor: isSelected ? "#54A0FF" : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
-                          flexShrink: 0, transition: "all 0.15s",
-                        }}>
-                          {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                        </div>
+                        {!isAlreadyHandled && (
+                          <div style={{
+                            width: 16, height: 16, borderRadius: 3, border: `2px solid ${isSelected ? "#54A0FF" : C.border}`,
+                            backgroundColor: isSelected ? "#54A0FF" : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                            flexShrink: 0, transition: "all 0.15s",
+                          }}>
+                            {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </div>
+                        )}
                         {friend.profilePicture ? (
                           <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
                         ) : (
@@ -13175,6 +13330,12 @@ export default function Pattrn() {
                           </div>
                         )}
                         <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                        {isActive && (
+                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.correct, letterSpacing: 1, textTransform: "uppercase" }}>Active</span>
+                        )}
+                        {isInvited && !isActive && (
+                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.coop, letterSpacing: 1, textTransform: "uppercase" }}>Invited</span>
+                        )}
                       </button>
                     );
                   })}
@@ -13186,12 +13347,15 @@ export default function Pattrn() {
                 onClick={async () => {
                   const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : "";
                   await Promise.all([...coopSelectedFriends].map(uid =>
-                    sendNotification(uid, {
-                      type: "coop_invite",
-                      fromUid: firebaseUser.uid,
-                      fromUsername: username || firebaseUser.email,
-                      data: { sessionId: coopSessionId, mode: difficulty, level: currentPuzzle, url: coopUrl },
-                    }).catch(() => {})
+                    Promise.all([
+                      sendNotification(uid, {
+                        type: "coop_invite",
+                        fromUid: firebaseUser.uid,
+                        fromUsername: username || firebaseUser.email,
+                        data: { sessionId: coopSessionId, mode: difficulty, level: currentPuzzle, url: coopUrl },
+                      }).catch(() => {}),
+                      addCoopInvitedUid(coopSessionId, uid).catch(() => {}),
+                    ])
                   ));
                   setCoopSelectedFriends(new Set());
                 }}
