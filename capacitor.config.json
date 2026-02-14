@@ -1,5 +1,14 @@
 {
   "appId": "com.pattrn.app",
   "appName": "Agnus",
-  "webDir": "dist"
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile",
+    "scheme": "Agnus"
+  },
+  "server": {
+    "iosScheme": "https",
+    "androidScheme": "https"
+  }
 }

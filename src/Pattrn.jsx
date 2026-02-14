@@ -6,6 +6,8 @@ import {
   signInWithEmail,
   signInWithGoogle,
   logOut,
+  deleteAccount,
+  reauthenticateUser,
   loadCloudData,
   saveCloudData,
   mergeGameData,
@@ -2678,6 +2680,10 @@ export default function Pattrn() {
   const [showAchievements, setShowAchievements] = useState(false);
   const [showGameMenu, setShowGameMenu] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
+  const [deleteAccountPassword, setDeleteAccountPassword] = useState("");
+  const [deleteAccountError, setDeleteAccountError] = useState("");
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
   const [coopSetupMode, setCoopSetupMode] = useState(null); // null | difficulty key
   const [coopSetupLevel, setCoopSetupLevel] = useState(0);
   const [coopSetupStarting, setCoopSetupStarting] = useState(false);
@@ -3712,6 +3718,62 @@ export default function Pattrn() {
       console.error("Sign out failed:", e);
     }
   }, []);
+
+  // Handle account deletion (App Store requirement: users must be able to delete their account)
+  const handleDeleteAccount = useCallback(async () => {
+    if (!firebaseUser) return;
+    setDeleteAccountLoading(true);
+    setDeleteAccountError("");
+    try {
+      // Re-authenticate first (required by Firebase for account deletion)
+      const providerIds = firebaseUser.providerData.map(p => p.providerId);
+      const isPasswordUser = providerIds.includes("password");
+      if (isPasswordUser && !deleteAccountPassword) {
+        setDeleteAccountError("Please enter your password to confirm.");
+        setDeleteAccountLoading(false);
+        return;
+      }
+      await reauthenticateUser(isPasswordUser ? deleteAccountPassword : null);
+      // Delete account and all data
+      await deleteAccount(firebaseUser.uid);
+      // Clear local data
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(TIMES_KEY);
+        localStorage.removeItem(BIRTHDAY_KEY);
+        localStorage.removeItem(THEME_KEY);
+        localStorage.removeItem(ACHIEV_KEY);
+      } catch { /* ignore */ }
+      setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
+      setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
+      setSavedAchievementIds(new Set());
+      setBirthday(null);
+      setActiveThemeId("classic");
+      setShowDeleteAccountConfirm(false);
+      setShowAccountModal(false);
+      setShowProfilePage(false);
+      setShowGameMenu(false);
+      setSyncStatus("");
+      setUsername(null);
+      setProfilePicture(null);
+      hasCheckedUsername.current = false;
+      setDeleteAccountPassword("");
+      setView("menu");
+    } catch (e) {
+      console.error("Account deletion failed:", e);
+      if (e.code === "auth/wrong-password" || e.code === "auth/invalid-credential") {
+        setDeleteAccountError("Incorrect password. Please try again.");
+      } else if (e.code === "auth/too-many-requests") {
+        setDeleteAccountError("Too many attempts. Please try again later.");
+      } else if (e.code === "auth/requires-recent-login") {
+        setDeleteAccountError("Please sign out and sign back in, then try again.");
+      } else {
+        setDeleteAccountError("Failed to delete account. Please try again.");
+      }
+    } finally {
+      setDeleteAccountLoading(false);
+    }
+  }, [firebaseUser, deleteAccountPassword]);
 
   // Debounced username availability check
   const checkUsernameDebounced = useCallback((value) => {
@@ -10258,6 +10320,37 @@ export default function Pattrn() {
                 </div>
               </div>
             </button>
+
+            {/* Delete Account */}
+            {firebaseUser && (
+              <button onClick={() => { setShowDeleteAccountConfirm(true); setDeleteAccountError(""); setDeleteAccountPassword(""); }} style={{
+                width: "100%", padding: "14px 16px", borderRadius: 12,
+                backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                transition: "all 0.15s", marginTop: 4,
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "#dc2626"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  backgroundColor: "#dc262622", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: "1.5px solid #dc262644", flexShrink: 0,
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: "#dc2626", letterSpacing: 0.5 }}>
+                    Delete Account
+                  </div>
+                  <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                    Permanently delete your account and all data
+                  </div>
+                </div>
+              </button>
+            )}
           </div>
         </div>
 
@@ -10318,6 +10411,94 @@ export default function Pattrn() {
                   background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
                   textTransform: "uppercase",
                 }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Account confirmation dialog */}
+        {showDeleteAccountConfirm && firebaseUser && (
+          <div onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountError(""); setDeleteAccountPassword(""); }} style={{
+            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              backgroundColor: C.bg, border: "1px solid #dc262644", borderRadius: 16,
+              padding: "24px", maxWidth: 340, width: "100%",
+              boxShadow: "0 16px 48px rgba(0,0,0,0.6), 0 0 40px #dc262622",
+              animation: "fadeUp 0.25s ease",
+            }}>
+              <div style={{ textAlign: "center", marginBottom: 20 }}>
+                <div style={{
+                  width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
+                  backgroundColor: "#dc262622", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: "2px solid #dc262644",
+                }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 9v4m0 4h.01M12 3L2 21h20L12 3z" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </div>
+                <h3 style={{
+                  fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#dc2626", margin: "0 0 8px",
+                }}>
+                  Delete Account?
+                </h3>
+                <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+                  This will <strong style={{ color: C.text }}>permanently delete your account</strong>, all progress, cloud data, friends, and mosaics. This cannot be undone.
+                </p>
+              </div>
+
+              {/* Password field for email/password users */}
+              {firebaseUser.providerData.some(p => p.providerId === "password") && (
+                <div style={{ marginBottom: 12 }}>
+                  <input
+                    type="password"
+                    placeholder="Enter your password to confirm"
+                    value={deleteAccountPassword}
+                    onChange={e => setDeleteAccountPassword(e.target.value)}
+                    style={{
+                      width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 12,
+                      fontFamily: "'Space Mono', monospace",
+                      background: C.surface, border: `1px solid ${C.border}`, color: C.text,
+                      outline: "none", boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+              )}
+
+              {deleteAccountError && (
+                <div style={{ color: "#dc2626", fontSize: 11, textAlign: "center", marginBottom: 12 }}>
+                  {deleteAccountError}
+                </div>
+              )}
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button
+                  onClick={handleDeleteAccount}
+                  disabled={deleteAccountLoading}
+                  style={{
+                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+                    background: deleteAccountLoading ? "#dc262688" : "#dc2626", color: "#fff", border: "none",
+                    cursor: deleteAccountLoading ? "not-allowed" : "pointer",
+                    textTransform: "uppercase", transition: "all 0.15s",
+                  }}
+                >
+                  {deleteAccountLoading ? "Deleting..." : "Delete my account"}
+                </button>
+                <button
+                  onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountError(""); setDeleteAccountPassword(""); }}
+                  disabled={deleteAccountLoading}
+                  style={{
+                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    background: "none", border: `1px solid ${C.border}`, color: C.textDim,
+                    cursor: deleteAccountLoading ? "not-allowed" : "pointer",
+                    textTransform: "uppercase", transition: "all 0.15s",
+                  }}
+                >
                   Cancel
                 </button>
               </div>
