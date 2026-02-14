@@ -856,23 +856,63 @@ export async function createCoopSession(uid, { mode, level, dailyDate, hostTheme
     hostTheme: hostTheme ?? "classic",
     hostTimerStart: Date.now(),
     createdAt: serverTimestamp(),
+    // Multi-player support
+    players: {
+      [uid]: {
+        username: hostUsername || null,
+        lockedIn: false,
+        correct: false,
+        joinedAt: Date.now(),
+      },
+    },
+    invitedUids: {},
   });
   // Index this session under the user's session list
   await set(ref(db, `userCoopSessions/${uid}/${id}`), { createdAt: serverTimestamp(), role: "host" });
   return id;
 }
 
-// Join an existing coop session as guest
-export async function joinCoopSession(sessionId, uid, guestUsername) {
+// Join an existing coop session as a player (supports N players)
+export async function joinCoopSession(sessionId, uid, playerUsername) {
   if (!db) return null;
   const sessionRef = ref(db, `coopSessions/${sessionId}`);
   const snap = await get(sessionRef);
   if (!snap.exists()) return null;
   const data = snap.val();
-  if (data.guestUid && data.guestUid !== uid) return null; // already taken
-  if (data.hostUid === uid) return data; // host rejoining
-  await update(sessionRef, { guestUid: uid, guestUsername: guestUsername || null, status: "playing" });
-  // Index this session under the guest's session list
+  const players = data.players || {};
+  // Already a player in this session (host or other player)
+  if (players[uid]) return data;
+  if (data.hostUid === uid) return data; // host rejoining (legacy check)
+  // Check if there's room (max = number of blank cells, enforced client-side)
+  // Add to players map
+  const playerUpdates = {
+    [`players/${uid}`]: {
+      username: playerUsername || null,
+      lockedIn: false,
+      correct: false,
+      joinedAt: Date.now(),
+    },
+    status: "playing",
+  };
+  // For backward compat: set guestUid for first guest
+  if (!data.guestUid) {
+    playerUpdates.guestUid = uid;
+    playerUpdates.guestUsername = playerUsername || null;
+  }
+  // Reset all existing players' lock-in states (blanks will be re-allocated)
+  for (const existingUid of Object.keys(players)) {
+    playerUpdates[`players/${existingUid}/lockedIn`] = false;
+    playerUpdates[`players/${existingUid}/correct`] = false;
+  }
+  playerUpdates.hostLockedIn = false;
+  playerUpdates.guestLockedIn = false;
+  playerUpdates.hostCorrect = false;
+  playerUpdates.guestCorrect = false;
+  playerUpdates.attempts = 0;
+  playerUpdates.fills = {};
+  playerUpdates.hostTimerStart = Date.now();
+  await update(sessionRef, playerUpdates);
+  // Index this session under the player's session list
   await set(ref(db, `userCoopSessions/${uid}/${sessionId}`), { createdAt: serverTimestamp(), role: "guest" });
   const updated = await get(sessionRef);
   return updated.val();
@@ -898,21 +938,36 @@ export async function updateCoopFill(sessionId, cellKey, token) {
   }
 }
 
-// Lock in a player's half (host or guest)
-export async function lockInCoopPlayer(sessionId, role, isCorrect) {
+// Lock in a player's blanks (supports multi-player via uid)
+export async function lockInCoopPlayer(sessionId, role, isCorrect, uid) {
   if (!db) return;
+  const updates = {};
+  // Multi-player: lock in via players map
+  if (uid) {
+    updates[`players/${uid}/lockedIn`] = true;
+    updates[`players/${uid}/correct`] = isCorrect;
+  }
+  // Legacy: also set role-based fields for backward compat
   const key = role === "host" ? "hostLockedIn" : "guestLockedIn";
   const correctKey = role === "host" ? "hostCorrect" : "guestCorrect";
-  const updates = { [key]: true, [correctKey]: isCorrect };
+  updates[key] = true;
+  updates[correctKey] = isCorrect;
   await update(ref(db, `coopSessions/${sessionId}`), updates);
 }
 
-// Unlock a player's half (when they retry after wrong answer)
-export async function unlockCoopPlayer(sessionId, role) {
+// Unlock a player's blanks (when they retry after wrong answer)
+export async function unlockCoopPlayer(sessionId, role, uid) {
   if (!db) return;
+  const updates = {};
+  if (uid) {
+    updates[`players/${uid}/lockedIn`] = false;
+    updates[`players/${uid}/correct`] = false;
+  }
   const key = role === "host" ? "hostLockedIn" : "guestLockedIn";
   const correctKey = role === "host" ? "hostCorrect" : "guestCorrect";
-  await update(ref(db, `coopSessions/${sessionId}`), { [key]: false, [correctKey]: false });
+  updates[key] = false;
+  updates[correctKey] = false;
+  await update(ref(db, `coopSessions/${sessionId}`), updates);
 }
 
 // Update shared attempt counter for the coop session
@@ -930,7 +985,8 @@ export async function completeCoopSession(sessionId) {
 // Reset a coop session for retry (keep players, reset game state)
 export async function resetCoopSession(sessionId) {
   if (!db) return;
-  await update(ref(db, `coopSessions/${sessionId}`), {
+  const sessionRef = ref(db, `coopSessions/${sessionId}`);
+  const updates = {
     status: "playing",
     fills: {},
     hostLockedIn: false,
@@ -939,16 +995,32 @@ export async function resetCoopSession(sessionId) {
     guestCorrect: false,
     attempts: 0,
     hostTimerStart: Date.now(),
-  });
+  };
+  // Also reset all players' lock-in states in the players map
+  const snap = await get(sessionRef);
+  if (snap.exists()) {
+    const players = snap.val().players || {};
+    for (const uid of Object.keys(players)) {
+      updates[`players/${uid}/lockedIn`] = false;
+      updates[`players/${uid}/correct`] = false;
+    }
+  }
+  await update(sessionRef, updates);
 }
 
-// Guest leaves a coop session: clear guest fields, reset to waiting
-export async function guestLeaveCoopSession(sessionId, guestUid) {
+// Player leaves a coop session: remove from players map, reset game state
+export async function guestLeaveCoopSession(sessionId, playerUid) {
   if (!db) return;
-  await update(ref(db, `coopSessions/${sessionId}`), {
-    guestUid: null,
-    guestUsername: null,
-    status: "waiting",
+  const sessionRef = ref(db, `coopSessions/${sessionId}`);
+  const snap = await get(sessionRef);
+  if (!snap.exists()) return;
+  const data = snap.val();
+  const players = data.players || {};
+  // Remove player from players map
+  await remove(ref(db, `coopSessions/${sessionId}/players/${playerUid}`)).catch(() => {});
+  // Check remaining player count (after removal)
+  const remainingUids = Object.keys(players).filter(uid => uid !== playerUid);
+  const updates = {
     fills: {},
     hostLockedIn: false,
     guestLockedIn: false,
@@ -956,23 +1028,45 @@ export async function guestLeaveCoopSession(sessionId, guestUid) {
     guestCorrect: false,
     attempts: 0,
     hostTimerStart: Date.now(),
-  });
-  // Remove from guest's session index
-  if (guestUid) {
-    await remove(ref(db, `userCoopSessions/${guestUid}/${sessionId}`)).catch(() => {});
+  };
+  // Reset all remaining players' lock-in states
+  for (const uid of remainingUids) {
+    updates[`players/${uid}/lockedIn`] = false;
+    updates[`players/${uid}/correct`] = false;
+  }
+  // If leaving player was the guestUid, clear it
+  if (data.guestUid === playerUid) {
+    updates.guestUid = null;
+    updates.guestUsername = null;
+  }
+  // If only host remains, set status back to waiting
+  if (remainingUids.length <= 1) {
+    updates.status = "waiting";
+  }
+  await update(sessionRef, updates);
+  // Remove from player's session index
+  if (playerUid) {
+    await remove(ref(db, `userCoopSessions/${playerUid}/${sessionId}`)).catch(() => {});
   }
 }
 
-// Close/delete a coop session (owner only)
-export async function closeCoopSession(sessionId, hostUid, guestUid) {
+// Close/delete a coop session (owner only) — cleans up all players' indexes
+export async function closeCoopSession(sessionId, hostUid, guestUid, allPlayerUids) {
   if (!db) return;
-  await remove(ref(db, `coopSessions/${sessionId}`));
-  // Clean up session indexes for both players
-  if (hostUid) {
-    await remove(ref(db, `userCoopSessions/${hostUid}/${sessionId}`)).catch(() => {});
+  // Read session to get all player UIDs if not provided
+  let playerUids = allPlayerUids;
+  if (!playerUids) {
+    const snap = await get(ref(db, `coopSessions/${sessionId}`));
+    if (snap.exists()) {
+      const players = snap.val().players || {};
+      playerUids = Object.keys(players);
+    }
   }
-  if (guestUid) {
-    await remove(ref(db, `userCoopSessions/${guestUid}/${sessionId}`)).catch(() => {});
+  await remove(ref(db, `coopSessions/${sessionId}`));
+  // Clean up session indexes for all players
+  const uids = new Set([...(playerUids || []), hostUid, guestUid].filter(Boolean));
+  for (const uid of uids) {
+    await remove(ref(db, `userCoopSessions/${uid}/${sessionId}`)).catch(() => {});
   }
 }
 
@@ -1221,6 +1315,7 @@ export async function createCoopMosaicSession(uid, { mosaicId, mosaicTitle, mosa
         joinedAt: Date.now(),
       },
     },
+    invitedUids: {},
     createdAt: serverTimestamp(),
   });
   await set(ref(db, `userCoopSessions/${uid}/${id}`), { createdAt: serverTimestamp(), role: "host", type: "mosaic" });
@@ -1343,4 +1438,26 @@ export async function loadCoopMosaicSession(sessionId) {
   if (!db) return null;
   const snap = await get(ref(db, `coopMosaicSessions/${sessionId}`));
   return snap.exists() ? snap.val() : null;
+}
+
+// Update locked cells for a specific tile in coop mosaic (persists lock-in across players)
+export async function updateCoopMosaicTileLockedCells(sessionId, tileIndex, cellKeys) {
+  if (!db || !cellKeys || cellKeys.length === 0) return;
+  const updates = {};
+  for (const k of cellKeys) {
+    updates[`tileLockedCells/${tileIndex}/${k}`] = true;
+  }
+  await update(ref(db, `coopMosaicSessions/${sessionId}`), updates);
+}
+
+// Add invited UID to a normal coop session
+export async function addCoopInvitedUid(sessionId, uid) {
+  if (!db) return;
+  await set(ref(db, `coopSessions/${sessionId}/invitedUids/${uid}`), Date.now());
+}
+
+// Add invited UID to a coop mosaic session
+export async function addCoopMosaicInvitedUid(sessionId, uid) {
+  if (!db) return;
+  await set(ref(db, `coopMosaicSessions/${sessionId}/invitedUids/${uid}`), Date.now());
 }
