@@ -11579,34 +11579,52 @@ export default function Pattrn() {
       }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } `}</style>
 
-        {/* ── Compact top app bar ── */}
+        {/* ── Floating liquid glass header ── */}
         <div style={{
           width: "100%", maxWidth: 480,
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 12, paddingLeft: 20, paddingRight: 20,
+          paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
           position: "sticky", top: 0, zIndex: 50,
-          backgroundColor: C.bg + "ee",
-          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
         }}>
-          {/* Left: logo */}
-          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
-            Agnus
-          </h1>
-          {/* Right: action buttons */}
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {/* Friends button */}
-            {firebaseConfigured && firebaseUser && (
+          {/* Left: logo pill */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "6px 14px 6px 6px",
+            backgroundColor: "rgba(18, 18, 32, 0.5)",
+            borderRadius: 100,
+            border: "1px solid rgba(255, 255, 255, 0.1)",
+            boxShadow: "0 4px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.15)",
+            backdropFilter: "blur(28px) saturate(1.8)",
+            WebkitBackdropFilter: "blur(28px) saturate(1.8)",
+          }}>
+            <img src="/app-icon.png" alt="Pattrn" style={{ width: 30, height: 30, borderRadius: 15 }} />
+            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700, letterSpacing: 1.5, color: C.accent, lineHeight: 1 }}>
+              Pattrn
+            </span>
+          </div>
+          {/* Right: action buttons pill */}
+          {firebaseConfigured && firebaseUser && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 2,
+              padding: "4px 4px",
+              backgroundColor: "rgba(18, 18, 32, 0.5)",
+              borderRadius: 100,
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.15)",
+              backdropFilter: "blur(28px) saturate(1.8)",
+              WebkitBackdropFilter: "blur(28px) saturate(1.8)",
+            }}>
+              {/* Friends button */}
               <button
                 onClick={() => {
                   setShowFriendsModal(true);
                   setFriendsModalTab("list");
                 }}
                 style={{
-                  background: "none", border: "none", borderRadius: 10,
+                  background: "none", border: "none", borderRadius: 100,
                   width: 36, height: 36, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.15s", position: "relative",
-                  backgroundColor: friendsList.length > 0 ? C.accent + "15" : "transparent",
                 }}
                 aria-label="Friends"
               >
@@ -11618,7 +11636,7 @@ export default function Pattrn() {
                 </svg>
                 {onlineFriendsCount > 0 && (
                   <span style={{
-                    position: "absolute", top: 2, right: 2,
+                    position: "absolute", top: 1, right: 1,
                     minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
                     backgroundColor: C.correct, color: "#fff",
                     fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
@@ -11628,17 +11646,14 @@ export default function Pattrn() {
                   </span>
                 )}
               </button>
-            )}
-            {/* Notification bell */}
-            {firebaseConfigured && firebaseUser && (
+              {/* Notification bell */}
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 style={{
-                  background: "none", border: "none", borderRadius: 10,
+                  background: "none", border: "none", borderRadius: 100,
                   width: 36, height: 36, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.15s", position: "relative",
-                  backgroundColor: notifications.length > 0 ? "#54A0FF15" : "transparent",
                 }}
                 aria-label="Notifications"
               >
@@ -11648,7 +11663,7 @@ export default function Pattrn() {
                 </svg>
                 {notifications.length > 0 && (
                   <span style={{
-                    position: "absolute", top: 2, right: 2,
+                    position: "absolute", top: 1, right: 1,
                     width: 14, height: 14, borderRadius: "50%",
                     backgroundColor: "#f87171", color: "#fff",
                     fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
@@ -11658,8 +11673,8 @@ export default function Pattrn() {
                   </span>
                 )}
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* ── Scrollable content area ── */}
