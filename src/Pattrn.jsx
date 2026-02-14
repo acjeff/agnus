@@ -12240,44 +12240,6 @@ export default function Pattrn() {
               Leave
             </button>
           )}
-          {/* Friends puzzle indicator - shows how friends did on this puzzle */}
-          {firebaseUser && Object.keys(friendsPuzzleData).length > 0 && !isCascade && !isMosaic && (() => {
-            const friendCompletions = Object.entries(friendsPuzzleData);
-            const count = friendCompletions.length;
-            const bestFriend = friendCompletions.reduce((best, [uid, data]) => {
-              if (!best || (data.time && (!best[1].time || data.time < best[1].time))) return [uid, data];
-              return best;
-            }, null);
-            const bestName = bestFriend ? (friendsList.find(f => f.uid === bestFriend[0])?.username || "Friend") : "";
-            return (
-              <div style={{ position: "relative" }}>
-                <button
-                  title={`${count} friend${count !== 1 ? "s" : ""} completed this puzzle${bestName ? `. Best: ${bestName} (${formatTime(bestFriend[1].time)})` : ""}`}
-                  style={{
-                    background: "none", border: `1px solid ${C.accent}44`, borderRadius: 8,
-                    padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
-                    transition: "all 0.15s", height: 30,
-                  }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-                  onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "44"; }}
-                  onClick={() => {
-                    setShowFriendsModal(true);
-                    setFriendsModalTab("list");
-                  }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                    <circle cx="9" cy="7" r="4"/>
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                  </svg>
-                  <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: C.accent, fontWeight: 700 }}>
-                    {count}
-                  </span>
-                </button>
-              </div>
-            );
-          })()}
         </div>
         </div>
       </div>
