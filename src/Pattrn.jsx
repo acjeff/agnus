@@ -105,29 +105,106 @@ const C = {
   coop: "#60a5fa", // blue for co-op completions
 };
 
-// --- Bottom Tab Bar (Apple Liquid Glass style) ---
+// --- Bottom Tab Bar (Apple Liquid Glass style with draggable pill) ---
 const TAB_KEYS = ["home", "mosaic", "coop", "profile"];
 let _prevTabIdx = 0; // module-level: remembers last tab across unmount/mount
 
 function BottomTabBar({ active, onNavigate, coopBadgeCount, firebaseUser, profilePicture }) {
   const activeIdx = TAB_KEYS.indexOf(active);
-  const activeColor = active === "coop" ? C.coop : C.accent;
   const pillRef = useRef(null);
+  const barRef = useRef(null);
+  const dragState = useRef({ active: false, startX: 0, pillStartLeft: 0, barWidth: 0, moved: false });
 
+  // Compute pill left in px from a tab index
+  const getPillLeft = (idx, barW) => {
+    const pad = 5; // inset from bar edge
+    const slotW = (barW - pad * 2) / 4;
+    return pad + idx * slotW;
+  };
+  const getPillWidth = (barW) => (barW - 10) / 4;
+
+  // Color for a given tab index
+  const colorForIdx = (idx) => TAB_KEYS[idx] === "coop" ? C.coop : C.accent;
+  const activeColor = colorForIdx(activeIdx);
+
+  // Animate pill from _prevTabIdx to activeIdx on mount/update
   useEffect(() => {
     const pill = pillRef.current;
-    if (!pill) return;
+    const bar = barRef.current;
+    if (!pill || !bar || dragState.current.active) return;
+    const barW = bar.offsetWidth;
     if (_prevTabIdx !== activeIdx) {
-      // Start at old position instantly (no transition)
       pill.style.transition = "none";
-      pill.style.left = `calc(${_prevTabIdx * 25}% + 4px)`;
-      // Force reflow then animate to new position
-      pill.offsetHeight; // eslint-disable-line no-unused-expressions
-      pill.style.transition = "left 0.4s cubic-bezier(0.32, 0.72, 0, 1), background 0.3s, border-color 0.3s, box-shadow 0.3s";
-      pill.style.left = `calc(${activeIdx * 25}% + 4px)`;
+      pill.style.left = getPillLeft(_prevTabIdx, barW) + "px";
+      pill.offsetHeight; // force reflow
+      pill.style.transition = "left 0.4s cubic-bezier(0.32, 0.72, 0, 1)";
+      pill.style.left = getPillLeft(activeIdx, barW) + "px";
       _prevTabIdx = activeIdx;
+    } else {
+      pill.style.left = getPillLeft(activeIdx, barW) + "px";
     }
   }, [activeIdx]);
+
+  // --- Drag handling ---
+  const onDragStart = (clientX) => {
+    const pill = pillRef.current;
+    const bar = barRef.current;
+    if (!pill || !bar) return;
+    const barW = bar.offsetWidth;
+    pill.style.transition = "none";
+    dragState.current = {
+      active: true,
+      startX: clientX,
+      pillStartLeft: getPillLeft(activeIdx, barW),
+      barWidth: barW,
+      moved: false,
+    };
+  };
+
+  const onDragMove = (clientX) => {
+    const ds = dragState.current;
+    if (!ds.active) return;
+    const pill = pillRef.current;
+    if (!pill) return;
+    const dx = clientX - ds.startX;
+    if (Math.abs(dx) > 3) ds.moved = true;
+    const pillW = getPillWidth(ds.barWidth);
+    const minLeft = 5;
+    const maxLeft = ds.barWidth - pillW - 5;
+    const newLeft = Math.max(minLeft, Math.min(maxLeft, ds.pillStartLeft + dx));
+    pill.style.left = newLeft + "px";
+  };
+
+  const onDragEnd = () => {
+    const ds = dragState.current;
+    if (!ds.active) return;
+    ds.active = false;
+    const pill = pillRef.current;
+    if (!pill) return;
+    if (!ds.moved) return; // was just a tap, let onClick handle it
+    // Snap to nearest tab
+    const currentLeft = parseFloat(pill.style.left) || 0;
+    const pillW = getPillWidth(ds.barWidth);
+    const centerX = currentLeft + pillW / 2;
+    const slotW = (ds.barWidth - 10) / 4;
+    let nearest = Math.round((centerX - 5 - slotW / 2) / slotW);
+    nearest = Math.max(0, Math.min(3, nearest));
+    const targetLeft = getPillLeft(nearest, ds.barWidth);
+    pill.style.transition = "left 0.3s cubic-bezier(0.32, 0.72, 0, 1)";
+    pill.style.left = targetLeft + "px";
+    _prevTabIdx = nearest;
+    if (nearest !== activeIdx) {
+      onNavigate(TAB_KEYS[nearest]);
+    }
+  };
+
+  // Pointer events on the pill
+  const onPointerDown = (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    onDragStart(e.clientX);
+  };
+  const onPointerMove = (e) => onDragMove(e.clientX);
+  const onPointerUp = () => onDragEnd();
 
   return (
     <nav className="bottom-tab-bar" style={{
@@ -137,7 +214,7 @@ function BottomTabBar({ active, onNavigate, coopBadgeCount, firebaseUser, profil
       paddingLeft: 12, paddingRight: 12,
       pointerEvents: "none",
     }}>
-      <div style={{
+      <div ref={barRef} style={{
         display: "flex", width: "100%", maxWidth: 420, position: "relative",
         justifyContent: "space-around", alignItems: "center",
         padding: "6px 6px 5px",
@@ -149,23 +226,30 @@ function BottomTabBar({ active, onNavigate, coopBadgeCount, firebaseUser, profil
         WebkitBackdropFilter: "blur(28px) saturate(1.8)",
         pointerEvents: "auto",
         overflow: "hidden",
+        touchAction: "none",
       }}>
-        {/* Sliding pill indicator */}
+        {/* Draggable sliding pill indicator */}
         {activeIdx >= 0 && (
-          <div ref={pillRef} style={{
-            position: "absolute", top: 4, bottom: 4,
-            left: `calc(${activeIdx * 25}% + 4px)`,
-            width: "calc(25% - 8px)",
-            borderRadius: 22,
-            background: `radial-gradient(ellipse at 50% 0%, ${activeColor}18 0%, ${activeColor}0a 70%, transparent 100%)`,
-            border: `1px solid ${activeColor}22`,
-            boxShadow: `0 0 20px ${activeColor}12, inset 0 1px 0 ${activeColor}15, inset 0 -1px 0 rgba(0,0,0,0.1)`,
-            pointerEvents: "none",
-            zIndex: 0,
-          }} />
+          <div ref={pillRef}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            style={{
+              position: "absolute", top: 4, bottom: 4,
+              left: 5,
+              width: "calc(25% - 2.5px)",
+              borderRadius: 9999,
+              background: `radial-gradient(ellipse at 50% 0%, ${activeColor}18 0%, ${activeColor}0a 70%, transparent 100%)`,
+              border: `1px solid ${activeColor}22`,
+              boxShadow: `0 0 20px ${activeColor}12, inset 0 1px 0 ${activeColor}15, inset 0 -1px 0 rgba(0,0,0,0.1)`,
+              cursor: "grab",
+              zIndex: 2,
+              touchAction: "none",
+            }} />
         )}
         {/* Home */}
-        <button onClick={() => onNavigate("home")}
+        <button onClick={() => { if (!dragState.current.moved) onNavigate("home"); }}
           style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
           <svg width="21" height="21" viewBox="0 0 24 24" fill={active === "home" ? C.accent + "22" : "none"} stroke={active === "home" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "all 0.25s" }}>
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
@@ -173,7 +257,7 @@ function BottomTabBar({ active, onNavigate, coopBadgeCount, firebaseUser, profil
           <span style={{ fontSize: 9, fontWeight: active === "home" ? 700 : 500, color: active === "home" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace", transition: "color 0.25s", letterSpacing: 0.3 }}>Home</span>
         </button>
         {/* Mosaic */}
-        <button onClick={() => onNavigate("mosaic")}
+        <button onClick={() => { if (!dragState.current.moved) onNavigate("mosaic"); }}
           style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
           <svg width="21" height="21" viewBox="0 0 24 24" fill={active === "mosaic" ? C.accent + "22" : "none"} stroke={active === "mosaic" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "all 0.25s" }}>
             <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
@@ -181,7 +265,7 @@ function BottomTabBar({ active, onNavigate, coopBadgeCount, firebaseUser, profil
           <span style={{ fontSize: 9, fontWeight: active === "mosaic" ? 700 : 500, color: active === "mosaic" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace", transition: "color 0.25s", letterSpacing: 0.3 }}>Mosaic</span>
         </button>
         {/* Co-op */}
-        <button onClick={() => onNavigate("coop")}
+        <button onClick={() => { if (!dragState.current.moved) onNavigate("coop"); }}
           style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
           <div style={{ position: "relative", display: "inline-flex" }}>
             <svg width="21" height="21" viewBox="0 0 24 24" fill={active === "coop" ? C.coop + "22" : "none"} stroke={active === "coop" ? C.coop : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "all 0.25s" }}>
@@ -204,7 +288,7 @@ function BottomTabBar({ active, onNavigate, coopBadgeCount, firebaseUser, profil
           <span style={{ fontSize: 9, fontWeight: active === "coop" ? 700 : 500, color: active === "coop" ? C.coop : C.textDim, fontFamily: "'Space Mono', monospace", transition: "color 0.25s", letterSpacing: 0.3 }}>Co-op</span>
         </button>
         {/* Profile */}
-        <button onClick={() => onNavigate("profile")}
+        <button onClick={() => { if (!dragState.current.moved) onNavigate("profile"); }}
           style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
           {firebaseUser && profilePicture ? (
             <img src={profilePicture} alt="" style={{ width: 21, height: 21, borderRadius: 11, objectFit: "cover", border: `1.5px solid ${active === "profile" ? C.accent : "transparent"}`, transition: "border-color 0.25s" }} />
