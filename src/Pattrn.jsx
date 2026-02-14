@@ -6540,7 +6540,7 @@ export default function Pattrn() {
   const availW = parentW - 2 * edgePad - (gridSize - 1) * gridGap - 2 * gridPad;
   const availH = parentH - 2 * edgePad - (gridSize - 1) * gridGap - 2 * gridPad;
   const dynamicCell = Math.min(Math.floor(availW / gridSize), Math.floor(availH / gridSize));
-  const cellSize = Math.max(28, Math.min(dynamicCell, 80));
+  const cellSize = Math.max(28, dynamicCell);
   const gridTotalWidth = cellSize * gridSize + (gridSize - 1) * gridGap + 2 * gridPad;
   const iconSize = Math.max(14, Math.round(cellSize * 0.5));
   const pickerSize = 48;
