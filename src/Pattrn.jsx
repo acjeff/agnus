@@ -105,6 +105,74 @@ const C = {
   coop: "#60a5fa", // blue for co-op completions
 };
 
+// --- Draggable Drawer (mobile bottom sheet with drag-to-dismiss) ---
+function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
+  const drawerRef = useRef(null);
+  const backdropRef = useRef(null);
+  const handleRef = useRef(null);
+  const dragState = useRef({ active: false, startY: 0, current: 0 });
+
+  const onTouchStart = useCallback((e) => {
+    const handleEl = handleRef.current;
+    const drawerEl = drawerRef.current;
+    if (!handleEl || !drawerEl) return;
+    const isHandle = handleEl.contains(e.target);
+    const scrollEl = drawerEl.querySelector("[data-drawer-scroll]");
+    const isScrolledToTop = !scrollEl || scrollEl.scrollTop <= 0;
+    if (!isHandle && !isScrolledToTop) return;
+    dragState.current = { active: true, startY: e.touches[0].clientY, current: 0 };
+    drawerEl.style.transition = "none";
+  }, []);
+
+  const onTouchMove = useCallback((e) => {
+    if (!dragState.current.active) return;
+    const dy = e.touches[0].clientY - dragState.current.startY;
+    if (dy > 0) {
+      dragState.current.current = dy;
+      if (drawerRef.current) drawerRef.current.style.transform = `translateY(${dy}px)`;
+      if (backdropRef.current) backdropRef.current.style.opacity = String(Math.max(0, 1 - dy / 400));
+    }
+  }, []);
+
+  const onTouchEnd = useCallback(() => {
+    if (!dragState.current.active) return;
+    dragState.current.active = false;
+    const dy = dragState.current.current;
+    if (drawerRef.current) drawerRef.current.style.transition = "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)";
+    if (dy > 100) {
+      if (drawerRef.current) drawerRef.current.style.transform = "translateY(100%)";
+      if (backdropRef.current) { backdropRef.current.style.transition = "opacity 0.3s"; backdropRef.current.style.opacity = "0"; }
+      setTimeout(() => onClose(), 300);
+    } else {
+      if (drawerRef.current) drawerRef.current.style.transform = "translateY(0)";
+      if (backdropRef.current) backdropRef.current.style.opacity = "1";
+    }
+    dragState.current.current = 0;
+  }, [onClose]);
+
+  if (!isOpen) return null;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: zIndex || 1100, display: "flex", flexDirection: "column", justifyContent: "flex-end" }} role="dialog" aria-modal="true">
+      <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } } @keyframes drawerOverlayFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
+      <div ref={backdropRef} onClick={onClose} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", animation: "drawerOverlayFade 0.25s ease both" }} />
+      <div ref={drawerRef} onClick={e => e.stopPropagation()} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} style={{
+        position: "relative", backgroundColor: C.bg, borderRadius: "20px 20px 0 0",
+        border: `1px solid ${C.border}`, borderBottom: "none",
+        maxHeight: maxHeight || "85vh", display: "flex", flexDirection: "column",
+        animation: "drawerSlideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both",
+        boxShadow: "0 -12px 48px rgba(0,0,0,0.5)",
+        width: "100%", maxWidth: 480, alignSelf: "center",
+      }}>
+        <div ref={handleRef} style={{ padding: "12px 0 8px", flexShrink: 0, cursor: "grab", touchAction: "none" }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border, margin: "0 auto" }} />
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
 // --- Shape overlays ---
 const shapeStyle = { position: "absolute", inset: 0, margin: "auto" };
 const SHAPES = [
@@ -6549,21 +6617,8 @@ export default function Pattrn() {
   const themePickerEl = showThemePicker ? (() => {
     const achList = computeAchievements(progress, times, savedAchievementIds);
     return (
-      <div onClick={() => setShowThemePicker(false)} style={{
-        position: "fixed", inset: 0, zIndex: 1100,
-        display: "flex", flexDirection: "column", justifyContent: "flex-end",
-        animation: "drawerOverlayFade 0.25s ease both",
-      }}>
-        <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } } @keyframes drawerOverlayFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
-        <div style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.6)" }} />
-        <div onClick={e => e.stopPropagation()} style={{
-          backgroundColor: C.bg, borderRadius: "20px 20px 0 0",
-          border: `1px solid ${C.border}`, borderBottom: "none",
-          maxHeight: "75vh", display: "flex", flexDirection: "column",
-          animation: "drawerSlideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both",
-        }}>
-          <div style={{ padding: "20px 24px 0", flexShrink: 0 }}>
-            <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border, margin: "0 auto 16px" }} />
+      <DraggableDrawer isOpen={true} onClose={() => setShowThemePicker(false)} maxHeight="75vh">
+          <div style={{ padding: "4px 24px 0", flexShrink: 0 }}>
             <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, margin: "0 0 4px", letterSpacing: 1 }}>
               Themes
             </h2>
@@ -6572,7 +6627,7 @@ export default function Pattrn() {
             </p>
           </div>
 
-          <div style={{ flex: 1, overflowY: "auto", padding: "0 24px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
+          <div data-drawer-scroll style={{ flex: 1, overflowY: "auto", padding: "0 24px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
             {PUZZLE_THEMES.map(theme => {
               const unlocked = isThemeUnlocked(theme, achList);
               const isActive = activeThemeId === theme.id;
@@ -6682,8 +6737,7 @@ export default function Pattrn() {
               Close
             </button>
           </div>
-        </div>
-      </div>
+      </DraggableDrawer>
     );
   })() : null;
 
@@ -6981,24 +7035,8 @@ export default function Pattrn() {
 
   // --- Account modal (shared across views) ---
   accountModalEl = showAccountModal && firebaseConfigured && (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="account-modal-title"
-      onKeyDown={e => { if (e.key === "Escape") accountModalDismiss(); }}
-      onClick={accountModalDismiss}
-      style={{
-        position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        padding: 24,
-      }}
-    >
-      <div ref={accountModalRef} onClick={e => e.stopPropagation()} style={{
-        backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
-        padding: "24px", maxWidth: 380, width: "100%",
-        boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
-        animation: "fadeUp 0.25s ease",
-      }}>
+    <DraggableDrawer isOpen={true} onClose={accountModalDismiss}>
+      <div ref={accountModalRef} style={{ padding: "0 24px 24px" }}>
         {firebaseUser ? (
           // Signed in: redirect to profile page
           <>
@@ -7246,22 +7284,13 @@ export default function Pattrn() {
           Close
         </button>
       </div>
-    </div>
+    </DraggableDrawer>
   );
 
   // --- Username modal (non-dismissible when logged in without username, dismissible when changing) ---
   usernameModalEl = showUsernameModal && firebaseUser && firebaseConfigured && (
-    <div onClick={username ? () => { setShowUsernameModal(false); setUsernameError(""); } : undefined} style={{
-      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.92)", zIndex: 1200,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 24,
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
-        padding: "24px", maxWidth: 380, width: "100%",
-        boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
-        animation: "fadeUp 0.25s ease",
-      }}>
+    <DraggableDrawer isOpen={true} onClose={username ? () => { setShowUsernameModal(false); setUsernameError(""); } : () => {}} zIndex={1200}>
+      <div style={{ padding: "0 24px 24px" }}>
         <div style={{ textAlign: "center", marginBottom: 20 }}>
           <div style={{
             width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
@@ -7362,7 +7391,1265 @@ export default function Pattrn() {
           </button>
         )}
       </div>
-    </div>
+    </DraggableDrawer>
+  );
+
+  // Helper: format "time ago" from a timestamp
+  const formatTimeAgo = (ts) => {
+    if (!ts) return "Unknown";
+    const now = Date.now();
+    const diff = now - ts;
+    if (diff < 60000) return "Just now";
+    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+    if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
+    return new Date(ts).toLocaleDateString();
+  };
+
+  // Helper: check if a friend is considered "online" (seen within last 2 minutes)
+  const isFriendOnline = (presence) => {
+    if (!presence || !presence.lastSeen) return false;
+    return (Date.now() - presence.lastSeen) < 120000;
+  };
+
+  // Helper: format puzzle label from mode + puzzle key
+  const formatPuzzleLabel = (mode, puzzleKey) => {
+    if (!mode) return null;
+    const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
+    if (mode === "daily") return `Daily (${puzzleKey || "today"})`;
+    if (mode === "cascade") return `Cascade #${(parseInt(puzzleKey) || 0) + 1}`;
+    return `${modeLabel} #${(parseInt(puzzleKey) || 0) + 1}`;
+  };
+
+  // --- Profile page modal ---
+  const profilePageEl = showProfilePage && firebaseUser && firebaseConfigured && (
+    <DraggableDrawer isOpen={true} onClose={() => setShowProfilePage(false)}>
+      <div data-drawer-scroll style={{ padding: "0 24px", overflowY: "auto", flex: 1 }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          {/* Profile picture */}
+          <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
+            <div style={{
+              width: 80, height: 80, borderRadius: "50%", margin: "0 auto",
+              backgroundColor: C.surface, display: "flex", alignItems: "center", justifyContent: "center",
+              border: `2px solid ${C.border}`, overflow: "hidden", position: "relative",
+            }}>
+              {profilePicture ? (
+                <img src={profilePicture} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
+                  <circle cx="12" cy="8" r="4" stroke={C.textDim} strokeWidth="2" fill="none"/>
+                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={C.textDim} strokeWidth="2" fill="none" strokeLinecap="round"/>
+                </svg>
+              )}
+            </div>
+            <label style={{
+              position: "absolute", bottom: -2, right: -2,
+              width: 28, height: 28, borderRadius: "50%",
+              backgroundColor: C.accent, display: "flex", alignItems: "center", justifyContent: "center",
+              cursor: profilePictureLoading ? "not-allowed" : "pointer",
+              border: `2px solid ${C.bg}`,
+              opacity: profilePictureLoading ? 0.5 : 1,
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke={C.bg} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleProfilePictureUpload}
+                disabled={profilePictureLoading}
+                style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
+              />
+            </label>
+          </div>
+
+          {profilePicture && (
+            <button
+              onClick={handleRemoveProfilePicture}
+              disabled={profilePictureLoading}
+              style={{
+                display: "block", margin: "4px auto 0", background: "none", border: "none",
+                color: C.textDim, fontSize: 10, cursor: "pointer", textDecoration: "underline",
+              }}
+            >
+              Remove photo
+            </button>
+          )}
+
+          <h3 style={{
+            fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent,
+            margin: profilePicture ? "8px 0 4px" : "0 0 4px",
+          }}>
+            Profile
+          </h3>
+          <p style={{ color: C.textDim, fontSize: 12, margin: 0, wordBreak: "break-all" }}>
+            {firebaseUser.email}
+          </p>
+        </div>
+
+        {/* Username section */}
+        <div style={{
+          padding: "14px 16px", borderRadius: 10, backgroundColor: C.surface,
+          border: `1px solid ${C.border}`, marginBottom: 12,
+        }}>
+          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>Username</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{
+              flex: 1, fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700,
+              color: username ? C.text : C.textDim,
+            }}>
+              {username || "Not set"}
+            </div>
+            <button
+              onClick={() => {
+                setUsernameInput(username || "");
+                setUsernameError("");
+                setUsernameAvailable(null);
+                setShowProfilePage(false);
+                setShowUsernameModal(true);
+              }}
+              style={{
+                padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                fontFamily: "'Space Mono', monospace",
+                background: "none", border: `1px solid ${C.border}`, color: C.textDim,
+                cursor: "pointer", textTransform: "uppercase", letterSpacing: 0.5,
+              }}
+            >
+              {username ? "Change" : "Set"}
+            </button>
+          </div>
+        </div>
+
+        {/* Cloud sync section */}
+        <div style={{
+          padding: "12px 16px", borderRadius: 10, backgroundColor: C.surface,
+          border: `1px solid ${C.border}`, marginBottom: 16, textAlign: "center",
+        }}>
+          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
+          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct }}>
+            {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
+          </div>
+        </div>
+
+        {/* Sign out */}
+        <button
+          onClick={handleSignOut}
+          style={{
+            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+            textTransform: "uppercase", transition: "all 0.15s", marginBottom: 8,
+          }}
+        >
+          Sign out
+        </button>
+
+        <button
+          onClick={() => setShowProfilePage(false)}
+          style={{
+            width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            background: "none", border: "none", color: C.textDim, cursor: "pointer",
+            textTransform: "uppercase", transition: "all 0.15s",
+          }}
+        >
+          Close
+        </button>
+      </div>
+    </DraggableDrawer>
+  );
+
+  // --- Friends Modal ---
+  const friendsModalEl = showFriendsModal && firebaseUser && firebaseConfigured && (
+    <DraggableDrawer isOpen={true} onClose={() => setShowFriendsModal(false)}>
+      <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
+        {/* Header */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <h2 style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, margin: 0 }}>
+            {friendsModalTab === "compare" && compareFriend ? `vs ${compareFriend.username}` : "Friends"}
+          </h2>
+          <div style={{ display: "flex", gap: 6 }}>
+            {friendsModalTab === "compare" && (
+              <button onClick={() => { setFriendsModalTab("list"); setCompareFriend(null); setCompareFriendStats(null); }}
+                style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "4px 10px", color: C.textDim, cursor: "pointer", fontSize: 10, fontFamily: "'Space Mono', monospace", transition: "all 0.15s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+              >Back</button>
+            )}
+            <button onClick={() => setShowFriendsModal(false)}
+              style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
+            >&times;</button>
+          </div>
+        </div>
+
+        {/* Unified friends list + activity view */}
+        {friendsModalTab === "list" && (
+          <div style={{ marginBottom: 16 }}>
+            {/* Add friend input */}
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input
+                  type="text" value={addFriendInput}
+                  onChange={e => setAddFriendInput(e.target.value)}
+                  placeholder="Add friend by username"
+                  style={{
+                    flex: 1, padding: "10px 14px", borderRadius: 10,
+                    backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                    color: C.text, fontSize: 13, fontFamily: "'Space Mono', monospace", outline: "none",
+                  }}
+                  onFocus={e => { e.target.style.borderColor = C.accent; }}
+                  onBlur={e => { e.target.style.borderColor = C.border; }}
+                  onKeyDown={e => { if (e.key === "Enter" && addFriendInput.trim()) handleAddFriend(); }}
+                />
+                <button onClick={handleAddFriend}
+                  disabled={!addFriendInput.trim() || addFriendLoading}
+                  style={{
+                    padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    background: addFriendInput.trim() ? C.accent : C.surfaceLight,
+                    color: addFriendInput.trim() ? C.bg : C.textDim,
+                    border: "none", cursor: addFriendInput.trim() ? "pointer" : "not-allowed",
+                    textTransform: "uppercase", flexShrink: 0,
+                  }}
+                >{addFriendLoading ? "..." : "Add"}</button>
+              </div>
+              {addFriendMsg && (
+                <div style={{ fontSize: 11, color: C.accent, marginTop: 6, fontFamily: "'Space Mono', monospace" }}>
+                  {addFriendMsg}
+                </div>
+              )}
+            </div>
+
+            {/* Friends list with activity */}
+            {friendsList.length === 0 ? (
+              <div style={{ textAlign: "center", padding: "30px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
+                No friends added yet.<br/>Add friends by their username to see their activity and compare stats.
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                  Friends ({friendsList.length})
+                </div>
+                {/* Sort: online first, then by lastSeen */}
+                {friendsList
+                  .slice()
+                  .sort((a, b) => {
+                    const pa = friendPresence[a.uid];
+                    const pb = friendPresence[b.uid];
+                    const onlineA = isFriendOnline(pa) ? 1 : 0;
+                    const onlineB = isFriendOnline(pb) ? 1 : 0;
+                    if (onlineA !== onlineB) return onlineB - onlineA;
+                    return ((pb?.lastSeen || 0) - (pa?.lastSeen || 0));
+                  })
+                  .map(friend => {
+                    const presence = friendPresence[friend.uid];
+                    const online = isFriendOnline(presence);
+                    const lastSolvedLabel = presence ? formatPuzzleLabel(presence.lastSolvedMode, presence.lastSolvedPuzzle) : null;
+                    const currentLabel = (online && presence?.status === "playing") ? formatPuzzleLabel(presence.currentMode, presence.currentPuzzle) : null;
+                    return (
+                      <div key={friend.uid} style={{
+                        padding: "12px 14px", borderRadius: 12,
+                        backgroundColor: C.surface,
+                        border: `1px solid ${online ? C.correct + "33" : C.border}`,
+                        transition: "border-color 0.2s",
+                      }}>
+                        {/* Top row: avatar, name + status, action buttons */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          {/* Avatar with online dot */}
+                          <div style={{ position: "relative", flexShrink: 0 }}>
+                            {friend.profilePicture ? (
+                              <img src={friend.profilePicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
+                            ) : (
+                              <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: C.accent, fontWeight: 700 }}>
+                                {(friend.username || "?")[0].toUpperCase()}
+                              </div>
+                            )}
+                            <div style={{
+                              position: "absolute", bottom: -1, right: -1, width: 12, height: 12,
+                              borderRadius: "50%", border: `2px solid ${C.surface}`,
+                              backgroundColor: online ? C.correct : C.textDim,
+                            }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ fontSize: 14, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {friend.username}
+                              </span>
+                              <span style={{ fontSize: 10, color: online ? C.correct : C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
+                                {online ? "ONLINE" : "OFFLINE"}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 2 }}>
+                              {online ? (
+                                currentLabel ? `Playing ${currentLabel}` : "In menus"
+                              ) : (
+                                presence?.lastSeen ? `Last seen ${formatTimeAgo(presence.lastSeen)}` : "No activity yet"
+                              )}
+                            </div>
+                          </div>
+                          {/* Action buttons */}
+                          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                            <button onClick={() => {
+                              setCompareFriend(friend);
+                              setFriendsModalTab("compare");
+                              setCompareFriendLoading(true);
+                              setCompareFriendStats(null);
+                              loadPublicStats(friend.uid)
+                                .then(setCompareFriendStats)
+                                .catch(() => setCompareFriendStats(null))
+                                .finally(() => setCompareFriendLoading(false));
+                            }}
+                              style={{
+                                background: "none", border: `1px solid ${C.accent}55`, borderRadius: 6,
+                                padding: "4px 10px", color: C.accent, cursor: "pointer", fontSize: 10,
+                                fontFamily: "'Space Mono', monospace", transition: "all 0.15s", fontWeight: 700,
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.backgroundColor = C.accent + "11"; }}
+                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "55"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                            >Stats</button>
+                            <button onClick={() => handleRemoveFriend(friend.uid)}
+                              title="Remove friend"
+                              style={{
+                                background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
+                                padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 13,
+                                lineHeight: 1, transition: "all 0.15s",
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
+                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                            >&times;</button>
+                          </div>
+                        </div>
+                        {/* Activity details row */}
+                        {(lastSolvedLabel || currentLabel) && (
+                          <div style={{ display: "flex", gap: 8, marginLeft: 48, marginTop: 8 }}>
+                            {lastSolvedLabel && (
+                              <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.surfaceLight, border: `1px solid ${C.border}` }}>
+                                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Last Solved</div>
+                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{lastSolvedLabel}</div>
+                                {presence?.lastSolvedAt && (
+                                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 1 }}>{formatTimeAgo(presence.lastSolvedAt)}</div>
+                                )}
+                              </div>
+                            )}
+                            {currentLabel && (
+                              <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.correct + "0a", border: `1px solid ${C.correct}22` }}>
+                                <div style={{ fontSize: 9, color: C.correct, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Now Playing</div>
+                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{currentLabel}</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Comparison view */}
+        {friendsModalTab === "compare" && compareFriend && (() => {
+          const myStats = summariseGameData({ progress, times, achievements: [...savedAchievementIds] });
+          const theirProgress = compareFriendStats?.progress || {};
+          const theirTotalSolved = compareFriendStats?.totalSolved || 0;
+          const theirAchievements = compareFriendStats?.achievements || 0;
+          const theirTimes = compareFriendStats?.times || {};
+          const statModes = [
+            { key: "easy", label: "Easy" },
+            { key: "medium", label: "Medium" },
+            { key: "hard", label: "Hard" },
+            { key: "blind", label: "Blind" },
+            { key: "daily", label: "Daily" },
+            { key: "cascade", label: "Cascade" },
+            { key: "spin", label: "Spin" },
+            { key: "mosaic", label: "Mosaic" },
+          ];
+
+          if (compareFriendLoading) {
+            return (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13 }}>
+                Loading stats...
+              </div>
+            );
+          }
+
+          if (!compareFriendStats) {
+            return (
+              <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
+                No stats available for this friend yet.<br/>They need to sign in and solve some puzzles first.
+              </div>
+            );
+          }
+
+          const CompareRow = ({ label, myVal, theirVal, isBetter }) => {
+            const myWins = myVal > theirVal;
+            const theyWin = theirVal > myVal;
+            const tie = myVal === theirVal && myVal > 0;
+            return (
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                padding: "8px 12px", borderRadius: 8,
+                backgroundColor: tie ? C.surface : myWins ? C.correct + "0a" : theyWin ? C.incorrect + "0a" : C.surface,
+                border: `1px solid ${tie ? C.border : myWins ? C.correct + "22" : theyWin ? C.incorrect + "22" : C.border}`,
+              }}>
+                <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: myWins ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
+                  {isBetter ? (myVal ? formatTime(myVal) : "--") : myVal}
+                </div>
+                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
+                  {label}
+                </div>
+                <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: theyWin ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
+                  {isBetter ? (theirVal ? formatTime(theirVal) : "--") : theirVal}
+                </div>
+              </div>
+            );
+          };
+
+          // Calculate best times per mode
+          const getBestTime = (timesObj, mode) => {
+            const modeTimes = timesObj[mode] || {};
+            const vals = Object.values(modeTimes).filter(t => t > 0);
+            return vals.length > 0 ? Math.min(...vals) : null;
+          };
+
+          return (
+            <div style={{ animation: "fadeUp 0.25s ease" }}>
+              {/* Header row */}
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, padding: "0 12px" }}>
+                <div style={{ fontSize: 11, color: C.accent, fontFamily: "'Space Mono', monospace", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+                  You
+                </div>
+                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+                  {compareFriend.username}
+                </div>
+              </div>
+
+              {/* Total solved */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
+                <CompareRow label="Total Solved" myVal={myStats.totalSolved} theirVal={theirTotalSolved} />
+                <CompareRow label="Achievements" myVal={myStats.achievements} theirVal={theirAchievements} />
+              </div>
+
+              {/* Per-mode solved */}
+              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                Puzzles Solved by Mode
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
+                {statModes.map(m => (
+                  <CompareRow key={m.key} label={m.label} myVal={myStats.modes[m.key] || 0} theirVal={theirProgress[m.key] || 0} />
+                ))}
+              </div>
+
+              {/* Best times */}
+              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                Best Times (lower is better)
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {["easy", "medium", "hard", "blind", "daily"].map(mode => {
+                  const myBest = getBestTime(times, mode);
+                  const theirBest = getBestTime(theirTimes, mode);
+                  const myWins = myBest && theirBest ? myBest < theirBest : false;
+                  const theyWin = myBest && theirBest ? theirBest < myBest : false;
+                  return (
+                    <div key={mode} style={{
+                      display: "flex", alignItems: "center", justifyContent: "space-between",
+                      padding: "8px 12px", borderRadius: 8,
+                      backgroundColor: myWins ? C.correct + "0a" : theyWin ? C.incorrect + "0a" : C.surface,
+                      border: `1px solid ${myWins ? C.correct + "22" : theyWin ? C.incorrect + "22" : C.border}`,
+                    }}>
+                      <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: myWins ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
+                        {myBest ? formatTime(myBest) : "--"}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
+                        {mode.charAt(0).toUpperCase() + mode.slice(1)}
+                      </div>
+                      <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: theyWin ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
+                        {theirBest ? formatTime(theirBest) : "--"}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+      </div>
+    </DraggableDrawer>
+  );
+
+  // --- Extracted Global Modals (DraggableDrawer-based, rendered once at top level) ---
+
+  const clearConfirmEl = showClearConfirm && (
+    <DraggableDrawer isOpen={true} onClose={() => setShowClearConfirm(false)}>
+      <div style={{ padding: "0 24px 24px" }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
+            backgroundColor: C.incorrect + "22", display: "flex", alignItems: "center", justifyContent: "center",
+            border: `2px solid ${C.incorrect}44`,
+          }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 9v4m0 4h.01M12 3L2 21h20L12 3z" stroke={C.incorrect} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.incorrect, margin: "0 0 8px" }}>
+            Clear All Data?
+          </h3>
+          <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+            This will permanently delete <strong style={{ color: C.text }}>all your progress</strong>, solve times, achievements, streak, birthday, and saved data. This cannot be undone.
+          </p>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button onClick={async () => {
+            try {
+              localStorage.removeItem(STORAGE_KEY);
+              localStorage.removeItem(TIMES_KEY);
+              localStorage.removeItem(BIRTHDAY_KEY);
+              localStorage.removeItem(THEME_KEY);
+              localStorage.removeItem(ACHIEV_KEY);
+            } catch { /* ignore */ }
+            if (firebaseUser) { try { await logOut(); } catch { /* ignore */ } }
+            setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
+            setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
+            setSavedAchievementIds(new Set());
+            setBirthday(null);
+            setActiveThemeId("classic");
+            setShowClearConfirm(false);
+            setShowGameMenu(false);
+            setView("menu");
+          }} style={{
+            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+            background: C.incorrect, color: "#fff", border: "none", cursor: "pointer",
+            textTransform: "uppercase", transition: "all 0.15s",
+          }}>
+            Clear everything
+          </button>
+          <button onClick={() => setShowClearConfirm(false)} style={{
+            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+            textTransform: "uppercase", transition: "all 0.15s",
+          }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </DraggableDrawer>
+  );
+
+  const deleteAccountConfirmEl = showDeleteAccountConfirm && firebaseUser && (
+    <DraggableDrawer isOpen={true} onClose={() => { setShowDeleteAccountConfirm(false); setDeleteAccountError(""); setDeleteAccountPassword(""); }}>
+      <div style={{ padding: "0 24px 24px" }}>
+        <div style={{ textAlign: "center", marginBottom: 20 }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
+            backgroundColor: "#dc262622", display: "flex", alignItems: "center", justifyContent: "center",
+            border: "2px solid #dc262644",
+          }}>
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+              <path d="M12 9v4m0 4h.01M12 3L2 21h20L12 3z" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+          <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#dc2626", margin: "0 0 8px" }}>
+            Delete Account?
+          </h3>
+          <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+            This will <strong style={{ color: C.text }}>permanently delete your account</strong>, all progress, cloud data, friends, and mosaics. This cannot be undone.
+          </p>
+        </div>
+        {firebaseUser.providerData.some(p => p.providerId === "password") && (
+          <div style={{ marginBottom: 12 }}>
+            <input type="password" placeholder="Enter your password to confirm" value={deleteAccountPassword}
+              onChange={e => setDeleteAccountPassword(e.target.value)}
+              style={{
+                width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 12,
+                fontFamily: "'Space Mono', monospace",
+                background: C.surface, border: `1px solid ${C.border}`, color: C.text,
+                outline: "none", boxSizing: "border-box",
+              }}
+            />
+          </div>
+        )}
+        {deleteAccountError && (
+          <div style={{ color: "#dc2626", fontSize: 11, textAlign: "center", marginBottom: 12 }}>{deleteAccountError}</div>
+        )}
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          <button onClick={handleDeleteAccount} disabled={deleteAccountLoading} style={{
+            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+            background: deleteAccountLoading ? "#dc262688" : "#dc2626", color: "#fff", border: "none",
+            cursor: deleteAccountLoading ? "not-allowed" : "pointer",
+            textTransform: "uppercase", transition: "all 0.15s",
+          }}>
+            {deleteAccountLoading ? "Deleting..." : "Delete my account"}
+          </button>
+          <button onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountError(""); setDeleteAccountPassword(""); }}
+            disabled={deleteAccountLoading} style={{
+            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            background: "none", border: `1px solid ${C.border}`, color: C.textDim,
+            cursor: deleteAccountLoading ? "not-allowed" : "pointer",
+            textTransform: "uppercase", transition: "all 0.15s",
+          }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    </DraggableDrawer>
+  );
+
+  const achievementsEl = showAchievements ? (() => {
+    const achievements = computeAchievements(progress, times, savedAchievementIds);
+    const unlocked = achievements.filter(a => a.unlocked).length;
+    const total = achievements.length;
+    const tierColors = { 1: C.bronze, 2: C.silver, 3: C.gold };
+    const tierSymbols = { 1: "\u25C6", 2: "\u25CF", 3: "\u2605" };
+    return (
+      <DraggableDrawer isOpen={true} onClose={() => setShowAchievements(false)}>
+        <div data-drawer-scroll style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Achievements</h2>
+            <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>{unlocked}/{total} unlocked</p>
+          </div>
+          <div style={{ height: 6, borderRadius: 3, backgroundColor: C.surfaceLight, marginBottom: 20, overflow: "hidden" }}>
+            <div style={{ height: "100%", borderRadius: 3, backgroundColor: C.accent, width: `${(unlocked / total) * 100}%`, transition: "width 0.5s" }} />
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 20 }}>
+            {achievements.map(a => {
+              const tc = tierColors[a.tier] || C.textDim;
+              const ts = tierSymbols[a.tier] || "";
+              return (
+                <div key={a.id} style={{
+                  display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
+                  borderRadius: 10, backgroundColor: a.unlocked ? tc + "12" : C.surface,
+                  border: `1px solid ${a.unlocked ? tc + "44" : C.border}`,
+                  opacity: a.unlocked ? 1 : 0.5,
+                }}>
+                  <span style={{ fontSize: 14, color: tc, fontFamily: "'Space Mono', monospace" }}>{ts}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: a.unlocked ? C.text : C.textDim }}>{a.label}</div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 1 }}>{a.desc}</div>
+                  </div>
+                  {a.unlocked && <span style={{ fontSize: 10, color: tc, fontFamily: "'Space Mono', monospace" }}>{"\u2713"}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+        <div style={{ padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))", borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+          <button onClick={() => setShowAchievements(false)} style={{
+            width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+            padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+          }}>Close</button>
+        </div>
+      </DraggableDrawer>
+    );
+  })() : null;
+
+  const shareModalEl = showShareModal ? (() => {
+    const { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll } = getShareData();
+    const gridColors = { none: C.border, failed: C.incorrect, gold: C.gold, silver: C.silver, bronze: C.bronze };
+    return (
+      <DraggableDrawer isOpen={true} onClose={() => setShowShareModal(false)}>
+        <div data-drawer-scroll style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Agnus</h2>
+            <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>my stats</p>
+          </div>
+          <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginBottom: 20, padding: "10px 16px", borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}` }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.accent }}>{totalSolved}</div>
+              <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>solved</div>
+            </div>
+            <div style={{ width: 1, backgroundColor: C.border }} />
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700 }}>300</div>
+              <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>total</div>
+            </div>
+            {getDailyStreak(progress) > 0 && (
+              <>
+                <div style={{ width: 1, backgroundColor: C.border }} />
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.gold }}>{"\uD83D\uDD25"} {getDailyStreak(progress)}</div>
+                  <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>day streak</div>
+                </div>
+              </>
+            )}
+            {bestTimeAll != null && (
+              <>
+                <div style={{ width: 1, backgroundColor: C.border }} />
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.correct }}>{formatTime(bestTimeAll)}</div>
+                  <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>fastest</div>
+                </div>
+              </>
+            )}
+          </div>
+          {sections.map(s => (
+            <div key={s.key} style={{ marginBottom: 16 }}>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
+                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: s.key === "blind" ? "#e06040" : C.text, letterSpacing: 1, textTransform: "uppercase" }}>
+                  {s.label}
+                </span>
+                <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>{s.solved}/{s.total}</span>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
+                {s.grid.map((g, gi) => (
+                  <div key={gi} style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: gridColors[g] || C.border }} />
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div style={{ padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button onClick={copyShareText} style={{ flex: 1, backgroundColor: C.accent, color: C.bg, border: "none", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>{shareMsg || "Share all"}</button>
+            <button onClick={copyDailyShareText} style={{ flex: 1, backgroundColor: "transparent", color: C.accent, border: `1.5px solid ${C.accent}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>Share Daily</button>
+          </div>
+          <button onClick={() => setShowShareModal(false)} style={{ width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Close</button>
+        </div>
+      </DraggableDrawer>
+    );
+  })() : null;
+
+  const birthdayPromptEl = showBirthdayPrompt && (
+    <DraggableDrawer isOpen={true} onClose={() => { setShowBirthdayPrompt(false); setBirthdayInput(""); }}>
+      <div style={{ padding: "0 24px 0", overflow: "hidden" }}>
+        <div style={{ textAlign: "center", marginBottom: 16 }}>
+          <span style={{ fontSize: 32 }}>{"\uD83C\uDF82"}</span>
+          <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#F472B6", margin: "8px 0 4px" }}>
+            Set your birthday
+          </h3>
+          <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
+            We'll highlight it on the calendar and let you play &amp; share the puzzle from your birth date.
+          </p>
+        </div>
+        <input type="date" value={birthdayInput} onChange={e => setBirthdayInput(e.target.value)}
+          max={(() => { const n = new Date(); return `${n.getUTCFullYear()}-${String(n.getUTCMonth()+1).padStart(2,"0")}-${String(n.getUTCDate()).padStart(2,"0")}`; })()}
+          style={{
+            width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`,
+            backgroundColor: C.surface, color: C.text, fontFamily: "'Space Mono', monospace", fontSize: 16,
+            outline: "none", boxSizing: "border-box", minWidth: 0, colorScheme: "dark",
+          }}
+        />
+      </div>
+      <div style={{ padding: "16px 24px", paddingBottom: "max(16px, env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", gap: 8 }}>
+        <button onClick={() => {
+          if (!birthdayInput) return;
+          const [y, m, d] = birthdayInput.split("-").map(Number);
+          const bdStr = `${String(d).padStart(2, "0")}-${String(m).padStart(2, "0")}-${y}`;
+          setBirthday(bdStr);
+          try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
+          if (bdStr === CHEAT_BIRTHDAY) {
+            const saved = loadSavedAchievements();
+            if (!saved.has("cheat_turing")) {
+              achievementQueueRef.current.push({ id: "cheat_turing", label: "Welcome Back, Alan", desc: "The enigma has been decoded", tier: 3 });
+              if (!achievementToastTimer.current) advanceAchievementQueue();
+              saved.add("cheat_turing");
+              saveSavedAchievements(saved);
+              setSavedAchievementIds(new Set(saved));
+              const enigmaTheme = PUZZLE_THEMES.find(t => t.id === "enigma");
+              if (enigmaTheme) { setTimeout(() => showThemeToast(enigmaTheme), 3800); }
+            }
+          }
+          setShowBirthdayPrompt(false);
+          setBirthdayInput("");
+          setCalendarYear(y);
+          setCalendarMonth(m - 1);
+        }} disabled={!birthdayInput} style={{
+          width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+          fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+          background: birthdayInput ? "#F472B6" : C.surfaceLight, color: birthdayInput ? "#fff" : C.textDim,
+          border: "none", cursor: birthdayInput ? "pointer" : "not-allowed", textTransform: "uppercase",
+        }}>
+          Save
+        </button>
+        {birthday && (
+          <button onClick={() => { setBirthday(null); try { localStorage.removeItem(BIRTHDAY_KEY); } catch { /* ignore */ } setShowBirthdayPrompt(false); setBirthdayInput(""); }} style={{
+            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            background: "none", border: `1px solid ${C.incorrect}`, color: C.incorrect,
+            cursor: "pointer", textTransform: "uppercase",
+          }}>
+            Remove
+          </button>
+        )}
+        <button onClick={() => { setShowBirthdayPrompt(false); setBirthdayInput(""); }} style={{
+          width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+          fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+          background: "none", border: `1px solid ${C.border}`, color: C.textDim,
+          cursor: "pointer", textTransform: "uppercase",
+        }}>
+          Cancel
+        </button>
+      </div>
+    </DraggableDrawer>
+  );
+
+  const syncChoiceEl = showSyncChoice && syncChoiceData ? (() => {
+    const { localSummary, cloudSummary } = syncChoiceData;
+    const localMore = localSummary.totalSolved > cloudSummary.totalSolved;
+    const cloudMore = cloudSummary.totalSolved > localSummary.totalSolved;
+    const SyncOption = ({ label, tag, summary, highlight, onClick }) => (
+      <button onClick={onClick} style={{
+        width: "100%", padding: "14px 16px", borderRadius: 12, textAlign: "left",
+        background: highlight ? C.accent + "14" : C.surface,
+        border: `1px solid ${highlight ? C.accent + "66" : C.border}`,
+        cursor: "pointer", transition: "all 0.15s", marginBottom: 8, position: "relative",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text }}>{label}</span>
+          {tag && (
+            <span style={{ fontSize: 9, fontWeight: 700, fontFamily: "'Space Mono', monospace", padding: "2px 6px", borderRadius: 4, backgroundColor: C.correct + "22", color: C.correct, textTransform: "uppercase", letterSpacing: 0.5 }}>{tag}</span>
+          )}
+        </div>
+        <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5 }}>
+          {summary.totalSolved} puzzle{summary.totalSolved !== 1 ? "s" : ""} solved
+          {summary.achievements > 0 && (<span> &middot; {summary.achievements} achievement{summary.achievements !== 1 ? "s" : ""}</span>)}
+        </div>
+      </button>
+    );
+    return (
+      <DraggableDrawer isOpen={true} onClose={() => {}} zIndex={1100}>
+        <div style={{ padding: "0 24px 24px" }}>
+          <div style={{ textAlign: "center", marginBottom: 20 }}>
+            <div style={{
+              width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
+              backgroundColor: "#F59E0B22", display: "flex", alignItems: "center", justifyContent: "center",
+              border: "2px solid #F59E0B44",
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                <path d="M12 3L4 9v12h16V9l-8-6z" stroke="#F59E0B" strokeWidth="2" fill="none" strokeLinejoin="round"/>
+                <path d="M9 21v-6h6v6" stroke="#F59E0B" strokeWidth="2" fill="none" strokeLinejoin="round"/>
+              </svg>
+            </div>
+            <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, margin: "0 0 6px" }}>
+              Existing Save Found
+            </h3>
+            <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5, maxWidth: 300, marginInline: "auto" }}>
+              You have progress saved in the cloud and on this device. Which would you like to keep?
+            </p>
+          </div>
+          <SyncOption label="Use This Device" tag={localMore ? "More progress" : null} summary={localSummary} highlight={localMore} onClick={() => handleSyncChoice("local")} />
+          <SyncOption label="Use Cloud Save" tag={cloudMore ? "More progress" : null} summary={cloudSummary} highlight={cloudMore} onClick={() => handleSyncChoice("cloud")} />
+          <button onClick={() => handleSyncChoice("merge")} style={{
+            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            background: C.accent, color: C.bg, border: "none",
+            cursor: "pointer", textTransform: "uppercase", transition: "all 0.15s", marginTop: 4,
+          }}>
+            Merge Both
+          </button>
+          <p style={{ fontSize: 10, color: C.textDim, textAlign: "center", margin: "10px 0 0", lineHeight: 1.5, fontFamily: "'DM Sans', sans-serif" }}>
+            Merge keeps the best results from both saves
+          </p>
+        </div>
+      </DraggableDrawer>
+    );
+  })() : null;
+
+  const coopInviteEl = showCoopInvite && coopSessionId && (
+    <DraggableDrawer isOpen={true} onClose={() => { setShowCoopInvite(false); setCoopSelectedFriends(new Set()); }} zIndex={1200}>
+      <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
+        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+          Co-op Invite
+        </div>
+        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
+          Share a link or select friends to invite
+        </div>
+        {friendsList.length > 0 && (
+          <div style={{ marginBottom: 14, maxHeight: 140, overflowY: "auto" }}>
+            <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+              Invite Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
+            </div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {friendsList.map(friend => {
+                const isActive = !!coopPlayers[friend.uid];
+                const isInvited = coopInvitedUids.has(friend.uid);
+                const isAlreadyHandled = isActive || isInvited;
+                const isSelected = coopSelectedFriends.has(friend.uid);
+                return (
+                  <button key={friend.uid} onClick={() => {
+                    if (isAlreadyHandled) return;
+                    setCoopSelectedFriends(prev => { const next = new Set(prev); if (next.has(friend.uid)) next.delete(friend.uid); else next.add(friend.uid); return next; });
+                  }} style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8,
+                    backgroundColor: isActive ? C.correct + "12" : isInvited ? C.coop + "12" : isSelected ? "#54A0FF18" : C.bg,
+                    border: `1px solid ${isActive ? C.correct + "55" : isInvited ? C.coop + "55" : isSelected ? "#54A0FF" : C.border}`,
+                    cursor: isAlreadyHandled ? "default" : "pointer", opacity: isAlreadyHandled ? 0.8 : 1,
+                    transition: "all 0.15s", width: "100%", textAlign: "left",
+                  }}>
+                    {!isAlreadyHandled && (
+                      <div style={{ width: 16, height: 16, borderRadius: 3, border: `2px solid ${isSelected ? "#54A0FF" : C.border}`, backgroundColor: isSelected ? "#54A0FF" : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                        {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                      </div>
+                    )}
+                    {friend.profilePicture ? (
+                      <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                    ) : (
+                      <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: "#54A0FF33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#54A0FF", fontWeight: 700, flexShrink: 0 }}>{(friend.username || "?")[0].toUpperCase()}</div>
+                    )}
+                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                    {isActive && <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.correct, letterSpacing: 1, textTransform: "uppercase" }}>Active</span>}
+                    {isInvited && !isActive && <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.coop, letterSpacing: 1, textTransform: "uppercase" }}>Invited</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+        {coopSelectedFriends.size > 0 && (
+          <button onClick={async () => {
+            const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : "";
+            await Promise.all([...coopSelectedFriends].map(uid =>
+              Promise.all([ sendNotification(uid, { type: "coop_invite", fromUid: firebaseUser.uid, fromUsername: username || firebaseUser.email, data: { sessionId: coopSessionId, mode: difficulty, level: currentPuzzle, url: coopUrl } }).catch(() => {}), addCoopInvitedUid(coopSessionId, uid).catch(() => {}) ])
+            ));
+            setCoopSelectedFriends(new Set());
+          }} style={{ marginBottom: 14, width: "100%", padding: "8px 12px", borderRadius: 8, backgroundColor: "#54A0FF", color: "#fff", border: "none", fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
+            {`Send ${coopSelectedFriends.size} Invite${coopSelectedFriends.size > 1 ? "s" : ""}`}
+          </button>
+        )}
+        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>Or share link</div>
+        <div style={{ backgroundColor: C.bg, borderRadius: 8, padding: "10px 12px", marginBottom: 12, fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.text, wordBreak: "break-all", border: `1px solid ${C.border}` }}>
+          {typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : ""}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={async () => {
+            const url = `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}`;
+            const result = await tryNativeShare({ title: "Agnus Co-op", text: "Join me for a co-op puzzle!", url });
+            if (result === "shared") { setShowCoopInvite(false); return; }
+            if (result === "cancelled") return;
+            try { await navigator.clipboard.writeText(url); } catch {}
+            setShowCoopInvite(false);
+          }} style={{ flex: 1, backgroundColor: "#54A0FF", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
+            Copy Link
+          </button>
+          <button onClick={() => { setShowCoopInvite(false); setCoopSelectedFriends(new Set()); }} style={{ backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
+            Close
+          </button>
+        </div>
+        {!coopPartnerConnected && (
+          <div style={{ marginTop: 12, textAlign: "center", fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", animation: "pulse 2s infinite" }}>Waiting for partner to join...</div>
+        )}
+      </div>
+    </DraggableDrawer>
+  );
+
+  const leaveConfirmEl = showLeaveConfirm && (
+    <DraggableDrawer isOpen={true} onClose={() => setShowLeaveConfirm(false)} zIndex={1200}>
+      <div style={{ padding: "0 24px 24px" }}>
+        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>Leave Co-op?</div>
+        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
+          {coopRole === "host" ? "The session will stay active. You can rejoin from the main menu." : "You will leave this session and your partner will need to invite you again to rejoin."}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => { leaveCoopSession(); if (customMosaicPuzzlesRef.current && isMosaic) { setView("custom-mosaic"); } else { setView("menu"); } }} style={{ flex: 1, backgroundColor: "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Leave</button>
+          <button onClick={() => setShowLeaveConfirm(false)} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
+        </div>
+      </div>
+    </DraggableDrawer>
+  );
+
+  const coopMosaicNavigateEl = showCoopMosaicNavigate ? (() => {
+    const playersOnTiles = Object.entries(coopMosaicPlayers).filter(([, p]) => p.currentTile != null && p.currentTile >= 0 && p.currentTile !== currentPuzzle);
+    return playersOnTiles.length > 0 ? (
+      <DraggableDrawer isOpen={true} onClose={() => setShowCoopMosaicNavigate(false)} zIndex={1200}>
+        <div style={{ padding: "0 24px 24px", textAlign: "center" }}>
+          <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>Go to player</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+            {playersOnTiles.map(([uid, p]) => (
+              <button key={uid} onClick={() => {
+                const targetTile = p.currentTile;
+                setShowCoopMosaicNavigate(false);
+                coopMosaicCurrentTileRef.current = targetTile;
+                updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser?.uid, targetTile).catch(() => {});
+                coopMosaicWriteThrottleRef.current = {};
+                startPuzzle(targetTile, "mosaic", true);
+              }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.coop + "11", border: `1px solid ${C.coop}44`, borderRadius: 8, padding: "10px 16px", cursor: "pointer", transition: "all 0.15s" }}>
+                <span style={{ color: C.coop, fontWeight: 700, fontFamily: "'Space Mono', monospace", fontSize: 12 }}>{p.username || "Player"}</span>
+                <span style={{ color: C.textDim, fontFamily: "'Space Mono', monospace", fontSize: 11 }}>tile {p.currentTile + 1}</span>
+              </button>
+            ))}
+          </div>
+          <button onClick={() => setShowCoopMosaicNavigate(false)} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 18px", color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1 }}>Stay</button>
+        </div>
+      </DraggableDrawer>
+    ) : null;
+  })() : null;
+
+  const mosaicPreviewOverlayEl = showMosaicPreviewOverlay && customMosaicPlay && customMosaicPuzzlesRef.current && (
+    <DraggableDrawer isOpen={true} onClose={() => setShowMosaicPreviewOverlay(false)} zIndex={1200}>
+      <div style={{ padding: "0 24px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: "uppercase" }}>
+          Mosaic Preview — Tile {currentPuzzle + 1}
+        </div>
+        <canvas ref={el => {
+          if (!el || !customMosaicPlay.grid) return;
+          const grid = customMosaicPlay.grid;
+          const gs = grid.length;
+          const canvasSize = Math.min(320, typeof window !== "undefined" ? window.innerWidth - 60 : 320);
+          const cellSz = canvasSize / gs;
+          const ctx = el.getContext("2d");
+          el.width = canvasSize; el.height = canvasSize;
+          const dimColor = "#14141f";
+          const tileRow = Math.floor(currentPuzzle / 5);
+          const tileCol = currentPuzzle % 5;
+          for (let r = 0; r < gs; r++) {
+            for (let c = 0; c < (grid[r]?.length || 0); c++) {
+              const tr = Math.floor(r / 5); const tc = Math.floor(c / 5);
+              const tileIdx = tr * 5 + tc;
+              const isCurrentTile = (tr === tileRow && tc === tileCol);
+              const effectiveProgress = isCoopMosaic ? { ...customMosaicProgress, ...coopMosaicSharedProgress } : customMosaicProgress;
+              const tileSolved = (effectiveProgress[tileIdx] || 0) > 0;
+              if (isCurrentTile) {
+                const localR = r - tileRow * 5; const localC = c - tileCol * 5;
+                const cellKey = `${localR}-${localC}`;
+                const puz = customMosaicPuzzlesRef.current[currentPuzzle];
+                if (puz) {
+                  const isBlankCell = puz.blanks.has(cellKey);
+                  if (!isBlankCell || tileSolved) { ctx.fillStyle = grid[r][c] || dimColor; }
+                  else if (fills[cellKey]) {
+                    const parsed = fills[cellKey].split("|");
+                    ctx.fillStyle = parsed.length >= 2 ? parsed[1] : grid[r][c] || dimColor;
+                  } else { ctx.fillStyle = dimColor + "88"; }
+                } else { ctx.fillStyle = grid[r][c] || dimColor; }
+              } else if (tileSolved) { ctx.fillStyle = grid[r][c] || dimColor; }
+              else { ctx.fillStyle = dimColor; }
+              ctx.fillRect(c * cellSz, r * cellSz, cellSz, cellSz);
+            }
+          }
+          ctx.strokeStyle = C.accent; ctx.lineWidth = 2;
+          ctx.strokeRect(tileCol * 5 * cellSz, tileRow * 5 * cellSz, 5 * cellSz, 5 * cellSz);
+        }} style={{ borderRadius: 8, border: `1px solid ${C.border}` }} />
+        <button onClick={() => setShowMosaicPreviewOverlay(false)} style={{
+          background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px",
+          color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1,
+        }}>Close</button>
+      </div>
+    </DraggableDrawer>
+  );
+
+  const mosaicLeaveConfirmEl = showMosaicLeaveConfirm && (
+    <DraggableDrawer isOpen={true} onClose={() => setShowMosaicLeaveConfirm(false)} zIndex={1200}>
+      <div style={{ padding: "0 24px 24px" }}>
+        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+          {coopMosaicRole === "host" ? "Go to Menu?" : "Leave Co-op?"}
+        </div>
+        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
+          {coopMosaicRole === "host" ? "Your session will stay active. You can rejoin anytime from the Active Co-op Sessions panel on the main menu." : "You will leave this session and your partner will need to invite you again to rejoin."}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={() => { setShowMosaicLeaveConfirm(false); leaveCoopMosaicSession(); loadActiveCoopSessions(); setView("menu"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; }} style={{ flex: 1, backgroundColor: coopMosaicRole === "host" ? C.coop : "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
+            {coopMosaicRole === "host" ? "Go to Menu" : "Leave"}
+          </button>
+          <button onClick={() => setShowMosaicLeaveConfirm(false)} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
+        </div>
+      </div>
+    </DraggableDrawer>
+  );
+
+  const coopMosaicInviteUrl = isCoopMosaic && coopMosaicSessionId ? `${typeof window !== "undefined" ? window.location.origin + window.location.pathname : ""}?coopMosaic=${coopMosaicSessionId}` : "";
+
+  const coopMosaicInviteEl = showCoopMosaicInvite && (
+    <DraggableDrawer isOpen={true} onClose={() => { setShowCoopMosaicInvite(false); setCoopSelectedFriends(new Set()); }}>
+      <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
+        <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.coop, margin: "0 0 8px 0", letterSpacing: 1 }}>Co-op Mosaic</h3>
+        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace" }}>Select friends to invite or share a link — anyone with the link can join!</div>
+        {friendsList.length > 0 && (
+          <div style={{ marginBottom: 14, maxHeight: 140, overflowY: "auto" }}>
+            <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>Invite Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+              {friendsList.map(friend => {
+                const isMosaicActive = !!coopMosaicPlayers[friend.uid];
+                const isMosaicInvited = coopMosaicInvitedUids.has(friend.uid);
+                const isMosaicHandled = isMosaicActive || isMosaicInvited;
+                const isSelected = coopSelectedFriends.has(friend.uid);
+                return (
+                  <button key={friend.uid} onClick={() => { if (isMosaicHandled) return; setCoopSelectedFriends(prev => { const next = new Set(prev); if (next.has(friend.uid)) next.delete(friend.uid); else next.add(friend.uid); return next; }); }} style={{
+                    display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8,
+                    backgroundColor: isMosaicActive ? C.correct + "12" : isMosaicInvited ? C.coop + "12" : isSelected ? C.coop + "18" : C.bg,
+                    border: `1px solid ${isMosaicActive ? C.correct + "55" : isMosaicInvited ? C.coop + "55" : isSelected ? C.coop : C.border}`,
+                    cursor: isMosaicHandled ? "default" : "pointer", opacity: isMosaicHandled ? 0.8 : 1, transition: "all 0.15s", width: "100%", textAlign: "left",
+                  }}>
+                    {!isMosaicHandled && (
+                      <div style={{ width: 16, height: 16, borderRadius: 3, border: `2px solid ${isSelected ? C.coop : C.border}`, backgroundColor: isSelected ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                        {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                      </div>
+                    )}
+                    {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} /> : <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: C.coop + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: C.coop, fontWeight: 700, flexShrink: 0 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
+                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                    {isMosaicActive && <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.correct, letterSpacing: 1, textTransform: "uppercase" }}>Active</span>}
+                    {isMosaicInvited && !isMosaicActive && <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.coop, letterSpacing: 1, textTransform: "uppercase" }}>Invited</span>}
+                  </button>
+                );
+              })}
+            </div>
+            {coopSelectedFriends.size > 0 && coopMosaicSessionId && (
+              <button onClick={async () => {
+                const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?coopMosaic=${coopMosaicSessionId}` : "";
+                await Promise.all([...coopSelectedFriends].map(uid => Promise.all([ sendNotification(uid, { type: "coop_mosaic_invite", fromUid: firebaseUser.uid, fromUsername: username || firebaseUser.email, data: { sessionId: coopMosaicSessionId, mosaicTitle: customMosaicPlay?.title || "Untitled", url: coopUrl } }).catch(() => {}), addCoopMosaicInvitedUid(coopMosaicSessionId, uid).catch(() => {}) ])));
+                setCoopSelectedFriends(new Set()); setShowCoopMosaicInvite(false);
+              }} style={{ marginTop: 8, width: "100%", padding: "8px 12px", borderRadius: 8, backgroundColor: C.coop, color: "#fff", border: "none", fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
+                {`Send ${coopSelectedFriends.size} Invite${coopSelectedFriends.size > 1 ? "s" : ""}`}
+              </button>
+            )}
+          </div>
+        )}
+        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>Or share link</div>
+        <div style={{ padding: "10px 12px", borderRadius: 8, backgroundColor: C.bg, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: "'Space Mono', monospace", color: C.text, wordBreak: "break-all", marginBottom: 12, userSelect: "all" }}>
+          {coopMosaicInviteUrl}
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <button onClick={async () => {
+            const result = await tryNativeShare({ text: `Join me on this mosaic puzzle!\n${coopMosaicInviteUrl}` });
+            if (result === "shared") { setShowCoopMosaicInvite(false); return; }
+            if (result === "cancelled") return;
+            try { await navigator.clipboard.writeText(coopMosaicInviteUrl); } catch {}
+            setShowCoopMosaicInvite(false);
+          }} style={{ flex: 1, padding: "10px 16px", borderRadius: 10, backgroundColor: C.coop, color: "#fff", border: "none", fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Copy Link</button>
+          <button onClick={() => { setShowCoopMosaicInvite(false); setCoopSelectedFriends(new Set()); }} style={{ padding: "10px 16px", borderRadius: 10, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Close</button>
+        </div>
+      </div>
+    </DraggableDrawer>
+  );
+
+  const coopFriendPickerEl = showCoopFriendPicker ? (() => {
+    const isMosaicMode = coopPickerMode === "mosaic";
+    const pickerColor = isMosaicMode ? C.coop : "#54A0FF";
+    const availableMosaics = [...(myMosaics || []), ...(staffPickMosaic ? [staffPickMosaic] : [])].filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
+    return (
+      <DraggableDrawer isOpen={true} onClose={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); setCoopPickerMode(null); setCoopPickerMosaic(null); }} zIndex={1200}>
+        <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
+          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>Start Co-op</div>
+          <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>Select friends to invite or share a link</div>
+          {/* Mode picker */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>Puzzle Type</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {[
+                { key: null, label: `Current (${(DIFFICULTIES.find(m => m.key === difficulty) || {}).label || difficulty})` },
+                { key: "mosaic", label: "Mosaic" },
+              ].map(opt => {
+                const active = coopPickerMode === opt.key;
+                return (
+                  <button key={opt.key || "_current"} onClick={() => { setCoopPickerMode(opt.key); setCoopPickerMosaic(null); }} style={{
+                    padding: "5px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, cursor: "pointer",
+                    border: `1px solid ${active ? pickerColor : C.border}`, backgroundColor: active ? pickerColor + "22" : C.bg, color: active ? pickerColor : C.textDim, transition: "all 0.15s",
+                  }}>{opt.label}</button>
+                );
+              })}
+            </div>
+          </div>
+          {isMosaicMode && (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>Choose Mosaic</div>
+              {availableMosaics.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 120, overflowY: "auto" }}>
+                  {availableMosaics.map(m => {
+                    const sel = coopPickerMosaic?.id === m.id;
+                    return (
+                      <button key={m.id} onClick={() => setCoopPickerMosaic(m)} style={{
+                        display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8,
+                        backgroundColor: sel ? C.coop + "18" : C.bg, border: `1px solid ${sel ? C.coop : C.border}`,
+                        cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                      }}>
+                        <div style={{ width: 14, height: 14, borderRadius: 3, border: `2px solid ${sel ? C.coop : C.border}`, backgroundColor: sel ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                          {sel && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                        </div>
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{m.title || "Untitled"}</span>
+                        {m.authorUsername && <span style={{ fontSize: 9, color: C.textDim }}>by {m.authorUsername}</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", padding: "8px 0" }}>No mosaics available. Create one in the Mosaic gallery first.</div>
+              )}
+            </div>
+          )}
+          {friendsList.length > 0 && (
+            <div style={{ marginBottom: 16, maxHeight: 200, overflowY: "auto" }}>
+              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                Your Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {friendsList.map(friend => {
+                  const isSelected = coopSelectedFriends.has(friend.uid);
+                  return (
+                    <button key={friend.uid} onClick={() => { setCoopSelectedFriends(prev => { const next = new Set(prev); if (next.has(friend.uid)) next.delete(friend.uid); else next.add(friend.uid); return next; }); }} style={{
+                      display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10,
+                      backgroundColor: isSelected ? pickerColor + "18" : C.bg, border: `1px solid ${isSelected ? pickerColor : C.border}`,
+                      cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                    }}>
+                      <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? pickerColor : C.border}`, backgroundColor: isSelected ? pickerColor : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                        {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                      </div>
+                      {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} /> : <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: pickerColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: pickerColor, fontWeight: 700, flexShrink: 0 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
+                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {friendsList.length === 0 && (
+            <div style={{ marginBottom: 16, textAlign: "center", padding: "12px 0", color: C.textDim, fontSize: 11, fontFamily: "'Space Mono', monospace" }}>No friends added yet. You can add friends in the Mosaic gallery.</div>
+          )}
+          <div style={{ display: "flex", gap: 8 }}>
+            {coopSelectedFriends.size > 0 ? (
+              <button onClick={async () => {
+                if (isMosaicMode) { if (!coopPickerMosaic) return; setShowCoopFriendPicker(false); await startCoopMosaicSession({ inviteFriendUids: [...coopSelectedFriends], mosaicOverride: coopPickerMosaic }); setCoopPickerMode(null); setCoopPickerMosaic(null); }
+                else { setShowCoopFriendPicker(false); await startCoopSession({ inviteFriendUids: [...coopSelectedFriends] }); }
+              }} disabled={isMosaicMode && !coopPickerMosaic} style={{
+                flex: 1, backgroundColor: (isMosaicMode && !coopPickerMosaic) ? C.textDim : pickerColor, color: "#fff", border: "none",
+                padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                cursor: (isMosaicMode && !coopPickerMosaic) ? "not-allowed" : "pointer", textTransform: "uppercase", opacity: (isMosaicMode && !coopPickerMosaic) ? 0.5 : 1,
+              }}>{`Invite ${coopSelectedFriends.size} Friend${coopSelectedFriends.size > 1 ? "s" : ""}`}</button>
+            ) : (
+              <button onClick={async () => {
+                if (isMosaicMode) { if (!coopPickerMosaic) return; setShowCoopFriendPicker(false); await startCoopMosaicSession({ mosaicOverride: coopPickerMosaic }); setCoopPickerMode(null); setCoopPickerMosaic(null); }
+                else { setShowCoopFriendPicker(false); startCoopSession(); }
+              }} disabled={isMosaicMode && !coopPickerMosaic} style={{
+                flex: 1, backgroundColor: (isMosaicMode && !coopPickerMosaic) ? C.textDim : pickerColor, color: "#fff", border: "none",
+                padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                cursor: (isMosaicMode && !coopPickerMosaic) ? "not-allowed" : "pointer", textTransform: "uppercase", opacity: (isMosaicMode && !coopPickerMosaic) ? 0.5 : 1,
+              }}>Share Link</button>
+            )}
+            <button onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); setCoopPickerMode(null); setCoopPickerMosaic(null); }} style={{
+              backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+              padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+            }}>Cancel</button>
+          </div>
+        </div>
+      </DraggableDrawer>
+    );
+  })() : null;
+
+  // --- Global modals element (included in every return) ---
+  const globalModalsEl = (
+    <>
+      {themePickerEl}
+      {accountModalEl}
+      {usernameModalEl}
+      {profilePageEl}
+      {friendsModalEl}
+      {clearConfirmEl}
+      {deleteAccountConfirmEl}
+      {achievementsEl}
+      {shareModalEl}
+      {birthdayPromptEl}
+      {syncChoiceEl}
+      {coopInviteEl}
+      {coopFriendPickerEl}
+      {leaveConfirmEl}
+      {coopMosaicNavigateEl}
+      {mosaicPreviewOverlayEl}
+      {mosaicLeaveConfirmEl}
+      {coopMosaicInviteEl}
+      {coopInviteToastEl}
+    </>
   );
 
   // --- Coop Mosaic joining overlay (shown while waiting for auth + session load) ---
@@ -7425,8 +8712,7 @@ export default function Pattrn() {
             Cancel
           </button>
         </div>
-        {accountModalEl}
-        {usernameModalEl}
+        {globalModalsEl}
       </div>
     );
   }
@@ -7758,282 +9044,6 @@ export default function Pattrn() {
           </div>
         )}
 
-        {/* Coop mosaic friend picker */}
-        {showCoopFriendPicker && (
-          <div onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); }} style={{
-            position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            animation: "fadeUp 0.2s ease both",
-          }}>
-            <div onClick={e => e.stopPropagation()} style={{
-              backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 360, width: "90%",
-              border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
-              maxHeight: "80vh", display: "flex", flexDirection: "column",
-            }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.coop, marginBottom: 4 }}>
-                Start Co-op Mosaic
-              </div>
-              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
-                Select friends to invite or share a link — anyone can join!
-              </div>
-              {friendsList.length > 0 && (
-                <div style={{ marginBottom: 16, maxHeight: 200, overflowY: "auto" }}>
-                  <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
-                    Your Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {friendsList.map(friend => {
-                      const isSelected = coopSelectedFriends.has(friend.uid);
-                      return (
-                        <button
-                          key={friend.uid}
-                          onClick={() => {
-                            setCoopSelectedFriends(prev => {
-                              const next = new Set(prev);
-                              if (next.has(friend.uid)) next.delete(friend.uid);
-                              else next.add(friend.uid);
-                              return next;
-                            });
-                          }}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
-                            borderRadius: 10, backgroundColor: isSelected ? C.coop + "18" : C.bg,
-                            border: `1px solid ${isSelected ? C.coop : C.border}`,
-                            cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
-                          }}
-                          onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.borderColor = C.coop; e.currentTarget.style.backgroundColor = C.coop + "11"; } }}
-                          onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.backgroundColor = C.bg; } }}
-                        >
-                          <div style={{
-                            width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? C.coop : C.border}`,
-                            backgroundColor: isSelected ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
-                            flexShrink: 0, transition: "all 0.15s",
-                          }}>
-                            {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                          </div>
-                          {friend.profilePicture ? (
-                            <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                          ) : (
-                            <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: C.coop + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: C.coop, fontWeight: 700, flexShrink: 0 }}>
-                              {(friend.username || "?")[0].toUpperCase()}
-                            </div>
-                          )}
-                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>
-                            {friend.username}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-              {friendsList.length === 0 && (
-                <div style={{ marginBottom: 16, textAlign: "center", padding: "12px 0", color: C.textDim, fontSize: 11, fontFamily: "'Space Mono', monospace" }}>
-                  No friends added yet. You can add friends in the Mosaic gallery.
-                </div>
-              )}
-              <div style={{ display: "flex", gap: 8 }}>
-                {coopSelectedFriends.size > 0 ? (
-                  <button
-                    onClick={async () => {
-                      setShowCoopFriendPicker(false);
-                      await startCoopMosaicSession({ inviteFriendUids: [...coopSelectedFriends] });
-                    }}
-                    style={{
-                      flex: 1, backgroundColor: C.coop, color: "#fff", border: "none",
-                      padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    {`Invite ${coopSelectedFriends.size} Friend${coopSelectedFriends.size > 1 ? "s" : ""}`}
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setShowCoopFriendPicker(false);
-                      startCoopMosaicSession();
-                    }}
-                    style={{
-                      flex: 1, backgroundColor: C.coop, color: "#fff", border: "none",
-                      padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase",
-                    }}
-                  >
-                    Share Link
-                  </button>
-                )}
-                <button
-                  onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); }}
-                  style={{
-                    backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Coop mosaic invite modal */}
-        {showCoopMosaicInvite && (
-          <div style={{
-            position: "fixed", inset: 0, zIndex: 1100,
-            backgroundColor: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 20,
-          }} onClick={() => { setShowCoopMosaicInvite(false); setCoopSelectedFriends(new Set()); }}>
-            <div style={{
-              backgroundColor: C.surface, borderRadius: 16, padding: 24,
-              width: "100%", maxWidth: 360, border: `1px solid ${C.border}`,
-              animation: "fadeUp 0.3s ease",
-            }} onClick={e => e.stopPropagation()}>
-              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.coop, margin: "0 0 8px 0", letterSpacing: 1 }}>
-                Co-op Mosaic
-              </h3>
-              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace" }}>
-                Select friends to invite or share a link — anyone with the link can join!
-              </div>
-              {/* Friends multi-select */}
-              {friendsList.length > 0 && (
-                <div style={{ marginBottom: 14, maxHeight: 140, overflowY: "auto" }}>
-                  <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
-                    Invite Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    {friendsList.map(friend => {
-                      const isMosaicActive = !!coopMosaicPlayers[friend.uid];
-                      const isMosaicInvited = coopMosaicInvitedUids.has(friend.uid);
-                      const isMosaicHandled = isMosaicActive || isMosaicInvited;
-                      const isSelected = coopSelectedFriends.has(friend.uid);
-                      return (
-                        <button key={friend.uid}
-                          onClick={() => {
-                            if (isMosaicHandled) return;
-                            setCoopSelectedFriends(prev => {
-                              const next = new Set(prev);
-                              if (next.has(friend.uid)) next.delete(friend.uid);
-                              else next.add(friend.uid);
-                              return next;
-                            });
-                          }}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
-                            borderRadius: 8,
-                            backgroundColor: isMosaicActive ? C.correct + "12" : isMosaicInvited ? C.coop + "12" : isSelected ? C.coop + "18" : C.bg,
-                            border: `1px solid ${isMosaicActive ? C.correct + "55" : isMosaicInvited ? C.coop + "55" : isSelected ? C.coop : C.border}`,
-                            cursor: isMosaicHandled ? "default" : "pointer",
-                            opacity: isMosaicHandled ? 0.8 : 1,
-                            transition: "all 0.15s", width: "100%", textAlign: "left",
-                          }}
-                          onMouseEnter={e => { if (!isSelected && !isMosaicHandled) e.currentTarget.style.borderColor = C.coop; }}
-                          onMouseLeave={e => { if (!isSelected && !isMosaicHandled) e.currentTarget.style.borderColor = C.border; }}
-                        >
-                          {!isMosaicHandled && (
-                            <div style={{
-                              width: 16, height: 16, borderRadius: 3, border: `2px solid ${isSelected ? C.coop : C.border}`,
-                              backgroundColor: isSelected ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
-                              flexShrink: 0, transition: "all 0.15s",
-                            }}>
-                              {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                            </div>
-                          )}
-                          {friend.profilePicture ? (
-                            <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                          ) : (
-                            <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: C.coop + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: C.coop, fontWeight: 700, flexShrink: 0 }}>
-                              {(friend.username || "?")[0].toUpperCase()}
-                            </div>
-                          )}
-                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
-                          {isMosaicActive && (
-                            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.correct, letterSpacing: 1, textTransform: "uppercase" }}>Active</span>
-                          )}
-                          {isMosaicInvited && !isMosaicActive && (
-                            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.coop, letterSpacing: 1, textTransform: "uppercase" }}>Invited</span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {coopSelectedFriends.size > 0 && coopMosaicSessionId && (
-                    <button
-                      onClick={async () => {
-                        const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?coopMosaic=${coopMosaicSessionId}` : "";
-                        await Promise.all([...coopSelectedFriends].map(uid =>
-                          Promise.all([
-                            sendNotification(uid, {
-                              type: "coop_mosaic_invite",
-                              fromUid: firebaseUser.uid,
-                              fromUsername: username || firebaseUser.email,
-                              data: { sessionId: coopMosaicSessionId, mosaicTitle: customMosaicPlay?.title || "Untitled", url: coopUrl },
-                            }).catch(() => {}),
-                            addCoopMosaicInvitedUid(coopMosaicSessionId, uid).catch(() => {}),
-                          ])
-                        ));
-                        setCoopSelectedFriends(new Set());
-                        setShowCoopMosaicInvite(false);
-                      }}
-                      style={{
-                        marginTop: 8, width: "100%", padding: "8px 12px", borderRadius: 8,
-                        backgroundColor: C.coop, color: "#fff", border: "none",
-                        fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
-                        letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
-                      }}
-                    >
-                      {`Send ${coopSelectedFriends.size} Invite${coopSelectedFriends.size > 1 ? "s" : ""}`}
-                    </button>
-                  )}
-                </div>
-              )}
-              {/* Link section */}
-              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
-                Or share link
-              </div>
-              <div style={{
-                padding: "10px 12px", borderRadius: 8, backgroundColor: C.bg, border: `1px solid ${C.border}`,
-                fontSize: 11, fontFamily: "'Space Mono', monospace", color: C.text,
-                wordBreak: "break-all", marginBottom: 12, userSelect: "all",
-              }}>
-                {coopMosaicInviteUrl}
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={async () => {
-                  const result = await tryNativeShare({ text: `Join me on this mosaic puzzle!\n${coopMosaicInviteUrl}` });
-                  if (result === "shared") { setShowCoopMosaicInvite(false); return; }
-                  if (result === "cancelled") return;
-                  try { await navigator.clipboard.writeText(coopMosaicInviteUrl); } catch {}
-                  setShowCoopMosaicInvite(false);
-                }}
-                  style={{
-                    flex: 1, padding: "10px 16px", borderRadius: 10,
-                    backgroundColor: C.coop, color: "#fff", border: "none",
-                    fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
-                    letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
-                  }}
-                >
-                  Copy Link
-                </button>
-                <button onClick={() => { setShowCoopMosaicInvite(false); setCoopSelectedFriends(new Set()); }}
-                  style={{
-                    padding: "10px 16px", borderRadius: 10,
-                    backgroundColor: "transparent", color: C.textDim,
-                    border: `1px solid ${C.border}`,
-                    fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
-                    letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
-                  }}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Mosaic stats section */}
         {solvedCount > 0 && (() => {
           const localTimes = customMosaicPlay?.id ? ((times.mosaicCompletionTimes || {})[customMosaicPlay.id] || {}) : {};
@@ -8141,63 +9151,8 @@ export default function Pattrn() {
             </div>
           );
         })()}
-        {coopInviteToastEl}
 
-        {/* Leave coop mosaic confirmation dialog */}
-        {showMosaicLeaveConfirm && (
-          <div onClick={() => setShowMosaicLeaveConfirm(false)} style={{
-            position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            animation: "fadeUp 0.2s ease both",
-          }}>
-            <div onClick={e => e.stopPropagation()} style={{
-              backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 320, width: "90%",
-              border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
-            }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>
-                {coopMosaicRole === "host" ? "Go to Menu?" : "Leave Co-op?"}
-              </div>
-              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
-                {coopMosaicRole === "host"
-                  ? "Your session will stay active. You can rejoin anytime from the Active Co-op Sessions panel on the main menu."
-                  : "You will leave this session and your partner will need to invite you again to rejoin."
-                }
-              </div>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button
-                  onClick={() => {
-                    setShowMosaicLeaveConfirm(false);
-                    leaveCoopMosaicSession();
-                    loadActiveCoopSessions();
-                    setView("menu");
-                    setCustomMosaicPlay(null);
-                    customMosaicPuzzlesRef.current = null;
-                    customMosaicReturnViewRef.current = "gallery";
-                  }}
-                  style={{
-                    flex: 1, backgroundColor: coopMosaicRole === "host" ? C.coop : "#f87171", color: "#fff", border: "none",
-                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {coopMosaicRole === "host" ? "Go to Menu" : "Leave"}
-                </button>
-                <button
-                  onClick={() => setShowMosaicLeaveConfirm(false)}
-                  style={{
-                    flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Stay
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {globalModalsEl}
       </div>
     );
   }
@@ -8456,9 +9411,9 @@ export default function Pattrn() {
             </div>
           )}
         </div>
-        {coopInviteToastEl}
 
       <BottomTabBar active="mosaic" />
+      {globalModalsEl}
       </div>
     );
   }
@@ -8815,7 +9770,6 @@ export default function Pattrn() {
             ))}
           </div>
         )}
-        {coopInviteToastEl}
 
       {/* FAB: Create Mosaic */}
       {firebaseUser && (
@@ -8838,6 +9792,7 @@ export default function Pattrn() {
         </button>
       )}
       <BottomTabBar active="mosaic" />
+      {globalModalsEl}
       </div>
     );
   }
@@ -8952,7 +9907,7 @@ export default function Pattrn() {
             ))}
           </div>
         )}
-        {coopInviteToastEl}
+        {globalModalsEl}
       </div>
     );
   }
@@ -9118,7 +10073,7 @@ export default function Pattrn() {
             })}
           </div>
         )}
-        {coopInviteToastEl}
+        {globalModalsEl}
       </div>
     );
   }
@@ -9411,7 +10366,7 @@ export default function Pattrn() {
             )}
           </div>
         )}
-        {coopInviteToastEl}
+        {globalModalsEl}
       </div>
     );
   }
@@ -9655,511 +10610,11 @@ export default function Pattrn() {
             })}
           </div>
         )}
-        {coopInviteToastEl}
+        {globalModalsEl}
       </div>
     );
   }
 
-  // --- Profile page modal ---
-  const profilePageEl = showProfilePage && firebaseUser && firebaseConfigured && (
-    <div onClick={() => setShowProfilePage(false)} style={{
-      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
-      display: "flex", alignItems: "center", justifyContent: "center",
-      padding: 24,
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
-        padding: "24px", maxWidth: 400, width: "100%",
-        boxShadow: "0 16px 48px rgba(0,0,0,0.6)",
-        animation: "fadeUp 0.25s ease",
-        maxHeight: "85vh", overflowY: "auto",
-      }}>
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
-          {/* Profile picture */}
-          <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
-            <div style={{
-              width: 80, height: 80, borderRadius: "50%", margin: "0 auto",
-              backgroundColor: C.surface, display: "flex", alignItems: "center", justifyContent: "center",
-              border: `2px solid ${C.border}`, overflow: "hidden", position: "relative",
-            }}>
-              {profilePicture ? (
-                <img src={profilePicture} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="8" r="4" stroke={C.textDim} strokeWidth="2" fill="none"/>
-                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={C.textDim} strokeWidth="2" fill="none" strokeLinecap="round"/>
-                </svg>
-              )}
-            </div>
-            <label style={{
-              position: "absolute", bottom: -2, right: -2,
-              width: 28, height: 28, borderRadius: "50%",
-              backgroundColor: C.accent, display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: profilePictureLoading ? "not-allowed" : "pointer",
-              border: `2px solid ${C.bg}`,
-              opacity: profilePictureLoading ? 0.5 : 1,
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke={C.bg} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleProfilePictureUpload}
-                disabled={profilePictureLoading}
-                style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
-              />
-            </label>
-          </div>
-
-          {profilePicture && (
-            <button
-              onClick={handleRemoveProfilePicture}
-              disabled={profilePictureLoading}
-              style={{
-                display: "block", margin: "4px auto 0", background: "none", border: "none",
-                color: C.textDim, fontSize: 10, cursor: "pointer", textDecoration: "underline",
-              }}
-            >
-              Remove photo
-            </button>
-          )}
-
-          <h3 style={{
-            fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent,
-            margin: profilePicture ? "8px 0 4px" : "0 0 4px",
-          }}>
-            Profile
-          </h3>
-          <p style={{ color: C.textDim, fontSize: 12, margin: 0, wordBreak: "break-all" }}>
-            {firebaseUser.email}
-          </p>
-        </div>
-
-        {/* Username section */}
-        <div style={{
-          padding: "14px 16px", borderRadius: 10, backgroundColor: C.surface,
-          border: `1px solid ${C.border}`, marginBottom: 12,
-        }}>
-          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>Username</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-              flex: 1, fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700,
-              color: username ? C.text : C.textDim,
-            }}>
-              {username || "Not set"}
-            </div>
-            <button
-              onClick={() => {
-                setUsernameInput(username || "");
-                setUsernameError("");
-                setUsernameAvailable(null);
-                setShowProfilePage(false);
-                setShowUsernameModal(true);
-              }}
-              style={{
-                padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace",
-                background: "none", border: `1px solid ${C.border}`, color: C.textDim,
-                cursor: "pointer", textTransform: "uppercase", letterSpacing: 0.5,
-              }}
-            >
-              {username ? "Change" : "Set"}
-            </button>
-          </div>
-        </div>
-
-        {/* Cloud sync section */}
-        <div style={{
-          padding: "12px 16px", borderRadius: 10, backgroundColor: C.surface,
-          border: `1px solid ${C.border}`, marginBottom: 16, textAlign: "center",
-        }}>
-          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
-          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct }}>
-            {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
-          </div>
-        </div>
-
-        {/* Sign out */}
-        <button
-          onClick={handleSignOut}
-          style={{
-            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-            background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-            textTransform: "uppercase", transition: "all 0.15s", marginBottom: 8,
-          }}
-        >
-          Sign out
-        </button>
-
-        <button
-          onClick={() => setShowProfilePage(false)}
-          style={{
-            width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-            background: "none", border: "none", color: C.textDim, cursor: "pointer",
-            textTransform: "uppercase", transition: "all 0.15s",
-          }}
-        >
-          Close
-        </button>
-      </div>
-    </div>
-  );
-
-  // Helper: format "time ago" from a timestamp
-  const formatTimeAgo = (ts) => {
-    if (!ts) return "Unknown";
-    const now = Date.now();
-    const diff = now - ts;
-    if (diff < 60000) return "Just now";
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
-    return new Date(ts).toLocaleDateString();
-  };
-
-  // Helper: check if a friend is considered "online" (seen within last 2 minutes)
-  const isFriendOnline = (presence) => {
-    if (!presence || !presence.lastSeen) return false;
-    return (Date.now() - presence.lastSeen) < 120000;
-  };
-
-  // Helper: format puzzle label from mode + puzzle key
-  const formatPuzzleLabel = (mode, puzzleKey) => {
-    if (!mode) return null;
-    const modeLabel = mode.charAt(0).toUpperCase() + mode.slice(1);
-    if (mode === "daily") return `Daily (${puzzleKey || "today"})`;
-    if (mode === "cascade") return `Cascade #${(parseInt(puzzleKey) || 0) + 1}`;
-    return `${modeLabel} #${(parseInt(puzzleKey) || 0) + 1}`;
-  };
-
-  // --- Friends Modal ---
-  const friendsModalEl = showFriendsModal && firebaseUser && firebaseConfigured && (
-    <div onClick={() => setShowFriendsModal(false)} style={{
-      position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-    }}>
-      <div onClick={e => e.stopPropagation()} style={{
-        backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
-        padding: 24, maxWidth: 420, width: "100%",
-        boxShadow: "0 16px 48px rgba(0,0,0,0.6)", animation: "fadeUp 0.25s ease",
-        maxHeight: "85vh", overflowY: "auto",
-      }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <h2 style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, margin: 0 }}>
-            {friendsModalTab === "compare" && compareFriend ? `vs ${compareFriend.username}` : "Friends"}
-          </h2>
-          <div style={{ display: "flex", gap: 6 }}>
-            {friendsModalTab === "compare" && (
-              <button onClick={() => { setFriendsModalTab("list"); setCompareFriend(null); setCompareFriendStats(null); }}
-                style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "4px 10px", color: C.textDim, cursor: "pointer", fontSize: 10, fontFamily: "'Space Mono', monospace", transition: "all 0.15s" }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-              >Back</button>
-            )}
-            <button onClick={() => setShowFriendsModal(false)}
-              style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
-            >&times;</button>
-          </div>
-        </div>
-
-        {/* Unified friends list + activity view */}
-        {friendsModalTab === "list" && (
-          <div style={{ marginBottom: 16 }}>
-            {/* Add friend input */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  type="text" value={addFriendInput}
-                  onChange={e => setAddFriendInput(e.target.value)}
-                  placeholder="Add friend by username"
-                  style={{
-                    flex: 1, padding: "10px 14px", borderRadius: 10,
-                    backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                    color: C.text, fontSize: 13, fontFamily: "'Space Mono', monospace", outline: "none",
-                  }}
-                  onFocus={e => { e.target.style.borderColor = C.accent; }}
-                  onBlur={e => { e.target.style.borderColor = C.border; }}
-                  onKeyDown={e => { if (e.key === "Enter" && addFriendInput.trim()) handleAddFriend(); }}
-                />
-                <button onClick={handleAddFriend}
-                  disabled={!addFriendInput.trim() || addFriendLoading}
-                  style={{
-                    padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                    background: addFriendInput.trim() ? C.accent : C.surfaceLight,
-                    color: addFriendInput.trim() ? C.bg : C.textDim,
-                    border: "none", cursor: addFriendInput.trim() ? "pointer" : "not-allowed",
-                    textTransform: "uppercase", flexShrink: 0,
-                  }}
-                >{addFriendLoading ? "..." : "Add"}</button>
-              </div>
-              {addFriendMsg && (
-                <div style={{ fontSize: 11, color: C.accent, marginTop: 6, fontFamily: "'Space Mono', monospace" }}>
-                  {addFriendMsg}
-                </div>
-              )}
-            </div>
-
-            {/* Friends list with activity */}
-            {friendsList.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "30px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
-                No friends added yet.<br/>Add friends by their username to see their activity and compare stats.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
-                  Friends ({friendsList.length})
-                </div>
-                {/* Sort: online first, then by lastSeen */}
-                {friendsList
-                  .slice()
-                  .sort((a, b) => {
-                    const pa = friendPresence[a.uid];
-                    const pb = friendPresence[b.uid];
-                    const onlineA = isFriendOnline(pa) ? 1 : 0;
-                    const onlineB = isFriendOnline(pb) ? 1 : 0;
-                    if (onlineA !== onlineB) return onlineB - onlineA;
-                    return ((pb?.lastSeen || 0) - (pa?.lastSeen || 0));
-                  })
-                  .map(friend => {
-                    const presence = friendPresence[friend.uid];
-                    const online = isFriendOnline(presence);
-                    const lastSolvedLabel = presence ? formatPuzzleLabel(presence.lastSolvedMode, presence.lastSolvedPuzzle) : null;
-                    const currentLabel = (online && presence?.status === "playing") ? formatPuzzleLabel(presence.currentMode, presence.currentPuzzle) : null;
-                    return (
-                      <div key={friend.uid} style={{
-                        padding: "12px 14px", borderRadius: 12,
-                        backgroundColor: C.surface,
-                        border: `1px solid ${online ? C.correct + "33" : C.border}`,
-                        transition: "border-color 0.2s",
-                      }}>
-                        {/* Top row: avatar, name + status, action buttons */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          {/* Avatar with online dot */}
-                          <div style={{ position: "relative", flexShrink: 0 }}>
-                            {friend.profilePicture ? (
-                              <img src={friend.profilePicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
-                            ) : (
-                              <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: C.accent, fontWeight: 700 }}>
-                                {(friend.username || "?")[0].toUpperCase()}
-                              </div>
-                            )}
-                            <div style={{
-                              position: "absolute", bottom: -1, right: -1, width: 12, height: 12,
-                              borderRadius: "50%", border: `2px solid ${C.surface}`,
-                              backgroundColor: online ? C.correct : C.textDim,
-                            }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <span style={{ fontSize: 14, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {friend.username}
-                              </span>
-                              <span style={{ fontSize: 10, color: online ? C.correct : C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
-                                {online ? "ONLINE" : "OFFLINE"}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 2 }}>
-                              {online ? (
-                                currentLabel ? `Playing ${currentLabel}` : "In menus"
-                              ) : (
-                                presence?.lastSeen ? `Last seen ${formatTimeAgo(presence.lastSeen)}` : "No activity yet"
-                              )}
-                            </div>
-                          </div>
-                          {/* Action buttons */}
-                          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                            <button onClick={() => {
-                              setCompareFriend(friend);
-                              setFriendsModalTab("compare");
-                              setCompareFriendLoading(true);
-                              setCompareFriendStats(null);
-                              loadPublicStats(friend.uid)
-                                .then(setCompareFriendStats)
-                                .catch(() => setCompareFriendStats(null))
-                                .finally(() => setCompareFriendLoading(false));
-                            }}
-                              style={{
-                                background: "none", border: `1px solid ${C.accent}55`, borderRadius: 6,
-                                padding: "4px 10px", color: C.accent, cursor: "pointer", fontSize: 10,
-                                fontFamily: "'Space Mono', monospace", transition: "all 0.15s", fontWeight: 700,
-                              }}
-                              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.backgroundColor = C.accent + "11"; }}
-                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "55"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                            >Stats</button>
-                            <button onClick={() => handleRemoveFriend(friend.uid)}
-                              title="Remove friend"
-                              style={{
-                                background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
-                                padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 13,
-                                lineHeight: 1, transition: "all 0.15s",
-                              }}
-                              onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
-                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-                            >&times;</button>
-                          </div>
-                        </div>
-                        {/* Activity details row */}
-                        {(lastSolvedLabel || currentLabel) && (
-                          <div style={{ display: "flex", gap: 8, marginLeft: 48, marginTop: 8 }}>
-                            {lastSolvedLabel && (
-                              <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.surfaceLight, border: `1px solid ${C.border}` }}>
-                                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Last Solved</div>
-                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{lastSolvedLabel}</div>
-                                {presence?.lastSolvedAt && (
-                                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 1 }}>{formatTimeAgo(presence.lastSolvedAt)}</div>
-                                )}
-                              </div>
-                            )}
-                            {currentLabel && (
-                              <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.correct + "0a", border: `1px solid ${C.correct}22` }}>
-                                <div style={{ fontSize: 9, color: C.correct, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Now Playing</div>
-                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{currentLabel}</div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Comparison view */}
-        {friendsModalTab === "compare" && compareFriend && (() => {
-          const myStats = summariseGameData({ progress, times, achievements: [...savedAchievementIds] });
-          const theirProgress = compareFriendStats?.progress || {};
-          const theirTotalSolved = compareFriendStats?.totalSolved || 0;
-          const theirAchievements = compareFriendStats?.achievements || 0;
-          const theirTimes = compareFriendStats?.times || {};
-          const statModes = [
-            { key: "easy", label: "Easy" },
-            { key: "medium", label: "Medium" },
-            { key: "hard", label: "Hard" },
-            { key: "blind", label: "Blind" },
-            { key: "daily", label: "Daily" },
-            { key: "cascade", label: "Cascade" },
-            { key: "spin", label: "Spin" },
-            { key: "mosaic", label: "Mosaic" },
-          ];
-
-          if (compareFriendLoading) {
-            return (
-              <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13 }}>
-                Loading stats...
-              </div>
-            );
-          }
-
-          if (!compareFriendStats) {
-            return (
-              <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
-                No stats available for this friend yet.<br/>They need to sign in and solve some puzzles first.
-              </div>
-            );
-          }
-
-          const CompareRow = ({ label, myVal, theirVal, isBetter }) => {
-            const myWins = myVal > theirVal;
-            const theyWin = theirVal > myVal;
-            const tie = myVal === theirVal && myVal > 0;
-            return (
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "8px 12px", borderRadius: 8,
-                backgroundColor: tie ? C.surface : myWins ? C.correct + "0a" : theyWin ? C.incorrect + "0a" : C.surface,
-                border: `1px solid ${tie ? C.border : myWins ? C.correct + "22" : theyWin ? C.incorrect + "22" : C.border}`,
-              }}>
-                <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: myWins ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
-                  {isBetter ? (myVal ? formatTime(myVal) : "--") : myVal}
-                </div>
-                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
-                  {label}
-                </div>
-                <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: theyWin ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
-                  {isBetter ? (theirVal ? formatTime(theirVal) : "--") : theirVal}
-                </div>
-              </div>
-            );
-          };
-
-          // Calculate best times per mode
-          const getBestTime = (timesObj, mode) => {
-            const modeTimes = timesObj[mode] || {};
-            const vals = Object.values(modeTimes).filter(t => t > 0);
-            return vals.length > 0 ? Math.min(...vals) : null;
-          };
-
-          return (
-            <div style={{ animation: "fadeUp 0.25s ease" }}>
-              {/* Header row */}
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, padding: "0 12px" }}>
-                <div style={{ fontSize: 11, color: C.accent, fontFamily: "'Space Mono', monospace", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
-                  You
-                </div>
-                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
-                  {compareFriend.username}
-                </div>
-              </div>
-
-              {/* Total solved */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
-                <CompareRow label="Total Solved" myVal={myStats.totalSolved} theirVal={theirTotalSolved} />
-                <CompareRow label="Achievements" myVal={myStats.achievements} theirVal={theirAchievements} />
-              </div>
-
-              {/* Per-mode solved */}
-              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
-                Puzzles Solved by Mode
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
-                {statModes.map(m => (
-                  <CompareRow key={m.key} label={m.label} myVal={myStats.modes[m.key] || 0} theirVal={theirProgress[m.key] || 0} />
-                ))}
-              </div>
-
-              {/* Best times */}
-              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
-                Best Times (lower is better)
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {["easy", "medium", "hard", "blind", "daily"].map(mode => {
-                  const myBest = getBestTime(times, mode);
-                  const theirBest = getBestTime(theirTimes, mode);
-                  const myWins = myBest && theirBest ? myBest < theirBest : false;
-                  const theyWin = myBest && theirBest ? theirBest < myBest : false;
-                  return (
-                    <div key={mode} style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "8px 12px", borderRadius: 8,
-                      backgroundColor: myWins ? C.correct + "0a" : theyWin ? C.incorrect + "0a" : C.surface,
-                      border: `1px solid ${myWins ? C.correct + "22" : theyWin ? C.incorrect + "22" : C.border}`,
-                    }}>
-                      <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: myWins ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
-                        {myBest ? formatTime(myBest) : "--"}
-                      </div>
-                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
-                        {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                      </div>
-                      <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: theyWin ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
-                        {theirBest ? formatTime(theirBest) : "--"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-    </div>
-  );
 
   // --- CO-OP VIEW ---
   if (view === "coop") {
@@ -10462,16 +10917,8 @@ export default function Pattrn() {
                   const perfectTiles = Object.values(tp).filter(v => v === 1).length;
                   const formatTime = (s) => { const m = Math.floor(s / 60); const sec = s % 60; return m > 0 ? `${m}m ${sec}s` : `${sec}s`; };
                   return (
-                    <div onClick={() => setCoopCompletedBreakdown(null)} style={{
-                      position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      animation: "fadeUp 0.2s ease both",
-                    }}>
-                      <div onClick={e => e.stopPropagation()} style={{
-                        backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 380, width: "90%",
-                        border: `1px solid ${C.correct}33`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
-                        maxHeight: "80vh", overflowY: "auto",
-                      }}>
+                    <DraggableDrawer isOpen={true} onClose={() => setCoopCompletedBreakdown(null)} zIndex={1200}>
+                      <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
                         <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.correct, marginBottom: 4 }}>
                           {"\u2713"} {bs.mosaicTitle || "Untitled"}
                         </div>
@@ -10545,18 +10992,15 @@ export default function Pattrn() {
                           Close
                         </button>
                       </div>
-                    </div>
+                    </DraggableDrawer>
                   );
                 })()}
               </>
             );
           })()}
         </div>
-        {accountModalEl}
-        {usernameModalEl}
-        {friendsModalEl}
-        {coopInviteToastEl}
         <BottomTabBar active="coop" />
+        {globalModalsEl}
       </div>
     );
   }
@@ -10975,272 +11419,10 @@ export default function Pattrn() {
           </div>
         </div>
 
-        {themePickerEl}
-        {accountModalEl}
-        {usernameModalEl}
-        {profilePageEl}
-        {friendsModalEl}
-
-        {/* Clear All Data confirmation dialog */}
-        {showClearConfirm && (
-          <div onClick={() => setShowClearConfirm(false)} style={{
-            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-          }}>
-            <div onClick={e => e.stopPropagation()} style={{
-              backgroundColor: C.bg, border: `1px solid ${C.incorrect}44`, borderRadius: 16,
-              padding: "24px", maxWidth: 340, width: "100%",
-              boxShadow: `0 16px 48px rgba(0,0,0,0.6), 0 0 40px ${C.incorrect}22`,
-              animation: "fadeUp 0.25s ease",
-            }}>
-              <div style={{ textAlign: "center", marginBottom: 20 }}>
-                <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.incorrect, margin: "0 0 8px" }}>
-                  Clear All Data?
-                </h3>
-                <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
-                  This will permanently delete <strong style={{ color: C.text }}>all your progress</strong>, times, achievements, streak, and saved data. This cannot be undone.
-                </p>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <button onClick={async () => {
-                  try {
-                    localStorage.removeItem(STORAGE_KEY);
-                    localStorage.removeItem(TIMES_KEY);
-                    localStorage.removeItem(BIRTHDAY_KEY);
-                    localStorage.removeItem(THEME_KEY);
-                    localStorage.removeItem(ACHIEV_KEY);
-                  } catch { /* ignore */ }
-                  if (firebaseUser) { try { await logOut(); } catch { /* ignore */ } }
-                  setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
-                  setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
-                  setSavedAchievementIds(new Set());
-                  setBirthday(null);
-                  setActiveThemeId("classic");
-                  setShowClearConfirm(false);
-                  setView("menu");
-                }} style={{
-                  width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-                  background: C.incorrect, color: "#fff", border: "none", cursor: "pointer",
-                  textTransform: "uppercase",
-                }}>
-                  Clear everything
-                </button>
-                <button onClick={() => setShowClearConfirm(false)} style={{
-                  width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                  background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                  textTransform: "uppercase",
-                }}>
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Delete Account confirmation dialog */}
-        {showDeleteAccountConfirm && firebaseUser && (
-          <div onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountError(""); setDeleteAccountPassword(""); }} style={{
-            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-          }}>
-            <div onClick={e => e.stopPropagation()} style={{
-              backgroundColor: C.bg, border: "1px solid #dc262644", borderRadius: 16,
-              padding: "24px", maxWidth: 340, width: "100%",
-              boxShadow: "0 16px 48px rgba(0,0,0,0.6), 0 0 40px #dc262622",
-              animation: "fadeUp 0.25s ease",
-            }}>
-              <div style={{ textAlign: "center", marginBottom: 20 }}>
-                <div style={{
-                  width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
-                  backgroundColor: "#dc262622", display: "flex", alignItems: "center", justifyContent: "center",
-                  border: "2px solid #dc262644",
-                }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 9v4m0 4h.01M12 3L2 21h20L12 3z" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <h3 style={{
-                  fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#dc2626", margin: "0 0 8px",
-                }}>
-                  Delete Account?
-                </h3>
-                <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
-                  This will <strong style={{ color: C.text }}>permanently delete your account</strong>, all progress, cloud data, friends, and mosaics. This cannot be undone.
-                </p>
-              </div>
-
-              {/* Password field for email/password users */}
-              {firebaseUser.providerData.some(p => p.providerId === "password") && (
-                <div style={{ marginBottom: 12 }}>
-                  <input
-                    type="password"
-                    placeholder="Enter your password to confirm"
-                    value={deleteAccountPassword}
-                    onChange={e => setDeleteAccountPassword(e.target.value)}
-                    style={{
-                      width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 12,
-                      fontFamily: "'Space Mono', monospace",
-                      background: C.surface, border: `1px solid ${C.border}`, color: C.text,
-                      outline: "none", boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-              )}
-
-              {deleteAccountError && (
-                <div style={{ color: "#dc2626", fontSize: 11, textAlign: "center", marginBottom: 12 }}>
-                  {deleteAccountError}
-                </div>
-              )}
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <button
-                  onClick={handleDeleteAccount}
-                  disabled={deleteAccountLoading}
-                  style={{
-                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-                    background: deleteAccountLoading ? "#dc262688" : "#dc2626", color: "#fff", border: "none",
-                    cursor: deleteAccountLoading ? "not-allowed" : "pointer",
-                    textTransform: "uppercase", transition: "all 0.15s",
-                  }}
-                >
-                  {deleteAccountLoading ? "Deleting..." : "Delete my account"}
-                </button>
-                <button
-                  onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountError(""); setDeleteAccountPassword(""); }}
-                  disabled={deleteAccountLoading}
-                  style={{
-                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                    background: "none", border: `1px solid ${C.border}`, color: C.textDim,
-                    cursor: deleteAccountLoading ? "not-allowed" : "pointer",
-                    textTransform: "uppercase", transition: "all 0.15s",
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Achievements drawer */}
-        {showAchievements && (() => {
-          const achievements = computeAchievements(progress, times, savedAchievementIds);
-          const unlocked = achievements.filter(a => a.unlocked).length;
-          const total = achievements.length;
-          const tierColors = { 1: C.bronze, 2: C.silver, 3: C.gold };
-          const tierSymbols = { 1: "\u25C6", 2: "\u25CF", 3: "\u2605" };
-          return (
-            <div onClick={() => setShowAchievements(false)} style={{
-              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
-              display: "flex", alignItems: "flex-end", justifyContent: "center",
-            }}>
-              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
-              <div onClick={e => e.stopPropagation()} style={{
-                backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
-                padding: "0", maxWidth: 480, width: "100%",
-                boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`, maxHeight: "85vh",
-                display: "flex", flexDirection: "column",
-                animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-              }}>
-                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
-                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
-                </div>
-                <div style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
-                  <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Achievements</h2>
-                    <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>{unlocked}/{total} unlocked</p>
-                  </div>
-                  <div style={{ height: 6, borderRadius: 3, backgroundColor: C.surfaceLight, marginBottom: 20, overflow: "hidden" }}>
-                    <div style={{ height: "100%", borderRadius: 3, backgroundColor: C.accent, width: `${(unlocked / total) * 100}%`, transition: "width 0.5s" }} />
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 20 }}>
-                    {achievements.map(a => {
-                      const tc = tierColors[a.tier] || C.textDim;
-                      const ts = tierSymbols[a.tier] || "";
-                      return (
-                        <div key={a.id} style={{
-                          display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
-                          borderRadius: 10, backgroundColor: a.unlocked ? tc + "12" : C.surface,
-                          border: `1px solid ${a.unlocked ? tc + "44" : C.border}`,
-                          opacity: a.unlocked ? 1 : 0.5,
-                        }}>
-                          <span style={{ fontSize: 14, color: tc, fontFamily: "'Space Mono', monospace" }}>{ts}</span>
-                          <div style={{ flex: 1 }}>
-                            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: a.unlocked ? C.text : C.textDim }}>{a.label}</div>
-                            <div style={{ fontSize: 10, color: C.textDim, marginTop: 1 }}>{a.desc}</div>
-                          </div>
-                          {a.unlocked && <span style={{ fontSize: 10, color: tc, fontFamily: "'Space Mono', monospace" }}>{"\u2713"}</span>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-                <div style={{ padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))", borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
-                  <button onClick={() => setShowAchievements(false)} style={{
-                    width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                    padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
-                  }}>Close</button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Stats drawer */}
-        {showShareModal && (() => {
-          const { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll } = getShareData();
-          const gridColors = { none: C.border, failed: C.incorrect, gold: C.gold, silver: C.silver, bronze: C.bronze };
-          return (
-            <div onClick={() => setShowShareModal(false)} style={{
-              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
-              display: "flex", alignItems: "flex-end", justifyContent: "center",
-            }}>
-              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
-              <div onClick={e => e.stopPropagation()} style={{
-                backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
-                padding: "0", maxWidth: 480, width: "100%", maxHeight: "85vh",
-                display: "flex", flexDirection: "column",
-                animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-              }}>
-                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
-                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
-                </div>
-                <div style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
-                  <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Agnus</h2>
-                    <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>my stats</p>
-                  </div>
-                  <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginBottom: 20, padding: "10px 16px", borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}` }}>
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.accent }}>{totalSolved}</div>
-                      <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>solved</div>
-                    </div>
-                    <div style={{ width: 1, backgroundColor: C.border }} />
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700 }}>300</div>
-                      <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>total</div>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={copyShareText} style={{ flex: 1, backgroundColor: C.accent, color: C.bg, border: "none", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>{shareMsg || "Share all"}</button>
-                    <button onClick={copyDailyShareText} style={{ flex: 1, backgroundColor: "transparent", color: C.accent, border: `1.5px solid ${C.accent}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>Share Daily</button>
-                  </div>
-                  <button onClick={() => setShowShareModal(false)} style={{ width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Close</button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
 
         <BottomTabBar active="profile" />
+        {globalModalsEl}
       </div>
     );
   }
@@ -12085,126 +12267,6 @@ export default function Pattrn() {
           );
         })()}
 
-        {/* Birthday prompt drawer */}
-        {showBirthdayPrompt && (
-          <div onClick={() => setShowBirthdayPrompt(false)} style={{
-            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
-            display: "flex", alignItems: "flex-end", justifyContent: "center",
-          }}>
-            <div onClick={e => e.stopPropagation()} style={{
-              backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
-              maxWidth: 480, width: "100%", overflow: "hidden",
-              boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`,
-              animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-            }}>
-              {/* Drag handle */}
-              <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
-                <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
-              </div>
-
-              <div style={{ padding: "8px 24px 0", overflow: "hidden" }}>
-                <div style={{ textAlign: "center", marginBottom: 16 }}>
-                  <span style={{ fontSize: 32 }}>{"\uD83C\uDF82"}</span>
-                  <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#F472B6", margin: "8px 0 4px" }}>
-                    Set your birthday
-                  </h3>
-                  <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
-                    We'll highlight it on the calendar and let you play &amp; share the puzzle from your birth date.
-                  </p>
-                </div>
-                <input
-                  type="date"
-                  value={birthdayInput}
-                  onChange={e => setBirthdayInput(e.target.value)}
-                  max={(() => { const n = new Date(); return `${n.getUTCFullYear()}-${String(n.getUTCMonth()+1).padStart(2,"0")}-${String(n.getUTCDate()).padStart(2,"0")}`; })()}
-                  style={{
-                    width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`,
-                    backgroundColor: C.surface, color: C.text, fontFamily: "'Space Mono', monospace", fontSize: 16,
-                    outline: "none", boxSizing: "border-box", minWidth: 0,
-                    colorScheme: "dark",
-                  }}
-                />
-              </div>
-
-              {/* Sticky footer buttons */}
-              <div style={{
-                padding: "16px 24px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
-                display: "flex", flexDirection: "column", gap: 8,
-              }}>
-                <button
-                  onClick={() => {
-                    if (!birthdayInput) return;
-                    const [y, m, d] = birthdayInput.split("-").map(Number);
-                    const bdStr = `${String(d).padStart(2, "0")}-${String(m).padStart(2, "0")}-${y}`;
-                    setBirthday(bdStr);
-                    try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
-                    if (bdStr === CHEAT_BIRTHDAY) {
-                      const saved = loadSavedAchievements();
-                      if (!saved.has("cheat_turing")) {
-                        // Show achievement toast
-                        achievementQueueRef.current.push({ id: "cheat_turing", label: "Welcome Back, Alan", desc: "The enigma has been decoded", tier: 3 });
-                        if (!achievementToastTimer.current) advanceAchievementQueue();
-                        // Persist so it survives birthday changes
-                        saved.add("cheat_turing");
-                        saveSavedAchievements(saved);
-                        setSavedAchievementIds(new Set(saved));
-                        // Show Enigma theme unlock toast after achievement toast
-                        const enigmaTheme = PUZZLE_THEMES.find(t => t.id === "enigma");
-                        if (enigmaTheme) {
-                          setTimeout(() => showThemeToast(enigmaTheme), 3800);
-                        }
-                      }
-                    }
-                    setShowBirthdayPrompt(false);
-                    setBirthdayInput("");
-                    setCalendarYear(y);
-                    setCalendarMonth(m - 1);
-                  }}
-                  disabled={!birthdayInput}
-                  style={{
-                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-                    background: birthdayInput ? "#F472B6" : C.surfaceLight, color: birthdayInput ? "#fff" : C.textDim,
-                    border: "none", cursor: birthdayInput ? "pointer" : "not-allowed",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Save
-                </button>
-                {birthday && (
-                  <button
-                    onClick={() => {
-                      setBirthday(null);
-                      try { localStorage.removeItem(BIRTHDAY_KEY); } catch { /* ignore */ }
-                      setShowBirthdayPrompt(false);
-                      setBirthdayInput("");
-                    }}
-                    style={{
-                      width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                      background: "none", border: `1px solid ${C.incorrect}`, color: C.incorrect,
-                      cursor: "pointer", textTransform: "uppercase",
-                    }}
-                  >
-                    Remove
-                  </button>
-                )}
-                <button
-                  onClick={() => { setShowBirthdayPrompt(false); setBirthdayInput(""); }}
-                  style={{
-                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                    background: "none", border: `1px solid ${C.border}`, color: C.textDim,
-                    cursor: "pointer", textTransform: "uppercase",
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Mosaic: Staff Pick featured panel + carousel of all mosaics */}
         {isMosaic && (<>
         <style>{`.mosaic-carousel::-webkit-scrollbar { display: none; }`}</style>
@@ -12465,470 +12527,11 @@ export default function Pattrn() {
 
         </div>{/* close scrollable content wrapper */}
 
-        {/* Stats drawer */}
-        {showShareModal && (() => {
-          const { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll } = getShareData();
-          const gridColors = { none: C.border, failed: C.incorrect, gold: C.gold, silver: C.silver, bronze: C.bronze };
-          return (
-            <div onClick={() => setShowShareModal(false)} style={{
-              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
-              display: "flex", alignItems: "flex-end", justifyContent: "center",
-            }}>
-              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } } @keyframes drawerOverlayFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
-              <div onClick={e => e.stopPropagation()} style={{
-                backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
-                padding: "0", maxWidth: 480, width: "100%",
-                boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`, maxHeight: "85vh",
-                display: "flex", flexDirection: "column",
-                animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-              }}>
-                {/* Drag handle */}
-                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
-                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
-                </div>
-
-                {/* Scrollable content */}
-                <div style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
-                  {/* Drawer header */}
-                  <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
-                      Agnus
-                    </h2>
-                    <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>my stats</p>
-                  </div>
-
-                  {/* Overall stats */}
-                  <div style={{
-                    display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginBottom: 20,
-                    padding: "10px 16px", borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                  }}>
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.accent }}>{totalSolved}</div>
-                      <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>solved</div>
-                    </div>
-                    <div style={{ width: 1, backgroundColor: C.border }} />
-                    <div style={{ textAlign: "center" }}>
-                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700 }}>300</div>
-                      <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>total</div>
-                    </div>
-                    {getDailyStreak(progress) > 0 && (
-                      <>
-                        <div style={{ width: 1, backgroundColor: C.border }} />
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.gold }}>🔥 {getDailyStreak(progress)}</div>
-                          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>day streak</div>
-                        </div>
-                      </>
-                    )}
-                    {bestTimeAll != null && (
-                      <>
-                        <div style={{ width: 1, backgroundColor: C.border }} />
-                        <div style={{ textAlign: "center" }}>
-                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.correct }}>{formatTime(bestTimeAll)}</div>
-                          <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>fastest</div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-
-                  {/* Per-difficulty sections */}
-                  {sections.map(s => (
-                    <div key={s.key} style={{ marginBottom: 16 }}>
-                      <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: s.key === "blind" ? "#e06040" : C.text, letterSpacing: 1, textTransform: "uppercase" }}>
-                          {s.label}
-                        </span>
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, fontWeight: 700 }}>
-                          {s.solved}/50
-                        </span>
-                        {s.bestTime != null && (
-                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.textDim }}>
-                            best {formatTime(s.bestTime)}
-                          </span>
-                        )}
-                        {s.avgTime != null && (
-                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.textDim }}>
-                            avg {formatTime(s.avgTime)}
-                          </span>
-                        )}
-                      </div>
-                      {/* Visual grid - 25 columns */}
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(25, 1fr)", gap: 2 }}>
-                        {s.grid.map((g, i) => (
-                          <div key={i} style={{
-                            aspectRatio: "1", borderRadius: 2,
-                            backgroundColor: g === "none" ? C.surface : gridColors[g] + (g === "none" ? "" : "cc"),
-                            border: `1px solid ${g === "none" ? C.border : gridColors[g]}44`,
-                          }} />
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-
-                  {/* Medal summary */}
-                  <div style={{
-                    display: "flex", justifyContent: "center", gap: 14, marginTop: 16, marginBottom: 8,
-                    fontSize: 11, fontFamily: "'Space Mono', monospace", color: C.textDim,
-                  }}>
-                    <span><span style={{ color: C.gold }}>{"\u2605"}</span> {totalGold}</span>
-                    <span><span style={{ color: C.silver }}>{"\u25CF"}</span> {totalSilver}</span>
-                    <span><span style={{ color: C.bronze }}>{"\u25C6"}</span> {totalBronze}</span>
-                    <span><span style={{ color: C.incorrect }}>{"\u2717"}</span> {totalFailed}</span>
-                  </div>
-                </div>
-
-                {/* Sticky footer buttons */}
-                <div style={{
-                  padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))",
-                  borderTop: `1px solid ${C.border}`,
-                  display: "flex", flexDirection: "column", gap: 8, flexShrink: 0,
-                }}>
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <button onClick={copyShareText}
-                      style={{
-                        flex: 1, backgroundColor: C.accent, color: C.bg, border: "none",
-                        padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
-                        textTransform: "uppercase", transition: "all 0.15s",
-                      }}
-                    >
-                      {shareMsg || "Share all"}
-                    </button>
-                    <button onClick={copyDailyShareText}
-                      style={{
-                        flex: 1, backgroundColor: "transparent", color: C.accent, border: `1.5px solid ${C.accent}`,
-                        padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
-                        textTransform: "uppercase", transition: "all 0.15s",
-                      }}
-                    >
-                      Share Daily
-                    </button>
-                  </div>
-                  <button onClick={() => setShowShareModal(false)}
-                    style={{
-                      width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                      padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
-
         {/* Game Menu redirect (legacy — now uses profile view) */}
         {showGameMenu && (() => {
           setShowGameMenu(false);
           setView("profile");
           return null;
-        })()}
-        {themePickerEl}
-
-        {/* Clear All Data confirmation dialog */}
-        {showClearConfirm && (
-          <div onClick={() => setShowClearConfirm(false)} style={{
-            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 24,
-          }}>
-            <div onClick={e => e.stopPropagation()} style={{
-              backgroundColor: C.bg, border: `1px solid ${C.incorrect}44`, borderRadius: 16,
-              padding: "24px", maxWidth: 340, width: "100%",
-              boxShadow: `0 16px 48px rgba(0,0,0,0.6), 0 0 40px ${C.incorrect}22`,
-              animation: "fadeUp 0.25s ease",
-            }}>
-              <div style={{ textAlign: "center", marginBottom: 20 }}>
-                <div style={{
-                  width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
-                  backgroundColor: C.incorrect + "22", display: "flex", alignItems: "center", justifyContent: "center",
-                  border: `2px solid ${C.incorrect}44`,
-                }}>
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <path d="M12 9v4m0 4h.01M12 3L2 21h20L12 3z" stroke={C.incorrect} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </div>
-                <h3 style={{
-                  fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.incorrect, margin: "0 0 8px",
-                }}>
-                  Clear All Data?
-                </h3>
-                <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
-                  This will permanently delete <strong style={{ color: C.text }}>all your progress</strong>, solve times, achievements, streak, birthday, and saved data. This cannot be undone.
-                </p>
-              </div>
-
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <button
-                  onClick={async () => {
-                    try {
-                      localStorage.removeItem(STORAGE_KEY);
-                      localStorage.removeItem(TIMES_KEY);
-                      localStorage.removeItem(BIRTHDAY_KEY);
-                      localStorage.removeItem(THEME_KEY);
-                      localStorage.removeItem(ACHIEV_KEY);
-                    } catch { /* ignore */ }
-                    // Sign out if logged in (clears cloud sync link)
-                    if (firebaseUser) {
-                      try { await logOut(); } catch { /* ignore */ }
-                    }
-                    setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
-                    setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
-                    setSavedAchievementIds(new Set());
-                    setBirthday(null);
-                    setActiveThemeId("classic");
-                    setShowClearConfirm(false);
-                    setShowGameMenu(false);
-                  }}
-                  style={{
-                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-                    background: C.incorrect, color: "#fff", border: "none", cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.15s",
-                  }}
-                >
-                  Clear everything
-                </button>
-                <button
-                  onClick={() => setShowClearConfirm(false)}
-                  style={{
-                    width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                    background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.15s",
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {accountModalEl}
-        {usernameModalEl}
-        {profilePageEl}
-        {friendsModalEl}
-
-        {/* Sync choice prompt (local vs cloud data on login) */}
-        {showSyncChoice && syncChoiceData && (() => {
-          const { localSummary, cloudSummary } = syncChoiceData;
-          const localMore = localSummary.totalSolved > cloudSummary.totalSolved;
-          const cloudMore = cloudSummary.totalSolved > localSummary.totalSolved;
-          const SyncOption = ({ label, tag, summary, highlight, onClick }) => (
-            <button onClick={onClick} style={{
-              width: "100%", padding: "14px 16px", borderRadius: 12, textAlign: "left",
-              background: highlight ? C.accent + "14" : C.surface,
-              border: `1px solid ${highlight ? C.accent + "66" : C.border}`,
-              cursor: "pointer", transition: "all 0.15s", marginBottom: 8,
-              position: "relative",
-            }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text }}>
-                  {label}
-                </span>
-                {tag && (
-                  <span style={{
-                    fontSize: 9, fontWeight: 700, fontFamily: "'Space Mono', monospace",
-                    padding: "2px 6px", borderRadius: 4,
-                    backgroundColor: C.correct + "22", color: C.correct,
-                    textTransform: "uppercase", letterSpacing: 0.5,
-                  }}>
-                    {tag}
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5 }}>
-                {summary.totalSolved} puzzle{summary.totalSolved !== 1 ? "s" : ""} solved
-                {summary.achievements > 0 && (<span> &middot; {summary.achievements} achievement{summary.achievements !== 1 ? "s" : ""}</span>)}
-              </div>
-            </button>
-          );
-          return (
-            <div onClick={() => {}} style={{
-              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
-              display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
-            }}>
-              <div onClick={e => e.stopPropagation()} style={{
-                backgroundColor: C.bg, border: `1px solid ${C.border}`, borderRadius: 16,
-                padding: "24px", maxWidth: 400, width: "100%",
-                boxShadow: "0 16px 48px rgba(0,0,0,0.6)", animation: "fadeUp 0.25s ease",
-              }}>
-                <div style={{ textAlign: "center", marginBottom: 20 }}>
-                  <div style={{
-                    width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
-                    backgroundColor: "#F59E0B22", display: "flex", alignItems: "center", justifyContent: "center",
-                    border: "2px solid #F59E0B44",
-                  }}>
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 3L4 9v12h16V9l-8-6z" stroke="#F59E0B" strokeWidth="2" fill="none" strokeLinejoin="round"/>
-                      <path d="M9 21v-6h6v6" stroke="#F59E0B" strokeWidth="2" fill="none" strokeLinejoin="round"/>
-                    </svg>
-                  </div>
-                  <h3 style={{
-                    fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, margin: "0 0 6px",
-                  }}>
-                    Existing Save Found
-                  </h3>
-                  <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5, maxWidth: 300, marginInline: "auto" }}>
-                    You have progress saved in the cloud and on this device. Which would you like to keep?
-                  </p>
-                </div>
-
-                <SyncOption
-                  label="Use This Device"
-                  tag={localMore ? "More progress" : null}
-                  summary={localSummary}
-                  highlight={localMore}
-                  onClick={() => handleSyncChoice("local")}
-                />
-                <SyncOption
-                  label="Use Cloud Save"
-                  tag={cloudMore ? "More progress" : null}
-                  summary={cloudSummary}
-                  highlight={cloudMore}
-                  onClick={() => handleSyncChoice("cloud")}
-                />
-                <button onClick={() => handleSyncChoice("merge")} style={{
-                  width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                  background: C.accent, color: C.bg, border: "none",
-                  cursor: "pointer", textTransform: "uppercase", transition: "all 0.15s", marginTop: 4,
-                }}>
-                  Merge Both
-                </button>
-                <p style={{
-                  fontSize: 10, color: C.textDim, textAlign: "center", margin: "10px 0 0",
-                  lineHeight: 1.5, fontFamily: "'DM Sans', sans-serif",
-                }}>
-                  Merge keeps the best results from both saves
-                </p>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* Achievements drawer */}
-        {showAchievements && (() => {
-          const achievements = computeAchievements(progress, times, savedAchievementIds);
-          const unlocked = achievements.filter(a => a.unlocked).length;
-          const total = achievements.length;
-          const tierColors = { 1: C.bronze, 2: C.silver, 3: C.gold };
-          const tierSymbols = { 1: "\u25C6", 2: "\u25CF", 3: "\u2605" };
-          return (
-            <div onClick={() => setShowAchievements(false)} style={{
-              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
-              display: "flex", alignItems: "flex-end", justifyContent: "center",
-            }}>
-              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
-              <div onClick={e => e.stopPropagation()} style={{
-                backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
-                padding: "0", maxWidth: 480, width: "100%",
-                boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`, maxHeight: "85vh",
-                display: "flex", flexDirection: "column",
-                animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-              }}>
-                {/* Drag handle */}
-                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
-                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
-                </div>
-
-                {/* Scrollable content */}
-                <div style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
-                  {/* Header */}
-                  <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
-                      Achievements
-                    </h2>
-                    <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>{unlocked}/{total} unlocked</p>
-                  </div>
-
-                  {/* Progress bar */}
-                  <div style={{
-                    height: 6, borderRadius: 3, backgroundColor: C.surfaceLight, marginBottom: 20, overflow: "hidden",
-                  }}>
-                    <div style={{
-                      height: "100%", borderRadius: 3, backgroundColor: C.accent,
-                      width: `${(unlocked / total) * 100}%`, transition: "width 0.5s ease",
-                    }} />
-                  </div>
-
-                  {/* Achievement categories */}
-                  {ACHIEVEMENT_CATS.map(cat => {
-                    const catAchs = achievements.filter(a => a.cat === cat.key);
-                    return (
-                      <div key={cat.key} style={{ marginBottom: 16 }}>
-                        <div style={{
-                          fontSize: 10, color: C.textDim, textTransform: "uppercase",
-                          letterSpacing: 1.5, marginBottom: 8,
-                          fontFamily: "'Space Mono', monospace",
-                        }}>{cat.label}</div>
-                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                          {catAchs.map(a => (
-                            <div key={a.id} style={{
-                              display: "flex", alignItems: "center", gap: 12,
-                              padding: "10px 12px", borderRadius: 10,
-                              backgroundColor: C.surface,
-                              border: `1px solid ${a.unlocked ? tierColors[a.tier] + "44" : C.border}`,
-                              opacity: a.unlocked ? 1 : 0.4,
-                              transition: "all 0.2s",
-                            }}>
-                              <div style={{
-                                width: 32, height: 32, borderRadius: 8,
-                                backgroundColor: a.unlocked ? tierColors[a.tier] + "22" : C.surfaceLight,
-                                display: "flex", alignItems: "center", justifyContent: "center",
-                                border: `1.5px solid ${a.unlocked ? tierColors[a.tier] : C.border}`,
-                                flexShrink: 0,
-                              }}>
-                                <span style={{
-                                  fontSize: 16, color: a.unlocked ? tierColors[a.tier] : C.textDim,
-                                  lineHeight: 1,
-                                }}>{tierSymbols[a.tier]}</span>
-                              </div>
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{
-                                  fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
-                                  color: a.unlocked ? C.text : C.textDim,
-                                  letterSpacing: 0.5,
-                                }}>{a.label}</div>
-                                <div style={{
-                                  fontSize: 10, color: C.textDim, lineHeight: 1.3, marginTop: 2,
-                                }}>{a.desc}</div>
-                              </div>
-                              {a.unlocked && (
-                                <span style={{ color: C.correct, fontSize: 14, flexShrink: 0 }}>{"\u2713"}</span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Sticky footer */}
-                <div style={{
-                  padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))",
-                  borderTop: `1px solid ${C.border}`, flexShrink: 0,
-                }}>
-                  <button onClick={() => setShowAchievements(false)}
-                    style={{
-                      width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                      padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
         })()}
 
       {/* Achievement toast (menu view) */}
@@ -13108,9 +12711,9 @@ export default function Pattrn() {
           </div>
         </div>
       )}
-      {coopInviteToastEl}
 
       <BottomTabBar active="home" />
+      {globalModalsEl}
       </div>
     );
   }
@@ -13472,589 +13075,6 @@ export default function Pattrn() {
         </div>
         </div>
       </div>
-
-      {/* Coop invite modal */}
-      {showCoopInvite && coopSessionId && (
-        <div onClick={() => { setShowCoopInvite(false); setCoopSelectedFriends(new Set()); }} style={{
-          position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          animation: "fadeUp 0.2s ease both",
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 360, width: "90%",
-            border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
-            maxHeight: "80vh", display: "flex", flexDirection: "column",
-          }}>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>
-              Co-op Invite
-            </div>
-            <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
-              Share a link or select friends to invite
-            </div>
-            {/* Friends multi-select invite */}
-            {friendsList.length > 0 && (
-              <div style={{ marginBottom: 14, maxHeight: 140, overflowY: "auto" }}>
-                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
-                  Invite Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {friendsList.map(friend => {
-                    const isActive = !!coopPlayers[friend.uid];
-                    const isInvited = coopInvitedUids.has(friend.uid);
-                    const isAlreadyHandled = isActive || isInvited;
-                    const isSelected = coopSelectedFriends.has(friend.uid);
-                    return (
-                      <button
-                        key={friend.uid}
-                        onClick={() => {
-                          if (isAlreadyHandled) return;
-                          setCoopSelectedFriends(prev => {
-                            const next = new Set(prev);
-                            if (next.has(friend.uid)) next.delete(friend.uid);
-                            else next.add(friend.uid);
-                            return next;
-                          });
-                        }}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
-                          borderRadius: 8,
-                          backgroundColor: isActive ? C.correct + "12" : isInvited ? C.coop + "12" : isSelected ? "#54A0FF18" : C.bg,
-                          border: `1px solid ${isActive ? C.correct + "55" : isInvited ? C.coop + "55" : isSelected ? "#54A0FF" : C.border}`,
-                          cursor: isAlreadyHandled ? "default" : "pointer",
-                          opacity: isAlreadyHandled ? 0.8 : 1,
-                          transition: "all 0.15s", width: "100%", textAlign: "left",
-                        }}
-                        onMouseEnter={e => { if (!isSelected && !isAlreadyHandled) e.currentTarget.style.borderColor = "#54A0FF"; }}
-                        onMouseLeave={e => { if (!isSelected && !isAlreadyHandled) e.currentTarget.style.borderColor = C.border; }}
-                      >
-                        {!isAlreadyHandled && (
-                          <div style={{
-                            width: 16, height: 16, borderRadius: 3, border: `2px solid ${isSelected ? "#54A0FF" : C.border}`,
-                            backgroundColor: isSelected ? "#54A0FF" : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
-                            flexShrink: 0, transition: "all 0.15s",
-                          }}>
-                            {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                          </div>
-                        )}
-                        {friend.profilePicture ? (
-                          <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                        ) : (
-                          <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: "#54A0FF33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#54A0FF", fontWeight: 700, flexShrink: 0 }}>
-                            {(friend.username || "?")[0].toUpperCase()}
-                          </div>
-                        )}
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
-                        {isActive && (
-                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.correct, letterSpacing: 1, textTransform: "uppercase" }}>Active</span>
-                        )}
-                        {isInvited && !isActive && (
-                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.coop, letterSpacing: 1, textTransform: "uppercase" }}>Invited</span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {coopSelectedFriends.size > 0 && (
-              <button
-                onClick={async () => {
-                  const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : "";
-                  await Promise.all([...coopSelectedFriends].map(uid =>
-                    Promise.all([
-                      sendNotification(uid, {
-                        type: "coop_invite",
-                        fromUid: firebaseUser.uid,
-                        fromUsername: username || firebaseUser.email,
-                        data: { sessionId: coopSessionId, mode: difficulty, level: currentPuzzle, url: coopUrl },
-                      }).catch(() => {}),
-                      addCoopInvitedUid(coopSessionId, uid).catch(() => {}),
-                    ])
-                  ));
-                  setCoopSelectedFriends(new Set());
-                }}
-                style={{
-                  marginBottom: 14, width: "100%", padding: "8px 12px", borderRadius: 8,
-                  backgroundColor: "#54A0FF", color: "#fff", border: "none",
-                  fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
-                  letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
-                }}
-              >
-                {`Send ${coopSelectedFriends.size} Invite${coopSelectedFriends.size > 1 ? "s" : ""}`}
-              </button>
-            )}
-            {/* Link section */}
-            <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
-              Or share link
-            </div>
-            <div style={{
-              backgroundColor: C.bg, borderRadius: 8, padding: "10px 12px", marginBottom: 12,
-              fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.text, wordBreak: "break-all",
-              border: `1px solid ${C.border}`,
-            }}>
-              {typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : ""}
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={async () => {
-                  const url = `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}`;
-                  const result = await tryNativeShare({ title: "Agnus Co-op", text: "Join me for a co-op puzzle!", url });
-                  if (result === "shared") {
-                    setShowCoopInvite(false);
-                    return;
-                  }
-                  if (result === "cancelled") return;
-                  try { await navigator.clipboard.writeText(url); } catch {}
-                  setShowCoopInvite(false);
-                }}
-                style={{
-                  flex: 1, backgroundColor: "#54A0FF", color: "#fff", border: "none",
-                  padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase",
-                }}
-              >
-                Copy Link
-              </button>
-              <button
-                onClick={() => { setShowCoopInvite(false); setCoopSelectedFriends(new Set()); }}
-                style={{
-                  backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                  padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase",
-                }}
-              >
-                Close
-              </button>
-            </div>
-            {!coopPartnerConnected && (
-              <div style={{ marginTop: 12, textAlign: "center", fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", animation: "pulse 2s infinite" }}>
-                Waiting for partner to join...
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Coop friend picker modal - shown when clicking Co-op button */}
-      {showCoopFriendPicker && (() => {
-        const isMosaicMode = coopPickerMode === "mosaic";
-        const pickerColor = isMosaicMode ? C.coop : "#54A0FF";
-        const availableMosaics = [...(myMosaics || []), ...(staffPickMosaic ? [staffPickMosaic] : [])].filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
-        return (
-        <div onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); setCoopPickerMode(null); setCoopPickerMosaic(null); }} style={{
-          position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          animation: "fadeUp 0.2s ease both",
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 360, width: "90%",
-            border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
-            maxHeight: "80vh", display: "flex", flexDirection: "column", overflowY: "auto",
-          }}>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>
-              Start Co-op
-            </div>
-            <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
-              Select friends to invite or share a link
-            </div>
-            {/* Mode picker */}
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
-                Puzzle Type
-              </div>
-              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                {[
-                  { key: null, label: `Current (${(DIFFICULTIES.find(m => m.key === difficulty) || {}).label || difficulty})` },
-                  { key: "mosaic", label: "Mosaic" },
-                ].map(opt => {
-                  const active = coopPickerMode === opt.key;
-                  return (
-                    <button key={opt.key || "_current"} onClick={() => { setCoopPickerMode(opt.key); setCoopPickerMosaic(null); }}
-                      style={{
-                        padding: "5px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, cursor: "pointer",
-                        border: `1px solid ${active ? pickerColor : C.border}`,
-                        backgroundColor: active ? pickerColor + "22" : C.bg,
-                        color: active ? pickerColor : C.textDim, transition: "all 0.15s",
-                      }}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            {/* Mosaic picker — shown when mosaic mode selected */}
-            {isMosaicMode && (
-              <div style={{ marginBottom: 14 }}>
-                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
-                  Choose Mosaic
-                </div>
-                {availableMosaics.length > 0 ? (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 120, overflowY: "auto" }}>
-                    {availableMosaics.map(m => {
-                      const sel = coopPickerMosaic?.id === m.id;
-                      return (
-                        <button key={m.id} onClick={() => setCoopPickerMosaic(m)}
-                          style={{
-                            display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
-                            borderRadius: 8, backgroundColor: sel ? C.coop + "18" : C.bg,
-                            border: `1px solid ${sel ? C.coop : C.border}`,
-                            cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
-                          }}
-                        >
-                          <div style={{
-                            width: 14, height: 14, borderRadius: 3, border: `2px solid ${sel ? C.coop : C.border}`,
-                            backgroundColor: sel ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
-                            flexShrink: 0, transition: "all 0.15s",
-                          }}>
-                            {sel && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                          </div>
-                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>
-                            {m.title || "Untitled"}
-                          </span>
-                          {m.authorUsername && <span style={{ fontSize: 9, color: C.textDim }}>by {m.authorUsername}</span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", padding: "8px 0" }}>
-                    No mosaics available. Create one in the Mosaic gallery first.
-                  </div>
-                )}
-              </div>
-            )}
-            {/* Friends list with multi-select */}
-            {friendsList.length > 0 && (
-              <div style={{ marginBottom: 16, maxHeight: 200, overflowY: "auto" }}>
-                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
-                  Your Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {friendsList.map(friend => {
-                    const isSelected = coopSelectedFriends.has(friend.uid);
-                    return (
-                      <button
-                        key={friend.uid}
-                        onClick={() => {
-                          setCoopSelectedFriends(prev => {
-                            const next = new Set(prev);
-                            if (next.has(friend.uid)) next.delete(friend.uid);
-                            else next.add(friend.uid);
-                            return next;
-                          });
-                        }}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
-                          borderRadius: 10, backgroundColor: isSelected ? pickerColor + "18" : C.bg,
-                          border: `1px solid ${isSelected ? pickerColor : C.border}`,
-                          cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
-                        }}
-                        onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.borderColor = pickerColor; e.currentTarget.style.backgroundColor = pickerColor + "11"; } }}
-                        onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.backgroundColor = C.bg; } }}
-                      >
-                        <div style={{
-                          width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? pickerColor : C.border}`,
-                          backgroundColor: isSelected ? pickerColor : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
-                          flexShrink: 0, transition: "all 0.15s",
-                        }}>
-                          {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                        </div>
-                        {friend.profilePicture ? (
-                          <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                        ) : (
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: pickerColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: pickerColor, fontWeight: 700, flexShrink: 0 }}>
-                            {(friend.username || "?")[0].toUpperCase()}
-                          </div>
-                        )}
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>
-                          {friend.username}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-            {friendsList.length === 0 && (
-              <div style={{ marginBottom: 16, textAlign: "center", padding: "12px 0", color: C.textDim, fontSize: 11, fontFamily: "'Space Mono', monospace" }}>
-                No friends added yet. You can add friends in the Mosaic gallery.
-              </div>
-            )}
-            {/* Action buttons */}
-            <div style={{ display: "flex", gap: 8 }}>
-              {coopSelectedFriends.size > 0 ? (
-                <button
-                  onClick={async () => {
-                    if (isMosaicMode) {
-                      if (!coopPickerMosaic) return;
-                      setShowCoopFriendPicker(false);
-                      await startCoopMosaicSession({ inviteFriendUids: [...coopSelectedFriends], mosaicOverride: coopPickerMosaic });
-                      setCoopPickerMode(null); setCoopPickerMosaic(null);
-                    } else {
-                      setShowCoopFriendPicker(false);
-                      await startCoopSession({ inviteFriendUids: [...coopSelectedFriends] });
-                    }
-                  }}
-                  disabled={isMosaicMode && !coopPickerMosaic}
-                  style={{
-                    flex: 1, backgroundColor: (isMosaicMode && !coopPickerMosaic) ? C.textDim : pickerColor, color: "#fff", border: "none",
-                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                    cursor: (isMosaicMode && !coopPickerMosaic) ? "not-allowed" : "pointer",
-                    textTransform: "uppercase", opacity: (isMosaicMode && !coopPickerMosaic) ? 0.5 : 1,
-                  }}
-                >
-                  {`Invite ${coopSelectedFriends.size} Friend${coopSelectedFriends.size > 1 ? "s" : ""}`}
-                </button>
-              ) : (
-                <button
-                  onClick={async () => {
-                    if (isMosaicMode) {
-                      if (!coopPickerMosaic) return;
-                      setShowCoopFriendPicker(false);
-                      await startCoopMosaicSession({ mosaicOverride: coopPickerMosaic });
-                      setCoopPickerMode(null); setCoopPickerMosaic(null);
-                    } else {
-                      setShowCoopFriendPicker(false);
-                      startCoopSession();
-                    }
-                  }}
-                  disabled={isMosaicMode && !coopPickerMosaic}
-                  style={{
-                    flex: 1, backgroundColor: (isMosaicMode && !coopPickerMosaic) ? C.textDim : pickerColor, color: "#fff", border: "none",
-                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                    cursor: (isMosaicMode && !coopPickerMosaic) ? "not-allowed" : "pointer",
-                    textTransform: "uppercase", opacity: (isMosaicMode && !coopPickerMosaic) ? 0.5 : 1,
-                  }}
-                >
-                  Share Link
-                </button>
-              )}
-              <button
-                onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); setCoopPickerMode(null); setCoopPickerMosaic(null); }}
-                style={{
-                  backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                  padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase",
-                }}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-        );
-      })()}
-
-      {/* Leave coop confirmation dialog */}
-      {showLeaveConfirm && (
-        <div onClick={() => setShowLeaveConfirm(false)} style={{
-          position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          animation: "fadeUp 0.2s ease both",
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 320, width: "90%",
-            border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
-          }}>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>
-              Leave Co-op?
-            </div>
-            <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
-              {coopRole === "host"
-                ? "The session will stay active. You can rejoin from the main menu."
-                : "You will leave this session and your partner will need to invite you again to rejoin."
-              }
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button
-                onClick={() => {
-                  leaveCoopSession();
-                  if (customMosaicPuzzlesRef.current && isMosaic) {
-                    setView("custom-mosaic");
-                  } else {
-                    setView("menu");
-                  }
-                }}
-                style={{
-                  flex: 1, backgroundColor: "#f87171", color: "#fff", border: "none",
-                  padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase",
-                }}
-              >
-                Leave
-              </button>
-              <button
-                onClick={() => setShowLeaveConfirm(false)}
-                style={{
-                  flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                  padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase",
-                }}
-              >
-                Stay
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Navigate to player's tile modal */}
-      {showCoopMosaicNavigate && (() => {
-        const playersOnTiles = Object.entries(coopMosaicPlayers)
-          .filter(([, p]) => p.currentTile != null && p.currentTile >= 0 && p.currentTile !== currentPuzzle);
-        return playersOnTiles.length > 0 ? (
-          <div onClick={() => setShowCoopMosaicNavigate(false)} style={{
-            position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <div onClick={e => e.stopPropagation()} style={{
-              backgroundColor: C.surface, borderRadius: 16, padding: "24px 28px",
-              border: `1px solid ${C.border}`, maxWidth: 320, width: "90%",
-              textAlign: "center", animation: "fadeUp 0.25s ease",
-            }}>
-              <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>
-                Go to player
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-                {playersOnTiles.map(([uid, p]) => (
-                  <button key={uid} onClick={() => {
-                    const targetTile = p.currentTile;
-                    setShowCoopMosaicNavigate(false);
-                    coopMosaicCurrentTileRef.current = targetTile;
-                    updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser?.uid, targetTile).catch(() => {});
-                    coopMosaicWriteThrottleRef.current = {};
-                    startPuzzle(targetTile, "mosaic", true);
-                  }}
-                    style={{
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-                      background: C.coop + "11", border: `1px solid ${C.coop}44`, borderRadius: 8,
-                      padding: "10px 16px", cursor: "pointer", transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.coop + "22"; }}
-                    onMouseLeave={e => { e.currentTarget.style.backgroundColor = C.coop + "11"; }}
-                  >
-                    <span style={{ color: C.coop, fontWeight: 700, fontFamily: "'Space Mono', monospace", fontSize: 12 }}>
-                      {p.username || "Player"}
-                    </span>
-                    <span style={{ color: C.textDim, fontFamily: "'Space Mono', monospace", fontSize: 11 }}>
-                      tile {p.currentTile + 1}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => setShowCoopMosaicNavigate(false)}
-                style={{
-                  background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
-                  padding: "8px 18px", color: C.textDim, cursor: "pointer",
-                  fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1,
-                }}
-              >
-                Stay
-              </button>
-            </div>
-          </div>
-        ) : null;
-      })()}
-
-      {/* Mosaic preview overlay — shows full mosaic with current tile highlighted */}
-      {showMosaicPreviewOverlay && customMosaicPlay && customMosaicPuzzlesRef.current && (
-        <div onClick={() => setShowMosaicPreviewOverlay(false)} style={{
-          position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.85)",
-          display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column",
-          animation: "fadeUp 0.2s ease both",
-        }}>
-          <div onClick={e => e.stopPropagation()} style={{
-            display: "flex", flexDirection: "column", alignItems: "center", gap: 12,
-            padding: 20, maxWidth: "90vw",
-          }}>
-            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: "uppercase" }}>
-              Mosaic Preview — Tile {currentPuzzle + 1}
-            </div>
-            {/* Full mosaic canvas with current tile highlighted with in-progress fills */}
-            <canvas ref={el => {
-              if (!el || !customMosaicPlay.grid) return;
-              const grid = customMosaicPlay.grid;
-              const gs = grid.length;
-              const canvasSize = Math.min(320, typeof window !== "undefined" ? window.innerWidth - 60 : 320);
-              const cellSz = canvasSize / gs;
-              const ctx = el.getContext("2d");
-              el.width = canvasSize;
-              el.height = canvasSize;
-              const dimColor = "#14141f";
-              const tileRow = Math.floor(currentPuzzle / 5);
-              const tileCol = currentPuzzle % 5;
-              // Draw all cells
-              for (let r = 0; r < gs; r++) {
-                for (let c = 0; c < (grid[r]?.length || 0); c++) {
-                  const tr = Math.floor(r / 5);
-                  const tc = Math.floor(c / 5);
-                  const tileIdx = tr * 5 + tc;
-                  const isCurrentTile = (tr === tileRow && tc === tileCol);
-                  const tileSolved = (customMosaicProgress[tileIdx] || 0) > 0;
-                  if (isCurrentTile) {
-                    // Current tile: show user's in-progress fills or solution colors
-                    const localR = r - tileRow * 5;
-                    const localC = c - tileCol * 5;
-                    const cellKey = `${localR}-${localC}`;
-                    const puz = customMosaicPuzzlesRef.current[currentPuzzle];
-                    if (puz) {
-                      const isBlankCell = puz.blanks.has(cellKey);
-                      if (!isBlankCell || tileSolved) {
-                        // Pre-filled or solved: show actual color
-                        ctx.fillStyle = grid[r][c] || dimColor;
-                      } else if (fills[cellKey]) {
-                        // User has placed a token — show its color
-                        const placedToken = fills[cellKey];
-                        const parsed = placedToken.split("|");
-                        ctx.fillStyle = parsed[0] || dimColor;
-                      } else {
-                        // Empty blank: show with a slight highlight
-                        ctx.fillStyle = "#2a2a3a";
-                      }
-                    } else {
-                      ctx.fillStyle = grid[r][c] || dimColor;
-                    }
-                  } else if (tileSolved) {
-                    ctx.fillStyle = grid[r][c] || dimColor;
-                  } else {
-                    ctx.fillStyle = dimColor;
-                  }
-                  ctx.fillRect(c * cellSz, r * cellSz, Math.ceil(cellSz), Math.ceil(cellSz));
-                }
-              }
-              // Draw highlight border around current tile
-              ctx.strokeStyle = C.accent;
-              ctx.lineWidth = 3;
-              ctx.strokeRect(tileCol * 5 * cellSz + 1, tileRow * 5 * cellSz + 1, 5 * cellSz - 2, 5 * cellSz - 2);
-            }} style={{ borderRadius: 8, display: "block" }} />
-            <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", textAlign: "center", maxWidth: 280, lineHeight: 1.5 }}>
-              Your current tile is highlighted. Solved tiles are revealed.
-            </div>
-            <button
-              onClick={() => setShowMosaicPreviewOverlay(false)}
-              style={{
-                marginTop: 4, background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
-                padding: "8px 24px", color: C.textDim, cursor: "pointer",
-                fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1,
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-            >
-              Close
-            </button>
-          </div>
-        </div>
-      )}
 
       {/* Partner lock-in toast notification */}
       {coopPartnerLockToast && (
@@ -14985,12 +14005,7 @@ export default function Pattrn() {
         )}
       </div>
 
-      {themePickerEl}
-      {accountModalEl}
-      {usernameModalEl}
-      {profilePageEl}
-      {friendsModalEl}
-      {coopInviteToastEl}
+      {globalModalsEl}
     </div>
   );
 }
