@@ -7,6 +7,10 @@ import {
   onAuthStateChanged,
   GoogleAuthProvider,
   signInWithPopup,
+  deleteUser,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
 } from "firebase/auth";
 import {
   getDatabase,
@@ -82,6 +86,63 @@ export async function signInWithGoogle() {
 export async function logOut() {
   if (!auth) return;
   await signOut(auth);
+}
+
+// Delete the current user's account and all associated data from the database.
+// Requires recent authentication — callers should handle re-auth if needed.
+export async function deleteAccount(uid) {
+  if (!auth || !db || !uid) throw new Error("Firebase not configured");
+  const user = auth.currentUser;
+  if (!user || user.uid !== uid) throw new Error("No authenticated user");
+
+  // 1. Load the user's username so we can clean up the index
+  let usernameKey = null;
+  try {
+    const snap = await get(ref(db, `users/${uid}/username`));
+    if (snap.exists()) usernameKey = snap.val().toLowerCase();
+  } catch { /* proceed even if lookup fails */ }
+
+  // 2. Load the user's email so we can clean up the email index
+  let emailKey = null;
+  try {
+    const snap = await get(ref(db, `users/${uid}/email`));
+    if (snap.exists()) emailKey = sanitizeEmailKey(snap.val());
+  } catch { /* proceed */ }
+
+  // 3. Remove all user data from the database
+  const cleanups = [
+    remove(ref(db, `users/${uid}`)),
+    remove(ref(db, `presence/${uid}`)),
+    remove(ref(db, `publicStats/${uid}`)),
+    remove(ref(db, `notifications/${uid}`)),
+    remove(ref(db, `userCoopSessions/${uid}`)),
+    remove(ref(db, `friends/${uid}`)),
+  ];
+  if (usernameKey) cleanups.push(remove(ref(db, `usernameIndex/${usernameKey}`)));
+  if (emailKey) cleanups.push(remove(ref(db, `emailIndex/${emailKey}`)));
+  await Promise.allSettled(cleanups);
+
+  // 4. Delete the Firebase Auth account
+  await deleteUser(user);
+}
+
+// Re-authenticate a user before sensitive operations like account deletion.
+// For email/password users, requires the current password.
+// For Google users, triggers a Google sign-in popup.
+export async function reauthenticateUser(password) {
+  if (!auth) throw new Error("Firebase not configured");
+  const user = auth.currentUser;
+  if (!user) throw new Error("No authenticated user");
+
+  const providerIds = user.providerData.map(p => p.providerId);
+  if (providerIds.includes("google.com")) {
+    await reauthenticateWithPopup(user, googleProvider);
+  } else if (providerIds.includes("password") && password) {
+    const credential = EmailAuthProvider.credential(user.email, password);
+    await reauthenticateWithCredential(user, credential);
+  } else {
+    throw new Error("Unable to re-authenticate");
+  }
 }
 
 // Cloud data structure matches localStorage keys
