@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <g>
+  <rect width="1024" height="1024" fill="#13111f"/>
+
+  <!-- 3x3 grid, cell 300, gap 42 -->
+  <!-- Edge cells pushed 40px off each side to hide corner radii -->
+
+  <!-- Row 0 -->
+  <rect x="-40" y="-40" width="350" height="350" rx="28" fill="#FF6B6B"/>
+  <circle cx="135" cy="135" r="55" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="18"/>
+
+  <rect x="352" y="-40" width="320" height="350" rx="28" fill="#4ECDC4"/>
+  <polygon points="512,80 575,135 512,190 449,135" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="18" stroke-linejoin="round"/>
+
+  <rect x="714" y="-40" width="350" height="350" rx="28" fill="#c8f03e"/>
+  <polygon points="889,83 949,193 829,193" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="18" stroke-linejoin="round"/>
+
+  <!-- Row 1 -->
+  <rect x="-40" y="352" width="350" height="320" rx="28" fill="#4ECDC4"/>
+  <polygon points="135,457 198,512 135,567 72,512" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="18" stroke-linejoin="round"/>
+
+  <rect x="352" y="352" width="320" height="320" rx="28" fill="#c8f03e"/>
+  <polygon points="512,460 572,570 452,570" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="18" stroke-linejoin="round"/>
+
+  <rect x="714" y="352" width="350" height="320" rx="28" fill="#FF6B6B"/>
+  <circle cx="889" cy="512" r="55" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="18"/>
+
+  <!-- Row 2 -->
+  <rect x="-40" y="714" width="350" height="350" rx="28" fill="#c8f03e"/>
+  <polygon points="135,819 195,929 75,929" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="18" stroke-linejoin="round"/>
+
+  <rect x="352" y="714" width="320" height="350" rx="28" fill="#FF6B6B"/>
+  <circle cx="512" cy="889" r="55" fill="none" stroke="rgba(255,255,255,0.85)" stroke-width="18"/>
+
+  <!-- Empty cell -->
+  <rect x="714" y="714" width="350" height="350" rx="28" fill="#1e1b2e"/>
+  </g>
+</svg>
