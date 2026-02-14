@@ -14405,28 +14405,6 @@ export default function Pattrn() {
         {/* Token picker row */}
         {gameState === "playing" && (
           <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId}
-            passOption={isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0 ? {
-              active: !!coopPassMode || coopPassPlayerPicker,
-              onPass: () => {
-                if (coopPassMode) {
-                  // Cancel pass mode
-                  setCoopPassMode(null);
-                  setSelectedToken(null);
-                  return;
-                }
-                // Deselect any token, open player picker
-                setSelectedToken(null);
-                setSelectedCell(null);
-                const entries = Object.entries(coopPlayers);
-                if (entries.length === 1) {
-                  // Only one partner — skip picker, go straight to pass mode
-                  const [uid, p] = entries[0];
-                  setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
-                } else {
-                  setCoopPassPlayerPicker(prev => !prev);
-                }
-              },
-            } : null}
           />
         )}
         {/* Pass player picker dropdown (multi-partner) */}
@@ -14509,6 +14487,43 @@ export default function Pattrn() {
               fontFamily: "'Space Mono', monospace", fontWeight: 600,
             }}>Cancel</button>
           </div>
+        )}
+        {/* Pass this cell — own row above lock in */}
+        {gameState === "playing" && isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0 && (
+          <button
+            onClick={() => {
+              if (coopPassMode) {
+                setCoopPassMode(null);
+                setSelectedToken(null);
+                return;
+              }
+              setSelectedToken(null);
+              setSelectedCell(null);
+              const entries = Object.entries(coopPlayers);
+              if (entries.length === 1) {
+                const [uid, p] = entries[0];
+                setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
+              } else {
+                setCoopPassPlayerPicker(prev => !prev);
+              }
+            }}
+            style={{
+              display: "flex", alignItems: "center", gap: 8, padding: "8px 20px",
+              borderRadius: 10, cursor: "pointer",
+              backgroundColor: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF18" : "transparent",
+              border: (coopPassMode || coopPassPlayerPicker) ? "1px solid #54A0FF44" : `1px solid ${C.border}`,
+              color: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF" : C.textDim,
+              fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600,
+              letterSpacing: 1, textTransform: "uppercase",
+              transition: "all 0.2s",
+            }}
+          >
+            <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
+              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M11 13l-7 7"/><path d="M3 16v5h5"/>
+            </svg>
+            Pass Cell
+          </button>
         )}
         {gameState === "playing" && (
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
