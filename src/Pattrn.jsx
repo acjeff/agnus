@@ -2784,7 +2784,7 @@ export default function Pattrn() {
 
   // --- Friends Modal & Comparison state ---
   const [showFriendsModal, setShowFriendsModal] = useState(false);
-  const [friendsModalTab, setFriendsModalTab] = useState("list"); // "list" | "compare" | "activity"
+  const [friendsModalTab, setFriendsModalTab] = useState("list"); // "list" | "compare"
   const [compareFriend, setCompareFriend] = useState(null); // friend object being compared
   const [compareFriendStats, setCompareFriendStats] = useState(null); // loaded public stats for comparison
   const [compareFriendLoading, setCompareFriendLoading] = useState(false);
@@ -9146,142 +9146,20 @@ export default function Pattrn() {
           </div>
         </div>
 
-        {/* Tab bar (List | Activity) — hidden during compare */}
-        {friendsModalTab !== "compare" && (
-          <div style={{ display: "flex", gap: 4, marginBottom: 16 }}>
-            {[{ key: "list", label: "List" }, { key: "activity", label: "Activity" }].map(tab => (
-              <button key={tab.key}
-                onClick={() => {
-                  setFriendsModalTab(tab.key);
-                  // Friend activity data kept fresh via real-time subscriptions
-                }}
-                style={{
-                  flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                  textTransform: "uppercase", cursor: "pointer", transition: "all 0.15s",
-                  background: friendsModalTab === tab.key ? C.accent : "transparent",
-                  color: friendsModalTab === tab.key ? C.bg : C.textDim,
-                  border: `1px solid ${friendsModalTab === tab.key ? C.accent : C.border}`,
-                }}
-              >{tab.label}</button>
-            ))}
-          </div>
-        )}
-
-        {/* Activity tab */}
-        {friendsModalTab === "activity" && (
-          <div style={{ animation: "fadeUp 0.25s ease" }}>
-            {friendPresenceLoading ? (
-              <div style={{ textAlign: "center", padding: "30px 20px", color: C.textDim, fontSize: 13 }}>
-                Loading activity...
-              </div>
-            ) : friendsList.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "30px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
-                No friends added yet.<br/>Add friends to see their activity.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                {/* Sort: online first, then by lastSeen */}
-                {friendsList
-                  .slice()
-                  .sort((a, b) => {
-                    const pa = friendPresence[a.uid];
-                    const pb = friendPresence[b.uid];
-                    const onlineA = isFriendOnline(pa) ? 1 : 0;
-                    const onlineB = isFriendOnline(pb) ? 1 : 0;
-                    if (onlineA !== onlineB) return onlineB - onlineA;
-                    return ((pb?.lastSeen || 0) - (pa?.lastSeen || 0));
-                  })
-                  .map(friend => {
-                    const presence = friendPresence[friend.uid];
-                    const online = isFriendOnline(presence);
-                    const lastSolvedLabel = presence ? formatPuzzleLabel(presence.lastSolvedMode, presence.lastSolvedPuzzle) : null;
-                    const currentLabel = (online && presence?.status === "playing") ? formatPuzzleLabel(presence.currentMode, presence.currentPuzzle) : null;
-                    return (
-                      <div key={friend.uid} style={{
-                        padding: "12px 14px", borderRadius: 12,
-                        backgroundColor: C.surface,
-                        border: `1px solid ${online ? C.correct + "33" : C.border}`,
-                        transition: "border-color 0.2s",
-                      }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 8 }}>
-                          {/* Avatar with online dot */}
-                          <div style={{ position: "relative", flexShrink: 0 }}>
-                            {friend.profilePicture ? (
-                              <img src={friend.profilePicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
-                            ) : (
-                              <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: C.accent, fontWeight: 700 }}>
-                                {(friend.username || "?")[0].toUpperCase()}
-                              </div>
-                            )}
-                            {/* Online indicator dot */}
-                            <div style={{
-                              position: "absolute", bottom: -1, right: -1, width: 12, height: 12,
-                              borderRadius: "50%", border: `2px solid ${C.surface}`,
-                              backgroundColor: online ? C.correct : C.textDim,
-                            }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <span style={{ fontSize: 14, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {friend.username}
-                              </span>
-                              <span style={{ fontSize: 10, color: online ? C.correct : C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
-                                {online ? "ONLINE" : "OFFLINE"}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 2 }}>
-                              {online ? (
-                                currentLabel ? `Playing ${currentLabel}` : "In menus"
-                              ) : (
-                                presence?.lastSeen ? `Last seen ${formatTimeAgo(presence.lastSeen)}` : "No activity yet"
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                        {/* Activity details */}
-                        <div style={{ display: "flex", gap: 8, marginLeft: 48 }}>
-                          {lastSolvedLabel && (
-                            <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.surfaceLight, border: `1px solid ${C.border}` }}>
-                              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Last Solved</div>
-                              <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{lastSolvedLabel}</div>
-                              {presence?.lastSolvedAt && (
-                                <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 1 }}>{formatTimeAgo(presence.lastSolvedAt)}</div>
-                              )}
-                            </div>
-                          )}
-                          {currentLabel && (
-                            <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.correct + "0a", border: `1px solid ${C.correct}22` }}>
-                              <div style={{ fontSize: 9, color: C.correct, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Now Playing</div>
-                              <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{currentLabel}</div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* List tab (add friends + friend list) */}
+        {/* Unified friends list + activity view */}
         {friendsModalTab === "list" && (
           <div style={{ marginBottom: 16 }}>
             {/* Add friend input */}
             <div style={{ marginBottom: 16 }}>
-              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
-                Add Friend by Username
-              </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <input
                   type="text" value={addFriendInput}
                   onChange={e => setAddFriendInput(e.target.value)}
-                  placeholder="Enter username"
+                  placeholder="Add friend by username"
                   style={{
                     flex: 1, padding: "10px 14px", borderRadius: 10,
                     backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                    color: C.text, fontSize: 14, fontFamily: "'Space Mono', monospace", outline: "none",
+                    color: C.text, fontSize: 13, fontFamily: "'Space Mono', monospace", outline: "none",
                   }}
                   onFocus={e => { e.target.style.borderColor = C.accent; }}
                   onBlur={e => { e.target.style.borderColor = C.border; }}
@@ -9306,63 +9184,128 @@ export default function Pattrn() {
               )}
             </div>
 
-            {/* Friends list */}
+            {/* Friends list with activity */}
             {friendsList.length === 0 ? (
               <div style={{ textAlign: "center", padding: "30px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
-                No friends added yet.<br/>Add friends by their username to compare stats and see how they did on puzzles.
+                No friends added yet.<br/>Add friends by their username to see their activity and compare stats.
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
-                  Your Friends ({friendsList.length})
+                  Friends ({friendsList.length})
                 </div>
-                {friendsList.map(friend => (
-                  <div key={friend.uid} style={{
-                    display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
-                    borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                  }}>
-                    {friend.profilePicture ? (
-                      <img src={friend.profilePicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                    ) : (
-                      <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: C.accent, fontWeight: 700, flexShrink: 0 }}>
-                        {(friend.username || "?")[0].toUpperCase()}
+                {/* Sort: online first, then by lastSeen */}
+                {friendsList
+                  .slice()
+                  .sort((a, b) => {
+                    const pa = friendPresence[a.uid];
+                    const pb = friendPresence[b.uid];
+                    const onlineA = isFriendOnline(pa) ? 1 : 0;
+                    const onlineB = isFriendOnline(pb) ? 1 : 0;
+                    if (onlineA !== onlineB) return onlineB - onlineA;
+                    return ((pb?.lastSeen || 0) - (pa?.lastSeen || 0));
+                  })
+                  .map(friend => {
+                    const presence = friendPresence[friend.uid];
+                    const online = isFriendOnline(presence);
+                    const lastSolvedLabel = presence ? formatPuzzleLabel(presence.lastSolvedMode, presence.lastSolvedPuzzle) : null;
+                    const currentLabel = (online && presence?.status === "playing") ? formatPuzzleLabel(presence.currentMode, presence.currentPuzzle) : null;
+                    return (
+                      <div key={friend.uid} style={{
+                        padding: "12px 14px", borderRadius: 12,
+                        backgroundColor: C.surface,
+                        border: `1px solid ${online ? C.correct + "33" : C.border}`,
+                        transition: "border-color 0.2s",
+                      }}>
+                        {/* Top row: avatar, name + status, action buttons */}
+                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                          {/* Avatar with online dot */}
+                          <div style={{ position: "relative", flexShrink: 0 }}>
+                            {friend.profilePicture ? (
+                              <img src={friend.profilePicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
+                            ) : (
+                              <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: C.accent, fontWeight: 700 }}>
+                                {(friend.username || "?")[0].toUpperCase()}
+                              </div>
+                            )}
+                            <div style={{
+                              position: "absolute", bottom: -1, right: -1, width: 12, height: 12,
+                              borderRadius: "50%", border: `2px solid ${C.surface}`,
+                              backgroundColor: online ? C.correct : C.textDim,
+                            }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                              <span style={{ fontSize: 14, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                {friend.username}
+                              </span>
+                              <span style={{ fontSize: 10, color: online ? C.correct : C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
+                                {online ? "ONLINE" : "OFFLINE"}
+                              </span>
+                            </div>
+                            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 2 }}>
+                              {online ? (
+                                currentLabel ? `Playing ${currentLabel}` : "In menus"
+                              ) : (
+                                presence?.lastSeen ? `Last seen ${formatTimeAgo(presence.lastSeen)}` : "No activity yet"
+                              )}
+                            </div>
+                          </div>
+                          {/* Action buttons */}
+                          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                            <button onClick={() => {
+                              setCompareFriend(friend);
+                              setFriendsModalTab("compare");
+                              setCompareFriendLoading(true);
+                              setCompareFriendStats(null);
+                              loadPublicStats(friend.uid)
+                                .then(setCompareFriendStats)
+                                .catch(() => setCompareFriendStats(null))
+                                .finally(() => setCompareFriendLoading(false));
+                            }}
+                              style={{
+                                background: "none", border: `1px solid ${C.accent}55`, borderRadius: 6,
+                                padding: "4px 10px", color: C.accent, cursor: "pointer", fontSize: 10,
+                                fontFamily: "'Space Mono', monospace", transition: "all 0.15s", fontWeight: 700,
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.backgroundColor = C.accent + "11"; }}
+                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "55"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                            >Stats</button>
+                            <button onClick={() => handleRemoveFriend(friend.uid)}
+                              title="Remove friend"
+                              style={{
+                                background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
+                                padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 13,
+                                lineHeight: 1, transition: "all 0.15s",
+                              }}
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
+                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                            >&times;</button>
+                          </div>
+                        </div>
+                        {/* Activity details row */}
+                        {(lastSolvedLabel || currentLabel) && (
+                          <div style={{ display: "flex", gap: 8, marginLeft: 48, marginTop: 8 }}>
+                            {lastSolvedLabel && (
+                              <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.surfaceLight, border: `1px solid ${C.border}` }}>
+                                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Last Solved</div>
+                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{lastSolvedLabel}</div>
+                                {presence?.lastSolvedAt && (
+                                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 1 }}>{formatTimeAgo(presence.lastSolvedAt)}</div>
+                                )}
+                              </div>
+                            )}
+                            {currentLabel && (
+                              <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.correct + "0a", border: `1px solid ${C.correct}22` }}>
+                                <div style={{ fontSize: 9, color: C.correct, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Now Playing</div>
+                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{currentLabel}</div>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 14, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {friend.username}
-                      </div>
-                    </div>
-                    <button onClick={() => {
-                      setCompareFriend(friend);
-                      setFriendsModalTab("compare");
-                      setCompareFriendLoading(true);
-                      setCompareFriendStats(null);
-                      loadPublicStats(friend.uid)
-                        .then(setCompareFriendStats)
-                        .catch(() => setCompareFriendStats(null))
-                        .finally(() => setCompareFriendLoading(false));
-                    }}
-                      style={{
-                        background: "none", border: `1px solid ${C.accent}55`, borderRadius: 6,
-                        padding: "4px 10px", color: C.accent, cursor: "pointer", fontSize: 10,
-                        fontFamily: "'Space Mono', monospace", transition: "all 0.15s", flexShrink: 0, fontWeight: 700,
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.backgroundColor = C.accent + "11"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "55"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                    >Compare</button>
-                    <button onClick={() => handleRemoveFriend(friend.uid)}
-                      title="Remove friend"
-                      style={{
-                        background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
-                        padding: "4px 10px", color: C.textDim, cursor: "pointer", fontSize: 10,
-                        fontFamily: "'Space Mono', monospace", transition: "all 0.15s", flexShrink: 0,
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-                    >Remove</button>
-                  </div>
-                ))}
+                    );
+                  })}
               </div>
             )}
           </div>
