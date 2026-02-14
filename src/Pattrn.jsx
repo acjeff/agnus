@@ -2819,6 +2819,9 @@ export default function Pattrn() {
   const [activeCoopSessions, setActiveCoopSessions] = useState([]); // user's active coop sessions
   const [activeSessionsLoading, setActiveSessionsLoading] = useState(false);
   const [showCoopFriendPicker, setShowCoopFriendPicker] = useState(false); // friend picker for coop
+  const [coopSelectedFriends, setCoopSelectedFriends] = useState(new Set()); // multi-select friends for coop invites
+  const [coopPickerMode, setCoopPickerMode] = useState(null); // mode picker in coop friend picker (null = use current mode)
+  const [coopPickerMosaic, setCoopPickerMosaic] = useState(null); // selected mosaic when coopPickerMode === "mosaic"
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false); // leave coop confirmation
   const [showMosaicLeaveConfirm, setShowMosaicLeaveConfirm] = useState(false); // leave coop mosaic confirmation
   const [coopPartnerLockToast, setCoopPartnerLockToast] = useState(null); // toast when partner locks in
@@ -4818,7 +4821,7 @@ export default function Pattrn() {
   }, []);
 
   // Create a coop session for the current puzzle
-  const startCoopSession = useCallback(async (inviteFriendUid = null, inviteFriendUsername = null) => {
+  const startCoopSession = useCallback(async ({ inviteFriendUids = [] } = {}) => {
     if (!firebaseUser || !puzzle) return;
     const sessionId = await createCoopSession(firebaseUser.uid, {
       mode: difficulty,
@@ -4856,16 +4859,19 @@ export default function Pattrn() {
     timerInterval.current = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
     }, 1000);
-    // If inviting a friend, send notification instead of showing link modal
-    if (inviteFriendUid) {
+    // If inviting friends, send notifications instead of showing link modal
+    if (inviteFriendUids.length > 0) {
       const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${sessionId}` : "";
-      await sendNotification(inviteFriendUid, {
-        type: "coop_invite",
-        fromUid: firebaseUser.uid,
-        fromUsername: username || firebaseUser.email,
-        data: { sessionId, mode: difficulty, level: currentPuzzle, dailyDate: isDaily ? currentDailyDate : null, url: coopUrl },
-      }).catch(() => {});
+      await Promise.all(inviteFriendUids.map(uid =>
+        sendNotification(uid, {
+          type: "coop_invite",
+          fromUid: firebaseUser.uid,
+          fromUsername: username || firebaseUser.email,
+          data: { sessionId, mode: difficulty, level: currentPuzzle, dailyDate: isDaily ? currentDailyDate : null, url: coopUrl },
+        }).catch(() => {})
+      ));
       setShowCoopFriendPicker(false);
+      setCoopSelectedFriends(new Set());
     } else {
       setShowCoopInvite(true);
     }
@@ -5202,12 +5208,21 @@ export default function Pattrn() {
   // --- Coop Mosaic session management ---
 
   // Start a coop mosaic session from the custom-mosaic view
-  const startCoopMosaicSession = useCallback(async (inviteFriendUid = null, inviteFriendUsername = null) => {
-    if (!firebaseUser || !customMosaicPlay) return;
+  const startCoopMosaicSession = useCallback(async ({ inviteFriendUids = [], mosaicOverride = null } = {}) => {
+    const mosaic = mosaicOverride || customMosaicPlay;
+    if (!firebaseUser || !mosaic) return;
+    // If mosaicOverride provided, set up the mosaic play state
+    if (mosaicOverride) {
+      const puzzles = buildCustomMosaicPuzzles(mosaicOverride.grid);
+      customMosaicPuzzlesRef.current = puzzles;
+      setCustomMosaicPlay(mosaicOverride);
+      setCustomMosaicProgress({});
+      setView("custom-mosaic");
+    }
     const sessionId = await createCoopMosaicSession(firebaseUser.uid, {
-      mosaicId: customMosaicPlay.id,
-      mosaicTitle: customMosaicPlay.title || "Untitled",
-      mosaicGrid: customMosaicPlay.grid,
+      mosaicId: mosaic.id,
+      mosaicTitle: mosaic.title || "Untitled",
+      mosaicGrid: mosaic.grid,
       hostTheme: activeThemeId,
       hostUsername: username,
     });
@@ -5234,8 +5249,8 @@ export default function Pattrn() {
         hostUsername: username || null,
         guestUid: null,
         guestUsername: null,
-        mosaicId: customMosaicPlay.id || null,
-        mosaicTitle: customMosaicPlay.title || "Untitled",
+        mosaicId: mosaic.id || null,
+        mosaicTitle: mosaic.title || "Untitled",
         status: "waiting",
         tileProgress: {},
         tileTimes: {},
@@ -5249,20 +5264,23 @@ export default function Pattrn() {
     coopMosaicJoinedRef.current = true;
     // Ensure the session appears in the Active Co-op Sessions panel on the menu
     loadActiveCoopSessions();
-    // If inviting a friend, send notification
-    if (inviteFriendUid) {
+    // If inviting friends, send notifications
+    if (inviteFriendUids.length > 0) {
       const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?coopMosaic=${sessionId}` : "";
-      await sendNotification(inviteFriendUid, {
-        type: "coop_mosaic_invite",
-        fromUid: firebaseUser.uid,
-        fromUsername: username || firebaseUser.email,
-        data: { sessionId, mosaicTitle: customMosaicPlay.title || "Untitled", url: coopUrl },
-      }).catch(() => {});
+      await Promise.all(inviteFriendUids.map(uid =>
+        sendNotification(uid, {
+          type: "coop_mosaic_invite",
+          fromUid: firebaseUser.uid,
+          fromUsername: username || firebaseUser.email,
+          data: { sessionId, mosaicTitle: mosaic.title || "Untitled", url: coopUrl },
+        }).catch(() => {})
+      ));
       setShowCoopFriendPicker(false);
+      setCoopSelectedFriends(new Set());
     } else {
       setShowCoopMosaicInvite(true);
     }
-  }, [firebaseUser, customMosaicPlay, activeThemeId, username]);
+  }, [firebaseUser, customMosaicPlay, activeThemeId, username, buildCustomMosaicPuzzles]);
 
   // Leave coop mosaic session
   const leaveCoopMosaicSession = useCallback(() => {
@@ -7222,7 +7240,7 @@ export default function Pattrn() {
 
         {/* Coop mosaic friend picker */}
         {showCoopFriendPicker && (
-          <div onClick={() => setShowCoopFriendPicker(false)} style={{
+          <div onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); }} style={{
             position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
             display: "flex", alignItems: "center", justifyContent: "center",
             animation: "fadeUp 0.2s ease both",
@@ -7236,44 +7254,56 @@ export default function Pattrn() {
                 Start Co-op Mosaic
               </div>
               <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
-                Invite friends or share a link — anyone can join!
+                Select friends to invite or share a link — anyone can join!
               </div>
               {friendsList.length > 0 && (
                 <div style={{ marginBottom: 16, maxHeight: 200, overflowY: "auto" }}>
                   <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
-                    Your Friends
+                    Your Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                    {friendsList.map(friend => (
-                      <button
-                        key={friend.uid}
-                        onClick={async () => {
-                          setShowCoopFriendPicker(false);
-                          await startCoopMosaicSession(friend.uid, friend.username);
-                        }}
-                        style={{
-                          display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
-                          borderRadius: 10, backgroundColor: C.bg, border: `1px solid ${C.border}`,
-                          cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = C.coop; e.currentTarget.style.backgroundColor = C.coop + "11"; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.backgroundColor = C.bg; }}
-                      >
-                        {friend.profilePicture ? (
-                          <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                        ) : (
-                          <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: C.coop + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: C.coop, fontWeight: 700, flexShrink: 0 }}>
-                            {(friend.username || "?")[0].toUpperCase()}
+                    {friendsList.map(friend => {
+                      const isSelected = coopSelectedFriends.has(friend.uid);
+                      return (
+                        <button
+                          key={friend.uid}
+                          onClick={() => {
+                            setCoopSelectedFriends(prev => {
+                              const next = new Set(prev);
+                              if (next.has(friend.uid)) next.delete(friend.uid);
+                              else next.add(friend.uid);
+                              return next;
+                            });
+                          }}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
+                            borderRadius: 10, backgroundColor: isSelected ? C.coop + "18" : C.bg,
+                            border: `1px solid ${isSelected ? C.coop : C.border}`,
+                            cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                          }}
+                          onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.borderColor = C.coop; e.currentTarget.style.backgroundColor = C.coop + "11"; } }}
+                          onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.backgroundColor = C.bg; } }}
+                        >
+                          <div style={{
+                            width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? C.coop : C.border}`,
+                            backgroundColor: isSelected ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                            flexShrink: 0, transition: "all 0.15s",
+                          }}>
+                            {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                           </div>
-                        )}
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>
-                          {friend.username}
-                        </span>
-                        <span style={{ fontSize: 10, color: C.coop, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
-                          Invite
-                        </span>
-                      </button>
-                    ))}
+                          {friend.profilePicture ? (
+                            <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                          ) : (
+                            <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: C.coop + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: C.coop, fontWeight: 700, flexShrink: 0 }}>
+                              {(friend.username || "?")[0].toUpperCase()}
+                            </div>
+                          )}
+                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>
+                            {friend.username}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               )}
@@ -7283,22 +7313,39 @@ export default function Pattrn() {
                 </div>
               )}
               <div style={{ display: "flex", gap: 8 }}>
+                {coopSelectedFriends.size > 0 ? (
+                  <button
+                    onClick={async () => {
+                      setShowCoopFriendPicker(false);
+                      await startCoopMosaicSession({ inviteFriendUids: [...coopSelectedFriends] });
+                    }}
+                    style={{
+                      flex: 1, backgroundColor: C.coop, color: "#fff", border: "none",
+                      padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    {`Invite ${coopSelectedFriends.size} Friend${coopSelectedFriends.size > 1 ? "s" : ""}`}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setShowCoopFriendPicker(false);
+                      startCoopMosaicSession();
+                    }}
+                    style={{
+                      flex: 1, backgroundColor: C.coop, color: "#fff", border: "none",
+                      padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    Share Link
+                  </button>
+                )}
                 <button
-                  onClick={() => {
-                    setShowCoopFriendPicker(false);
-                    startCoopMosaicSession();
-                  }}
-                  style={{
-                    flex: 1, backgroundColor: C.coop, color: "#fff", border: "none",
-                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  Share Link
-                </button>
-                <button
-                  onClick={() => setShowCoopFriendPicker(false)}
+                  onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); }}
                   style={{
                     backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
                     padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
@@ -7319,7 +7366,7 @@ export default function Pattrn() {
             position: "fixed", inset: 0, zIndex: 1100,
             backgroundColor: "rgba(0,0,0,0.7)", display: "flex", alignItems: "center", justifyContent: "center",
             padding: 20,
-          }} onClick={() => setShowCoopMosaicInvite(false)}>
+          }} onClick={() => { setShowCoopMosaicInvite(false); setCoopSelectedFriends(new Set()); }}>
             <div style={{
               backgroundColor: C.surface, borderRadius: 16, padding: 24,
               width: "100%", maxWidth: 360, border: `1px solid ${C.border}`,
@@ -7329,7 +7376,85 @@ export default function Pattrn() {
                 Co-op Mosaic
               </h3>
               <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace" }}>
-                Share this link to invite friends to solve this mosaic together. Anyone with the link can join!
+                Select friends to invite or share a link — anyone with the link can join!
+              </div>
+              {/* Friends multi-select */}
+              {friendsList.length > 0 && (
+                <div style={{ marginBottom: 14, maxHeight: 140, overflowY: "auto" }}>
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+                    Invite Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    {friendsList.map(friend => {
+                      const isSelected = coopSelectedFriends.has(friend.uid);
+                      return (
+                        <button key={friend.uid}
+                          onClick={() => {
+                            setCoopSelectedFriends(prev => {
+                              const next = new Set(prev);
+                              if (next.has(friend.uid)) next.delete(friend.uid);
+                              else next.add(friend.uid);
+                              return next;
+                            });
+                          }}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
+                            borderRadius: 8, backgroundColor: isSelected ? C.coop + "18" : C.bg,
+                            border: `1px solid ${isSelected ? C.coop : C.border}`,
+                            cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                          }}
+                          onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = C.coop; }}
+                          onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = C.border; }}
+                        >
+                          <div style={{
+                            width: 16, height: 16, borderRadius: 3, border: `2px solid ${isSelected ? C.coop : C.border}`,
+                            backgroundColor: isSelected ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                            flexShrink: 0, transition: "all 0.15s",
+                          }}>
+                            {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </div>
+                          {friend.profilePicture ? (
+                            <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                          ) : (
+                            <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: C.coop + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: C.coop, fontWeight: 700, flexShrink: 0 }}>
+                              {(friend.username || "?")[0].toUpperCase()}
+                            </div>
+                          )}
+                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {coopSelectedFriends.size > 0 && coopMosaicSessionId && (
+                    <button
+                      onClick={async () => {
+                        const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?coopMosaic=${coopMosaicSessionId}` : "";
+                        await Promise.all([...coopSelectedFriends].map(uid =>
+                          sendNotification(uid, {
+                            type: "coop_mosaic_invite",
+                            fromUid: firebaseUser.uid,
+                            fromUsername: username || firebaseUser.email,
+                            data: { sessionId: coopMosaicSessionId, mosaicTitle: customMosaicPlay?.title || "Untitled", url: coopUrl },
+                          }).catch(() => {})
+                        ));
+                        setCoopSelectedFriends(new Set());
+                        setShowCoopMosaicInvite(false);
+                      }}
+                      style={{
+                        marginTop: 8, width: "100%", padding: "8px 12px", borderRadius: 8,
+                        backgroundColor: C.coop, color: "#fff", border: "none",
+                        fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
+                        letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+                      }}
+                    >
+                      {`Send ${coopSelectedFriends.size} Invite${coopSelectedFriends.size > 1 ? "s" : ""}`}
+                    </button>
+                  )}
+                </div>
+              )}
+              {/* Link section */}
+              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+                Or share link
               </div>
               <div style={{
                 padding: "10px 12px", borderRadius: 8, backgroundColor: C.bg, border: `1px solid ${C.border}`,
@@ -7355,7 +7480,7 @@ export default function Pattrn() {
                 >
                   Copy Link
                 </button>
-                <button onClick={() => setShowCoopMosaicInvite(false)}
+                <button onClick={() => { setShowCoopMosaicInvite(false); setCoopSelectedFriends(new Set()); }}
                   style={{
                     padding: "10px 16px", borderRadius: 10,
                     backgroundColor: "transparent", color: C.textDim,
@@ -12526,7 +12651,7 @@ export default function Pattrn() {
 
       {/* Coop invite modal */}
       {showCoopInvite && coopSessionId && (
-        <div onClick={() => setShowCoopInvite(false)} style={{
+        <div onClick={() => { setShowCoopInvite(false); setCoopSelectedFriends(new Set()); }} style={{
           position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
           display: "flex", alignItems: "center", justifyContent: "center",
           animation: "fadeUp 0.2s ease both",
@@ -12540,48 +12665,81 @@ export default function Pattrn() {
               Co-op Invite
             </div>
             <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
-              Share a link or invite a friend directly
+              Share a link or select friends to invite
             </div>
-            {/* Friends quick-invite */}
+            {/* Friends multi-select invite */}
             {friendsList.length > 0 && (
               <div style={{ marginBottom: 14, maxHeight: 140, overflowY: "auto" }}>
                 <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
-                  Invite Friend
+                  Invite Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                  {friendsList.map(friend => (
-                    <button
-                      key={friend.uid}
-                      onClick={async () => {
-                        const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : "";
-                        await sendNotification(friend.uid, {
+                  {friendsList.map(friend => {
+                    const isSelected = coopSelectedFriends.has(friend.uid);
+                    return (
+                      <button
+                        key={friend.uid}
+                        onClick={() => {
+                          setCoopSelectedFriends(prev => {
+                            const next = new Set(prev);
+                            if (next.has(friend.uid)) next.delete(friend.uid);
+                            else next.add(friend.uid);
+                            return next;
+                          });
+                        }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
+                          borderRadius: 8, backgroundColor: isSelected ? "#54A0FF18" : C.bg,
+                          border: `1px solid ${isSelected ? "#54A0FF" : C.border}`,
+                          cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                        }}
+                        onMouseEnter={e => { if (!isSelected) e.currentTarget.style.borderColor = "#54A0FF"; }}
+                        onMouseLeave={e => { if (!isSelected) e.currentTarget.style.borderColor = C.border; }}
+                      >
+                        <div style={{
+                          width: 16, height: 16, borderRadius: 3, border: `2px solid ${isSelected ? "#54A0FF" : C.border}`,
+                          backgroundColor: isSelected ? "#54A0FF" : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                          flexShrink: 0, transition: "all 0.15s",
+                        }}>
+                          {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                        </div>
+                        {friend.profilePicture ? (
+                          <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: "#54A0FF33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#54A0FF", fontWeight: 700, flexShrink: 0 }}>
+                            {(friend.username || "?")[0].toUpperCase()}
+                          </div>
+                        )}
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                {coopSelectedFriends.size > 0 && (
+                  <button
+                    onClick={async () => {
+                      const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : "";
+                      await Promise.all([...coopSelectedFriends].map(uid =>
+                        sendNotification(uid, {
                           type: "coop_invite",
                           fromUid: firebaseUser.uid,
                           fromUsername: username || firebaseUser.email,
                           data: { sessionId: coopSessionId, mode: difficulty, level: currentPuzzle, url: coopUrl },
-                        }).catch(() => {});
-                        setShowCoopInvite(false);
-                      }}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
-                        borderRadius: 8, backgroundColor: C.bg, border: `1px solid ${C.border}`,
-                        cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-                    >
-                      {friend.profilePicture ? (
-                        <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                      ) : (
-                        <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: "#54A0FF33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#54A0FF", fontWeight: 700, flexShrink: 0 }}>
-                          {(friend.username || "?")[0].toUpperCase()}
-                        </div>
-                      )}
-                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
-                      <span style={{ fontSize: 9, color: "#54A0FF", fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>Invite</span>
-                    </button>
-                  ))}
-                </div>
+                        }).catch(() => {})
+                      ));
+                      setCoopSelectedFriends(new Set());
+                      setShowCoopInvite(false);
+                    }}
+                    style={{
+                      marginTop: 8, width: "100%", padding: "8px 12px", borderRadius: 8,
+                      backgroundColor: "#54A0FF", color: "#fff", border: "none",
+                      fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
+                      letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+                    }}
+                  >
+                    {`Send ${coopSelectedFriends.size} Invite${coopSelectedFriends.size > 1 ? "s" : ""}`}
+                  </button>
+                )}
               </div>
             )}
             {/* Link section */}
@@ -12618,7 +12776,7 @@ export default function Pattrn() {
                 Copy Link
               </button>
               <button
-                onClick={() => setShowCoopInvite(false)}
+                onClick={() => { setShowCoopInvite(false); setCoopSelectedFriends(new Set()); }}
                 style={{
                   backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
                   padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700,
@@ -12639,8 +12797,12 @@ export default function Pattrn() {
       )}
 
       {/* Coop friend picker modal - shown when clicking Co-op button */}
-      {showCoopFriendPicker && (
-        <div onClick={() => setShowCoopFriendPicker(false)} style={{
+      {showCoopFriendPicker && (() => {
+        const isMosaicMode = coopPickerMode === "mosaic";
+        const pickerColor = isMosaicMode ? C.coop : "#54A0FF";
+        const availableMosaics = [...(myMosaics || []), ...(staffPickMosaic ? [staffPickMosaic] : [])].filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
+        return (
+        <div onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); setCoopPickerMode(null); setCoopPickerMosaic(null); }} style={{
           position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
           display: "flex", alignItems: "center", justifyContent: "center",
           animation: "fadeUp 0.2s ease both",
@@ -12648,50 +12810,131 @@ export default function Pattrn() {
           <div onClick={e => e.stopPropagation()} style={{
             backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 360, width: "90%",
             border: `1px solid ${C.border}`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
-            maxHeight: "80vh", display: "flex", flexDirection: "column",
+            maxHeight: "80vh", display: "flex", flexDirection: "column", overflowY: "auto",
           }}>
             <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>
               Start Co-op
             </div>
             <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
-              Invite a friend or share a link
+              Select friends to invite or share a link
             </div>
-            {/* Friends list */}
+            {/* Mode picker */}
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+                Puzzle Type
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {[
+                  { key: null, label: `Current (${(MODES.find(m => m.key === difficulty) || {}).label || difficulty})` },
+                  { key: "mosaic", label: "Mosaic" },
+                ].map(opt => {
+                  const active = coopPickerMode === opt.key;
+                  return (
+                    <button key={opt.key || "_current"} onClick={() => { setCoopPickerMode(opt.key); setCoopPickerMosaic(null); }}
+                      style={{
+                        padding: "5px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, cursor: "pointer",
+                        border: `1px solid ${active ? pickerColor : C.border}`,
+                        backgroundColor: active ? pickerColor + "22" : C.bg,
+                        color: active ? pickerColor : C.textDim, transition: "all 0.15s",
+                      }}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            {/* Mosaic picker — shown when mosaic mode selected */}
+            {isMosaicMode && (
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+                  Choose Mosaic
+                </div>
+                {availableMosaics.length > 0 ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 120, overflowY: "auto" }}>
+                    {availableMosaics.map(m => {
+                      const sel = coopPickerMosaic?.id === m.id;
+                      return (
+                        <button key={m.id} onClick={() => setCoopPickerMosaic(m)}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 8, padding: "6px 10px",
+                            borderRadius: 8, backgroundColor: sel ? C.coop + "18" : C.bg,
+                            border: `1px solid ${sel ? C.coop : C.border}`,
+                            cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                          }}
+                        >
+                          <div style={{
+                            width: 14, height: 14, borderRadius: 3, border: `2px solid ${sel ? C.coop : C.border}`,
+                            backgroundColor: sel ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                            flexShrink: 0, transition: "all 0.15s",
+                          }}>
+                            {sel && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </div>
+                          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>
+                            {m.title || "Untitled"}
+                          </span>
+                          {m.authorUsername && <span style={{ fontSize: 9, color: C.textDim }}>by {m.authorUsername}</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", padding: "8px 0" }}>
+                    No mosaics available. Create one in the Mosaic gallery first.
+                  </div>
+                )}
+              </div>
+            )}
+            {/* Friends list with multi-select */}
             {friendsList.length > 0 && (
               <div style={{ marginBottom: 16, maxHeight: 200, overflowY: "auto" }}>
                 <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
-                  Your Friends
+                  Your Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                  {friendsList.map(friend => (
-                    <button
-                      key={friend.uid}
-                      onClick={async () => {
-                        await startCoopSession(friend.uid, friend.username);
-                      }}
-                      style={{
-                        display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
-                        borderRadius: 10, backgroundColor: C.bg, border: `1px solid ${C.border}`,
-                        cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
-                      }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.backgroundColor = C.bg; }}
-                    >
-                      {friend.profilePicture ? (
-                        <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
-                      ) : (
-                        <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: "#54A0FF33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: "#54A0FF", fontWeight: 700, flexShrink: 0 }}>
-                          {(friend.username || "?")[0].toUpperCase()}
+                  {friendsList.map(friend => {
+                    const isSelected = coopSelectedFriends.has(friend.uid);
+                    return (
+                      <button
+                        key={friend.uid}
+                        onClick={() => {
+                          setCoopSelectedFriends(prev => {
+                            const next = new Set(prev);
+                            if (next.has(friend.uid)) next.delete(friend.uid);
+                            else next.add(friend.uid);
+                            return next;
+                          });
+                        }}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 10, padding: "8px 12px",
+                          borderRadius: 10, backgroundColor: isSelected ? pickerColor + "18" : C.bg,
+                          border: `1px solid ${isSelected ? pickerColor : C.border}`,
+                          cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                        }}
+                        onMouseEnter={e => { if (!isSelected) { e.currentTarget.style.borderColor = pickerColor; e.currentTarget.style.backgroundColor = pickerColor + "11"; } }}
+                        onMouseLeave={e => { if (!isSelected) { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.backgroundColor = C.bg; } }}
+                      >
+                        <div style={{
+                          width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? pickerColor : C.border}`,
+                          backgroundColor: isSelected ? pickerColor : "transparent", display: "flex", alignItems: "center", justifyContent: "center",
+                          flexShrink: 0, transition: "all 0.15s",
+                        }}>
+                          {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                         </div>
-                      )}
-                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>
-                        {friend.username}
-                      </span>
-                      <span style={{ fontSize: 10, color: "#54A0FF", fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
-                        Invite
-                      </span>
-                    </button>
-                  ))}
+                        {friend.profilePicture ? (
+                          <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: pickerColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: pickerColor, fontWeight: 700, flexShrink: 0 }}>
+                            {(friend.username || "?")[0].toUpperCase()}
+                          </div>
+                        )}
+                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>
+                          {friend.username}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -12700,24 +12943,59 @@ export default function Pattrn() {
                 No friends added yet. You can add friends in the Mosaic gallery.
               </div>
             )}
-            {/* Generate link button */}
+            {/* Action buttons */}
             <div style={{ display: "flex", gap: 8 }}>
+              {coopSelectedFriends.size > 0 ? (
+                <button
+                  onClick={async () => {
+                    if (isMosaicMode) {
+                      if (!coopPickerMosaic) return;
+                      setShowCoopFriendPicker(false);
+                      await startCoopMosaicSession({ inviteFriendUids: [...coopSelectedFriends], mosaicOverride: coopPickerMosaic });
+                      setCoopPickerMode(null); setCoopPickerMosaic(null);
+                    } else {
+                      setShowCoopFriendPicker(false);
+                      await startCoopSession({ inviteFriendUids: [...coopSelectedFriends] });
+                    }
+                  }}
+                  disabled={isMosaicMode && !coopPickerMosaic}
+                  style={{
+                    flex: 1, backgroundColor: (isMosaicMode && !coopPickerMosaic) ? C.textDim : pickerColor, color: "#fff", border: "none",
+                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    cursor: (isMosaicMode && !coopPickerMosaic) ? "not-allowed" : "pointer",
+                    textTransform: "uppercase", opacity: (isMosaicMode && !coopPickerMosaic) ? 0.5 : 1,
+                  }}
+                >
+                  {`Invite ${coopSelectedFriends.size} Friend${coopSelectedFriends.size > 1 ? "s" : ""}`}
+                </button>
+              ) : (
+                <button
+                  onClick={async () => {
+                    if (isMosaicMode) {
+                      if (!coopPickerMosaic) return;
+                      setShowCoopFriendPicker(false);
+                      await startCoopMosaicSession({ mosaicOverride: coopPickerMosaic });
+                      setCoopPickerMode(null); setCoopPickerMosaic(null);
+                    } else {
+                      setShowCoopFriendPicker(false);
+                      startCoopSession();
+                    }
+                  }}
+                  disabled={isMosaicMode && !coopPickerMosaic}
+                  style={{
+                    flex: 1, backgroundColor: (isMosaicMode && !coopPickerMosaic) ? C.textDim : pickerColor, color: "#fff", border: "none",
+                    padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    cursor: (isMosaicMode && !coopPickerMosaic) ? "not-allowed" : "pointer",
+                    textTransform: "uppercase", opacity: (isMosaicMode && !coopPickerMosaic) ? 0.5 : 1,
+                  }}
+                >
+                  Share Link
+                </button>
+              )}
               <button
-                onClick={() => {
-                  setShowCoopFriendPicker(false);
-                  startCoopSession();
-                }}
-                style={{
-                  flex: 1, backgroundColor: "#54A0FF", color: "#fff", border: "none",
-                  padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase",
-                }}
-              >
-                Share Link
-              </button>
-              <button
-                onClick={() => setShowCoopFriendPicker(false)}
+                onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); setCoopPickerMode(null); setCoopPickerMosaic(null); }}
                 style={{
                   backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
                   padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
@@ -12730,7 +13008,8 @@ export default function Pattrn() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Leave coop confirmation dialog */}
       {showLeaveConfirm && (
