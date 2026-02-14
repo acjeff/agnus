@@ -10440,7 +10440,7 @@ export default function Pattrn() {
           const todayLabel = getDailyDateLabel(todayIdx);
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginBottom: 20, animation: "fadeUp 0.4s ease both",
+              width: "100%", marginBottom: 20, animation: "fadeUp 0.4s ease both",
               borderRadius: 16, overflow: "hidden",
               background: `linear-gradient(135deg, ${C.surface} 0%, ${C.accent}11 100%)`,
               border: `1px solid ${C.accent}33`,
@@ -10529,9 +10529,9 @@ export default function Pattrn() {
         {/* Notification panel - dropdown when bell is clicked */}
         {showNotifications && firebaseUser && notifications.length > 0 && (
           <div style={{
-            width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.3s ease both",
+            width: "100%", marginBottom: 16, animation: "fadeUp 0.3s ease both",
             borderRadius: 12, overflow: "hidden", border: `1px solid #54A0FF44`,
-            backgroundColor: C.surface, padding: "12px 16px",
+            backgroundColor: C.surface, padding: "12px 16px", boxSizing: "border-box",
           }}>
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10,
@@ -10693,9 +10693,9 @@ export default function Pattrn() {
         {/* Active co-op sessions panel */}
         {firebaseUser && activeCoopSessions.length > 0 && (
           <div style={{
-            width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
+            width: "100%", marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
             borderRadius: 12, overflow: "hidden", border: `1px solid #54A0FF33`,
-            backgroundColor: C.surface, padding: "12px 16px",
+            backgroundColor: C.surface, padding: "12px 16px", boxSizing: "border-box",
           }}>
             <div style={{
               fontSize: 9, color: "#54A0FF", textTransform: "uppercase",
@@ -10780,7 +10780,7 @@ export default function Pattrn() {
         {/* Mode selector: categorized auto-wrapping grid */}
         <div style={{
           marginBottom: 20, animation: "fadeUp 0.5s 0.05s ease both",
-          width: "100%", maxWidth: 360,
+          width: "100%",
           display: "flex", flexDirection: "column", gap: 14,
         }}>
           {MODE_CATEGORIES.map((cat) => (
@@ -10844,7 +10844,7 @@ export default function Pattrn() {
         {/* Stats summary with inline share */}
         {isDaily ? (
           <div style={{
-            width: "100%", maxWidth: 360,
+            width: "100%",
             display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
             padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
             alignItems: "center", boxSizing: "border-box",
@@ -10874,7 +10874,7 @@ export default function Pattrn() {
           </div>
         ) : (
           <div style={{
-            width: "100%", maxWidth: 360,
+            width: "100%",
             display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
             padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
             alignItems: "center", boxSizing: "border-box",
@@ -10911,7 +10911,7 @@ export default function Pattrn() {
           const total = achs.length;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.12s ease both",
+              width: "100%", marginBottom: 16, animation: "fadeUp 0.5s 0.12s ease both",
             }}>
               <button onClick={() => setShowAchievements(true)} style={{
                 width: "100%", padding: "12px 16px", borderRadius: 12,
@@ -10958,9 +10958,9 @@ export default function Pattrn() {
           if (!birthday) {
             return (
               <div style={{
-                width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
+                width: "100%", marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
                 borderRadius: 12, overflow: "hidden", border: `1px solid #F472B633`,
-                backgroundColor: C.surface, padding: "12px 16px",
+                backgroundColor: C.surface, padding: "12px 16px", boxSizing: "border-box",
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                   <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F472B6" }}>
@@ -11107,7 +11107,7 @@ export default function Pattrn() {
           };
           const todayISO = `${todayUTCYear}-${String(todayUTCMonth + 1).padStart(2, "0")}-${String(todayUTCDate).padStart(2, "0")}`;
           return (
-            <div style={{ maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both" }}>
+            <div style={{ width: "100%", animation: "fadeUp 0.5s 0.15s ease both" }}>
               {/* Month navigation with Today button */}
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8,
@@ -11390,7 +11390,7 @@ export default function Pattrn() {
           const spSolved = spProgress ? Object.values(spProgress).filter(v => typeof v === "number" && v > 0).length : 0;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, animation: "fadeUp 0.5s 0.15s ease both",
+              width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
               display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
             }}>
               <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Space Mono', monospace" }}>
@@ -11441,7 +11441,7 @@ export default function Pattrn() {
           if (sharedCarouselMosaics.length === 0) return null;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
+              width: "100%", marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
             }}>
               <div style={{
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
@@ -11497,7 +11497,7 @@ export default function Pattrn() {
           if (carouselMosaics.length === 0) return null;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
+              width: "100%", marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
             }}>
               <div style={{
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
@@ -11549,7 +11549,7 @@ export default function Pattrn() {
         {!isDaily && !isMosaic && (<>
         <div style={{
           display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
-          maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
+          width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
         }}>
           {(isCascade ? Array.from({ length: 50 }, (_, i) => i) : puzzles).map((p, i) => {
             const idx = isCascade ? i : p?.id ?? i;
