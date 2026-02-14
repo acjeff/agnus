@@ -14248,7 +14248,7 @@ export default function Pattrn() {
       )}
 
       {/* Grid area: absolutely positioned between fixed header and footer, centers grid */}
-      <div style={{ position: "absolute", top: headerHeight, bottom: footerHeight, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, boxSizing: "border-box" }}>
+      <div style={{ position: "absolute", top: headerHeight, bottom: footerHeight, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, boxSizing: "border-box", padding: edgePad }}>
         <GridDecoration decoration={activeTheme.decoration} />
         {/* Coop mosaic players indicator — positioned top-left of puzzle panel */}
         {isCoopMosaic && coopMosaicAnyConnected && gameState === "playing" && (
