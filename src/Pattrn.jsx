@@ -7476,12 +7476,18 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+        paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
 
         {/* Header */}
-        <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
+        <div style={{
+          width: "100%", maxWidth: 480,
+          display: "flex", alignItems: "center", gap: 12, marginBottom: 16,
+          padding: "12px 4px", position: "sticky", top: 0, zIndex: 50,
+          backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+          animation: "fadeUp 0.3s ease",
+        }}>
           <button onClick={() => {
             const returnTo = creatorReturnView || "menu";
             resetCreator();
@@ -7715,6 +7721,50 @@ export default function Pattrn() {
           )}
         </div>
         {coopInviteToastEl}
+
+      {/* ── Bottom Tab Navigation Bar ── */}
+      <nav className="bottom-tab-bar" style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
+        backgroundColor: C.bg + "f0",
+        borderTop: `1px solid ${C.border}`,
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        display: "flex", justifyContent: "center",
+      }}>
+        <div style={{
+          display: "flex", width: "100%", maxWidth: 480,
+          justifyContent: "space-around", alignItems: "center",
+          padding: "6px 0 4px",
+        }}>
+          <button onClick={() => { resetCreator(); setCreatorReturnView("menu"); setView("menu"); }}
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            <span style={{ fontSize: 10, fontWeight: 500, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>Home</span>
+          </button>
+          <button onClick={() => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); }}
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            <span style={{ fontSize: 10, fontWeight: 500, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>Gallery</span>
+          </button>
+          <button
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+            <div style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: C.accent, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 2px 12px ${C.accent}44` }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.bg} strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.accent, fontFamily: "'Space Mono', monospace" }}>Create</span>
+          </button>
+          <button onClick={() => setShowGameMenu(true)}
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span style={{ fontSize: 10, fontWeight: 500, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>Profile</span>
+          </button>
+        </div>
+      </nav>
       </div>
     );
   }
@@ -7730,61 +7780,25 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+        paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
 
         {/* Header */}
-        <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => setView("menu")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
+        <div style={{
+          width: "100%", maxWidth: 480,
+          display: "flex", alignItems: "center", gap: 12, marginBottom: 16,
+          padding: "12px 4px", position: "sticky", top: 0, zIndex: 50,
+          backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+          animation: "fadeUp 0.3s ease",
+        }}>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
-            Mosaics
+            Gallery
           </h2>
-          {firebaseConfigured && firebaseUser && (
-            <button
-              onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }}
-              style={{
-                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
-                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
-                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
-                position: "relative", minWidth: 32, height: 30,
-              }}
-              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
-              aria-label="Friends"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              {onlineFriendsCount > 0 && (
-                <span style={{
-                  position: "absolute", top: -4, right: -4,
-                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
-                  backgroundColor: C.correct, color: "#fff",
-                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: "'Space Mono', monospace",
-                }}>
-                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
-                </span>
-              )}
-            </button>
-          )}
           {firebaseUser && (
             <button onClick={() => { resetCreator(); setCreatorReturnView("gallery"); setView("creator"); }}
               style={{
-                background: C.accent, color: C.bg, border: "none", borderRadius: 8, padding: "6px 14px",
+                background: C.accent, color: C.bg, border: "none", borderRadius: 10, padding: "8px 14px",
                 cursor: "pointer", fontFamily: "'Space Mono', monospace",
                 fontSize: 11, fontWeight: 700, letterSpacing: 1,
               }}
@@ -8118,6 +8132,50 @@ export default function Pattrn() {
           </div>
         )}
         {coopInviteToastEl}
+
+      {/* ── Bottom Tab Navigation Bar ── */}
+      <nav className="bottom-tab-bar" style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
+        backgroundColor: C.bg + "f0",
+        borderTop: `1px solid ${C.border}`,
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        display: "flex", justifyContent: "center",
+      }}>
+        <div style={{
+          display: "flex", width: "100%", maxWidth: 480,
+          justifyContent: "space-around", alignItems: "center",
+          padding: "6px 0 4px",
+        }}>
+          <button onClick={() => setView("menu")}
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            <span style={{ fontSize: 10, fontWeight: 500, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>Home</span>
+          </button>
+          <button
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.accent, fontFamily: "'Space Mono', monospace" }}>Gallery</span>
+          </button>
+          <button onClick={() => { resetCreator(); setCreatorReturnView("menu"); setView("creator"); }}
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+            <div style={{ width: 36, height: 36, borderRadius: 12, backgroundColor: C.accent, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 2px 12px ${C.accent}44` }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.bg} strokeWidth="2.5" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 500, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>Create</span>
+          </button>
+          <button onClick={() => setShowGameMenu(true)}
+            style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span style={{ fontSize: 10, fontWeight: 500, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>Profile</span>
+          </button>
+        </div>
+      </nav>
       </div>
     );
   }
@@ -9505,30 +9563,41 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: "calc(32px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+        paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 0, paddingRight: 0,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); } .mode-chips::-webkit-scrollbar { display: none; }`}</style>
 
-        <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease", position: "relative", width: "100%", maxWidth: 360 }}>
-          {/* Top-left: Friends button */}
-          {firebaseConfigured && firebaseUser && (
-            <div style={{ position: "absolute", top: 2, left: 0, display: "flex", gap: 6, alignItems: "center" }}>
+        {/* ── Compact top app bar ── */}
+        <div style={{
+          width: "100%", maxWidth: 480,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 20px", position: "sticky", top: 0, zIndex: 50,
+          backgroundColor: C.bg + "ee",
+          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        }}>
+          {/* Left: logo */}
+          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
+            Agnus
+          </h1>
+          {/* Right: action buttons */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {/* Friends button */}
+            {firebaseConfigured && firebaseUser && (
               <button
                 onClick={() => {
                   setShowFriendsModal(true);
                   setFriendsModalTab("list");
                 }}
                 style={{
-                  background: "none", border: `1px solid ${friendsList.length > 0 ? "#c8f03e55" : C.border}`, borderRadius: 10,
-                  width: 38, height: 38, cursor: "pointer",
+                  background: "none", border: "none", borderRadius: 10,
+                  width: 36, height: 36, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.15s", position: "relative",
+                  backgroundColor: friendsList.length > 0 ? C.accent + "15" : "transparent",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = friendsList.length > 0 ? "#c8f03e55" : C.border; }}
                 aria-label="Friends"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={friendsList.length > 0 ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={friendsList.length > 0 ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                   <circle cx="9" cy="7" r="4"/>
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
@@ -9536,44 +9605,40 @@ export default function Pattrn() {
                 </svg>
                 {onlineFriendsCount > 0 && (
                   <span style={{
-                    position: "absolute", top: -2, right: -2,
-                    minWidth: 16, height: 16, borderRadius: 8, padding: "0 3px", boxSizing: "border-box",
+                    position: "absolute", top: 2, right: 2,
+                    minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
                     backgroundColor: C.correct, color: "#fff",
-                    fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
                     fontFamily: "'Space Mono', monospace",
                   }}>
                     {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
                   </span>
                 )}
               </button>
-            </div>
-          )}
-          {/* Top-right buttons: notification bell + menu */}
-          <div style={{ position: "absolute", top: 2, right: 0, display: "flex", gap: 6, alignItems: "center" }}>
+            )}
             {/* Notification bell */}
             {firebaseConfigured && firebaseUser && (
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 style={{
-                  background: "none", border: `1px solid ${notifications.length > 0 ? "#54A0FF55" : C.border}`, borderRadius: 10,
-                  width: 38, height: 38, cursor: "pointer",
+                  background: "none", border: "none", borderRadius: 10,
+                  width: 36, height: 36, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.15s", position: "relative",
+                  backgroundColor: notifications.length > 0 ? "#54A0FF15" : "transparent",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = notifications.length > 0 ? "#54A0FF55" : C.border; }}
                 aria-label="Notifications"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={notifications.length > 0 ? "#54A0FF" : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={notifications.length > 0 ? "#54A0FF" : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
                 {notifications.length > 0 && (
                   <span style={{
-                    position: "absolute", top: -2, right: -2,
-                    width: 16, height: 16, borderRadius: "50%",
+                    position: "absolute", top: 2, right: 2,
+                    width: 14, height: 14, borderRadius: "50%",
                     backgroundColor: "#f87171", color: "#fff",
-                    fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
                     fontFamily: "'Space Mono', monospace",
                   }}>
                     {notifications.length > 9 ? "9+" : notifications.length}
@@ -9581,48 +9646,13 @@ export default function Pattrn() {
                 )}
               </button>
             )}
-            {/* Menu button */}
-            <button
-              onClick={() => setShowGameMenu(true)}
-              style={{
-                background: "none", border: `1px solid ${C.border}`, borderRadius: 10,
-                width: 38, height: 38, cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-              aria-label="Menu"
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="2" y="3" width="14" height="2" rx="1" fill={C.textDim} />
-                <rect x="2" y="8" width="14" height="2" rx="1" fill={C.textDim} />
-                <rect x="2" y="13" width="14" height="2" rx="1" fill={C.textDim} />
-              </svg>
-            </button>
           </div>
-          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: 4, margin: 0, color: C.accent }}>
-            Agnus
-          </h1>
-          <p style={{ color: C.textDim, fontSize: 13, marginTop: 6, letterSpacing: 2 }}>
-            find the pattern &middot; fill the gaps
-          </p>
-          {firebaseConfigured && firebaseUser && (
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              marginTop: 6, fontSize: 10, color: C.textDim,
-            }}>
-              <div style={{
-                width: 6, height: 6, borderRadius: "50%",
-                backgroundColor: syncStatus === "syncing" ? C.inProgress : syncStatus === "error" ? C.incorrect : C.correct,
-                transition: "background-color 0.3s",
-              }} />
-              <span>Signed in as {username || firebaseUser.email}</span>
-            </div>
-          )}
         </div>
 
-        {/* Daily overview: streak, play today, share */}
+        {/* ── Scrollable content area ── */}
+        <div style={{ width: "100%", maxWidth: 480, padding: "0 20px", boxSizing: "border-box" }}>
+
+        {/* ── Daily hero card ── */}
         {(() => {
           const todayIdx = getTodayDailyIndex();
           const todayKey = getDailyKey(todayIdx);
@@ -9632,62 +9662,87 @@ export default function Pattrn() {
           const todayLabel = getDailyDateLabel(todayIdx);
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.02s ease both",
-              borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`,
-              backgroundColor: C.surface, padding: "12px 16px",
+              width: "100%", marginBottom: 20, animation: "fadeUp 0.4s ease both",
+              borderRadius: 16, overflow: "hidden",
+              background: `linear-gradient(135deg, ${C.surface} 0%, ${C.accent}11 100%)`,
+              border: `1px solid ${C.accent}33`,
+              padding: "20px",
             }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.accent }}>Today: {todayLabel}</span>
-                  {streak > 0 && (
-                    <span style={{ fontSize: 12, color: C.textDim }}>🔥 {streak} day streak</span>
-                  )}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                    Daily Puzzle
+                  </div>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
+                    {todayLabel}
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {todayResult > 0 && (
-                    <span style={{ fontSize: 11, color: C.textDim }}>
-                      <ScoreBadge attempts={todayResult} />
-                      {todayTime != null && ` ${formatTime(todayTime)}`}
+                {streak > 0 && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    padding: "4px 10px", borderRadius: 20,
+                    backgroundColor: C.gold + "18", border: `1px solid ${C.gold}33`,
+                  }}>
+                    <span style={{ fontSize: 13 }}>🔥</span>
+                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.gold }}>{streak}</span>
+                  </div>
+                )}
+              </div>
+              {todayResult > 0 && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+                  padding: "8px 12px", borderRadius: 10, backgroundColor: C.bg + "88",
+                }}>
+                  <ScoreBadge attempts={todayResult} />
+                  <span style={{ fontSize: 12, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                    Solved in {todayResult} attempt{todayResult !== 1 ? "s" : ""}
+                  </span>
+                  {todayTime != null && (
+                    <span style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                      {formatTime(todayTime)}
                     </span>
                   )}
-                  <button
-                    onClick={async () => {
-                      const medal = todayResult <= 2 ? "\u2605" : todayResult <= 4 ? "\u25CF" : "\u25C6";
-                      const streakPart = streak > 0 ? ` 🔥 ${streak} day streak` : "";
-                      const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${todayLabel}` : "";
-                      const text = todayResult > 0
-                        ? `Agnus Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
-                        : `Agnus Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
-                      const result = await tryNativeShare({ text, url: dailyUrl });
-                      if (result === "shared") {
-                        setDailyShareMsg("Shared!");
-                        setTimeout(() => setDailyShareMsg(""), 2000);
-                        return;
-                      }
-                      if (result === "cancelled") return;
-                      try { await navigator.clipboard.writeText(text + "\n" + dailyUrl); } catch { /* fallback */ }
-                      setDailyShareMsg("Copied!");
-                      setTimeout(() => setDailyShareMsg(""), 2000);
-                    }}
-                    style={{
-                      padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                      background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                    }}
-                  >
-                    {dailyShareMsg || "Share"}
-                  </button>
-                  <button
-                    onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, todayLabel); }}
-                    style={{
-                      padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                      background: C.accent, color: C.bg, border: "none", cursor: "pointer",
-                    }}
-                  >
-                    {todayResult > 0 ? "View today's result" : "Play today"}
-                  </button>
                 </div>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, todayLabel); }}
+                  style={{
+                    flex: 1, padding: "12px 0", borderRadius: 12, fontSize: 13, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    background: C.accent, color: C.bg, border: "none", cursor: "pointer",
+                    transition: "transform 0.15s",
+                  }}
+                >
+                  {todayResult > 0 ? "View Result" : "Play Today"}
+                </button>
+                <button
+                  onClick={async () => {
+                    const medal = todayResult <= 2 ? "\u2605" : todayResult <= 4 ? "\u25CF" : "\u25C6";
+                    const streakPart = streak > 0 ? ` 🔥 ${streak} day streak` : "";
+                    const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${todayLabel}` : "";
+                    const text = todayResult > 0
+                      ? `Agnus Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
+                      : `Agnus Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
+                    const result = await tryNativeShare({ text, url: dailyUrl });
+                    if (result === "shared") {
+                      setDailyShareMsg("Shared!");
+                      setTimeout(() => setDailyShareMsg(""), 2000);
+                      return;
+                    }
+                    if (result === "cancelled") return;
+                    try { await navigator.clipboard.writeText(text + "\n" + dailyUrl); } catch { /* fallback */ }
+                    setDailyShareMsg("Copied!");
+                    setTimeout(() => setDailyShareMsg(""), 2000);
+                  }}
+                  style={{
+                    padding: "12px 16px", borderRadius: 12, fontSize: 12, fontWeight: 600,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                    background: "none", border: `1px solid ${C.accent}55`, color: C.accent, cursor: "pointer",
+                  }}
+                >
+                  {dailyShareMsg || "Share"}
+                </button>
               </div>
             </div>
           );
@@ -9696,9 +9751,9 @@ export default function Pattrn() {
         {/* Notification panel - dropdown when bell is clicked */}
         {showNotifications && firebaseUser && notifications.length > 0 && (
           <div style={{
-            width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.3s ease both",
-            borderRadius: 12, overflow: "hidden", border: `1px solid #54A0FF44`,
-            backgroundColor: C.surface, padding: "12px 16px",
+            width: "100%", marginBottom: 16, animation: "fadeUp 0.3s ease both",
+            borderRadius: 14, overflow: "hidden", border: `1px solid #54A0FF44`,
+            backgroundColor: C.surface, padding: "14px 16px",
           }}>
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10,
@@ -9860,9 +9915,9 @@ export default function Pattrn() {
         {/* Active co-op sessions panel */}
         {firebaseUser && activeCoopSessions.length > 0 && (
           <div style={{
-            width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
-            borderRadius: 12, overflow: "hidden", border: `1px solid #54A0FF33`,
-            backgroundColor: C.surface, padding: "12px 16px",
+            width: "100%", marginBottom: 20, animation: "fadeUp 0.4s 0.03s ease both",
+            borderRadius: 14, overflow: "hidden", border: `1px solid ${C.coop}33`,
+            backgroundColor: C.surface, padding: "14px 16px",
           }}>
             <div style={{
               fontSize: 9, color: "#54A0FF", textTransform: "uppercase",
@@ -9944,23 +9999,23 @@ export default function Pattrn() {
           </div>
         )}
 
-        {/* Mode selector: categorized auto-wrapping grid */}
+        {/* ── Mode selector: horizontal scrollable chips ── */}
         <div style={{
-          marginBottom: 20, animation: "fadeUp 0.5s 0.05s ease both",
-          width: "100%", maxWidth: 360,
-          display: "flex", flexDirection: "column", gap: 14,
+          marginBottom: 20, animation: "fadeUp 0.4s 0.05s ease both",
+          width: "100%",
+          display: "flex", flexDirection: "column", gap: 12,
         }}>
           {MODE_CATEGORIES.map((cat) => (
             <div key={cat}>
               <div style={{
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
-                letterSpacing: 1.5, marginBottom: 6,
+                letterSpacing: 1.5, marginBottom: 8,
                 fontFamily: "'Space Mono', monospace",
               }}>{cat}</div>
-              <div style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
-                gap: 8,
+              <div className="mode-chips" style={{
+                display: "flex", gap: 8, overflowX: "auto", paddingBottom: 4,
+                scrollSnapType: "x mandatory", WebkitOverflowScrolling: "touch",
+                msOverflowStyle: "none", scrollbarWidth: "none",
               }}>
                 {DIFFICULTIES.filter((d) => d.cat === cat).map((d) => {
                   const active = difficulty === d.key;
@@ -9975,31 +10030,29 @@ export default function Pattrn() {
                       key={d.key}
                       onClick={() => setDifficulty(d.key)}
                       style={{
-                        padding: "12px 8px",
+                        flexShrink: 0, scrollSnapAlign: "start",
+                        padding: "10px 16px",
                         background: active ? (isCleared ? C.gold : d.key === "blind" ? "#e06040" : C.accent) : C.surface,
-                        color: active ? (d.key === "blind" && !isCleared ? "#fff" : C.bg) : isCleared ? C.gold : C.textDim,
-                        border: active ? "1px solid transparent" : isCleared ? `1.5px solid ${C.gold}88` : `1px solid ${C.border}`,
-                        borderRadius: 10,
+                        color: active ? (d.key === "blind" && !isCleared ? "#fff" : C.bg) : isCleared ? C.gold : C.text,
+                        border: active ? "1.5px solid transparent" : isCleared ? `1.5px solid ${C.gold}66` : `1.5px solid ${C.border}`,
+                        borderRadius: 12,
                         cursor: "pointer",
                         fontFamily: "'Space Mono', monospace",
-                        fontSize: 11,
-                        fontWeight: active ? 700 : isCleared ? 600 : 400,
+                        fontSize: 12,
+                        fontWeight: active ? 700 : 500,
                         letterSpacing: 0.5,
-                        textTransform: "uppercase",
-                        transition: "background 0.2s, color 0.2s, border 0.2s",
+                        transition: "all 0.2s",
                         display: "flex",
-                        flexDirection: "column",
                         alignItems: "center",
-                        gap: 2,
-                        position: "relative",
+                        gap: 8,
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      <span style={{ whiteSpace: "nowrap" }}>{d.label}</span>
+                      <span>{d.label}</span>
                       <span style={{
-                        fontSize: 8,
+                        fontSize: 9, fontWeight: 600,
                         color: active ? (d.key === "blind" && !isCleared ? "#fff9" : C.bg + "aa") : isCleared ? C.gold + "cc" : C.textDim,
-                      }}>{d.desc}</span>
-                      <span style={{ fontSize: 8, color: active ? (d.key === "blind" && !isCleared ? "#fff7" : C.bg + "88") : isCleared ? C.gold + "bb" : C.textDim }}>{d.key === "daily" ? `${solved} solved` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}{isCleared ? " \u2713" : ""}</span>
+                      }}>{d.key === "daily" ? `${solved}` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}{isCleared ? " \u2713" : ""}</span>
                     </button>
                   );
                 })}
@@ -10011,9 +10064,9 @@ export default function Pattrn() {
         {/* Stats summary with inline share */}
         {isDaily ? (
           <div style={{
-            width: "100%", maxWidth: 360,
-            display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
-            padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+            width: "100%",
+            display: "flex", gap: 24, marginBottom: 20, animation: "fadeUp 0.4s 0.1s ease both",
+            padding: "14px 20px", borderRadius: 14, backgroundColor: C.surface, border: `1px solid ${C.border}`,
             alignItems: "center", boxSizing: "border-box",
           }}>
             <div style={{ textAlign: "center" }}>
@@ -10041,9 +10094,9 @@ export default function Pattrn() {
           </div>
         ) : (
           <div style={{
-            width: "100%", maxWidth: 360,
-            display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
-            padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+            width: "100%",
+            display: "flex", gap: 24, marginBottom: 20, animation: "fadeUp 0.4s 0.1s ease both",
+            padding: "14px 20px", borderRadius: 14, backgroundColor: C.surface, border: `1px solid ${C.border}`,
             alignItems: "center", boxSizing: "border-box",
           }}>
             <div style={{ textAlign: "center" }}>
@@ -10078,7 +10131,7 @@ export default function Pattrn() {
           const total = achs.length;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.12s ease both",
+              width: "100%", marginBottom: 16, animation: "fadeUp 0.4s 0.12s ease both",
             }}>
               <button onClick={() => setShowAchievements(true)} style={{
                 width: "100%", padding: "12px 16px", borderRadius: 12,
@@ -10125,9 +10178,9 @@ export default function Pattrn() {
           if (!birthday) {
             return (
               <div style={{
-                width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
-                borderRadius: 12, overflow: "hidden", border: `1px solid #F472B633`,
-                backgroundColor: C.surface, padding: "12px 16px",
+                width: "100%", marginBottom: 16, animation: "fadeUp 0.4s 0.03s ease both",
+                borderRadius: 14, overflow: "hidden", border: `1px solid #F472B633`,
+                backgroundColor: C.surface, padding: "14px 16px",
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                   <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F472B6" }}>
@@ -10136,7 +10189,7 @@ export default function Pattrn() {
                   <button
                     onClick={() => setShowBirthdayPrompt(true)}
                     style={{
-                      padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      padding: "8px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
                       fontFamily: "'Space Mono', monospace", letterSpacing: 1,
                       background: "#F472B6", color: "#fff", border: "none", cursor: "pointer",
                     }}
@@ -10159,9 +10212,9 @@ export default function Pattrn() {
           const bdLabel = `${String(bdDay).padStart(2, "0")}-${String(bdMonthNum).padStart(2, "0")}${bdYearNum ? `-${bdYearNum}` : ""}`;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
-              borderRadius: 12, overflow: "hidden", border: `1px solid #F472B633`,
-              backgroundColor: C.surface, padding: "12px 16px",
+              width: "100%", marginBottom: 16, animation: "fadeUp 0.4s 0.03s ease both",
+              borderRadius: 14, overflow: "hidden", border: `1px solid #F472B633`,
+              backgroundColor: C.surface, padding: "14px 16px",
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -10274,7 +10327,7 @@ export default function Pattrn() {
           };
           const todayISO = `${todayUTCYear}-${String(todayUTCMonth + 1).padStart(2, "0")}-${String(todayUTCDate).padStart(2, "0")}`;
           return (
-            <div style={{ maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both" }}>
+            <div style={{ width: "100%", animation: "fadeUp 0.4s 0.15s ease both" }}>
               {/* Month navigation with Today button */}
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8,
@@ -10557,7 +10610,7 @@ export default function Pattrn() {
           const spSolved = spProgress ? Object.values(spProgress).filter(v => typeof v === "number" && v > 0).length : 0;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, animation: "fadeUp 0.5s 0.15s ease both",
+              width: "100%", animation: "fadeUp 0.4s 0.15s ease both",
               display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
             }}>
               <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Space Mono', monospace" }}>
@@ -10608,7 +10661,7 @@ export default function Pattrn() {
           if (sharedCarouselMosaics.length === 0) return null;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
+              width: "100%", marginTop: 20, animation: "fadeUp 0.4s 0.3s ease both",
             }}>
               <div style={{
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
@@ -10664,7 +10717,7 @@ export default function Pattrn() {
           if (carouselMosaics.length === 0) return null;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
+              width: "100%", marginTop: 20, animation: "fadeUp 0.4s 0.3s ease both",
             }}>
               <div style={{
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
@@ -10716,7 +10769,7 @@ export default function Pattrn() {
         {!isDaily && !isMosaic && (<>
         <div style={{
           display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
-          maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
+          width: "100%", animation: "fadeUp 0.4s 0.15s ease both",
         }}>
           {(isCascade ? Array.from({ length: 50 }, (_, i) => i) : puzzles).map((p, i) => {
             const idx = isCascade ? i : p?.id ?? i;
@@ -10804,6 +10857,8 @@ export default function Pattrn() {
           <span><span style={{ color: C.coop }}>{"\u25CF"}</span> co-op</span>
         </div>
         </>)}
+
+        </div>{/* close scrollable content wrapper */}
 
         {/* Stats drawer */}
         {showShareModal && (() => {
@@ -10988,11 +11043,44 @@ export default function Pattrn() {
                 </div>
 
                 <div style={{ padding: "8px 24px 0", overflowY: "auto", flex: 1, minHeight: 0, WebkitOverflowScrolling: "touch" }}>
-                  {/* Header */}
-                  <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
-                      Menu
-                    </h2>
+                  {/* Profile header */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 20, padding: "4px 0" }}>
+                    <div style={{
+                      width: 48, height: 48, borderRadius: 14, flexShrink: 0, overflow: "hidden",
+                      backgroundColor: "#60A5FA22", border: "2px solid #60A5FA44",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {firebaseUser && profilePicture ? (
+                        <img src={profilePicture} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                        </svg>
+                      )}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
+                        {firebaseUser ? (username || "Profile") : "Settings"}
+                      </div>
+                      <div style={{ fontSize: 11, color: C.textDim, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {firebaseUser ? firebaseUser.email : "Sign in to sync progress"}
+                      </div>
+                      {firebaseUser && (
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 3 }}>
+                          <div style={{
+                            width: 6, height: 6, borderRadius: "50%",
+                            backgroundColor: syncStatus === "syncing" ? C.inProgress : syncStatus === "error" ? C.incorrect : C.correct,
+                          }} />
+                          <span style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                            {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Synced"}
+                          </span>
+                          <span style={{ color: C.textDim, fontSize: 9 }}>&middot;</span>
+                          <span style={{ fontSize: 9, color: C.accent, fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                            {totalSolvedAll} solved
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Menu items */}
@@ -11862,7 +11950,7 @@ export default function Pattrn() {
       {/* Login hint toast */}
       {loginHintToast && (
         <div style={{
-          position: "fixed", bottom: "calc(32px + env(safe-area-inset-bottom, 0px))", left: "50%",
+          position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom, 0px))", left: "50%",
           transform: "translateX(-50%)", zIndex: 1200,
           maxWidth: "calc(100vw - 32px)", boxSizing: "border-box",
           animation: loginHintDismissing
@@ -11883,7 +11971,7 @@ export default function Pattrn() {
             <span style={{
               fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: C.text, lineHeight: 1.4,
             }}>
-              You can sign in anytime from the <strong style={{ color: C.accent }}>menu button</strong>
+              Sign in from the <strong style={{ color: C.accent }}>Profile</strong> tab to sync progress
             </span>
             <button
               onClick={() => {
@@ -11904,6 +11992,91 @@ export default function Pattrn() {
         </div>
       )}
       {coopInviteToastEl}
+
+      {/* ── Bottom Tab Navigation Bar ── */}
+      <nav className="bottom-tab-bar" style={{
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
+        backgroundColor: C.bg + "f0",
+        borderTop: `1px solid ${C.border}`,
+        paddingBottom: "env(safe-area-inset-bottom, 0px)",
+        display: "flex", justifyContent: "center",
+      }}>
+        <div style={{
+          display: "flex", width: "100%", maxWidth: 480,
+          justifyContent: "space-around", alignItems: "center",
+          padding: "6px 0 4px",
+        }}>
+          {/* Home tab */}
+          <button
+            style={{
+              flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+              background: "none", border: "none", cursor: "pointer", padding: "6px 0",
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+              <polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.accent, fontFamily: "'Space Mono', monospace", letterSpacing: 0.5 }}>Home</span>
+          </button>
+
+          {/* Gallery tab */}
+          <button
+            onClick={() => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); }}
+            style={{
+              flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+              background: "none", border: "none", cursor: "pointer", padding: "6px 0",
+            }}
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="3" y="3" width="7" height="7" rx="1"/>
+              <rect x="14" y="3" width="7" height="7" rx="1"/>
+              <rect x="3" y="14" width="7" height="7" rx="1"/>
+              <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
+            <span style={{ fontSize: 10, fontWeight: 500, color: C.textDim, fontFamily: "'Space Mono', monospace", letterSpacing: 0.5 }}>Gallery</span>
+          </button>
+
+          {/* Create tab */}
+          <button
+            onClick={() => { resetCreator(); setCreatorReturnView("menu"); setView("creator"); }}
+            style={{
+              flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+              background: "none", border: "none", cursor: "pointer", padding: "6px 0",
+            }}
+          >
+            <div style={{
+              width: 36, height: 36, borderRadius: 12,
+              backgroundColor: C.accent, display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: `0 2px 12px ${C.accent}44`,
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.bg} strokeWidth="2.5" strokeLinecap="round">
+                <path d="M12 5v14M5 12h14"/>
+              </svg>
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 500, color: C.textDim, fontFamily: "'Space Mono', monospace", letterSpacing: 0.5 }}>Create</span>
+          </button>
+
+          {/* Profile / Menu tab */}
+          <button
+            onClick={() => setShowGameMenu(true)}
+            style={{
+              flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+              background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative",
+            }}
+          >
+            {firebaseUser && profilePicture ? (
+              <img src={profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: 11, objectFit: "cover", border: `1.5px solid ${C.border}` }} />
+            ) : (
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+              </svg>
+            )}
+            <span style={{ fontSize: 10, fontWeight: 500, color: C.textDim, fontFamily: "'Space Mono', monospace", letterSpacing: 0.5 }}>Profile</span>
+          </button>
+        </div>
+      </nav>
       </div>
     );
   }
