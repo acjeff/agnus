@@ -32,7 +32,6 @@ import {
   resetCoopSession,
   deleteCoopSession,
   loadCoopSession,
-  guestLeaveCoopSession,
   closeCoopSession,
   loadUserCoopSessions,
   subscribeToUserCoopSessionIndex,
@@ -4988,20 +4987,12 @@ export default function Pattrn() {
   }, [firebaseUser, coopSessionId, puzzle, startCoopSession]);
 
   // Leave coop session and clean up
-  // Host leaving: session persists (goes back to "waiting"), host disconnects locally
-  // Guest leaving: guest removed from session, session goes back to "waiting"
+  // All players (host and guests) just disconnect locally — session persists
+  // and remains in their active sessions list so they can rejoin
   const leaveCoopSession = useCallback(() => {
     if (coopUnsubRef.current) {
       coopUnsubRef.current();
       coopUnsubRef.current = null;
-    }
-    if (coopSessionId && firebaseUser) {
-      if (coopRole === "guest") {
-        // Guest leaving: remove guest from session, session persists for host
-        guestLeaveCoopSession(coopSessionId, firebaseUser.uid).catch(() => {});
-      }
-      // Host leaving: session persists in "waiting" state, host just disconnects locally
-      // (Host can rejoin from the active sessions panel on the menu)
     }
     // Restore guest's original theme (don't persist the host's theme)
     if (coopOriginalThemeRef.current !== null) {
@@ -5028,7 +5019,7 @@ export default function Pattrn() {
     coopHostTimerStartRef.current = null;
     prevCoopPartnerLockedRef.current = false;
     coopGuestJoinedRef.current = false;
-  }, [coopSessionId, firebaseUser, coopRole]);
+  }, [coopSessionId, firebaseUser]);
 
   // Close coop session permanently (owner only)
   const closeCoopSessionPermanently = useCallback(async (sessionId, session) => {
