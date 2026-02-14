@@ -13048,7 +13048,7 @@ export default function Pattrn() {
               </svg>
             </button>
           )}
-          {/* Coop invite button - visible when playing supported modes, prompts login if needed */}
+          {/* Coop share button - visible when playing supported modes, prompts login if needed */}
           {!isCoop && gameState === "playing" && !isCascade && !isMosaic && (
             <button
               onClick={() => {
@@ -13060,31 +13060,53 @@ export default function Pattrn() {
                 setShowCoopFriendPicker(true);
               }}
               style={{
-                background: "none", border: `1px solid #54A0FF55`, borderRadius: 8, padding: "6px 10px",
-                color: "#54A0FF", cursor: "pointer", fontSize: 12, transition: "all 0.15s",
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, fontWeight: 700,
+                background: "none", border: `1px solid #54A0FF55`, borderRadius: 8,
+                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.15s", minWidth: 32, height: 30,
               }}
-              title="Invite a friend to play co-op"
+              title="Start co-op"
               onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = "#54A0FF55"; e.currentTarget.style.backgroundColor = "transparent"; }}
             >
-              Co-op
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#54A0FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+              </svg>
             </button>
           )}
-          {/* Coop leave button when in coop - requires confirmation */}
+          {/* Coop invite button when in coop */}
+          {isCoop && (
+            <button
+              onClick={() => setShowCoopInvite(true)}
+              style={{
+                background: "none", border: `1px solid #54A0FF55`, borderRadius: 8,
+                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.15s", minWidth: 32, height: 30,
+              }}
+              title="Invite a friend"
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#54A0FF55"; e.currentTarget.style.backgroundColor = "transparent"; }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#54A0FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
+              </svg>
+            </button>
+          )}
+          {/* Coop leave button when in coop */}
           {isCoop && (
             <button
               onClick={() => { setShowLeaveConfirm(true); }}
               style={{
-                background: "none", border: `1px solid #f8717188`, borderRadius: 8, padding: "6px 10px",
-                color: "#f87171", cursor: "pointer", fontSize: 11, transition: "all 0.15s",
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                background: "none", border: `1px solid #f8717188`, borderRadius: 8,
+                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                transition: "all 0.15s", minWidth: 32, height: 30,
               }}
               title="Leave co-op session"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#f8717188"; }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.backgroundColor = "#f8717111"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#f8717188"; e.currentTarget.style.backgroundColor = "transparent"; }}
             >
-              Leave
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
             </button>
           )}
         </div>
