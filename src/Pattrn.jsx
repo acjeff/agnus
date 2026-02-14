@@ -4045,8 +4045,10 @@ export default function Pattrn() {
   const [viewportSize, setViewportSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
   const [headerHeight, setHeaderHeight] = useState(88);
   const [footerHeight, setFooterHeight] = useState(140);
+  const [infoRowHeight, setInfoRowHeight] = useState(40);
   const headerRef = useRef(null);
   const footerRef = useRef(null);
+  const infoRowRef = useRef(null);
   useEffect(() => {
     const onResize = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener("resize", onResize);
@@ -4057,13 +4059,16 @@ export default function Pattrn() {
     if (barObserverRef.current) barObserverRef.current.disconnect();
     const hEl = headerRef.current;
     const fEl = footerRef.current;
-    if (!hEl && !fEl) return;
+    const iEl = infoRowRef.current;
+    if (!hEl && !fEl && !iEl) return;
     const ro = new ResizeObserver(() => {
       if (headerRef.current) setHeaderHeight(headerRef.current.offsetHeight);
       if (footerRef.current) setFooterHeight(footerRef.current.offsetHeight);
+      if (infoRowRef.current) setInfoRowHeight(infoRowRef.current.offsetHeight);
     });
     if (hEl) { ro.observe(hEl); setHeaderHeight(hEl.offsetHeight); }
     if (fEl) { ro.observe(fEl); setFooterHeight(fEl.offsetHeight); }
+    if (iEl) { ro.observe(iEl); setInfoRowHeight(iEl.offsetHeight); }
     barObserverRef.current = ro;
     return () => ro.disconnect();
   }, [view, gameState]);
@@ -6531,7 +6536,7 @@ export default function Pattrn() {
   const gridPad = gridSize >= 7 ? (isMobile ? 6 : 10) : (isMobile ? 10 : 14);
   const edgePad = isMobile ? 12 : 24;
   const parentW = viewportSize.w;
-  const parentH = viewportSize.h - headerHeight - footerHeight;
+  const parentH = viewportSize.h - headerHeight - footerHeight - infoRowHeight;
   const availW = parentW - 2 * edgePad - (gridSize - 1) * gridGap - 2 * gridPad;
   const availH = parentH - 2 * edgePad - (gridSize - 1) * gridGap - 2 * gridPad;
   const dynamicCell = Math.min(Math.floor(availW / gridSize), Math.floor(availH / gridSize));
@@ -13122,8 +13127,8 @@ export default function Pattrn() {
       style={{
       height: "100dvh", minHeight: "100dvh", backgroundColor: C.bg, color: C.text,
       fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
-      display: "flex", flexDirection: "column", alignItems: "center",
-      padding: "0 16px", position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+      display: "flex", flexDirection: "column",
+      position: "relative", width: "100%",
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
@@ -13266,7 +13271,7 @@ export default function Pattrn() {
 
       {/* Top bar - fixed at top so it always stays visible */}
       <div ref={headerRef} style={{
-        position: "fixed", top: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg,
+        flexShrink: 0, zIndex: 10, backgroundColor: C.bg,
         paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
         display: "flex", justifyContent: "center", boxSizing: "border-box",
         touchAction: "manipulation",
@@ -14067,9 +14072,9 @@ export default function Pattrn() {
         </div>
       )}
 
-      {/* Info row: fixed below header */}
-      <div style={{
-        position: "fixed", top: "calc(48px + env(safe-area-inset-top, 0px))", left: 0, right: 0, zIndex: 10,
+      {/* Info row: flex child below header */}
+      <div ref={infoRowRef} style={{
+        flexShrink: 0, zIndex: 10,
         backgroundColor: C.bg, display: "flex", justifyContent: "center",
         paddingTop: 4, paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
       }}>
@@ -14247,8 +14252,8 @@ export default function Pattrn() {
         </div>
       )}
 
-      {/* Grid area: fixed between header and footer, centers grid */}
-      <div style={{ position: "fixed", top: headerHeight, bottom: footerHeight, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, boxSizing: "border-box", padding: edgePad }}>
+      {/* Grid area: flex child between header/info and footer, centers grid */}
+      <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, boxSizing: "border-box", padding: edgePad }}>
         <GridDecoration decoration={activeTheme.decoration} />
         {/* Coop mosaic players indicator — positioned top-left of puzzle panel */}
         {isCoopMosaic && coopMosaicAnyConnected && gameState === "playing" && (
@@ -14454,7 +14459,7 @@ export default function Pattrn() {
       </div>
 
       {/* Fixed bottom bar: token picker + actions */}
-      <div ref={footerRef} style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
+      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
         {/* Token picker row */}
         {gameState === "playing" && (
           <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId}
