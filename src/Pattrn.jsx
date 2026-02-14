@@ -13005,6 +13005,22 @@ export default function Pattrn() {
               Co-op
             </button>
           )}
+          {/* Coop invite button when in coop - opens invite modal with friends checkbox list */}
+          {isCoop && (
+            <button
+              onClick={() => setShowCoopInvite(true)}
+              style={{
+                background: "none", border: `1px solid #54A0FF55`, borderRadius: 8, padding: "6px 10px",
+                color: "#54A0FF", cursor: "pointer", fontSize: 11, transition: "all 0.15s",
+                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, fontWeight: 700,
+              }}
+              title="Invite a friend to play co-op"
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = "#54A0FF55"; e.currentTarget.style.backgroundColor = "transparent"; }}
+            >
+              Invite
+            </button>
+          )}
           {/* Coop leave button when in coop - requires confirmation */}
           {isCoop && (
             <button
