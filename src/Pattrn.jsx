@@ -142,7 +142,7 @@ function BottomTabBar({ active, onNavigate, coopBadgeCount, firebaseUser, profil
         justifyContent: "space-around", alignItems: "center",
         padding: "6px 6px 5px",
         backgroundColor: "rgba(18, 18, 32, 0.55)",
-        borderRadius: 28,
+        borderRadius: 9999,
         border: "1px solid rgba(255, 255, 255, 0.1)",
         boxShadow: "0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
         backdropFilter: "blur(28px) saturate(1.8)",
@@ -11597,9 +11597,9 @@ export default function Pattrn() {
             backdropFilter: "blur(28px) saturate(1.8)",
             WebkitBackdropFilter: "blur(28px) saturate(1.8)",
           }}>
-            <img src="/app-icon.png" alt="Pattrn" style={{ width: 30, height: 30, borderRadius: 15 }} />
+            <img src="/app-icon.png" alt="Agnus" style={{ width: 30, height: 30, borderRadius: 15 }} />
             <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700, letterSpacing: 1.5, color: C.accent, lineHeight: 1 }}>
-              Pattrn
+              Agnus
             </span>
           </div>
           {/* Right: action buttons pill */}
