@@ -2573,7 +2573,7 @@ const DIFFICULTIES = [
 const MODE_CATEGORIES = ["classic", "special"];
 const VALID_MODES = new Set(["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"]);
 
-const VALID_VIEWS = new Set(["gallery", "creator", "custom-mosaic"]);
+const VALID_VIEWS = new Set(["gallery", "creator", "custom-mosaic", "coop", "profile"]);
 
 function getSearchParams() {
   const params = new URLSearchParams(typeof window !== "undefined" ? window.location.search : "");
@@ -2678,6 +2678,9 @@ export default function Pattrn() {
   const [showAchievements, setShowAchievements] = useState(false);
   const [showGameMenu, setShowGameMenu] = useState(false);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
+  const [coopSetupMode, setCoopSetupMode] = useState(null); // null | difficulty key
+  const [coopSetupLevel, setCoopSetupLevel] = useState(0);
+  const [coopSetupStarting, setCoopSetupStarting] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null); // { label, tier, key }
   const [toastDismissing, setToastDismissing] = useState(false);
   const achievementQueueRef = useRef([]);
@@ -2895,7 +2898,7 @@ export default function Pattrn() {
   // Update presence status when view changes (menu = idle, play = playing)
   useEffect(() => {
     if (!firebaseUser || !firebaseConfigured) return;
-    if (view === "menu" || view === "gallery" || view === "creator" || view === "profile") {
+    if (view === "menu" || view === "gallery" || view === "creator" || view === "profile" || view === "coop") {
       updatePresence(firebaseUser.uid, { online: true, status: "idle", currentMode: null, currentPuzzle: null }).catch(() => {});
     }
   }, [view, firebaseUser, firebaseConfigured]);
@@ -4188,6 +4191,75 @@ export default function Pattrn() {
     cascadeAttemptsRef.current = attempts;
     cascadeRunIndexRef.current = cascadeRunIndex;
   }
+  // --- Bottom Tab Bar helper ---
+  const BottomTabBar = ({ active }) => (
+    <nav className="bottom-tab-bar" style={{
+      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
+      backgroundColor: C.bg + "f0",
+      borderTop: `1px solid ${C.border}`,
+      paddingBottom: "env(safe-area-inset-bottom, 0px)",
+      display: "flex", justifyContent: "center",
+    }}>
+      <div style={{
+        display: "flex", width: "100%", maxWidth: 480,
+        justifyContent: "space-around", alignItems: "center",
+        padding: "6px 0 4px",
+      }}>
+        {/* Home */}
+        <button onClick={() => setView("menu")}
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "home" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span style={{ fontSize: 10, fontWeight: active === "home" ? 700 : 500, color: active === "home" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Home</span>
+        </button>
+        {/* Mosaic (Gallery) */}
+        <button onClick={() => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); }}
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "mosaic" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          <span style={{ fontSize: 10, fontWeight: active === "mosaic" ? 700 : 500, color: active === "mosaic" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Mosaic</span>
+        </button>
+        {/* Co-op */}
+        <button onClick={() => setView("coop")}
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative" }}>
+          <div style={{ position: "relative", display: "inline-flex" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "coop" ? C.coop : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            {activeCoopSessions.length > 0 && (
+              <div style={{
+                position: "absolute", top: -4, right: -8,
+                minWidth: 16, height: 16, borderRadius: 8,
+                backgroundColor: C.coop, display: "flex", alignItems: "center", justifyContent: "center",
+                padding: "0 4px", boxSizing: "border-box",
+              }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "'Space Mono', monospace", lineHeight: 1 }}>
+                  {activeCoopSessions.length}
+                </span>
+              </div>
+            )}
+          </div>
+          <span style={{ fontSize: 10, fontWeight: active === "coop" ? 700 : 500, color: active === "coop" ? C.coop : C.textDim, fontFamily: "'Space Mono', monospace" }}>Co-op</span>
+        </button>
+        {/* Profile */}
+        <button onClick={() => setView("profile")}
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative" }}>
+          {firebaseUser && profilePicture ? (
+            <img src={profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: 11, objectFit: "cover", border: `1.5px solid ${active === "profile" ? C.accent : C.border}` }} />
+          ) : (
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "profile" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+          )}
+          <span style={{ fontSize: 10, fontWeight: active === "profile" ? 700 : 500, color: active === "profile" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Profile</span>
+        </button>
+      </div>
+    </nav>
+  );
+
   const isMosaic = difficulty === "mosaic";
   const mosaicMainPuzzles = isMosaic ? (staffPickPuzzlesRef.current || PUZZLE_SETS.mosaic) : null;
   const puzzles = isCascade ? [] : isDaily ? [] : (customMosaicPuzzlesRef.current && isMosaic ? customMosaicPuzzlesRef.current : isMosaic ? mosaicMainPuzzles : (PUZZLE_SETS[difficulty] || []));
@@ -7476,12 +7548,18 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+        paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
 
         {/* Header */}
-        <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
+        <div style={{
+          width: "100%", maxWidth: 480,
+          display: "flex", alignItems: "center", gap: 12, marginBottom: 16,
+          padding: "12px 4px", position: "sticky", top: 0, zIndex: 50,
+          backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+          animation: "fadeUp 0.3s ease",
+        }}>
           <button onClick={() => {
             const returnTo = creatorReturnView || "menu";
             resetCreator();
@@ -7715,6 +7793,8 @@ export default function Pattrn() {
           )}
         </div>
         {coopInviteToastEl}
+
+      <BottomTabBar active="mosaic" />
       </div>
     );
   }
@@ -7730,68 +7810,21 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+        paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
 
         {/* Header */}
-        <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => setView("menu")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
+        <div style={{
+          width: "100%", maxWidth: 480,
+          display: "flex", alignItems: "center", gap: 12, marginBottom: 16,
+          padding: "12px 4px", position: "sticky", top: 0, zIndex: 50,
+          backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+          animation: "fadeUp 0.3s ease",
+        }}>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
-            Mosaics
+            Mosaic
           </h2>
-          {firebaseConfigured && firebaseUser && (
-            <button
-              onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }}
-              style={{
-                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
-                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
-                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
-                position: "relative", minWidth: 32, height: 30,
-              }}
-              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
-              aria-label="Friends"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              {onlineFriendsCount > 0 && (
-                <span style={{
-                  position: "absolute", top: -4, right: -4,
-                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
-                  backgroundColor: C.correct, color: "#fff",
-                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: "'Space Mono', monospace",
-                }}>
-                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
-                </span>
-              )}
-            </button>
-          )}
-          {firebaseUser && (
-            <button onClick={() => { resetCreator(); setCreatorReturnView("gallery"); setView("creator"); }}
-              style={{
-                background: C.accent, color: C.bg, border: "none", borderRadius: 8, padding: "6px 14px",
-                cursor: "pointer", fontFamily: "'Space Mono', monospace",
-                fontSize: 11, fontWeight: 700, letterSpacing: 1,
-              }}
-            >
-              + New
-            </button>
-          )}
         </div>
 
         {/* Tabs */}
@@ -8118,6 +8151,28 @@ export default function Pattrn() {
           </div>
         )}
         {coopInviteToastEl}
+
+      {/* FAB: Create Mosaic */}
+      {firebaseUser && (
+        <button onClick={() => { resetCreator(); setCreatorReturnView("gallery"); setView("creator"); }}
+          style={{
+            position: "fixed", bottom: "calc(80px + env(safe-area-inset-bottom, 0px))", right: 20,
+            width: 56, height: 56, borderRadius: 16, zIndex: 80,
+            backgroundColor: C.accent, border: "none", cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: `0 4px 16px ${C.accent}55, 0 2px 8px rgba(0,0,0,0.3)`,
+            transition: "transform 0.15s, box-shadow 0.15s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+          aria-label="Create Mosaic"
+        >
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.bg} strokeWidth="2.5" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </button>
+      )}
+      <BottomTabBar active="mosaic" />
       </div>
     );
   }
@@ -9441,6 +9496,824 @@ export default function Pattrn() {
     </div>
   );
 
+  // --- CO-OP VIEW ---
+  if (view === "coop") {
+    const coopModes = DIFFICULTIES.filter(d => d.key !== "daily" && d.key !== "mosaic");
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+
+        {/* Header */}
+        <div style={{
+          width: "100%", maxWidth: 480,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 4px", position: "sticky", top: 0, zIndex: 50,
+          backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        }}>
+          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.coop, lineHeight: 1 }}>
+            Co-op
+          </h1>
+          {firebaseConfigured && firebaseUser && onlineFriendsCount > 0 && (
+            <span style={{ fontSize: 10, color: C.correct, fontFamily: "'Space Mono', monospace" }}>
+              {onlineFriendsCount} friend{onlineFriendsCount !== 1 ? "s" : ""} online
+            </span>
+          )}
+        </div>
+
+        <div style={{ width: "100%", maxWidth: 400, animation: "fadeUp 0.4s ease" }}>
+
+          {/* Not signed in state */}
+          {!firebaseUser && (
+            <div style={{
+              textAlign: "center", padding: "40px 20px", borderRadius: 16,
+              backgroundColor: C.surface, border: `1px solid ${C.border}`, marginBottom: 20,
+            }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 16, opacity: 0.5 }}>
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+              </svg>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>
+                Sign in to play co-op
+              </div>
+              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
+                Add friends and solve puzzles together in real-time
+              </div>
+              <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
+                style={{
+                  padding: "10px 24px", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                  background: C.coop, color: "#fff", border: "none", cursor: "pointer",
+                }}>
+                Sign In
+              </button>
+            </div>
+          )}
+
+          {/* Start Co-op Puzzle card */}
+          {firebaseUser && (
+            <div style={{
+              marginBottom: 20, borderRadius: 16, overflow: "hidden",
+              background: `linear-gradient(135deg, ${C.surface} 0%, ${C.coop}11 100%)`,
+              border: `1px solid ${C.coop}33`, padding: 20,
+            }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+                Start Co-op Puzzle
+              </div>
+              <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16 }}>
+                Choose a mode and puzzle, then invite a friend
+              </div>
+
+              {/* Mode selection */}
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
+                  Game Mode
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {coopModes.map(d => (
+                    <button key={d.key} onClick={() => { setCoopSetupMode(d.key); setCoopSetupLevel(0); }}
+                      style={{
+                        padding: "8px 14px", borderRadius: 10,
+                        background: coopSetupMode === d.key ? C.coop : C.bg,
+                        color: coopSetupMode === d.key ? "#fff" : C.textDim,
+                        border: `1px solid ${coopSetupMode === d.key ? C.coop : C.border}`,
+                        cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600,
+                        transition: "all 0.15s",
+                      }}>
+                      {d.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Puzzle selection */}
+              {coopSetupMode && coopSetupMode !== "cascade" && (
+                <div style={{ marginBottom: 16 }}>
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
+                    Puzzle #{coopSetupLevel + 1}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <button onClick={() => setCoopSetupLevel(Math.max(0, coopSetupLevel - 1))}
+                      style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 14 }}>
+                      &minus;
+                    </button>
+                    <input type="range" min={0} max={49} value={coopSetupLevel}
+                      onChange={e => setCoopSetupLevel(Number(e.target.value))}
+                      style={{ flex: 1, accentColor: C.coop }} />
+                    <button onClick={() => setCoopSetupLevel(Math.min(49, coopSetupLevel + 1))}
+                      style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 14 }}>
+                      +
+                    </button>
+                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700, color: C.text, minWidth: 28, textAlign: "center" }}>
+                      {coopSetupLevel + 1}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {/* Start button */}
+              <button
+                disabled={!coopSetupMode || coopSetupStarting}
+                onClick={async () => {
+                  if (!coopSetupMode) return;
+                  setCoopSetupStarting(true);
+                  try {
+                    setDifficulty(coopSetupMode);
+                    const level = coopSetupMode === "cascade" ? 0 : coopSetupLevel;
+                    startPuzzle(level, coopSetupMode);
+                    setView("play");
+                    // Small delay to ensure puzzle is loaded, then start co-op
+                    setTimeout(() => {
+                      startCoopSession();
+                    }, 300);
+                  } catch { /* ignore */ }
+                  setCoopSetupStarting(false);
+                }}
+                style={{
+                  width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                  background: coopSetupMode ? C.coop : C.border, color: coopSetupMode ? "#fff" : C.textDim,
+                  border: "none", cursor: coopSetupMode ? "pointer" : "default",
+                  opacity: coopSetupStarting ? 0.6 : 1, transition: "all 0.15s",
+                }}>
+                {coopSetupStarting ? "Starting..." : "Start & Invite Friend"}
+              </button>
+            </div>
+          )}
+
+          {/* Active Co-op Sessions */}
+          {firebaseUser && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{
+                fontSize: 9, color: C.coop, textTransform: "uppercase",
+                letterSpacing: 1.5, marginBottom: 10,
+                fontFamily: "'Space Mono', monospace", fontWeight: 700,
+              }}>Active Sessions {activeCoopSessions.length > 0 && `(${activeCoopSessions.length})`}</div>
+
+              {activeCoopSessions.length === 0 ? (
+                <div style={{
+                  textAlign: "center", padding: "24px 16px", borderRadius: 12,
+                  backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                }}>
+                  <div style={{ fontSize: 12, color: C.textDim }}>
+                    No active sessions
+                  </div>
+                  <div style={{ fontSize: 11, color: C.textDim, marginTop: 4, opacity: 0.7 }}>
+                    Start a puzzle above to create one
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {activeCoopSessions.map(session => {
+                    const isHost = session.hostUid === firebaseUser.uid;
+                    const isMosaicSession = session._type === "mosaic";
+                    const mosaicPlayerCount = isMosaicSession ? Object.keys(session.players || {}).length : 0;
+                    const partnerName = isMosaicSession
+                      ? (mosaicPlayerCount > 1 ? `${mosaicPlayerCount} players` : null)
+                      : (isHost ? (session.guestUsername || null) : (session.hostUsername || null));
+                    const modeLabel = isMosaicSession ? "Mosaic" : ((DIFFICULTIES.find(d => d.key === session.mode)?.label) || session.mode);
+                    const titleLabel = isMosaicSession
+                      ? (session.mosaicTitle || "Untitled")
+                      : `${modeLabel} #${(session.level ?? 0) + 1}`;
+                    const statusLabel = session.status === "waiting" ? "Waiting for partner" : session.status === "playing" ? "In progress" : session.status === "complete" ? "Complete" : session.status;
+                    const statusColor = session.status === "waiting" ? C.textDim : session.status === "playing" ? C.coop : session.status === "complete" ? C.correct : C.textDim;
+                    const mosaicSolved = isMosaicSession ? Object.values(session.tileProgress || {}).filter(v => v > 0).length : 0;
+                    return (
+                      <div key={session.id} style={{
+                        display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
+                        borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${isMosaicSession ? C.coop + "22" : C.border}`,
+                      }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                            {isMosaicSession && (
+                              <span style={{ fontSize: 9, color: C.coop, fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                                Co-op Mosaic
+                              </span>
+                            )}
+                            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>
+                              {titleLabel}
+                            </span>
+                            <span style={{ fontSize: 9, color: isHost ? C.coop : "#FF9FF3", fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                              {isHost ? "Host" : "Guest"}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: 10, color: statusColor, fontFamily: "'Space Mono', monospace" }}>
+                            {statusLabel}
+                            {isMosaicSession && session.status === "playing" && <span style={{ color: C.textDim }}> {"\u2022"} {mosaicSolved}/25 tiles</span>}
+                            {partnerName && <span style={{ color: C.textDim }}> {"\u2022"} with {partnerName}</span>}
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                          {session.status !== "complete" && (
+                            <button
+                              onClick={() => isMosaicSession ? rejoinCoopMosaicSession(session) : rejoinCoopSession(session)}
+                              style={{
+                                background: C.coop, border: "none", borderRadius: 8,
+                                padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 10,
+                                fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
+                              }}>
+                              Rejoin
+                            </button>
+                          )}
+                          {isHost && (
+                            <button
+                              onClick={() => isMosaicSession ? closeCoopMosaicSessionPermanently(session.id, session) : closeCoopSessionPermanently(session.id, session)}
+                              style={{
+                                background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+                                padding: "8px 10px", color: C.textDim, cursor: "pointer", fontSize: 10,
+                                fontFamily: "'Space Mono', monospace",
+                              }}
+                              title="Close session"
+                              onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.color = "#f87171"; }}
+                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                            >{"\u2715"}</button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        {accountModalEl}
+        {usernameModalEl}
+        {friendsModalEl}
+        {coopInviteToastEl}
+        <BottomTabBar active="coop" />
+      </div>
+    );
+  }
+
+  // --- PROFILE VIEW ---
+  if (view === "profile") {
+    const achs = computeAchievements(progress, times, savedAchievementIds);
+    const achUnlocked = achs.filter(a => a.unlocked).length;
+    const achTotal = achs.length;
+    const totalSolvedAll = [...SOLVE_MODES, "daily"].reduce((s, m) => s + countModeSolved(progress[m]), 0)
+      + Object.values(progress.cascade || {}).filter(v => v === CASCADE_LEVELS.length).length;
+    return (
+      <div style={{
+        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+
+        {/* Header */}
+        <div style={{
+          width: "100%", maxWidth: 480,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 4px", position: "sticky", top: 0, zIndex: 50,
+          backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        }}>
+          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
+            Profile
+          </h1>
+        </div>
+
+        <div style={{ width: "100%", maxWidth: 400, animation: "fadeUp 0.4s ease" }}>
+
+          {/* Profile card */}
+          <div style={{
+            display: "flex", alignItems: "center", gap: 16, marginBottom: 24, padding: "16px 0",
+          }}>
+            <div style={{
+              width: 56, height: 56, borderRadius: 16, flexShrink: 0, overflow: "hidden",
+              backgroundColor: "#60A5FA22", border: "2px solid #60A5FA44",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              {firebaseUser && profilePicture ? (
+                <img src={profilePicture} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                </svg>
+              )}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
+                {firebaseUser ? (username || "Player") : "Guest"}
+              </div>
+              <div style={{ fontSize: 11, color: C.textDim, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {firebaseUser ? firebaseUser.email : "Not signed in"}
+              </div>
+              {firebaseUser && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+                  <div style={{
+                    width: 6, height: 6, borderRadius: "50%",
+                    backgroundColor: syncStatus === "syncing" ? C.inProgress : syncStatus === "error" ? C.incorrect : C.correct,
+                  }} />
+                  <span style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                    {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Synced"}
+                  </span>
+                  <span style={{ color: C.textDim, fontSize: 9 }}>&middot;</span>
+                  <span style={{ fontSize: 9, color: C.accent, fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                    {totalSolvedAll} solved
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Menu items */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {/* Account / Sign In */}
+            {firebaseConfigured && (
+              <button onClick={() => {
+                if (firebaseUser) {
+                  setShowProfilePage(true);
+                } else {
+                  setShowAccountModal(true); setAutoLoginModal(false); setAccountError("");
+                }
+              }} style={{
+                width: "100%", padding: "14px 16px", borderRadius: 12,
+                backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                transition: "all 0.15s",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = "#60A5FA"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: "1.5px solid #60A5FA44", flexShrink: 0,
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                    <circle cx="8" cy="5" r="3" stroke="#60A5FA" strokeWidth="1.5" fill="none"/>
+                    <path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5" stroke="#60A5FA" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                    {firebaseUser ? "Edit Profile" : "Sign In"}
+                  </div>
+                  <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                    {firebaseUser ? "Change picture, username" : "Sign in to sync progress"}
+                  </div>
+                </div>
+                <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+              </button>
+            )}
+
+            {/* Achievements */}
+            <button onClick={() => setShowAchievements(true)} style={{
+              width: "100%", padding: "14px 16px", borderRadius: 12,
+              backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+              transition: "all 0.15s",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                backgroundColor: C.accent + "22", display: "flex", alignItems: "center", justifyContent: "center",
+                border: `1.5px solid ${C.accent}44`, flexShrink: 0,
+              }}>
+                <span style={{ fontSize: 16, color: C.accent, lineHeight: 1 }}>{"\u2605"}</span>
+              </div>
+              <div style={{ flex: 1, textAlign: "left" }}>
+                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                  Achievements
+                </div>
+                <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                  {achUnlocked}/{achTotal} unlocked
+                </div>
+              </div>
+              <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+            </button>
+
+            {/* Statistics */}
+            <button onClick={() => setShowShareModal(true)} style={{
+              width: "100%", padding: "14px 16px", borderRadius: 12,
+              backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+              transition: "all 0.15s",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#4ECDC4"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                backgroundColor: "#4ECDC422", display: "flex", alignItems: "center", justifyContent: "center",
+                border: "1.5px solid #4ECDC444", flexShrink: 0,
+              }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <rect x="1" y="9" width="3" height="6" rx="0.5" fill="#4ECDC4" />
+                  <rect x="6" y="5" width="3" height="10" rx="0.5" fill="#4ECDC4" />
+                  <rect x="11" y="1" width="3" height="14" rx="0.5" fill="#4ECDC4" />
+                </svg>
+              </div>
+              <div style={{ flex: 1, textAlign: "left" }}>
+                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                  Statistics
+                </div>
+                <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                  {totalSolvedAll} puzzles solved
+                </div>
+              </div>
+              <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+            </button>
+
+            {/* Birthday Puzzle */}
+            <button onClick={() => setShowBirthdayPrompt(true)} style={{
+              width: "100%", padding: "14px 16px", borderRadius: 12,
+              backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+              transition: "all 0.15s",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#F472B6"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                backgroundColor: "#F472B622", display: "flex", alignItems: "center", justifyContent: "center",
+                border: "1.5px solid #F472B644", flexShrink: 0,
+              }}>
+                <span style={{ fontSize: 16, lineHeight: 1 }}>{"\uD83C\uDF82"}</span>
+              </div>
+              <div style={{ flex: 1, textAlign: "left" }}>
+                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                  Birthday Puzzle
+                </div>
+                <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                  {birthday ? `Set: ${birthday}` : "Set your birthday"}
+                </div>
+              </div>
+              <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+            </button>
+
+            {/* Themes */}
+            <button onClick={() => setShowThemePicker(true)} style={{
+              width: "100%", padding: "14px 16px", borderRadius: 12,
+              backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+              transition: "all 0.15s",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = "#A78BFA"; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                backgroundColor: "#A78BFA22", display: "flex", alignItems: "center", justifyContent: "center",
+                border: "1.5px solid #A78BFA44", flexShrink: 0,
+              }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <circle cx="5" cy="5" r="3" fill="#FF6B6B" opacity="0.8"/>
+                  <circle cx="11" cy="5" r="3" fill="#4ECDC4" opacity="0.8"/>
+                  <circle cx="8" cy="11" r="3" fill="#FFE66D" opacity="0.8"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1, textAlign: "left" }}>
+                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                  Themes
+                </div>
+                <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                  {activeTheme.id === "classic" ? "Classic" : `${activeTheme.icon || ""} ${activeTheme.name}`}
+                </div>
+              </div>
+              <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+            </button>
+
+            {/* Friends */}
+            {firebaseConfigured && firebaseUser && (
+              <button onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }} style={{
+                width: "100%", padding: "14px 16px", borderRadius: 12,
+                backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                transition: "all 0.15s",
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.correct; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+              >
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  backgroundColor: C.correct + "22", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `1.5px solid ${C.correct}44`, flexShrink: 0,
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.correct} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                    Friends
+                  </div>
+                  <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                    {friendsList.length} friend{friendsList.length !== 1 ? "s" : ""}{onlineFriendsCount > 0 ? `, ${onlineFriendsCount} online` : ""}
+                  </div>
+                </div>
+                <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+              </button>
+            )}
+
+            {/* Admin sections */}
+            {isAdmin && (
+              <>
+                <div style={{ height: 1, backgroundColor: C.border, margin: "4px 0" }} />
+                <button onClick={() => { setView("admin-review"); loadMosaicData("admin"); }} style={{
+                  width: "100%", padding: "14px 16px", borderRadius: 12,
+                  backgroundColor: C.surface, border: `1px solid ${C.incorrect}33`,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 12, transition: "all 0.15s",
+                }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: "#EF444422", display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #EF444444", flexShrink: 0 }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 9.5 4.5 11.5 5 8 2.5 5.5 6 5z" stroke="#EF4444" strokeWidth="1.5" fill="none" strokeLinejoin="round"/></svg>
+                  </div>
+                  <div style={{ flex: 1, textAlign: "left" }}>
+                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Review</div>
+                  </div>
+                  <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                </button>
+                <button onClick={() => { setView("admin-manage"); loadMosaicData("manage"); }} style={{
+                  width: "100%", padding: "14px 16px", borderRadius: 12,
+                  backgroundColor: C.surface, border: `1px solid #F59E0B33`,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 12, transition: "all 0.15s",
+                }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: "#F59E0B22", display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #F59E0B44", flexShrink: 0 }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                  </div>
+                  <div style={{ flex: 1, textAlign: "left" }}>
+                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Manage</div>
+                  </div>
+                  <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                </button>
+                <button onClick={() => { setView("admin-metrics"); loadAdminMetricsData(); }} style={{
+                  width: "100%", padding: "14px 16px", borderRadius: 12,
+                  backgroundColor: C.surface, border: `1px solid #8B5CF633`,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 12, transition: "all 0.15s",
+                }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: "#8B5CF622", display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #8B5CF644", flexShrink: 0 }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="9" width="3" height="5" rx="0.5" fill="#8B5CF6"/><rect x="6.5" y="5" width="3" height="9" rx="0.5" fill="#8B5CF6"/><rect x="11" y="2" width="3" height="12" rx="0.5" fill="#8B5CF6"/></svg>
+                  </div>
+                  <div style={{ flex: 1, textAlign: "left" }}>
+                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Metrics</div>
+                  </div>
+                  <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                </button>
+                <button onClick={() => setView("admin-users")} style={{
+                  width: "100%", padding: "14px 16px", borderRadius: 12,
+                  backgroundColor: C.surface, border: `1px solid #06B6D433`,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 12, transition: "all 0.15s",
+                }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, backgroundColor: "#06B6D422", display: "flex", alignItems: "center", justifyContent: "center", border: "1.5px solid #06B6D444", flexShrink: 0 }}>
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="#06B6D4" strokeWidth="1.5" fill="none"/><path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="#06B6D4" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
+                  </div>
+                  <div style={{ flex: 1, textAlign: "left" }}>
+                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Users</div>
+                  </div>
+                  <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
+                </button>
+              </>
+            )}
+
+            {/* Divider */}
+            <div style={{ height: 1, backgroundColor: C.border, margin: "4px 0" }} />
+
+            {/* Sign out */}
+            {firebaseUser && (
+              <button onClick={handleSignOut} style={{
+                width: "100%", padding: "14px 16px", borderRadius: 12,
+                backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                transition: "all 0.15s",
+              }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  backgroundColor: C.textDim + "22", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `1.5px solid ${C.textDim}44`, flexShrink: 0,
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Sign Out</div>
+                </div>
+              </button>
+            )}
+
+            {/* Clear All Data */}
+            <button onClick={() => setShowClearConfirm(true)} style={{
+              width: "100%", padding: "14px 16px", borderRadius: 12,
+              backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+              transition: "all 0.15s",
+            }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
+            >
+              <div style={{
+                width: 32, height: 32, borderRadius: 8,
+                backgroundColor: C.incorrect + "22", display: "flex", alignItems: "center", justifyContent: "center",
+                border: `1.5px solid ${C.incorrect}44`, flexShrink: 0,
+              }}>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                  <path d="M4 4L12 12M12 4L4 12" stroke={C.incorrect} strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </div>
+              <div style={{ flex: 1, textAlign: "left" }}>
+                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.incorrect, letterSpacing: 0.5 }}>
+                  Clear All Data
+                </div>
+                <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
+                  Reset all progress and start fresh
+                </div>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        {themePickerEl}
+        {accountModalEl}
+        {usernameModalEl}
+        {profilePageEl}
+        {friendsModalEl}
+
+        {/* Clear All Data confirmation dialog */}
+        {showClearConfirm && (
+          <div onClick={() => setShowClearConfirm(false)} style={{
+            position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.85)", zIndex: 1100,
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 24,
+          }}>
+            <div onClick={e => e.stopPropagation()} style={{
+              backgroundColor: C.bg, border: `1px solid ${C.incorrect}44`, borderRadius: 16,
+              padding: "24px", maxWidth: 340, width: "100%",
+              boxShadow: `0 16px 48px rgba(0,0,0,0.6), 0 0 40px ${C.incorrect}22`,
+              animation: "fadeUp 0.25s ease",
+            }}>
+              <div style={{ textAlign: "center", marginBottom: 20 }}>
+                <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.incorrect, margin: "0 0 8px" }}>
+                  Clear All Data?
+                </h3>
+                <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
+                  This will permanently delete <strong style={{ color: C.text }}>all your progress</strong>, times, achievements, streak, and saved data. This cannot be undone.
+                </p>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button onClick={async () => {
+                  try {
+                    localStorage.removeItem(STORAGE_KEY);
+                    localStorage.removeItem(TIMES_KEY);
+                    localStorage.removeItem(BIRTHDAY_KEY);
+                    localStorage.removeItem(THEME_KEY);
+                    localStorage.removeItem(ACHIEV_KEY);
+                  } catch { /* ignore */ }
+                  if (firebaseUser) { try { await logOut(); } catch { /* ignore */ } }
+                  setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
+                  setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
+                  setSavedAchievementIds(new Set());
+                  setBirthday(null);
+                  setActiveThemeId("classic");
+                  setShowClearConfirm(false);
+                  setView("menu");
+                }} style={{
+                  width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+                  background: C.incorrect, color: "#fff", border: "none", cursor: "pointer",
+                  textTransform: "uppercase",
+                }}>
+                  Clear everything
+                </button>
+                <button onClick={() => setShowClearConfirm(false)} style={{
+                  width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                  background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                  textTransform: "uppercase",
+                }}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Achievements drawer */}
+        {showAchievements && (() => {
+          const achievements = computeAchievements(progress, times, savedAchievementIds);
+          const unlocked = achievements.filter(a => a.unlocked).length;
+          const total = achievements.length;
+          const tierColors = { 1: C.bronze, 2: C.silver, 3: C.gold };
+          const tierSymbols = { 1: "\u25C6", 2: "\u25CF", 3: "\u2605" };
+          return (
+            <div onClick={() => setShowAchievements(false)} style={{
+              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
+              display: "flex", alignItems: "flex-end", justifyContent: "center",
+            }}>
+              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
+              <div onClick={e => e.stopPropagation()} style={{
+                backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
+                padding: "0", maxWidth: 480, width: "100%",
+                boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`, maxHeight: "85vh",
+                display: "flex", flexDirection: "column",
+                animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+              }}>
+                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
+                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
+                </div>
+                <div style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
+                  <div style={{ textAlign: "center", marginBottom: 20 }}>
+                    <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Achievements</h2>
+                    <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>{unlocked}/{total} unlocked</p>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 3, backgroundColor: C.surfaceLight, marginBottom: 20, overflow: "hidden" }}>
+                    <div style={{ height: "100%", borderRadius: 3, backgroundColor: C.accent, width: `${(unlocked / total) * 100}%`, transition: "width 0.5s" }} />
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 20 }}>
+                    {achievements.map(a => {
+                      const tc = tierColors[a.tier] || C.textDim;
+                      const ts = tierSymbols[a.tier] || "";
+                      return (
+                        <div key={a.id} style={{
+                          display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
+                          borderRadius: 10, backgroundColor: a.unlocked ? tc + "12" : C.surface,
+                          border: `1px solid ${a.unlocked ? tc + "44" : C.border}`,
+                          opacity: a.unlocked ? 1 : 0.5,
+                        }}>
+                          <span style={{ fontSize: 14, color: tc, fontFamily: "'Space Mono', monospace" }}>{ts}</span>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: a.unlocked ? C.text : C.textDim }}>{a.label}</div>
+                            <div style={{ fontSize: 10, color: C.textDim, marginTop: 1 }}>{a.desc}</div>
+                          </div>
+                          {a.unlocked && <span style={{ fontSize: 10, color: tc, fontFamily: "'Space Mono', monospace" }}>{"\u2713"}</span>}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+                <div style={{ padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))", borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
+                  <button onClick={() => setShowAchievements(false)} style={{
+                    width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                    padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+                  }}>Close</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Stats drawer */}
+        {showShareModal && (() => {
+          const { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll } = getShareData();
+          const gridColors = { none: C.border, failed: C.incorrect, gold: C.gold, silver: C.silver, bronze: C.bronze };
+          return (
+            <div onClick={() => setShowShareModal(false)} style={{
+              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
+              display: "flex", alignItems: "flex-end", justifyContent: "center",
+            }}>
+              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
+              <div onClick={e => e.stopPropagation()} style={{
+                backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
+                padding: "0", maxWidth: 480, width: "100%", maxHeight: "85vh",
+                display: "flex", flexDirection: "column",
+                animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+              }}>
+                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px" }}>
+                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
+                </div>
+                <div style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
+                  <div style={{ textAlign: "center", marginBottom: 20 }}>
+                    <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Agnus</h2>
+                    <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>my stats</p>
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginBottom: 20, padding: "10px 16px", borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}` }}>
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.accent }}>{totalSolved}</div>
+                      <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>solved</div>
+                    </div>
+                    <div style={{ width: 1, backgroundColor: C.border }} />
+                    <div style={{ textAlign: "center" }}>
+                      <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700 }}>300</div>
+                      <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>total</div>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <button onClick={copyShareText} style={{ flex: 1, backgroundColor: C.accent, color: C.bg, border: "none", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>{shareMsg || "Share all"}</button>
+                    <button onClick={copyDailyShareText} style={{ flex: 1, backgroundColor: "transparent", color: C.accent, border: `1.5px solid ${C.accent}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>Share Daily</button>
+                  </div>
+                  <button onClick={() => setShowShareModal(false)} style={{ width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Close</button>
+                </div>
+              </div>
+            </div>
+          );
+        })()}
+
+        <BottomTabBar active="profile" />
+      </div>
+    );
+  }
+
   // --- MENU VIEW ---
   if (view === "menu") {
     return (
@@ -9448,30 +10321,41 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: "calc(32px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
+        paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 0, paddingRight: 0,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); } `}</style>
 
-        <div style={{ textAlign: "center", marginBottom: 16, animation: "fadeUp 0.5s ease", position: "relative", width: "100%", maxWidth: 360 }}>
-          {/* Top-left: Friends button */}
-          {firebaseConfigured && firebaseUser && (
-            <div style={{ position: "absolute", top: 2, left: 0, display: "flex", gap: 6, alignItems: "center" }}>
+        {/* ── Compact top app bar ── */}
+        <div style={{
+          width: "100%", maxWidth: 480,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "12px 20px", position: "sticky", top: 0, zIndex: 50,
+          backgroundColor: C.bg + "ee",
+          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
+        }}>
+          {/* Left: logo */}
+          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
+            Agnus
+          </h1>
+          {/* Right: action buttons */}
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {/* Friends button */}
+            {firebaseConfigured && firebaseUser && (
               <button
                 onClick={() => {
                   setShowFriendsModal(true);
                   setFriendsModalTab("list");
                 }}
                 style={{
-                  background: "none", border: `1px solid ${friendsList.length > 0 ? "#c8f03e55" : C.border}`, borderRadius: 10,
-                  width: 38, height: 38, cursor: "pointer",
+                  background: "none", border: "none", borderRadius: 10,
+                  width: 36, height: 36, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.15s", position: "relative",
+                  backgroundColor: friendsList.length > 0 ? C.accent + "15" : "transparent",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = friendsList.length > 0 ? "#c8f03e55" : C.border; }}
                 aria-label="Friends"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={friendsList.length > 0 ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={friendsList.length > 0 ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                   <circle cx="9" cy="7" r="4"/>
                   <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
@@ -9479,44 +10363,40 @@ export default function Pattrn() {
                 </svg>
                 {onlineFriendsCount > 0 && (
                   <span style={{
-                    position: "absolute", top: -2, right: -2,
-                    minWidth: 16, height: 16, borderRadius: 8, padding: "0 3px", boxSizing: "border-box",
+                    position: "absolute", top: 2, right: 2,
+                    minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
                     backgroundColor: C.correct, color: "#fff",
-                    fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
                     fontFamily: "'Space Mono', monospace",
                   }}>
                     {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
                   </span>
                 )}
               </button>
-            </div>
-          )}
-          {/* Top-right buttons: notification bell + menu */}
-          <div style={{ position: "absolute", top: 2, right: 0, display: "flex", gap: 6, alignItems: "center" }}>
+            )}
             {/* Notification bell */}
             {firebaseConfigured && firebaseUser && (
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 style={{
-                  background: "none", border: `1px solid ${notifications.length > 0 ? "#54A0FF55" : C.border}`, borderRadius: 10,
-                  width: 38, height: 38, cursor: "pointer",
+                  background: "none", border: "none", borderRadius: 10,
+                  width: 36, height: 36, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.15s", position: "relative",
+                  backgroundColor: notifications.length > 0 ? "#54A0FF15" : "transparent",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = notifications.length > 0 ? "#54A0FF55" : C.border; }}
                 aria-label="Notifications"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={notifications.length > 0 ? "#54A0FF" : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={notifications.length > 0 ? "#54A0FF" : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
                   <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
                 </svg>
                 {notifications.length > 0 && (
                   <span style={{
-                    position: "absolute", top: -2, right: -2,
-                    width: 16, height: 16, borderRadius: "50%",
+                    position: "absolute", top: 2, right: 2,
+                    width: 14, height: 14, borderRadius: "50%",
                     backgroundColor: "#f87171", color: "#fff",
-                    fontSize: 9, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
                     fontFamily: "'Space Mono', monospace",
                   }}>
                     {notifications.length > 9 ? "9+" : notifications.length}
@@ -9524,48 +10404,13 @@ export default function Pattrn() {
                 )}
               </button>
             )}
-            {/* Menu button */}
-            <button
-              onClick={() => setShowGameMenu(true)}
-              style={{
-                background: "none", border: `1px solid ${C.border}`, borderRadius: 10,
-                width: 38, height: 38, cursor: "pointer",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-              aria-label="Menu"
-            >
-              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
-                <rect x="2" y="3" width="14" height="2" rx="1" fill={C.textDim} />
-                <rect x="2" y="8" width="14" height="2" rx="1" fill={C.textDim} />
-                <rect x="2" y="13" width="14" height="2" rx="1" fill={C.textDim} />
-              </svg>
-            </button>
           </div>
-          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 36, fontWeight: 700, letterSpacing: 4, margin: 0, color: C.accent }}>
-            Agnus
-          </h1>
-          <p style={{ color: C.textDim, fontSize: 13, marginTop: 6, letterSpacing: 2 }}>
-            find the pattern &middot; fill the gaps
-          </p>
-          {firebaseConfigured && firebaseUser && (
-            <div style={{
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              marginTop: 6, fontSize: 10, color: C.textDim,
-            }}>
-              <div style={{
-                width: 6, height: 6, borderRadius: "50%",
-                backgroundColor: syncStatus === "syncing" ? C.inProgress : syncStatus === "error" ? C.incorrect : C.correct,
-                transition: "background-color 0.3s",
-              }} />
-              <span>Signed in as {username || firebaseUser.email}</span>
-            </div>
-          )}
         </div>
 
-        {/* Daily overview: streak, play today, share */}
+        {/* ── Scrollable content area ── */}
+        <div style={{ width: "100%", maxWidth: 480, padding: "0 20px", boxSizing: "border-box" }}>
+
+        {/* ── Daily hero card ── */}
         {(() => {
           const todayIdx = getTodayDailyIndex();
           const todayKey = getDailyKey(todayIdx);
@@ -9575,62 +10420,87 @@ export default function Pattrn() {
           const todayLabel = getDailyDateLabel(todayIdx);
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.02s ease both",
-              borderRadius: 12, overflow: "hidden", border: `1px solid ${C.border}`,
-              backgroundColor: C.surface, padding: "12px 16px",
+              width: "100%", marginBottom: 20, animation: "fadeUp 0.4s ease both",
+              borderRadius: 16, overflow: "hidden",
+              background: `linear-gradient(135deg, ${C.surface} 0%, ${C.accent}11 100%)`,
+              border: `1px solid ${C.accent}33`,
+              padding: "20px", boxSizing: "border-box",
             }}>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.accent }}>Today: {todayLabel}</span>
-                  {streak > 0 && (
-                    <span style={{ fontSize: 12, color: C.textDim }}>🔥 {streak} day streak</span>
-                  )}
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                    Daily Puzzle
+                  </div>
+                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
+                    {todayLabel}
+                  </div>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  {todayResult > 0 && (
-                    <span style={{ fontSize: 11, color: C.textDim }}>
-                      <ScoreBadge attempts={todayResult} />
-                      {todayTime != null && ` ${formatTime(todayTime)}`}
+                {streak > 0 && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 4,
+                    padding: "4px 10px", borderRadius: 20,
+                    backgroundColor: C.gold + "18", border: `1px solid ${C.gold}33`,
+                  }}>
+                    <span style={{ fontSize: 13 }}>🔥</span>
+                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.gold }}>{streak}</span>
+                  </div>
+                )}
+              </div>
+              {todayResult > 0 && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+                  padding: "8px 12px", borderRadius: 10, backgroundColor: C.bg + "88",
+                }}>
+                  <ScoreBadge attempts={todayResult} />
+                  <span style={{ fontSize: 12, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                    Solved in {todayResult} attempt{todayResult !== 1 ? "s" : ""}
+                  </span>
+                  {todayTime != null && (
+                    <span style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                      {formatTime(todayTime)}
                     </span>
                   )}
-                  <button
-                    onClick={async () => {
-                      const medal = todayResult <= 2 ? "\u2605" : todayResult <= 4 ? "\u25CF" : "\u25C6";
-                      const streakPart = streak > 0 ? ` 🔥 ${streak} day streak` : "";
-                      const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${todayLabel}` : "";
-                      const text = todayResult > 0
-                        ? `Agnus Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
-                        : `Agnus Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
-                      const result = await tryNativeShare({ text, url: dailyUrl });
-                      if (result === "shared") {
-                        setDailyShareMsg("Shared!");
-                        setTimeout(() => setDailyShareMsg(""), 2000);
-                        return;
-                      }
-                      if (result === "cancelled") return;
-                      try { await navigator.clipboard.writeText(text + "\n" + dailyUrl); } catch { /* fallback */ }
-                      setDailyShareMsg("Copied!");
-                      setTimeout(() => setDailyShareMsg(""), 2000);
-                    }}
-                    style={{
-                      padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
-                      background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                    }}
-                  >
-                    {dailyShareMsg || "Share"}
-                  </button>
-                  <button
-                    onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, todayLabel); }}
-                    style={{
-                      padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                      background: C.accent, color: C.bg, border: "none", cursor: "pointer",
-                    }}
-                  >
-                    {todayResult > 0 ? "View today's result" : "Play today"}
-                  </button>
                 </div>
+              )}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button
+                  onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, todayLabel); }}
+                  style={{
+                    flex: 1, padding: "12px 0", borderRadius: 12, fontSize: 13, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    background: C.accent, color: C.bg, border: "none", cursor: "pointer",
+                    transition: "transform 0.15s",
+                  }}
+                >
+                  {todayResult > 0 ? "View Result" : "Play Today"}
+                </button>
+                <button
+                  onClick={async () => {
+                    const medal = todayResult <= 2 ? "\u2605" : todayResult <= 4 ? "\u25CF" : "\u25C6";
+                    const streakPart = streak > 0 ? ` 🔥 ${streak} day streak` : "";
+                    const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${todayLabel}` : "";
+                    const text = todayResult > 0
+                      ? `Agnus Daily ${todayLabel}\n${medal} Solved in ${todayResult} attempt${todayResult !== 1 ? "s" : ""} \u2022 ${formatTime(todayTime)}${streakPart}`
+                      : `Agnus Daily ${todayLabel}\n\uD83E\uDDE9 One puzzle per day`;
+                    const result = await tryNativeShare({ text, url: dailyUrl });
+                    if (result === "shared") {
+                      setDailyShareMsg("Shared!");
+                      setTimeout(() => setDailyShareMsg(""), 2000);
+                      return;
+                    }
+                    if (result === "cancelled") return;
+                    try { await navigator.clipboard.writeText(text + "\n" + dailyUrl); } catch { /* fallback */ }
+                    setDailyShareMsg("Copied!");
+                    setTimeout(() => setDailyShareMsg(""), 2000);
+                  }}
+                  style={{
+                    padding: "12px 16px", borderRadius: 12, fontSize: 12, fontWeight: 600,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                    background: "none", border: `1px solid ${C.accent}55`, color: C.accent, cursor: "pointer",
+                  }}
+                >
+                  {dailyShareMsg || "Share"}
+                </button>
               </div>
             </div>
           );
@@ -9639,9 +10509,9 @@ export default function Pattrn() {
         {/* Notification panel - dropdown when bell is clicked */}
         {showNotifications && firebaseUser && notifications.length > 0 && (
           <div style={{
-            width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.3s ease both",
+            width: "100%", marginBottom: 16, animation: "fadeUp 0.3s ease both",
             borderRadius: 12, overflow: "hidden", border: `1px solid #54A0FF44`,
-            backgroundColor: C.surface, padding: "12px 16px",
+            backgroundColor: C.surface, padding: "12px 16px", boxSizing: "border-box",
           }}>
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10,
@@ -9800,97 +10670,10 @@ export default function Pattrn() {
           </div>
         )}
 
-        {/* Active co-op sessions panel */}
-        {firebaseUser && activeCoopSessions.length > 0 && (
-          <div style={{
-            width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
-            borderRadius: 12, overflow: "hidden", border: `1px solid #54A0FF33`,
-            backgroundColor: C.surface, padding: "12px 16px",
-          }}>
-            <div style={{
-              fontSize: 9, color: "#54A0FF", textTransform: "uppercase",
-              letterSpacing: 1.5, marginBottom: 10,
-              fontFamily: "'Space Mono', monospace", fontWeight: 700,
-            }}>Active Co-op Sessions</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {activeCoopSessions.map(session => {
-                const isHost = session.hostUid === firebaseUser.uid;
-                const isMosaicSession = session._type === "mosaic";
-                // For mosaic sessions, count players from the players map; for regular coop, use guestUsername
-                const mosaicPlayerCount = isMosaicSession ? Object.keys(session.players || {}).length : 0;
-                const partnerName = isMosaicSession
-                  ? (mosaicPlayerCount > 1 ? `${mosaicPlayerCount} players` : null)
-                  : (isHost ? (session.guestUsername || null) : (session.hostUsername || null));
-                const modeLabel = isMosaicSession ? "Mosaic" : ((DIFFICULTIES.find(d => d.key === session.mode)?.label) || session.mode);
-                const titleLabel = isMosaicSession
-                  ? (session.mosaicTitle || "Untitled")
-                  : `${modeLabel} #${(session.level ?? 0) + 1}`;
-                const statusLabel = session.status === "waiting" ? "Waiting for partner" : session.status === "playing" ? "In progress" : session.status === "complete" ? "Complete" : session.status;
-                const statusColor = session.status === "waiting" ? C.textDim : session.status === "playing" ? C.coop : session.status === "complete" ? C.correct : C.textDim;
-                const mosaicSolved = isMosaicSession ? Object.values(session.tileProgress || {}).filter(v => v > 0).length : 0;
-                return (
-                  <div key={session.id} style={{
-                    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
-                    borderRadius: 10, backgroundColor: C.bg, border: `1px solid ${isMosaicSession ? C.coop + "22" : C.border}`,
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                        {isMosaicSession && (
-                          <span style={{ fontSize: 9, color: C.coop, fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
-                            Co-op Mosaic
-                          </span>
-                        )}
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>
-                          {titleLabel}
-                        </span>
-                        <span style={{ fontSize: 9, color: isHost ? C.coop : "#FF9FF3", fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
-                          {isHost ? "Host" : "Guest"}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 10, color: statusColor, fontFamily: "'Space Mono', monospace" }}>
-                        {statusLabel}
-                        {isMosaicSession && session.status === "playing" && <span style={{ color: C.textDim }}> {"\u2022"} {mosaicSolved}/25 tiles</span>}
-                        {partnerName && <span style={{ color: C.textDim }}> {"\u2022"} with {partnerName}</span>}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                      {session.status !== "complete" && (
-                        <button
-                          onClick={() => isMosaicSession ? rejoinCoopMosaicSession(session) : rejoinCoopSession(session)}
-                          style={{
-                            background: C.coop, border: "none", borderRadius: 8,
-                            padding: "6px 12px", color: "#fff", cursor: "pointer", fontSize: 10,
-                            fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
-                          }}
-                        >
-                          Rejoin
-                        </button>
-                      )}
-                      {isHost && (
-                        <button
-                          onClick={() => isMosaicSession ? closeCoopMosaicSessionPermanently(session.id, session) : closeCoopSessionPermanently(session.id, session)}
-                          style={{
-                            background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
-                            padding: "6px 8px", color: C.textDim, cursor: "pointer", fontSize: 10,
-                            fontFamily: "'Space Mono', monospace",
-                          }}
-                          title="Close session"
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.color = "#f87171"; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-                        >{"\u2715"}</button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Mode selector: categorized auto-wrapping grid */}
         <div style={{
           marginBottom: 20, animation: "fadeUp 0.5s 0.05s ease both",
-          width: "100%", maxWidth: 360,
+          width: "100%",
           display: "flex", flexDirection: "column", gap: 14,
         }}>
           {MODE_CATEGORIES.map((cat) => (
@@ -9954,7 +10737,7 @@ export default function Pattrn() {
         {/* Stats summary with inline share */}
         {isDaily ? (
           <div style={{
-            width: "100%", maxWidth: 360,
+            width: "100%",
             display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
             padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
             alignItems: "center", boxSizing: "border-box",
@@ -9984,7 +10767,7 @@ export default function Pattrn() {
           </div>
         ) : (
           <div style={{
-            width: "100%", maxWidth: 360,
+            width: "100%",
             display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
             padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
             alignItems: "center", boxSizing: "border-box",
@@ -10021,7 +10804,7 @@ export default function Pattrn() {
           const total = achs.length;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.12s ease both",
+              width: "100%", marginBottom: 16, animation: "fadeUp 0.5s 0.12s ease both",
             }}>
               <button onClick={() => setShowAchievements(true)} style={{
                 width: "100%", padding: "12px 16px", borderRadius: 12,
@@ -10068,9 +10851,9 @@ export default function Pattrn() {
           if (!birthday) {
             return (
               <div style={{
-                width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
+                width: "100%", marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
                 borderRadius: 12, overflow: "hidden", border: `1px solid #F472B633`,
-                backgroundColor: C.surface, padding: "12px 16px",
+                backgroundColor: C.surface, padding: "12px 16px", boxSizing: "border-box",
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                   <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F472B6" }}>
@@ -10079,7 +10862,7 @@ export default function Pattrn() {
                   <button
                     onClick={() => setShowBirthdayPrompt(true)}
                     style={{
-                      padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
+                      padding: "8px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
                       fontFamily: "'Space Mono', monospace", letterSpacing: 1,
                       background: "#F472B6", color: "#fff", border: "none", cursor: "pointer",
                     }}
@@ -10102,9 +10885,9 @@ export default function Pattrn() {
           const bdLabel = `${String(bdDay).padStart(2, "0")}-${String(bdMonthNum).padStart(2, "0")}${bdYearNum ? `-${bdYearNum}` : ""}`;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
-              borderRadius: 12, overflow: "hidden", border: `1px solid #F472B633`,
-              backgroundColor: C.surface, padding: "12px 16px",
+              width: "100%", marginBottom: 16, animation: "fadeUp 0.4s 0.03s ease both",
+              borderRadius: 14, overflow: "hidden", border: `1px solid #F472B633`,
+              backgroundColor: C.surface, padding: "14px 16px",
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -10217,7 +11000,7 @@ export default function Pattrn() {
           };
           const todayISO = `${todayUTCYear}-${String(todayUTCMonth + 1).padStart(2, "0")}-${String(todayUTCDate).padStart(2, "0")}`;
           return (
-            <div style={{ maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both" }}>
+            <div style={{ width: "100%", animation: "fadeUp 0.5s 0.15s ease both" }}>
               {/* Month navigation with Today button */}
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8,
@@ -10500,7 +11283,7 @@ export default function Pattrn() {
           const spSolved = spProgress ? Object.values(spProgress).filter(v => typeof v === "number" && v > 0).length : 0;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, animation: "fadeUp 0.5s 0.15s ease both",
+              width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
               display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
             }}>
               <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Space Mono', monospace" }}>
@@ -10551,7 +11334,7 @@ export default function Pattrn() {
           if (sharedCarouselMosaics.length === 0) return null;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
+              width: "100%", marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
             }}>
               <div style={{
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
@@ -10607,7 +11390,7 @@ export default function Pattrn() {
           if (carouselMosaics.length === 0) return null;
           return (
             <div style={{
-              width: "100%", maxWidth: 360, marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
+              width: "100%", marginTop: 24, animation: "fadeUp 0.5s 0.3s ease both",
             }}>
               <div style={{
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
@@ -10659,7 +11442,7 @@ export default function Pattrn() {
         {!isDaily && !isMosaic && (<>
         <div style={{
           display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
-          maxWidth: 360, width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
+          width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
         }}>
           {(isCascade ? Array.from({ length: 50 }, (_, i) => i) : puzzles).map((p, i) => {
             const idx = isCascade ? i : p?.id ?? i;
@@ -10747,6 +11530,8 @@ export default function Pattrn() {
           <span><span style={{ color: C.coop }}>{"\u25CF"}</span> co-op</span>
         </div>
         </>)}
+
+        </div>{/* close scrollable content wrapper */}
 
         {/* Stats drawer */}
         {showShareModal && (() => {
@@ -10904,467 +11689,12 @@ export default function Pattrn() {
           );
         })()}
 
-        {/* Game Menu drawer */}
+        {/* Game Menu redirect (legacy — now uses profile view) */}
         {showGameMenu && (() => {
-          const achs = computeAchievements(progress, times, savedAchievementIds);
-          const achUnlocked = achs.filter(a => a.unlocked).length;
-          const achTotal = achs.length;
-          const totalSolvedAll = [...SOLVE_MODES, "daily"].reduce((s, m) => s + countModeSolved(progress[m]), 0)
-            + Object.values(progress.cascade || {}).filter(v => v === CASCADE_LEVELS.length).length;
-          return (
-            <div onClick={() => setShowGameMenu(false)} style={{
-              position: "fixed", inset: 0, backgroundColor: "rgba(0,0,0,0.75)", zIndex: 1000,
-              display: "flex", alignItems: "flex-end", justifyContent: "center",
-            }}>
-              <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }`}</style>
-              <div onClick={e => e.stopPropagation()} style={{
-                backgroundColor: C.bg, borderTop: `1px solid ${C.border}`, borderRadius: "20px 20px 0 0",
-                padding: "0", maxWidth: 480, width: "100%",
-                boxShadow: `0 -12px 48px rgba(0,0,0,0.5)`,
-                display: "flex", flexDirection: "column",
-                maxHeight: "85vh",
-                animation: "drawerSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
-              }}>
-                {/* Drag handle */}
-                <div style={{ display: "flex", justifyContent: "center", padding: "10px 0 4px", flexShrink: 0 }}>
-                  <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border }} />
-                </div>
-
-                <div style={{ padding: "8px 24px 0", overflowY: "auto", flex: 1, minHeight: 0, WebkitOverflowScrolling: "touch" }}>
-                  {/* Header */}
-                  <div style={{ textAlign: "center", marginBottom: 20 }}>
-                    <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>
-                      Menu
-                    </h2>
-                  </div>
-
-                  {/* Menu items */}
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {/* Achievements */}
-                    <button onClick={() => { setShowGameMenu(false); setShowAchievements(true); }} style={{
-                      width: "100%", padding: "14px 16px", borderRadius: 12,
-                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                      transition: "all 0.15s",
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-                    >
-                      <div style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        backgroundColor: C.accent + "22", display: "flex", alignItems: "center", justifyContent: "center",
-                        border: `1.5px solid ${C.accent}44`, flexShrink: 0,
-                      }}>
-                        <span style={{ fontSize: 16, color: C.accent, lineHeight: 1 }}>{"\u2605"}</span>
-                      </div>
-                      <div style={{ flex: 1, textAlign: "left" }}>
-                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                          Achievements
-                        </div>
-                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                          {achUnlocked}/{achTotal} unlocked
-                        </div>
-                      </div>
-                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
-                    </button>
-
-                    {/* Stats */}
-                    <button onClick={() => { setShowGameMenu(false); setShowShareModal(true); }} style={{
-                      width: "100%", padding: "14px 16px", borderRadius: 12,
-                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                      transition: "all 0.15s",
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-                    >
-                      <div style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        backgroundColor: "#4ECDC422", display: "flex", alignItems: "center", justifyContent: "center",
-                        border: "1.5px solid #4ECDC444", flexShrink: 0,
-                      }}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <rect x="1" y="9" width="3" height="6" rx="0.5" fill="#4ECDC4" />
-                          <rect x="6" y="5" width="3" height="10" rx="0.5" fill="#4ECDC4" />
-                          <rect x="11" y="1" width="3" height="14" rx="0.5" fill="#4ECDC4" />
-                        </svg>
-                      </div>
-                      <div style={{ flex: 1, textAlign: "left" }}>
-                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                          Statistics
-                        </div>
-                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                          {totalSolvedAll} puzzles solved
-                        </div>
-                      </div>
-                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
-                    </button>
-
-                    {/* Birthday */}
-                    <button onClick={() => { setShowGameMenu(false); setShowBirthdayPrompt(true); }} style={{
-                      width: "100%", padding: "14px 16px", borderRadius: 12,
-                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                      transition: "all 0.15s",
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#F472B6"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-                    >
-                      <div style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        backgroundColor: "#F472B622", display: "flex", alignItems: "center", justifyContent: "center",
-                        border: "1.5px solid #F472B644", flexShrink: 0,
-                      }}>
-                        <span style={{ fontSize: 16, lineHeight: 1 }}>{"\uD83C\uDF82"}</span>
-                      </div>
-                      <div style={{ flex: 1, textAlign: "left" }}>
-                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                          Birthday Puzzle
-                        </div>
-                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                          {birthday ? `Set: ${birthday}` : "Set your birthday"}
-                        </div>
-                      </div>
-                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
-                    </button>
-
-                    {/* Themes */}
-                    <button onClick={() => { setShowGameMenu(false); setShowThemePicker(true); }} style={{
-                      width: "100%", padding: "14px 16px", borderRadius: 12,
-                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                      transition: "all 0.15s",
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#A78BFA"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-                    >
-                      <div style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        backgroundColor: "#A78BFA22", display: "flex", alignItems: "center", justifyContent: "center",
-                        border: "1.5px solid #A78BFA44", flexShrink: 0,
-                      }}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <circle cx="5" cy="5" r="3" fill="#FF6B6B" opacity="0.8"/>
-                          <circle cx="11" cy="5" r="3" fill="#4ECDC4" opacity="0.8"/>
-                          <circle cx="8" cy="11" r="3" fill="#FFE66D" opacity="0.8"/>
-                        </svg>
-                      </div>
-                      <div style={{ flex: 1, textAlign: "left" }}>
-                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                          Themes
-                        </div>
-                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                          {activeTheme.id === "classic" ? "Classic" : `${activeTheme.icon || ""} ${activeTheme.name}`}
-                        </div>
-                      </div>
-                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
-                    </button>
-
-                    {/* Mosaic Creator */}
-                    <button onClick={() => { setShowGameMenu(false); resetCreator(); setCreatorReturnView("menu"); setView("creator"); }} style={{
-                      width: "100%", padding: "14px 16px", borderRadius: 12,
-                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                      transition: "all 0.15s",
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#F59E0B"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-                    >
-                      <div style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        backgroundColor: "#F59E0B22", display: "flex", alignItems: "center", justifyContent: "center",
-                        border: "1.5px solid #F59E0B44", flexShrink: 0,
-                      }}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <rect x="2" y="2" width="5" height="5" rx="1" fill="#F59E0B" opacity="0.8"/>
-                          <rect x="9" y="2" width="5" height="5" rx="1" fill="#F59E0B" opacity="0.5"/>
-                          <rect x="2" y="9" width="5" height="5" rx="1" fill="#F59E0B" opacity="0.5"/>
-                          <rect x="9" y="9" width="5" height="5" rx="1" fill="#F59E0B" opacity="0.3"/>
-                        </svg>
-                      </div>
-                      <div style={{ flex: 1, textAlign: "left" }}>
-                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                          Create Mosaic
-                        </div>
-                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                          Paint your own design
-                        </div>
-                      </div>
-                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
-                    </button>
-
-                    {/* Mosaic Gallery */}
-                    <button onClick={() => { setShowGameMenu(false); setMosaicGalleryTab("mine"); setView("gallery"); loadMosaicData("mine"); }} style={{
-                      width: "100%", padding: "14px 16px", borderRadius: 12,
-                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                      transition: "all 0.15s",
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#10B981"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-                    >
-                      <div style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        backgroundColor: "#10B98122", display: "flex", alignItems: "center", justifyContent: "center",
-                        border: "1.5px solid #10B98144", flexShrink: 0,
-                      }}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <rect x="1" y="1" width="6" height="6" rx="1" stroke="#10B981" strokeWidth="1.5" fill="none"/>
-                          <rect x="9" y="1" width="6" height="6" rx="1" stroke="#10B981" strokeWidth="1.5" fill="none"/>
-                          <rect x="1" y="9" width="6" height="6" rx="1" stroke="#10B981" strokeWidth="1.5" fill="none"/>
-                          <rect x="9" y="9" width="6" height="6" rx="1" stroke="#10B981" strokeWidth="1.5" fill="none"/>
-                        </svg>
-                      </div>
-                      <div style={{ flex: 1, textAlign: "left" }}>
-                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                          Mosaic Gallery
-                        </div>
-                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                          Browse &amp; share mosaics
-                        </div>
-                      </div>
-                      <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
-                    </button>
-
-                    {/* Admin Review (only for admins) */}
-                    {isAdmin && (
-                      <button onClick={() => { setShowGameMenu(false); setView("admin-review"); loadMosaicData("admin"); }} style={{
-                        width: "100%", padding: "14px 16px", borderRadius: 12,
-                        backgroundColor: C.surface, border: `1px solid ${C.incorrect}33`,
-                        cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                        transition: "all 0.15s",
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#EF4444"; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.incorrect + "33"; }}
-                      >
-                        <div style={{
-                          width: 32, height: 32, borderRadius: 8,
-                          backgroundColor: "#EF444422", display: "flex", alignItems: "center", justifyContent: "center",
-                          border: "1.5px solid #EF444444", flexShrink: 0,
-                        }}>
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 9.5 4.5 11.5 5 8 2.5 5.5 6 5z" stroke="#EF4444" strokeWidth="1.5" fill="none" strokeLinejoin="round"/>
-                          </svg>
-                        </div>
-                        <div style={{ flex: 1, textAlign: "left" }}>
-                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                            Review Mosaics
-                          </div>
-                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                            Admin: approve submissions
-                          </div>
-                        </div>
-                        <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
-                      </button>
-                    )}
-
-                    {/* Admin Manage Public (only for admins) */}
-                    {isAdmin && (
-                      <button onClick={() => { setShowGameMenu(false); setView("admin-manage"); loadMosaicData("manage"); }} style={{
-                        width: "100%", padding: "14px 16px", borderRadius: 12,
-                        backgroundColor: C.surface, border: `1px solid #F59E0B33`,
-                        cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                        transition: "all 0.15s",
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#F59E0B"; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = "#F59E0B33"; }}
-                      >
-                        <div style={{
-                          width: 32, height: 32, borderRadius: 8,
-                          backgroundColor: "#F59E0B22", display: "flex", alignItems: "center", justifyContent: "center",
-                          border: "1.5px solid #F59E0B44", flexShrink: 0,
-                        }}>
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <path d="M2 4h12M2 8h12M2 12h12" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round"/>
-                            <circle cx="5" cy="4" r="1.5" fill="#F59E0B"/>
-                            <circle cx="11" cy="8" r="1.5" fill="#F59E0B"/>
-                            <circle cx="7" cy="12" r="1.5" fill="#F59E0B"/>
-                          </svg>
-                        </div>
-                        <div style={{ flex: 1, textAlign: "left" }}>
-                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                            Manage Public
-                          </div>
-                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                            Admin: order, staff pick, unpublish
-                          </div>
-                        </div>
-                        <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
-                      </button>
-                    )}
-
-                    {/* Admin Game Metrics (only for admins) */}
-                    {isAdmin && (
-                      <button onClick={() => { setShowGameMenu(false); setView("admin-metrics"); loadAdminMetricsData(); }} style={{
-                        width: "100%", padding: "14px 16px", borderRadius: 12,
-                        backgroundColor: C.surface, border: `1px solid #8B5CF633`,
-                        cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                        transition: "all 0.15s",
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#8B5CF6"; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = "#8B5CF633"; }}
-                      >
-                        <div style={{
-                          width: 32, height: 32, borderRadius: 8,
-                          backgroundColor: "#8B5CF622", display: "flex", alignItems: "center", justifyContent: "center",
-                          border: "1.5px solid #8B5CF644", flexShrink: 0,
-                        }}>
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <rect x="2" y="9" width="3" height="5" rx="0.5" fill="#8B5CF6"/>
-                            <rect x="6.5" y="5" width="3" height="9" rx="0.5" fill="#8B5CF6"/>
-                            <rect x="11" y="2" width="3" height="12" rx="0.5" fill="#8B5CF6"/>
-                          </svg>
-                        </div>
-                        <div style={{ flex: 1, textAlign: "left" }}>
-                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                            Game Metrics
-                          </div>
-                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                            Admin: player stats, difficulty analysis
-                          </div>
-                        </div>
-                        <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
-                      </button>
-                    )}
-
-                    {/* Admin User Activity (only for admins) */}
-                    {isAdmin && (
-                      <button onClick={() => { setShowGameMenu(false); setView("admin-users"); }} style={{
-                        width: "100%", padding: "14px 16px", borderRadius: 12,
-                        backgroundColor: C.surface, border: `1px solid #06B6D433`,
-                        cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                        transition: "all 0.15s",
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#06B6D4"; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = "#06B6D433"; }}
-                      >
-                        <div style={{
-                          width: 32, height: 32, borderRadius: 8,
-                          backgroundColor: "#06B6D422", display: "flex", alignItems: "center", justifyContent: "center",
-                          border: "1.5px solid #06B6D444", flexShrink: 0,
-                        }}>
-                          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                            <circle cx="8" cy="5" r="3" stroke="#06B6D4" strokeWidth="1.5" fill="none"/>
-                            <path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="#06B6D4" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-                          </svg>
-                        </div>
-                        <div style={{ flex: 1, textAlign: "left" }}>
-                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                            User Activity
-                          </div>
-                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                            Admin: all users, online status, activity
-                          </div>
-                        </div>
-                        <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
-                      </button>
-                    )}
-
-                    {/* Account / Profile */}
-                    {firebaseConfigured && (
-                      <button onClick={() => {
-                        setShowGameMenu(false);
-                        if (firebaseUser) {
-                          setShowProfilePage(true);
-                        } else {
-                          setShowAccountModal(true); setAutoLoginModal(false); setAccountError("");
-                        }
-                      }} style={{
-                        width: "100%", padding: "14px 16px", borderRadius: 12,
-                        backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                        cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                        transition: "all 0.15s",
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#60A5FA"; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-                      >
-                        <div style={{
-                          width: 32, height: 32, borderRadius: 8,
-                          backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
-                          border: "1.5px solid #60A5FA44", flexShrink: 0, overflow: "hidden",
-                        }}>
-                          {firebaseUser && profilePicture ? (
-                            <img src={profilePicture} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                          ) : (
-                            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                              <circle cx="8" cy="5" r="3" stroke="#60A5FA" strokeWidth="1.5" fill="none"/>
-                              <path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5" stroke="#60A5FA" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
-                            </svg>
-                          )}
-                        </div>
-                        <div style={{ flex: 1, textAlign: "left" }}>
-                          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                            {firebaseUser ? (username || "Profile") : "Account"}
-                          </div>
-                          <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                            {firebaseUser ? firebaseUser.email : "Sign in to sync progress"}
-                          </div>
-                        </div>
-                        {firebaseUser && syncStatus === "synced" && (
-                          <span style={{ fontSize: 10, color: C.correct }}>Synced</span>
-                        )}
-                        {firebaseUser && syncStatus === "syncing" && (
-                          <span style={{ fontSize: 10, color: C.textDim }}>Syncing...</span>
-                        )}
-                        <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
-                      </button>
-                    )}
-
-                    {/* Divider */}
-                    <div style={{ height: 1, backgroundColor: C.border, margin: "4px 0" }} />
-
-                    {/* Clear All Data */}
-                    <button onClick={() => setShowClearConfirm(true)} style={{
-                      width: "100%", padding: "14px 16px", borderRadius: 12,
-                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                      cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                      transition: "all 0.15s",
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-                    >
-                      <div style={{
-                        width: 32, height: 32, borderRadius: 8,
-                        backgroundColor: C.incorrect + "22", display: "flex", alignItems: "center", justifyContent: "center",
-                        border: `1.5px solid ${C.incorrect}44`, flexShrink: 0,
-                      }}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <path d="M4 4L12 12M12 4L4 12" stroke={C.incorrect} strokeWidth="2" strokeLinecap="round" />
-                        </svg>
-                      </div>
-                      <div style={{ flex: 1, textAlign: "left" }}>
-                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.incorrect, letterSpacing: 0.5 }}>
-                          Clear All Data
-                        </div>
-                        <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                          Reset all progress and start fresh
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Footer */}
-                <div style={{
-                  padding: "16px 24px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
-                  borderTop: `1px solid ${C.border}`, marginTop: 16, flexShrink: 0,
-                }}>
-                  <button onClick={() => setShowGameMenu(false)}
-                    style={{
-                      width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                      padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                  >
-                    Close
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
+          setShowGameMenu(false);
+          setView("profile");
+          return null;
         })()}
-
         {themePickerEl}
 
         {/* Clear All Data confirmation dialog */}
@@ -11805,7 +12135,7 @@ export default function Pattrn() {
       {/* Login hint toast */}
       {loginHintToast && (
         <div style={{
-          position: "fixed", bottom: "calc(32px + env(safe-area-inset-bottom, 0px))", left: "50%",
+          position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom, 0px))", left: "50%",
           transform: "translateX(-50%)", zIndex: 1200,
           maxWidth: "calc(100vw - 32px)", boxSizing: "border-box",
           animation: loginHintDismissing
@@ -11826,7 +12156,7 @@ export default function Pattrn() {
             <span style={{
               fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: C.text, lineHeight: 1.4,
             }}>
-              You can sign in anytime from the <strong style={{ color: C.accent }}>menu button</strong>
+              Sign in from the <strong style={{ color: C.accent }}>Profile</strong> tab to sync progress
             </span>
             <button
               onClick={() => {
@@ -11847,6 +12177,8 @@ export default function Pattrn() {
         </div>
       )}
       {coopInviteToastEl}
+
+      <BottomTabBar active="home" />
       </div>
     );
   }
