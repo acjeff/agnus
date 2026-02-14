@@ -6529,8 +6529,11 @@ export default function Pattrn() {
   const isMobile = viewportSize.w < 480;
   const gridGap = gridSize >= 7 ? (isMobile ? 2 : 3) : 4;
   const gridPad = gridSize >= 7 ? (isMobile ? 6 : 10) : (isMobile ? 10 : 14);
-  const availW = viewportSize.w - (isMobile ? 24 : 50) - (gridSize - 1) * gridGap - 2 * gridPad;
-  const availH = viewportSize.h - headerHeight - footerHeight - 24 - (gridSize - 1) * gridGap - 2 * gridPad;
+  const edgePad = isMobile ? 12 : 24;
+  const parentW = viewportSize.w;
+  const parentH = viewportSize.h - headerHeight - footerHeight;
+  const availW = parentW - 2 * edgePad - (gridSize - 1) * gridGap - 2 * gridPad;
+  const availH = parentH - 2 * edgePad - (gridSize - 1) * gridGap - 2 * gridPad;
   const dynamicCell = Math.min(Math.floor(availW / gridSize), Math.floor(availH / gridSize));
   const cellSize = Math.max(28, Math.min(dynamicCell, 80));
   const iconSize = Math.max(14, Math.round(cellSize * 0.5));
