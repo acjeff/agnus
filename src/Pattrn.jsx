@@ -14527,6 +14527,40 @@ export default function Pattrn() {
             Pass Cell
           </button>
         )}
+        {/* Accept/reject incoming pass request — own row above lock in */}
+        {gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8,
+            padding: "6px 16px",
+            backgroundColor: `${coopIncomingPass.fromColor}18`, border: `1px solid ${coopIncomingPass.fromColor}44`,
+            borderRadius: 10, animation: "fadeUp 0.2s ease both",
+          }}>
+            <span style={{
+              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.text,
+              fontWeight: 600,
+            }}>
+              <span style={{ color: coopIncomingPass.fromColor, fontWeight: 700 }}>{coopIncomingPass.fromName}</span> wants to pass this cell
+            </span>
+            <button onClick={() => {
+              respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, true).catch(() => {});
+              setSelectedCell(null);
+            }} style={{
+              backgroundColor: C.correct, color: "#fff", border: "none",
+              padding: "8px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+              fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+              textTransform: "uppercase",
+            }}>Accept</button>
+            <button onClick={() => {
+              respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, false).catch(() => {});
+              setSelectedCell(null);
+            }} style={{
+              backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+              padding: "8px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+              fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+              textTransform: "uppercase",
+            }}>Reject</button>
+          </div>
+        )}
         {gameState === "playing" && (
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
             {/* Coop: show Lock In or waiting state; Normal: show Check */}
@@ -14574,38 +14608,6 @@ export default function Pattrn() {
               >
                 Reset
               </button>
-            )}
-            {/* Accept/reject incoming pass request */}
-            {isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey && (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8,
-                animation: "fadeUp 0.2s ease both",
-              }}>
-                <span style={{
-                  fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.textDim,
-                  fontWeight: 600, letterSpacing: 0.5,
-                }}>
-                  <span style={{ color: coopIncomingPass.fromColor, fontWeight: 700 }}>{coopIncomingPass.fromName}</span> wants to pass this cell
-                </span>
-                <button onClick={() => {
-                  respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, true).catch(() => {});
-                  setSelectedCell(null);
-                }} style={{
-                  backgroundColor: C.correct, color: "#fff", border: "none",
-                  padding: "8px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase",
-                }}>Accept</button>
-                <button onClick={() => {
-                  respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, false).catch(() => {});
-                  setSelectedCell(null);
-                }} style={{
-                  backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                  padding: "8px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase",
-                }}>Reject</button>
-              </div>
             )}
           </div>
         )}
