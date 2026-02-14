@@ -3071,6 +3071,12 @@ export default function Pattrn() {
   const [showBirthdayPrompt, setShowBirthdayPrompt] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showGameMenu, setShowGameMenu] = useState(false);
+  const [logoExpanded, setLogoExpanded] = useState(false);
+  useEffect(() => {
+    if (!logoExpanded) return;
+    const t = setTimeout(() => setLogoExpanded(false), 2000);
+    return () => clearTimeout(t);
+  }, [logoExpanded]);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [deleteAccountPassword, setDeleteAccountPassword] = useState("");
@@ -11670,19 +11676,34 @@ export default function Pattrn() {
           paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
           position: "sticky", top: 0, zIndex: 50,
         }}>
-          {/* Left: logo pill */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "6px 14px 6px 6px",
-            backgroundColor: "rgba(18, 18, 32, 0.5)",
-            borderRadius: 100,
-            border: "1px solid rgba(255, 255, 255, 0.1)",
-            boxShadow: "0 4px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.15)",
-            backdropFilter: "blur(28px) saturate(1.8)",
-            WebkitBackdropFilter: "blur(28px) saturate(1.8)",
-          }}>
-            <img src="/app-icon.png" alt="Agnus" style={{ width: 30, height: 30, borderRadius: 15 }} />
-            <span style={{ fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700, letterSpacing: 1.5, color: C.accent, lineHeight: 1 }}>
+          {/* Left: logo pill — tap to expand/reveal name */}
+          <div
+            onClick={() => setLogoExpanded(prev => !prev)}
+            style={{
+              display: "flex", alignItems: "center", gap: 0,
+              padding: 4,
+              backgroundColor: "rgba(18, 18, 32, 0.5)",
+              borderRadius: 100,
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.15)",
+              backdropFilter: "blur(28px) saturate(1.8)",
+              WebkitBackdropFilter: "blur(28px) saturate(1.8)",
+              cursor: "pointer",
+              overflow: "hidden",
+              transition: "padding 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
+              ...(logoExpanded ? { paddingRight: 16, gap: 8 } : {}),
+            }}
+          >
+            <img src="/app-icon.png" alt="Agnus" style={{ width: 34, height: 34, borderRadius: 17, flexShrink: 0 }} />
+            <span style={{
+              fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700, letterSpacing: 1.5, color: C.accent, lineHeight: 1,
+              whiteSpace: "nowrap",
+              display: "inline-block",
+              maxWidth: logoExpanded ? 80 : 0,
+              opacity: logoExpanded ? 1 : 0,
+              overflow: "hidden",
+              transition: "max-width 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease",
+            }}>
               Agnus
             </span>
           </div>
