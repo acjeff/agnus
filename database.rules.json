@@ -59,7 +59,7 @@
     "coopSessions": {
       "$sessionId": {
         ".read": "auth != null",
-        ".write": "auth != null && (!data.exists() || data.child('hostUid').val() === auth.uid || data.child('guestUid').val() === auth.uid || data.child('guestUid').val() === null || data.child('players').child(auth.uid).exists() || data.child('invitedUids').child(auth.uid).exists())"
+        ".write": "auth != null"
       }
     },
     "coopMosaicSessions": {
