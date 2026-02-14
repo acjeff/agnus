@@ -4388,7 +4388,7 @@ export default function Pattrn() {
                 backgroundColor: C.coop, display: "flex", alignItems: "center", justifyContent: "center",
                 padding: "0 4px", boxSizing: "border-box",
               }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "'Space Mono', monospace", lineHeight: 1 }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "'Space Mono', monospace", lineHeight: 1, paddingTop: 1 }}>
                   {activeCoopSessions.filter(s => s.status !== "complete").length}
                 </span>
               </div>
