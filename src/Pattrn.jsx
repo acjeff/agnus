@@ -1864,7 +1864,7 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
           : isLocked ? `2.5px solid ${C.correct}`
           : isSelected ? `2.5px solid ${C.accent}`
           : isWrong ? `2.5px solid ${C.incorrect}`
-          : isBlank && !isFilled && !isRevealed && !isRemoving ? `2.5px dashed ${coopBorderColor || C.border}`
+          : isBlank && !isFilled && !isRevealed && !isRemoving ? (coopBorderColor ? `2.5px solid ${coopBorderColor}` : `2.5px dashed ${C.border}`)
           : "2.5px solid transparent",
         cursor: isBlank && !isRevealed && !isLocked ? "pointer" : "default",
         transition: "transform 0.15s cubic-bezier(0.4,0,0.2,1), box-shadow 0.15s cubic-bezier(0.4,0,0.2,1)",
@@ -14287,7 +14287,7 @@ export default function Pattrn() {
                       isRemoving={!!removingCells[key]}
                       removingToken={removingCells[key] || null}
                       coopOwnerColor={coopBgTint}
-                      coopBorderColor={isCoop && isBlankCell && cellOwnerColor ? (cellOwnerColor + "66") : undefined}
+                      coopBorderColor={isCoop && isBlankCell && isCoopMine ? (COOP_MY_COLOR + "66") : undefined}
                     />
                     {/* Coop ownership indicator — per-player colored badge */}
                     {isCoop && isBlankCell && gameState === "playing" && !isWon && (() => {
