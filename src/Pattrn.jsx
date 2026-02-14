@@ -10440,11 +10440,11 @@ export default function Pattrn() {
           const todayLabel = getDailyDateLabel(todayIdx);
           return (
             <div style={{
-              width: "100%", marginBottom: 20, animation: "fadeUp 0.4s ease both",
+              width: "100%", maxWidth: 360, marginBottom: 20, animation: "fadeUp 0.4s ease both",
               borderRadius: 16, overflow: "hidden",
               background: `linear-gradient(135deg, ${C.surface} 0%, ${C.accent}11 100%)`,
               border: `1px solid ${C.accent}33`,
-              padding: "20px",
+              padding: "20px", boxSizing: "border-box",
             }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
                 <div>
