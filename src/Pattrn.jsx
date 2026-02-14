@@ -2636,10 +2636,32 @@ function updateUrl(mode, level, replace = true, date = null, viewParam = null) {
     params.set("level", String(level));
   }
   if (viewParam) params.set("view", viewParam);
+  // Preserve active coop session params across URL updates
+  const current = new URLSearchParams(window.location.search);
+  const coopVal = current.get("coop");
+  const coopMosaicVal = current.get("coopMosaic");
+  if (coopVal) params.set("coop", coopVal);
+  if (coopMosaicVal) params.set("coopMosaic", coopMosaicVal);
   const search = params.toString();
   const url = search ? `${window.location.pathname}?${search}` : window.location.pathname;
   if (replace) window.history.replaceState({}, "", url);
   else window.history.pushState({}, "", url);
+}
+
+function setCoopUrlParam(paramName, value) {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams(window.location.search);
+  params.set(paramName, value);
+  const url = `${window.location.pathname}?${params}`;
+  window.history.replaceState({}, "", url);
+}
+
+function clearCoopUrlParam(paramName) {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams(window.location.search);
+  params.delete(paramName);
+  const url = params.toString() ? `${window.location.pathname}?${params}` : window.location.pathname;
+  window.history.replaceState({}, "", url);
 }
 
 // --- Main App ---
@@ -4062,19 +4084,16 @@ export default function Pattrn() {
     const hasDeepLink = hasDailyDeepLink || (mode && levelNum != null && !Number.isNaN(levelNum));
 
     // Handle coop mosaic join link — defer until Firebase auth is ready
+    // URL param is kept so refreshing the page rejoins the session
     if (coopMosaicParam) {
       setCoopMosaicSessionId(coopMosaicParam);
       setCoopMosaicRole("guest");
       setCoopMosaicStatus("joining");
-      // Clear param from URL
-      const cleanParams = new URLSearchParams(window.location.search);
-      cleanParams.delete("coopMosaic");
-      const cleanUrl = cleanParams.toString() ? `${window.location.pathname}?${cleanParams}` : window.location.pathname;
-      window.history.replaceState({}, "", cleanUrl);
       return;
     }
 
     // Handle coop join link — defer until Firebase auth is ready
+    // URL param is kept so refreshing the page rejoins the session
     if (coopParam && mode && levelNum != null) {
       setDifficulty(mode);
       setCurrentPuzzle(levelNum);
@@ -4092,11 +4111,6 @@ export default function Pattrn() {
       setSelectedCell(null);
       setSelectedToken(null);
       setView("play");
-      // Clear coop param from URL
-      const cleanParams = new URLSearchParams(window.location.search);
-      cleanParams.delete("coop");
-      const cleanUrl = cleanParams.toString() ? `${window.location.pathname}?${cleanParams}` : window.location.pathname;
-      window.history.replaceState({}, "", cleanUrl);
       return;
     }
 
@@ -5012,6 +5026,8 @@ export default function Pattrn() {
     timerInterval.current = setInterval(() => {
       setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
     }, 1000);
+    // Keep session ID in URL so page refresh rejoins the session
+    setCoopUrlParam("coop", sessionId);
     // If inviting friends, send notifications and track invited UIDs
     if (inviteFriendUids.length > 0) {
       const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${sessionId}` : "";
@@ -5054,6 +5070,8 @@ export default function Pattrn() {
       saveTheme(coopOriginalThemeRef.current);
       coopOriginalThemeRef.current = null;
     }
+    // Remove coop session ID from URL
+    clearCoopUrlParam("coop");
     setCoopSessionId(null);
     setCoopRole(null);
     setCoopMyBlanks(null);
@@ -5139,6 +5157,8 @@ export default function Pattrn() {
       setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
     }, 1000);
     coopHostTimerStartRef.current = remoteStart;
+    // Keep session ID in URL so page refresh rejoins the session
+    setCoopUrlParam("coop", session.id);
     setView("play");
   }, [firebaseUser, stopTimer]);
 
@@ -5370,7 +5390,8 @@ export default function Pattrn() {
       const session = await joinCoopSession(coopSessionId, firebaseUser.uid, username);
       if (cancelled || !session) {
         if (!cancelled) {
-          // Session doesn't exist or is full
+          // Session doesn't exist or is full — clean URL param
+          clearCoopUrlParam("coop");
           setCoopSessionId(null);
           setCoopRole(null);
           setCoopStatus(null);
@@ -5385,6 +5406,11 @@ export default function Pattrn() {
       if (level != null) setCurrentPuzzle(level);
       if (session.dailyDate) setCurrentDailyDate(session.dailyDate);
 
+      // Detect correct role — on page refresh the init code always sets "guest",
+      // but if this user is actually the host we need to correct that
+      if (session.hostUid === firebaseUser.uid) {
+        setCoopRole("host");
+      }
       setCoopStatus("playing");
     })();
     return () => { cancelled = true; };
@@ -5520,6 +5546,8 @@ export default function Pattrn() {
       }, ...prev];
     });
     coopMosaicJoinedRef.current = true;
+    // Keep session ID in URL so page refresh rejoins the session
+    setCoopUrlParam("coopMosaic", sessionId);
     // Ensure the session appears in the Active Co-op Sessions panel on the menu
     loadActiveCoopSessions();
     // If inviting friends, send notifications and track invited UIDs
@@ -5557,6 +5585,8 @@ export default function Pattrn() {
         updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, null).catch(() => {});
       }
     }
+    // Remove coop mosaic session ID from URL
+    clearCoopUrlParam("coopMosaic");
     setCoopMosaicSessionId(null);
     setCoopMosaicRole(null);
     setCoopMosaicStatus(null);
@@ -5626,6 +5656,8 @@ export default function Pattrn() {
     coopMosaicPrevSolvedRef.current = alreadySolved;
     // Signal we're back online by updating our current tile to -1 (overview)
     updateCoopMosaicCurrentTile(session.id, firebaseUser.uid, -1).catch(() => {});
+    // Keep session ID in URL so page refresh rejoins the session
+    setCoopUrlParam("coopMosaic", session.id);
     customMosaicReturnViewRef.current = "menu";
     setView("custom-mosaic");
   }, [firebaseUser, buildCustomMosaicPuzzles]);
@@ -5829,6 +5861,8 @@ export default function Pattrn() {
       const session = await joinCoopMosaicSession(coopMosaicSessionId, firebaseUser.uid, username);
       if (cancelled || !session) {
         if (!cancelled) {
+          // Session doesn't exist — clean URL param
+          clearCoopUrlParam("coopMosaic");
           setCoopMosaicSessionId(null);
           setCoopMosaicRole(null);
           setCoopMosaicStatus(null);
@@ -5871,6 +5905,11 @@ export default function Pattrn() {
       setCoopMosaicSharedProgress(session.tileProgress || {});
       setCoopMosaicSharedTileTimes(session.tileTimes || {});
       setCustomMosaicProgress(session.tileProgress || {});
+      // Detect correct role — on page refresh the init code always sets "guest",
+      // but if this user is actually the host we need to correct that
+      if (session.hostUid === firebaseUser.uid) {
+        setCoopMosaicRole("host");
+      }
       setCoopMosaicStatus("playing");
       setCoopMosaicPlayers(otherPlayers);
       coopMosaicCurrentTileRef.current = -1;
