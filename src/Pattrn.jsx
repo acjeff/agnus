@@ -2800,6 +2800,7 @@ export default function Pattrn() {
   const [coopMyBlanks, setCoopMyBlanks] = useState(null); // Set of cell keys assigned to me
   const [coopPartnerBlanks, setCoopPartnerBlanks] = useState(null); // Set of cell keys assigned to partner
   const [coopPartnerFills, setCoopPartnerFills] = useState({}); // partner's fills from Firebase
+  const prevCoopPartnerFillsRef = useRef({}); // previous partner fills for animation diffing
   const [coopMyLockedIn, setCoopMyLockedIn] = useState(false);
   const [coopPartnerLockedIn, setCoopPartnerLockedIn] = useState(false);
   const [coopPartnerCorrect, setCoopPartnerCorrect] = useState(false);
@@ -2921,6 +2922,7 @@ export default function Pattrn() {
   const [coopMosaicSharedProgress, setCoopMosaicSharedProgress] = useState({}); // { tileIdx: attempts } synced from Firebase
   const [coopMosaicSharedTileTimes, setCoopMosaicSharedTileTimes] = useState({}); // { tileIdx: seconds }
   const [coopMosaicOtherFills, setCoopMosaicOtherFills] = useState({}); // merged fills from all other players for current tile { "r-c": token }
+  const prevCoopMosaicOtherFillsRef = useRef({}); // previous mosaic fills for animation diffing
   const [showCoopMosaicInvite, setShowCoopMosaicInvite] = useState(false);
   const [showCoopMosaicNavigate, setShowCoopMosaicNavigate] = useState(false); // modal to navigate to a player's tile
   const coopMosaicUnsubRef = useRef(null);
@@ -4807,6 +4809,33 @@ export default function Pattrn() {
       delete removingTimersRef.current[key];
     }, 200);
   }, []);
+
+  // Animate partner fill changes from Firebase (coop + mosaic)
+  useEffect(() => {
+    const prev = prevCoopPartnerFillsRef.current;
+    const curr = coopPartnerFills;
+    // Detect new fills (appeared)
+    for (const key of Object.keys(curr)) {
+      if (!prev[key]) triggerPlaceAnimation(key);
+    }
+    // Detect removed fills (disappeared)
+    for (const key of Object.keys(prev)) {
+      if (!curr[key]) triggerRemoveAnimation(key, prev[key]);
+    }
+    prevCoopPartnerFillsRef.current = curr;
+  }, [coopPartnerFills, triggerPlaceAnimation, triggerRemoveAnimation]);
+
+  useEffect(() => {
+    const prev = prevCoopMosaicOtherFillsRef.current;
+    const curr = coopMosaicOtherFills;
+    for (const key of Object.keys(curr)) {
+      if (!prev[key]) triggerPlaceAnimation(key);
+    }
+    for (const key of Object.keys(prev)) {
+      if (!curr[key]) triggerRemoveAnimation(key, prev[key]);
+    }
+    prevCoopMosaicOtherFillsRef.current = curr;
+  }, [coopMosaicOtherFills, triggerPlaceAnimation, triggerRemoveAnimation]);
 
   const paintCell = useCallback((r, c) => {
     if (gameState !== "playing") return;
