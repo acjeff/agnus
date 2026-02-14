@@ -4223,11 +4223,25 @@ export default function Pattrn() {
         </button>
         {/* Co-op */}
         <button onClick={() => setView("coop")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "coop" ? C.coop : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative" }}>
+          <div style={{ position: "relative", display: "inline-flex" }}>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "coop" ? C.coop : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            {activeCoopSessions.length > 0 && (
+              <div style={{
+                position: "absolute", top: -4, right: -8,
+                minWidth: 16, height: 16, borderRadius: 8,
+                backgroundColor: C.coop, display: "flex", alignItems: "center", justifyContent: "center",
+                padding: "0 4px", boxSizing: "border-box",
+              }}>
+                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "'Space Mono', monospace", lineHeight: 1 }}>
+                  {activeCoopSessions.length}
+                </span>
+              </div>
+            )}
+          </div>
           <span style={{ fontSize: 10, fontWeight: active === "coop" ? 700 : 500, color: active === "coop" ? C.coop : C.textDim, fontFamily: "'Space Mono', monospace" }}>Co-op</span>
         </button>
         {/* Profile */}
@@ -10121,6 +10135,29 @@ export default function Pattrn() {
             {/* Divider */}
             <div style={{ height: 1, backgroundColor: C.border, margin: "4px 0" }} />
 
+            {/* Sign out */}
+            {firebaseUser && (
+              <button onClick={handleSignOut} style={{
+                width: "100%", padding: "14px 16px", borderRadius: 12,
+                backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
+                transition: "all 0.15s",
+              }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  backgroundColor: C.textDim + "22", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: `1.5px solid ${C.textDim}44`, flexShrink: 0,
+                }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+                  </svg>
+                </div>
+                <div style={{ flex: 1, textAlign: "left" }}>
+                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Sign Out</div>
+                </div>
+              </button>
+            )}
+
             {/* Clear All Data */}
             <button onClick={() => setShowClearConfirm(true)} style={{
               width: "100%", padding: "14px 16px", borderRadius: 12,
@@ -10686,93 +10723,6 @@ export default function Pattrn() {
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        )}
-
-        {/* Active co-op sessions panel */}
-        {firebaseUser && activeCoopSessions.length > 0 && (
-          <div style={{
-            width: "100%", marginBottom: 16, animation: "fadeUp 0.5s 0.03s ease both",
-            borderRadius: 12, overflow: "hidden", border: `1px solid #54A0FF33`,
-            backgroundColor: C.surface, padding: "12px 16px", boxSizing: "border-box",
-          }}>
-            <div style={{
-              fontSize: 9, color: "#54A0FF", textTransform: "uppercase",
-              letterSpacing: 1.5, marginBottom: 10,
-              fontFamily: "'Space Mono', monospace", fontWeight: 700,
-            }}>Active Co-op Sessions</div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {activeCoopSessions.map(session => {
-                const isHost = session.hostUid === firebaseUser.uid;
-                const isMosaicSession = session._type === "mosaic";
-                // For mosaic sessions, count players from the players map; for regular coop, use guestUsername
-                const mosaicPlayerCount = isMosaicSession ? Object.keys(session.players || {}).length : 0;
-                const partnerName = isMosaicSession
-                  ? (mosaicPlayerCount > 1 ? `${mosaicPlayerCount} players` : null)
-                  : (isHost ? (session.guestUsername || null) : (session.hostUsername || null));
-                const modeLabel = isMosaicSession ? "Mosaic" : ((DIFFICULTIES.find(d => d.key === session.mode)?.label) || session.mode);
-                const titleLabel = isMosaicSession
-                  ? (session.mosaicTitle || "Untitled")
-                  : `${modeLabel} #${(session.level ?? 0) + 1}`;
-                const statusLabel = session.status === "waiting" ? "Waiting for partner" : session.status === "playing" ? "In progress" : session.status === "complete" ? "Complete" : session.status;
-                const statusColor = session.status === "waiting" ? C.textDim : session.status === "playing" ? C.coop : session.status === "complete" ? C.correct : C.textDim;
-                const mosaicSolved = isMosaicSession ? Object.values(session.tileProgress || {}).filter(v => v > 0).length : 0;
-                return (
-                  <div key={session.id} style={{
-                    display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
-                    borderRadius: 10, backgroundColor: C.bg, border: `1px solid ${isMosaicSession ? C.coop + "22" : C.border}`,
-                  }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                        {isMosaicSession && (
-                          <span style={{ fontSize: 9, color: C.coop, fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
-                            Co-op Mosaic
-                          </span>
-                        )}
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>
-                          {titleLabel}
-                        </span>
-                        <span style={{ fontSize: 9, color: isHost ? C.coop : "#FF9FF3", fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
-                          {isHost ? "Host" : "Guest"}
-                        </span>
-                      </div>
-                      <div style={{ fontSize: 10, color: statusColor, fontFamily: "'Space Mono', monospace" }}>
-                        {statusLabel}
-                        {isMosaicSession && session.status === "playing" && <span style={{ color: C.textDim }}> {"\u2022"} {mosaicSolved}/25 tiles</span>}
-                        {partnerName && <span style={{ color: C.textDim }}> {"\u2022"} with {partnerName}</span>}
-                      </div>
-                    </div>
-                    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                      {session.status !== "complete" && (
-                        <button
-                          onClick={() => isMosaicSession ? rejoinCoopMosaicSession(session) : rejoinCoopSession(session)}
-                          style={{
-                            background: C.coop, border: "none", borderRadius: 8,
-                            padding: "6px 12px", color: "#fff", cursor: "pointer", fontSize: 10,
-                            fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
-                          }}
-                        >
-                          Rejoin
-                        </button>
-                      )}
-                      {isHost && (
-                        <button
-                          onClick={() => isMosaicSession ? closeCoopMosaicSessionPermanently(session.id, session) : closeCoopSessionPermanently(session.id, session)}
-                          style={{
-                            background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
-                            padding: "6px 8px", color: C.textDim, cursor: "pointer", fontSize: 10,
-                            fontFamily: "'Space Mono', monospace",
-                          }}
-                          title="Close session"
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.color = "#f87171"; }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-                        >{"\u2715"}</button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         )}
