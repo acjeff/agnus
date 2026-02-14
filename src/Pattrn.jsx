@@ -122,12 +122,14 @@ function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
     if (!isHandle && !isScrolledToTop) return;
     dragState.current = { active: true, startY: e.touches[0].clientY, current: 0 };
     drawerEl.style.transition = "none";
+    drawerEl.style.animation = "none";
   }, []);
 
   const onTouchMove = useCallback((e) => {
     if (!dragState.current.active) return;
     const dy = e.touches[0].clientY - dragState.current.startY;
     if (dy > 0) {
+      e.preventDefault();
       dragState.current.current = dy;
       if (drawerRef.current) drawerRef.current.style.transform = `translateY(${dy}px)`;
       if (backdropRef.current) backdropRef.current.style.opacity = String(Math.max(0, 1 - dy / 400));
@@ -150,13 +152,46 @@ function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
     dragState.current.current = 0;
   }, [onClose]);
 
+  // Attach non-passive touch listeners so e.preventDefault() works on mobile
+  useEffect(() => {
+    const el = drawerRef.current;
+    if (!el) return;
+    el.addEventListener("touchstart", onTouchStart, { passive: true });
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    return () => {
+      el.removeEventListener("touchstart", onTouchStart);
+      el.removeEventListener("touchmove", onTouchMove);
+      el.removeEventListener("touchend", onTouchEnd);
+    };
+  }, [isOpen, onTouchStart, onTouchMove, onTouchEnd]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const scrollY = window.scrollY;
+    const body = document.body;
+    body.style.position = "fixed";
+    body.style.top = `-${scrollY}px`;
+    body.style.left = "0";
+    body.style.right = "0";
+    body.style.overflow = "hidden";
+    return () => {
+      body.style.position = "";
+      body.style.top = "";
+      body.style.left = "";
+      body.style.right = "";
+      body.style.overflow = "";
+      window.scrollTo(0, scrollY);
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: zIndex || 1100, display: "flex", flexDirection: "column", justifyContent: "flex-end" }} role="dialog" aria-modal="true">
       <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } } @keyframes drawerOverlayFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
       <div ref={backdropRef} onClick={onClose} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", animation: "drawerOverlayFade 0.25s ease both" }} />
-      <div ref={drawerRef} onClick={e => e.stopPropagation()} onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd} style={{
+      <div ref={drawerRef} onClick={e => e.stopPropagation()} style={{
         position: "relative", backgroundColor: C.bg, borderRadius: "20px 20px 0 0",
         border: `1px solid ${C.border}`, borderBottom: "none",
         maxHeight: maxHeight || "85vh", display: "flex", flexDirection: "column",
