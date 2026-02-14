@@ -162,6 +162,7 @@ function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
         maxHeight: maxHeight || "85vh", display: "flex", flexDirection: "column",
         animation: "drawerSlideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both",
         boxShadow: "0 -12px 48px rgba(0,0,0,0.5)",
+        width: "100%", maxWidth: 480, alignSelf: "center",
       }}>
         <div ref={handleRef} style={{ padding: "12px 0 8px", flexShrink: 0, cursor: "grab", touchAction: "none" }}>
           <div style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: C.border, margin: "0 auto" }} />
