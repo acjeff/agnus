@@ -13072,22 +13072,6 @@ export default function Pattrn() {
               Co-op
             </button>
           )}
-          {/* Coop invite button when in coop - opens invite modal with friends checkbox list */}
-          {isCoop && (
-            <button
-              onClick={() => setShowCoopInvite(true)}
-              style={{
-                background: "none", border: `1px solid #54A0FF55`, borderRadius: 8, padding: "6px 10px",
-                color: "#54A0FF", cursor: "pointer", fontSize: 11, transition: "all 0.15s",
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, fontWeight: 700,
-              }}
-              title="Invite a friend to play co-op"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#54A0FF55"; e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              Invite
-            </button>
-          )}
           {/* Coop leave button when in coop - requires confirmation */}
           {isCoop && (
             <button
@@ -13760,7 +13744,7 @@ export default function Pattrn() {
           textAlign: "center", animation: "fadeUp 0.3s ease both",
         }}>
           <div style={{ marginBottom: 4, fontWeight: 700, color: "#54A0FF" }}>Waiting for partner</div>
-          <div style={{ fontSize: 10, color: C.textDim }}>Share the invite link to start</div>
+          <div style={{ fontSize: 10, color: C.textDim }}>Invite a friend or share a link to start</div>
           <button
             onClick={() => setShowCoopInvite(true)}
             style={{
@@ -13770,7 +13754,7 @@ export default function Pattrn() {
               textTransform: "uppercase",
             }}
           >
-            Show Link
+            Invite
           </button>
         </div>
       )}
