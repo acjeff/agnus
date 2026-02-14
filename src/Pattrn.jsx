@@ -4839,6 +4839,8 @@ export default function Pattrn() {
     // Coop pass mode: tapping my cell sends a pass request
     if (coopPassMode && isCoop && coopMyBlanks?.has(key) && !coopMyLockedIn && coopSessionId && firebaseUser) {
       sendCoopPassRequest(coopSessionId, key, firebaseUser.uid, coopPassMode.targetUid).catch(() => {});
+      // Clear any local fill on the passed cell
+      setFills(prev => { const next = { ...prev }; delete next[key]; return next; });
       setCoopPendingPassCell(key);
       setCoopPassMode(null);
       setCoopPassPlayerPicker(false);
