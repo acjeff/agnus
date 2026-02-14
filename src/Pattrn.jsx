@@ -2840,8 +2840,9 @@ export default function Pattrn() {
   const [deleteAccountPassword, setDeleteAccountPassword] = useState("");
   const [deleteAccountError, setDeleteAccountError] = useState("");
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
-  const [coopSetupMode, setCoopSetupMode] = useState(null); // null | difficulty key
+  const [coopSetupMode, setCoopSetupMode] = useState(null); // null | difficulty key | "mosaic"
   const [coopSetupLevel, setCoopSetupLevel] = useState(0);
+  const [coopSetupMosaic, setCoopSetupMosaic] = useState(null); // selected mosaic for coop setup
   const [coopSetupStarting, setCoopSetupStarting] = useState(false);
   const [achievementToast, setAchievementToast] = useState(null); // { label, tier, key }
   const [toastDismissing, setToastDismissing] = useState(false);
@@ -3000,8 +3001,6 @@ export default function Pattrn() {
   const [activeSessionsLoading, setActiveSessionsLoading] = useState(false);
   const [showCoopFriendPicker, setShowCoopFriendPicker] = useState(false); // friend picker for coop
   const [coopSelectedFriends, setCoopSelectedFriends] = useState(new Set()); // multi-select friends for coop invites
-  const [coopPickerMode, setCoopPickerMode] = useState(null); // mode picker in coop friend picker (null = use current mode)
-  const [coopPickerMosaic, setCoopPickerMosaic] = useState(null); // selected mosaic when coopPickerMode === "mosaic"
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false); // leave coop confirmation
   const [showMosaicLeaveConfirm, setShowMosaicLeaveConfirm] = useState(false); // leave coop mosaic confirmation
   const [coopPartnerLockToast, setCoopPartnerLockToast] = useState(null); // toast when partner locks in
@@ -8551,57 +8550,19 @@ export default function Pattrn() {
   );
 
   const coopFriendPickerEl = showCoopFriendPicker ? (() => {
-    const isMosaicMode = coopPickerMode === "mosaic";
-    const pickerColor = isMosaicMode ? C.coop : "#54A0FF";
-    const availableMosaics = [...(myMosaics || []), ...(staffPickMosaic ? [staffPickMosaic] : [])].filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
+    const isFromMosaic = view === "custom-mosaic" && !!customMosaicPlay;
+    const pickerColor = isFromMosaic ? C.coop : "#54A0FF";
     return (
-      <DraggableDrawer isOpen={true} onClose={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); setCoopPickerMode(null); setCoopPickerMosaic(null); }} zIndex={1200}>
+      <DraggableDrawer isOpen={true} onClose={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); }} zIndex={1200}>
         <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
           <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>Start Co-op</div>
-          <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>Select friends to invite or share a link</div>
-          {/* Mode picker */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>Puzzle Type</div>
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {[
-                { key: null, label: `Current (${(DIFFICULTIES.find(m => m.key === difficulty) || {}).label || difficulty})` },
-                { key: "mosaic", label: "Mosaic" },
-              ].map(opt => {
-                const active = coopPickerMode === opt.key;
-                return (
-                  <button key={opt.key || "_current"} onClick={() => { setCoopPickerMode(opt.key); setCoopPickerMosaic(null); }} style={{
-                    padding: "5px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, cursor: "pointer",
-                    border: `1px solid ${active ? pickerColor : C.border}`, backgroundColor: active ? pickerColor + "22" : C.bg, color: active ? pickerColor : C.textDim, transition: "all 0.15s",
-                  }}>{opt.label}</button>
-                );
-              })}
-            </div>
-          </div>
-          {isMosaicMode && (
-            <div style={{ marginBottom: 14 }}>
-              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>Choose Mosaic</div>
-              {availableMosaics.length > 0 ? (
-                <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 120, overflowY: "auto" }}>
-                  {availableMosaics.map(m => {
-                    const sel = coopPickerMosaic?.id === m.id;
-                    return (
-                      <button key={m.id} onClick={() => setCoopPickerMosaic(m)} style={{
-                        display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8,
-                        backgroundColor: sel ? C.coop + "18" : C.bg, border: `1px solid ${sel ? C.coop : C.border}`,
-                        cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
-                      }}>
-                        <div style={{ width: 14, height: 14, borderRadius: 3, border: `2px solid ${sel ? C.coop : C.border}`, backgroundColor: sel ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
-                          {sel && <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                        </div>
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{m.title || "Untitled"}</span>
-                        {m.authorUsername && <span style={{ fontSize: 9, color: C.textDim }}>by {m.authorUsername}</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", padding: "8px 0" }}>No mosaics available. Create one in the Mosaic gallery first.</div>
-              )}
+          <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>{isFromMosaic ? "Play this mosaic together" : "Select friends to invite or share a link"}</div>
+          {/* Show current mosaic info when opened from mosaic view */}
+          {isFromMosaic && (
+            <div style={{ marginBottom: 14, padding: "8px 12px", borderRadius: 10, backgroundColor: C.coop + "12", border: `1px solid ${C.coop}33` }}>
+              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>Mosaic</div>
+              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text }}>{customMosaicPlay.title || "Untitled"}</div>
+              {customMosaicPlay.authorUsername && <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorUsername}</div>}
             </div>
           )}
           {friendsList.length > 0 && (
@@ -8635,24 +8596,26 @@ export default function Pattrn() {
           <div style={{ display: "flex", gap: 8 }}>
             {coopSelectedFriends.size > 0 ? (
               <button onClick={async () => {
-                if (isMosaicMode) { if (!coopPickerMosaic) return; setShowCoopFriendPicker(false); await startCoopMosaicSession({ inviteFriendUids: [...coopSelectedFriends], mosaicOverride: coopPickerMosaic }); setCoopPickerMode(null); setCoopPickerMosaic(null); }
-                else { setShowCoopFriendPicker(false); await startCoopSession({ inviteFriendUids: [...coopSelectedFriends] }); }
-              }} disabled={isMosaicMode && !coopPickerMosaic} style={{
-                flex: 1, backgroundColor: (isMosaicMode && !coopPickerMosaic) ? C.textDim : pickerColor, color: "#fff", border: "none",
+                setShowCoopFriendPicker(false);
+                if (isFromMosaic) { await startCoopMosaicSession({ inviteFriendUids: [...coopSelectedFriends], mosaicOverride: customMosaicPlay }); }
+                else { await startCoopSession({ inviteFriendUids: [...coopSelectedFriends] }); }
+              }} style={{
+                flex: 1, backgroundColor: pickerColor, color: "#fff", border: "none",
                 padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                cursor: (isMosaicMode && !coopPickerMosaic) ? "not-allowed" : "pointer", textTransform: "uppercase", opacity: (isMosaicMode && !coopPickerMosaic) ? 0.5 : 1,
+                cursor: "pointer", textTransform: "uppercase",
               }}>{`Invite ${coopSelectedFriends.size} Friend${coopSelectedFriends.size > 1 ? "s" : ""}`}</button>
             ) : (
               <button onClick={async () => {
-                if (isMosaicMode) { if (!coopPickerMosaic) return; setShowCoopFriendPicker(false); await startCoopMosaicSession({ mosaicOverride: coopPickerMosaic }); setCoopPickerMode(null); setCoopPickerMosaic(null); }
-                else { setShowCoopFriendPicker(false); startCoopSession(); }
-              }} disabled={isMosaicMode && !coopPickerMosaic} style={{
-                flex: 1, backgroundColor: (isMosaicMode && !coopPickerMosaic) ? C.textDim : pickerColor, color: "#fff", border: "none",
+                setShowCoopFriendPicker(false);
+                if (isFromMosaic) { await startCoopMosaicSession({ mosaicOverride: customMosaicPlay }); }
+                else { startCoopSession(); }
+              }} style={{
+                flex: 1, backgroundColor: pickerColor, color: "#fff", border: "none",
                 padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                cursor: (isMosaicMode && !coopPickerMosaic) ? "not-allowed" : "pointer", textTransform: "uppercase", opacity: (isMosaicMode && !coopPickerMosaic) ? 0.5 : 1,
+                cursor: "pointer", textTransform: "uppercase",
               }}>Share Link</button>
             )}
-            <button onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); setCoopPickerMode(null); setCoopPickerMosaic(null); }} style={{
+            <button onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); }} style={{
               backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
               padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
             }}>Cancel</button>
@@ -10730,8 +10693,8 @@ export default function Pattrn() {
                   Game Mode
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                  {coopModes.map(d => (
-                    <button key={d.key} onClick={() => { setCoopSetupMode(d.key); setCoopSetupLevel(0); }}
+                  {[...coopModes, { key: "mosaic", label: "Mosaic" }].map(d => (
+                    <button key={d.key} onClick={() => { setCoopSetupMode(d.key); setCoopSetupLevel(0); setCoopSetupMosaic(null); }}
                       style={{
                         padding: "8px 14px", borderRadius: 10,
                         background: coopSetupMode === d.key ? C.coop : C.bg,
@@ -10746,8 +10709,8 @@ export default function Pattrn() {
                 </div>
               </div>
 
-              {/* Puzzle selection */}
-              {coopSetupMode && coopSetupMode !== "cascade" && (
+              {/* Puzzle selection - for non-mosaic, non-cascade modes */}
+              {coopSetupMode && coopSetupMode !== "cascade" && coopSetupMode !== "mosaic" && (
                 <div style={{ marginBottom: 16 }}>
                   <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
                     Puzzle #{coopSetupLevel + 1}
@@ -10771,29 +10734,69 @@ export default function Pattrn() {
                 </div>
               )}
 
+              {/* Mosaic selection - when mosaic mode is selected */}
+              {coopSetupMode === "mosaic" && (() => {
+                const availableMosaics = [...(myMosaics || []), ...(staffPickMosaic ? [staffPickMosaic] : [])].filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
+                return (
+                  <div style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
+                      Choose Mosaic
+                    </div>
+                    {availableMosaics.length > 0 ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: 160, overflowY: "auto" }}>
+                        {availableMosaics.map(m => {
+                          const sel = coopSetupMosaic?.id === m.id;
+                          return (
+                            <button key={m.id} onClick={() => setCoopSetupMosaic(m)} style={{
+                              display: "flex", alignItems: "center", gap: 8, padding: "8px 12px", borderRadius: 10,
+                              backgroundColor: sel ? C.coop + "18" : C.bg, border: `1px solid ${sel ? C.coop : C.border}`,
+                              cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                            }}>
+                              <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${sel ? C.coop : C.border}`, backgroundColor: sel ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                                {sel && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                              </div>
+                              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{m.title || "Untitled"}</span>
+                              {m.authorUsername && <span style={{ fontSize: 9, color: C.textDim }}>by {m.authorUsername}</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", padding: "8px 0" }}>No mosaics available. Create one in the Mosaic gallery first.</div>
+                    )}
+                  </div>
+                );
+              })()}
+
               {/* Start button */}
               <button
-                disabled={!coopSetupMode || coopSetupStarting}
+                disabled={!coopSetupMode || coopSetupStarting || (coopSetupMode === "mosaic" && !coopSetupMosaic)}
                 onClick={async () => {
                   if (!coopSetupMode) return;
+                  if (coopSetupMode === "mosaic" && !coopSetupMosaic) return;
                   setCoopSetupStarting(true);
                   try {
-                    setDifficulty(coopSetupMode);
-                    const level = coopSetupMode === "cascade" ? 0 : coopSetupLevel;
-                    startPuzzle(level, coopSetupMode);
-                    setView("play");
-                    // Small delay to ensure puzzle is loaded, then start co-op
-                    setTimeout(() => {
-                      startCoopSession();
-                    }, 300);
+                    if (coopSetupMode === "mosaic") {
+                      await startCoopMosaicSession({ mosaicOverride: coopSetupMosaic });
+                    } else {
+                      setDifficulty(coopSetupMode);
+                      const level = coopSetupMode === "cascade" ? 0 : coopSetupLevel;
+                      startPuzzle(level, coopSetupMode);
+                      setView("play");
+                      // Small delay to ensure puzzle is loaded, then start co-op
+                      setTimeout(() => {
+                        startCoopSession();
+                      }, 300);
+                    }
                   } catch { /* ignore */ }
                   setCoopSetupStarting(false);
                 }}
                 style={{
                   width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 13, fontWeight: 700,
                   fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                  background: coopSetupMode ? C.coop : C.border, color: coopSetupMode ? "#fff" : C.textDim,
-                  border: "none", cursor: coopSetupMode ? "pointer" : "default",
+                  background: (coopSetupMode && !(coopSetupMode === "mosaic" && !coopSetupMosaic)) ? C.coop : C.border,
+                  color: (coopSetupMode && !(coopSetupMode === "mosaic" && !coopSetupMosaic)) ? "#fff" : C.textDim,
+                  border: "none", cursor: (coopSetupMode && !(coopSetupMode === "mosaic" && !coopSetupMosaic)) ? "pointer" : "default",
                   opacity: coopSetupStarting ? 0.6 : 1, transition: "all 0.15s",
                 }}>
                 {coopSetupStarting ? "Starting..." : "Start & Invite Friend"}
