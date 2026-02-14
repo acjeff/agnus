@@ -2751,6 +2751,8 @@ export default function Pattrn() {
   const [coopPartnerLockedIn, setCoopPartnerLockedIn] = useState(false);
   const [coopPartnerCorrect, setCoopPartnerCorrect] = useState(false);
   const [coopPartnerConnected, setCoopPartnerConnected] = useState(false);
+  const [coopPartnerName, setCoopPartnerName] = useState(null); // partner's username in regular coop
+  const [coopPartnerPic, setCoopPartnerPic] = useState(null); // partner's profile picture in regular coop
   const [showCoopInvite, setShowCoopInvite] = useState(false); // invite modal
   const [coopStatus, setCoopStatus] = useState(null); // "waiting" | "playing" | "complete"
   const coopUnsubRef = useRef(null); // unsubscribe function for Firebase listener
@@ -2758,6 +2760,7 @@ export default function Pattrn() {
   const coopPendingLoginRef = useRef(false); // auto-start coop after login
   const coopOriginalThemeRef = useRef(null); // guest's original theme before coop override
   const coopHostTimerStartRef = useRef(null); // last known hostTimerStart for sync
+  const coopPartnerPicFetchedRef = useRef(null); // UID of partner whose pic was already fetched
   const activeThemeIdRef = useRef(activeThemeId); // current theme ref for coop subscription
   activeThemeIdRef.current = activeThemeId;
   const isCoop = !!coopSessionId;
@@ -2847,6 +2850,7 @@ export default function Pattrn() {
   const [coopMosaicRole, setCoopMosaicRole] = useState(null); // "host" | "guest"
   const [coopMosaicStatus, setCoopMosaicStatus] = useState(null); // "waiting" | "playing" | "complete"
   const [coopMosaicPlayers, setCoopMosaicPlayers] = useState({}); // { uid: { username, currentTile } } — all OTHER players
+  const [coopMosaicPlayerPics, setCoopMosaicPlayerPics] = useState({}); // { uid: base64 dataURL | null } — profile pics for coop players
   const [coopMosaicSharedProgress, setCoopMosaicSharedProgress] = useState({}); // { tileIdx: attempts } synced from Firebase
   const [coopMosaicSharedTileTimes, setCoopMosaicSharedTileTimes] = useState({}); // { tileIdx: seconds }
   const [coopMosaicOtherFills, setCoopMosaicOtherFills] = useState({}); // merged fills from all other players for current tile { "r-c": token }
@@ -5159,6 +5163,15 @@ export default function Pattrn() {
       const partnerLocked = isHost ? !!data.guestLockedIn : !!data.hostLockedIn;
       const partnerCorrect = isHost ? !!data.guestCorrect : !!data.hostCorrect;
       const partnerName = isHost ? (data.guestUsername || "Partner") : (data.hostUsername || "Partner");
+      setCoopPartnerName(partnerName);
+      // Load partner profile picture (once per partner UID)
+      const partnerUid = isHost ? data.guestUid : data.hostUid;
+      if (partnerUid && coopPartnerPicFetchedRef.current !== partnerUid) {
+        coopPartnerPicFetchedRef.current = partnerUid;
+        loadUserProfile(partnerUid).then(p => {
+          setCoopPartnerPic(p?.profilePicture || null);
+        }).catch(() => {});
+      }
       if (isHost) {
         setCoopPartnerLockedIn(!!data.guestLockedIn);
         setCoopPartnerCorrect(!!data.guestCorrect);
@@ -5560,6 +5573,32 @@ export default function Pattrn() {
       coopMosaicUnsubRef.current = null;
     };
   }, [coopMosaicSessionId, firebaseUser, leaveCoopMosaicSession, stopTimer]);
+
+  // Load profile pictures for coop mosaic players as they join
+  useEffect(() => {
+    const uids = Object.keys(coopMosaicPlayers);
+    if (uids.length === 0) return;
+    let cancelled = false;
+    (async () => {
+      for (const uid of uids) {
+        if (cancelled) break;
+        // Skip if we already fetched (even if null)
+        setCoopMosaicPlayerPics(prev => {
+          if (uid in prev) return prev;
+          // Kick off async load
+          loadUserProfile(uid).then(profile => {
+            if (!cancelled) {
+              setCoopMosaicPlayerPics(p => ({ ...p, [uid]: profile?.profilePicture || null }));
+            }
+          }).catch(() => {
+            if (!cancelled) setCoopMosaicPlayerPics(p => ({ ...p, [uid]: null }));
+          });
+          return { ...prev, [uid]: undefined }; // Mark as loading
+        });
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [coopMosaicPlayers]);
 
   // Handle guest joining coop mosaic: once auth ready + session ID set with role=guest, join
   useEffect(() => {
@@ -7207,22 +7246,35 @@ export default function Pattrn() {
                 </div>
                 {coopMosaicOtherPlayerCount > 0 && (
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "4px 10px", marginTop: 6 }}>
-                    {Object.entries(coopMosaicPlayers).map(([uid, p]) => (
-                      <span key={uid} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
-                        <span style={{
-                          width: 5, height: 5, borderRadius: "50%",
-                          backgroundColor: p.currentTile != null ? C.correct : C.textDim,
-                          display: "inline-block",
-                        }} />
-                        <span style={{ color: C.coop, fontWeight: 600, fontSize: 10 }}>{p.username || "Player"}</span>
-                        {p.currentTile != null && p.currentTile >= 0
-                          ? <span style={{ color: C.textDim, fontSize: 9 }}>tile {p.currentTile + 1}</span>
-                          : p.currentTile === -1
-                            ? <span style={{ color: C.textDim, fontSize: 9 }}>overview</span>
-                            : null
-                        }
-                      </span>
-                    ))}
+                    {Object.entries(coopMosaicPlayers).map(([uid, p]) => {
+                      const pic = coopMosaicPlayerPics[uid];
+                      const initial = (p.username || "P")[0].toUpperCase();
+                      const isOnline = p.currentTile != null;
+                      return (
+                        <span key={uid} style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                          {pic ? (
+                            <img src={pic} alt="" style={{
+                              width: 16, height: 16, borderRadius: "50%", objectFit: "cover",
+                              border: `1.5px solid ${isOnline ? C.correct : C.textDim}`,
+                            }} />
+                          ) : (
+                            <span style={{
+                              width: 16, height: 16, borderRadius: "50%",
+                              backgroundColor: isOnline ? C.correct : C.textDim,
+                              display: "inline-flex", alignItems: "center", justifyContent: "center",
+                              fontSize: 9, fontWeight: 700, color: "#fff", lineHeight: 1,
+                            }}>{initial}</span>
+                          )}
+                          <span style={{ color: C.coop, fontWeight: 600, fontSize: 10 }}>{p.username || "Player"}</span>
+                          {p.currentTile != null && p.currentTile >= 0
+                            ? <span style={{ color: C.textDim, fontSize: 9 }}>tile {p.currentTile + 1}</span>
+                            : p.currentTile === -1
+                              ? <span style={{ color: C.textDim, fontSize: 9 }}>overview</span>
+                              : null
+                          }
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -7244,7 +7296,7 @@ export default function Pattrn() {
             const solved = (effectiveMosaicProgress[i] || 0) > 0;
             // Count how many other players are on this tile
             const playersOnTile = isCoopMosaic
-              ? Object.values(coopMosaicPlayers).filter(pl => pl.currentTile === i)
+              ? Object.entries(coopMosaicPlayers).filter(([_, pl]) => pl.currentTile === i)
               : [];
             const anyPlayerHere = playersOnTile.length > 0;
             return (
@@ -7288,17 +7340,32 @@ export default function Pattrn() {
                     {i + 1}
                   </span>
                 )}
-                {/* Player indicator badges — show up to 3 dots for players on this tile */}
+                {/* Player indicator badges — show initials/pics for players on this tile */}
                 {anyPlayerHere && (
-                  <div style={{ position: "absolute", top: 2, right: 2, display: "flex", gap: 2 }}>
-                    {playersOnTile.slice(0, 3).map((_, idx) => (
-                      <div key={idx} style={{
-                        width: 5, height: 5, borderRadius: "50%",
-                        backgroundColor: C.coop, animation: "coopPulse 2s ease-in-out infinite",
-                      }} />
-                    ))}
+                  <div style={{ position: "absolute", top: 1, right: 1, display: "flex", gap: 1 }}>
+                    {playersOnTile.slice(0, 3).map(([uid, pl]) => {
+                      const pic = coopMosaicPlayerPics[uid];
+                      const initial = (pl.username || "P")[0].toUpperCase();
+                      return pic ? (
+                        <img key={uid} src={pic} alt="" style={{
+                          width: 12, height: 12, borderRadius: "50%", objectFit: "cover",
+                          border: `1px solid ${C.coop}`, animation: "coopPulse 2s ease-in-out infinite",
+                        }} />
+                      ) : (
+                        <div key={uid} style={{
+                          width: 12, height: 12, borderRadius: "50%",
+                          backgroundColor: C.coop, display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 7, fontWeight: 700, color: "#fff", lineHeight: 1,
+                          animation: "coopPulse 2s ease-in-out infinite",
+                        }}>{initial}</div>
+                      );
+                    })}
                     {playersOnTile.length > 3 && (
-                      <span style={{ fontSize: 6, color: C.coop, fontWeight: 700, lineHeight: "5px" }}>+{playersOnTile.length - 3}</span>
+                      <div style={{
+                        width: 12, height: 12, borderRadius: "50%",
+                        backgroundColor: C.coop + "88", display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 6, fontWeight: 700, color: "#fff", lineHeight: 1,
+                      }}>+{playersOnTile.length - 3}</div>
                     )}
                   </div>
                 )}
@@ -13711,24 +13778,39 @@ export default function Pattrn() {
               cursor: "pointer", transition: "all 0.15s", maxWidth: 160,
             }}
           >
-            {Object.entries(coopMosaicPlayers).slice(0, 4).map(([uid, p]) => (
-              <div key={uid} style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <div style={{
-                  width: 5, height: 5, borderRadius: "50%",
-                  backgroundColor: p.currentTile != null ? C.coop : C.textDim,
-                  animation: p.currentTile != null ? "coopPulse 2s ease-in-out infinite" : "none", flexShrink: 0,
-                }} />
-                <span style={{ color: C.coop, fontWeight: 700, maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                  {p.username || "Player"}
-                </span>
-                {p.currentTile != null && p.currentTile >= 0 && p.currentTile === currentPuzzle
-                  ? <span style={{ color: C.correct, fontSize: 8 }}>here</span>
-                  : p.currentTile != null && p.currentTile >= 0
-                    ? <span style={{ color: C.textDim, fontSize: 8 }}>tile {p.currentTile + 1}</span>
-                    : <span style={{ color: C.textDim, fontSize: 8 }}>overview</span>
-                }
-              </div>
-            ))}
+            {Object.entries(coopMosaicPlayers).slice(0, 4).map(([uid, p]) => {
+              const pic = coopMosaicPlayerPics[uid];
+              const initial = (p.username || "P")[0].toUpperCase();
+              const isOnline = p.currentTile != null;
+              return (
+                <div key={uid} style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  {pic ? (
+                    <img src={pic} alt="" style={{
+                      width: 14, height: 14, borderRadius: "50%", objectFit: "cover", flexShrink: 0,
+                      border: `1.5px solid ${isOnline ? C.coop : C.textDim}`,
+                      animation: isOnline ? "coopPulse 2s ease-in-out infinite" : "none",
+                    }} />
+                  ) : (
+                    <div style={{
+                      width: 14, height: 14, borderRadius: "50%", flexShrink: 0,
+                      backgroundColor: isOnline ? C.coop : C.textDim,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 8, fontWeight: 700, color: "#fff", lineHeight: 1,
+                      animation: isOnline ? "coopPulse 2s ease-in-out infinite" : "none",
+                    }}>{initial}</div>
+                  )}
+                  <span style={{ color: C.coop, fontWeight: 700, maxWidth: 60, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {p.username || "Player"}
+                  </span>
+                  {p.currentTile != null && p.currentTile >= 0 && p.currentTile === currentPuzzle
+                    ? <span style={{ color: C.correct, fontSize: 8 }}>here</span>
+                    : p.currentTile != null && p.currentTile >= 0
+                      ? <span style={{ color: C.textDim, fontSize: 8 }}>tile {p.currentTile + 1}</span>
+                      : <span style={{ color: C.textDim, fontSize: 8 }}>overview</span>
+                  }
+                </div>
+              );
+            })}
             {Object.keys(coopMosaicPlayers).length > 4 && (
               <span style={{ color: C.textDim, fontSize: 8 }}>+{Object.keys(coopMosaicPlayers).length - 4} more</span>
             )}
@@ -13780,7 +13862,7 @@ export default function Pattrn() {
                       isCorrect={isWon && isBlankCell}
                       isWrong={isWrongCell}
                       isRevealed={isRevealed}
-                      isLocked={(isLockedCell && gameState === "playing") || (isCoop && isBlankCell && isCoopPartner && !isWon)}
+                      isLocked={isLockedCell && gameState === "playing"}
                       isPrefilled={!isBlankCell}
                       fallDelay={fallDelay}
                       wrongFallDelay={wrongFallDelay}
@@ -13800,24 +13882,54 @@ export default function Pattrn() {
                       isRemoving={!!removingCells[key]}
                       removingToken={removingCells[key] || null}
                     />
-                    {/* Coop ownership indicator dot */}
-                    {isCoop && isBlankCell && gameState === "playing" && !isWon && (
-                      <div style={{
-                        position: "absolute", top: 2, right: 2,
-                        width: 5, height: 5, borderRadius: "50%",
-                        backgroundColor: isCoopMine ? "#54A0FF" : "#FF9FF3",
-                        opacity: 0.7, pointerEvents: "none",
-                      }} />
-                    )}
-                    {/* Mosaic coop: partner fill indicator */}
-                    {isMosaicCoopPartnerFill && gameState === "playing" && !isWon && (
-                      <div style={{
-                        position: "absolute", top: 2, right: 2,
-                        width: 5, height: 5, borderRadius: "50%",
-                        backgroundColor: C.coop,
-                        opacity: 0.8, pointerEvents: "none",
-                      }} />
-                    )}
+                    {/* Coop ownership indicator — initial letter */}
+                    {isCoop && isBlankCell && gameState === "playing" && !isWon && (() => {
+                      const myInitial = (username || "Y")[0].toUpperCase();
+                      const partnerInitial = (coopPartnerName || "P")[0].toUpperCase();
+                      const isMe = isCoopMine;
+                      const pic = isMe ? profilePicture : coopPartnerPic;
+                      const bgColor = isMe ? "#54A0FF" : "#FF9FF3";
+                      const letter = isMe ? myInitial : partnerInitial;
+                      return pic ? (
+                        <img src={pic} alt="" style={{
+                          position: "absolute", top: 1, right: 1,
+                          width: 12, height: 12, borderRadius: "50%", objectFit: "cover",
+                          border: `1px solid ${bgColor}`, opacity: 0.85, pointerEvents: "none",
+                        }} />
+                      ) : (
+                        <div style={{
+                          position: "absolute", top: 1, right: 1,
+                          width: 12, height: 12, borderRadius: "50%",
+                          backgroundColor: bgColor, opacity: 0.85, pointerEvents: "none",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 7, fontWeight: 700, color: "#fff", lineHeight: 1,
+                        }}>{letter}</div>
+                      );
+                    })()}
+                    {/* Mosaic coop: partner fill indicator — initial letter */}
+                    {isMosaicCoopPartnerFill && gameState === "playing" && !isWon && (() => {
+                      // Find which player filled this cell (use first other player for simplicity)
+                      const firstPlayer = Object.entries(coopMosaicPlayers)[0];
+                      const uid = firstPlayer?.[0];
+                      const pName = firstPlayer?.[1]?.username;
+                      const pic = uid ? coopMosaicPlayerPics[uid] : null;
+                      const initial = (pName || "P")[0].toUpperCase();
+                      return pic ? (
+                        <img src={pic} alt="" style={{
+                          position: "absolute", top: 1, right: 1,
+                          width: 12, height: 12, borderRadius: "50%", objectFit: "cover",
+                          border: `1px solid ${C.coop}`, opacity: 0.85, pointerEvents: "none",
+                        }} />
+                      ) : (
+                        <div style={{
+                          position: "absolute", top: 1, right: 1,
+                          width: 12, height: 12, borderRadius: "50%",
+                          backgroundColor: C.coop, opacity: 0.85, pointerEvents: "none",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 7, fontWeight: 700, color: "#fff", lineHeight: 1,
+                        }}>{initial}</div>
+                      );
+                    })()}
                   </div>
                 );
               })}
