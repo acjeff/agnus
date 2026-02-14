@@ -13157,31 +13157,31 @@ export default function Pattrn() {
                     );
                   })}
                 </div>
-                {coopSelectedFriends.size > 0 && (
-                  <button
-                    onClick={async () => {
-                      const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : "";
-                      await Promise.all([...coopSelectedFriends].map(uid =>
-                        sendNotification(uid, {
-                          type: "coop_invite",
-                          fromUid: firebaseUser.uid,
-                          fromUsername: username || firebaseUser.email,
-                          data: { sessionId: coopSessionId, mode: difficulty, level: currentPuzzle, url: coopUrl },
-                        }).catch(() => {})
-                      ));
-                      setCoopSelectedFriends(new Set());
-                    }}
-                    style={{
-                      marginTop: 8, width: "100%", padding: "8px 12px", borderRadius: 8,
-                      backgroundColor: "#54A0FF", color: "#fff", border: "none",
-                      fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
-                      letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
-                    }}
-                  >
-                    {`Send ${coopSelectedFriends.size} Invite${coopSelectedFriends.size > 1 ? "s" : ""}`}
-                  </button>
-                )}
               </div>
+            )}
+            {coopSelectedFriends.size > 0 && (
+              <button
+                onClick={async () => {
+                  const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : "";
+                  await Promise.all([...coopSelectedFriends].map(uid =>
+                    sendNotification(uid, {
+                      type: "coop_invite",
+                      fromUid: firebaseUser.uid,
+                      fromUsername: username || firebaseUser.email,
+                      data: { sessionId: coopSessionId, mode: difficulty, level: currentPuzzle, url: coopUrl },
+                    }).catch(() => {})
+                  ));
+                  setCoopSelectedFriends(new Set());
+                }}
+                style={{
+                  marginBottom: 14, width: "100%", padding: "8px 12px", borderRadius: 8,
+                  backgroundColor: "#54A0FF", color: "#fff", border: "none",
+                  fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
+                  letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+                }}
+              >
+                {`Send ${coopSelectedFriends.size} Invite${coopSelectedFriends.size > 1 ? "s" : ""}`}
+              </button>
             )}
             {/* Link section */}
             <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
