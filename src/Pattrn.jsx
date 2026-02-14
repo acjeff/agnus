@@ -12825,7 +12825,7 @@ export default function Pattrn() {
               </div>
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
                 {[
-                  { key: null, label: `Current (${(MODES.find(m => m.key === difficulty) || {}).label || difficulty})` },
+                  { key: null, label: `Current (${(DIFFICULTIES.find(m => m.key === difficulty) || {}).label || difficulty})` },
                   { key: "mosaic", label: "Mosaic" },
                 ].map(opt => {
                   const active = coopPickerMode === opt.key;
