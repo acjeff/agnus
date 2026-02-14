@@ -938,12 +938,41 @@ export async function updateCoopFill(sessionId, cellKey, token) {
   }
 }
 
-// Pass a cell to another player (cell override)
+// Pass a cell to another player (cell override) — direct transfer, used when pass is accepted
 export async function passCoopCell(sessionId, cellKey, toUid) {
   if (!db) return;
   await set(ref(db, `coopSessions/${sessionId}/cellOverrides/${cellKey}`), toUid);
   // Clear the fill for this cell since it's changing owner
   await remove(ref(db, `coopSessions/${sessionId}/fills/${cellKey}`)).catch(() => {});
+}
+
+// Send a pass request to another player (they must accept)
+export async function sendCoopPassRequest(sessionId, cellKey, fromUid, toUid) {
+  if (!db) return;
+  await set(ref(db, `coopSessions/${sessionId}/passRequests/${cellKey}`), {
+    fromUid, toUid, status: "pending", timestamp: Date.now(),
+  });
+}
+
+// Accept or reject a pass request
+export async function respondCoopPassRequest(sessionId, cellKey, accepted) {
+  if (!db) return;
+  if (accepted) {
+    // Read the request to get toUid, then execute the pass and clean up
+    const snap = await get(ref(db, `coopSessions/${sessionId}/passRequests/${cellKey}`));
+    const req = snap.val();
+    if (!req) return;
+    await set(ref(db, `coopSessions/${sessionId}/cellOverrides/${cellKey}`), req.toUid);
+    await remove(ref(db, `coopSessions/${sessionId}/fills/${cellKey}`)).catch(() => {});
+  }
+  // Remove the request regardless
+  await remove(ref(db, `coopSessions/${sessionId}/passRequests/${cellKey}`));
+}
+
+// Cancel a pending pass request
+export async function cancelCoopPassRequest(sessionId, cellKey) {
+  if (!db) return;
+  await remove(ref(db, `coopSessions/${sessionId}/passRequests/${cellKey}`));
 }
 
 // Lock in a player's blanks (supports multi-player via uid)

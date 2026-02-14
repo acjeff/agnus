@@ -26,6 +26,9 @@ import {
   subscribeToCoopSession,
   updateCoopFill,
   passCoopCell,
+  sendCoopPassRequest,
+  respondCoopPassRequest,
+  cancelCoopPassRequest,
   lockInCoopPlayer,
   unlockCoopPlayer,
   updateCoopAttempts,
@@ -1885,7 +1888,7 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
   );
 }
 
-function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remaining, colorMap, shapesArr, themeId }) {
+function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remaining, colorMap, shapesArr, themeId, passOption }) {
   const isEasy = mode === "easy" || mode === "blind";
   const shapes = shapesArr || SHAPES;
   const isEnigma = themeId === "enigma";
@@ -2018,6 +2021,29 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
             </div>
           );
         })}
+        {/* Pass tile — always shown in coop mode */}
+        {passOption && (
+          <div
+            onClick={() => { if (!dragRef.current.moved) passOption.onPass(); }}
+            style={{
+              width: cellSize, height: cellSize,
+              borderRadius: 12,
+              backgroundColor: passOption.active ? "#54A0FF" : C.surfaceLight,
+              border: passOption.active ? "3px solid #54A0FF" : `3px solid ${C.border}`,
+              cursor: "pointer",
+              transition: "transform 0.2s, box-shadow 0.2s, border-color 0.2s",
+              transform: passOption.active ? "scale(1.15)" : "scale(1)",
+              boxShadow: passOption.active ? "0 0 20px #54A0FF66" : "none",
+              position: "relative", display: "flex", alignItems: "center", justifyContent: "center",
+              flexShrink: 0,
+            }}
+          >
+            <svg width={cellSize * 0.45} height={cellSize * 0.45} viewBox="0 0 24 24" fill="none"
+              stroke={passOption.active ? "#fff" : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M11 13l-7 7"/><path d="M3 16v5h5"/>
+            </svg>
+          </div>
+        )}
       </div>
       {canScrollRight && <button onClick={() => doScroll(1)} style={arrowStyle} aria-label="Scroll right">{"\u203A"}</button>}
     </div>
@@ -2777,6 +2803,10 @@ export default function Pattrn() {
   const [coopCellOverrides, setCoopCellOverrides] = useState({}); // { cellKey: uid } — manual cell reassignments from Firebase
   const [coopPassingCell, setCoopPassingCell] = useState(null); // cellKey being passed to another player
   const [coopPlayersExpanded, setCoopPlayersExpanded] = useState(false); // expanded player list in top bar
+  const [coopPassMode, setCoopPassMode] = useState(null); // { targetUid, targetName, targetColor } — in pass-cell-selection mode
+  const [coopIncomingPass, setCoopIncomingPass] = useState(null); // { fromUid, fromName, fromColor, cellKey } — incoming pass request
+  const [coopPendingPassCell, setCoopPendingPassCell] = useState(null); // cellKey of outgoing pending pass
+  const [coopPassPlayerPicker, setCoopPassPlayerPicker] = useState(false); // show player picker for pass
   const COOP_NEON_COLORS = ["#FF6B6B", "#00E676", "#FF9100", "#E040FB", "#FFEA00", "#00E5FF", "#FF4081", "#76FF03"];
   const COOP_MY_COLOR = "#54A0FF";
 
@@ -4792,6 +4822,20 @@ export default function Pattrn() {
   const applyCellAction = useCallback((r, c) => {
     const key = `${r}-${c}`;
     if (!puzzle.blanks.has(key) || lockedCells.has(key)) return;
+    // Coop pass mode: tapping my cell sends a pass request
+    if (coopPassMode && isCoop && coopMyBlanks?.has(key) && !coopMyLockedIn && coopSessionId && firebaseUser) {
+      sendCoopPassRequest(coopSessionId, key, firebaseUser.uid, coopPassMode.targetUid).catch(() => {});
+      setCoopPendingPassCell(key);
+      setCoopPassMode(null);
+      setCoopPassPlayerPicker(false);
+      setSelectedCell(null);
+      return;
+    }
+    // Coop incoming pass: tapping the incoming pass cell selects it (to show accept/reject)
+    if (isCoop && coopIncomingPass && coopIncomingPass.cellKey === key) {
+      setSelectedCell(key);
+      return;
+    }
     // Coop: only allow filling my blanks, and not if I'm locked in
     if (isCoop && coopMyBlanks && !coopMyBlanks.has(key)) return;
     if (isCoop && coopMyLockedIn) return;
@@ -4812,7 +4856,7 @@ export default function Pattrn() {
     } else {
       setSelectedCell(key);
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass]);
 
   const handleCellPointerUp = useCallback((r, c) => {
     if (gameState !== "playing") return;
@@ -5028,6 +5072,10 @@ export default function Pattrn() {
     setCoopCellOverrides({});
     setCoopPassingCell(null);
     setCoopPlayersExpanded(false);
+    setCoopPassMode(null);
+    setCoopIncomingPass(null);
+    setCoopPendingPassCell(null);
+    setCoopPassPlayerPicker(false);
     coopPlayerUidsRef.current = "";
     setShowLeaveConfirm(false);
     coopWriteThrottleRef.current = {};
@@ -5175,6 +5223,29 @@ export default function Pattrn() {
       // Sync cell overrides from Firebase
       setCoopCellOverrides(data.cellOverrides || {});
 
+      // Sync pass requests from Firebase
+      const passRequests = data.passRequests || {};
+      // Check for incoming pass request targeted at me
+      const incomingEntry = Object.entries(passRequests).find(([, req]) => req.toUid === myUid && req.status === "pending");
+      if (incomingEntry) {
+        const [cellKey, req] = incomingEntry;
+        const fromPlayer = players[req.fromUid];
+        const fromColor = colorMap[req.fromUid] || "#54A0FF";
+        setCoopIncomingPass({
+          fromUid: req.fromUid,
+          fromName: fromPlayer?.username || "Player",
+          fromColor,
+          cellKey,
+        });
+      } else {
+        setCoopIncomingPass(null);
+      }
+      // Check if my outgoing pass was accepted/rejected (no longer pending)
+      const myOutgoing = Object.entries(passRequests).find(([, req]) => req.fromUid === myUid && req.status === "pending");
+      if (!myOutgoing) {
+        setCoopPendingPassCell(null);
+      }
+
       // Sync invited UIDs
       const invited = data.invitedUids || {};
       setCoopInvitedUids(new Set(Object.keys(invited)));
@@ -5205,6 +5276,10 @@ export default function Pattrn() {
           setCoopPartnerCorrect(false);
           setCoopPartnerFills({});
           coopWriteThrottleRef.current = {};
+          setCoopPassMode(null);
+          setCoopIncomingPass(null);
+          setCoopPendingPassCell(null);
+          setCoopPassPlayerPicker(false);
         }
       }
 
@@ -5852,6 +5927,8 @@ export default function Pattrn() {
 
   const handleTokenSelect = useCallback((token) => {
     setSelectedToken(token);
+    // Cancel pass mode when a regular token is selected
+    if (coopPassMode) { setCoopPassMode(null); setCoopPassPlayerPicker(false); }
     if (selectedCell && puzzle?.blanks.has(selectedCell) && !lockedCells.has(selectedCell)) {
       // Coop: only allow filling my blanks
       if (isCoop && coopMyBlanks && !coopMyBlanks.has(selectedCell)) return;
@@ -13926,7 +14003,7 @@ export default function Pattrn() {
           const isSinglePartner = otherEntries.length === 1;
           const isMultiPartner = otherEntries.length > 1;
           return (
-            <div style={{ marginTop: 6, width: "100%", maxWidth: gridSize >= 7 ? 380 : 360 }}>
+            <div style={{ marginTop: 6, width: "100%", maxWidth: gridSize >= 7 ? 380 : 360, position: "relative" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
                 {/* You indicator */}
                 <div style={{
@@ -14013,8 +14090,10 @@ export default function Pattrn() {
               {/* Expanded player list */}
               {coopPlayersExpanded && isMultiPartner && (
                 <div style={{
-                  marginTop: 6, padding: "8px 12px",
+                  position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)",
+                  marginTop: 4, padding: "8px 12px", zIndex: 30, minWidth: 140,
                   backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
+                  boxShadow: "0 4px 16px rgba(0,0,0,0.4)",
                   display: "flex", flexDirection: "column", gap: 4,
                   animation: "fadeUp 0.2s ease both",
                 }}>
@@ -14229,6 +14308,25 @@ export default function Pattrn() {
                         }}>{letter}</div>
                       );
                     })()}
+                    {/* Incoming pass request glow indicator */}
+                    {coopIncomingPass && coopIncomingPass.cellKey === key && gameState === "playing" && (
+                      <div style={{
+                        position: "absolute", inset: -2, borderRadius: 14, pointerEvents: "none",
+                        border: `2px solid ${coopIncomingPass.fromColor}`,
+                        boxShadow: `0 0 12px ${coopIncomingPass.fromColor}66, inset 0 0 8px ${coopIncomingPass.fromColor}22`,
+                        animation: "pulse 1.5s infinite",
+                        zIndex: 2,
+                      }} />
+                    )}
+                    {/* Pending outgoing pass indicator */}
+                    {coopPendingPassCell === key && gameState === "playing" && (
+                      <div style={{
+                        position: "absolute", inset: -2, borderRadius: 14, pointerEvents: "none",
+                        border: `2px dashed ${COOP_MY_COLOR}88`,
+                        animation: "pulse 2s infinite",
+                        zIndex: 2,
+                      }} />
+                    )}
                     {/* Mosaic coop: partner fill indicator — initial letter */}
                     {isMosaicCoopPartnerFill && gameState === "playing" && !isWon && (() => {
                       // Find which player filled this cell (use first other player for simplicity)
@@ -14267,7 +14365,111 @@ export default function Pattrn() {
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
         {/* Token picker row */}
         {gameState === "playing" && (
-          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId} />
+          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId}
+            passOption={isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0 ? {
+              active: !!coopPassMode || coopPassPlayerPicker,
+              onPass: () => {
+                if (coopPassMode) {
+                  // Cancel pass mode
+                  setCoopPassMode(null);
+                  setSelectedToken(null);
+                  return;
+                }
+                // Deselect any token, open player picker
+                setSelectedToken(null);
+                setSelectedCell(null);
+                const entries = Object.entries(coopPlayers);
+                if (entries.length === 1) {
+                  // Only one partner — skip picker, go straight to pass mode
+                  const [uid, p] = entries[0];
+                  setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
+                } else {
+                  setCoopPassPlayerPicker(prev => !prev);
+                }
+              },
+            } : null}
+          />
+        )}
+        {/* Pass player picker dropdown (multi-partner) */}
+        {coopPassPlayerPicker && !coopPassMode && (
+          <div style={{
+            padding: "8px 12px", backgroundColor: C.surface,
+            border: `1px solid ${C.border}`, borderRadius: 12,
+            display: "flex", gap: 6, alignItems: "center", justifyContent: "center",
+            animation: "fadeUp 0.2s ease both",
+          }}>
+            <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, marginRight: 4 }}>
+              Pass to:
+            </span>
+            {Object.entries(coopPlayers).map(([uid, p]) => {
+              const playerColor = coopPlayerColorMap[uid] || "#FF9FF3";
+              return (
+                <button key={uid} onClick={() => {
+                  setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: playerColor });
+                  setCoopPassPlayerPicker(false);
+                }} style={{
+                  display: "flex", alignItems: "center", gap: 6, padding: "6px 12px",
+                  borderRadius: 8, border: `1px solid ${playerColor}44`, background: "none",
+                  cursor: "pointer", color: C.text, fontSize: 12, fontWeight: 600,
+                  fontFamily: "'Space Mono', monospace",
+                }}
+                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${playerColor}22`; }}
+                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                >
+                  <span style={{
+                    width: 14, height: 14, borderRadius: "50%", backgroundColor: playerColor,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 8, fontWeight: 700, color: "#fff", flexShrink: 0,
+                  }}>{(p.username || "P")[0].toUpperCase()}</span>
+                  {p.username || "Player"}
+                </button>
+              );
+            })}
+            <button onClick={() => setCoopPassPlayerPicker(false)} style={{
+              background: "none", border: "none", color: C.textDim, cursor: "pointer",
+              fontSize: 16, padding: "2px 6px", lineHeight: 1,
+            }}>{"\u2715"}</button>
+          </div>
+        )}
+        {/* Pass mode banner — tap a cell to pass */}
+        {coopPassMode && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 8, padding: "6px 16px",
+            backgroundColor: `${coopPassMode.targetColor}18`, border: `1px solid ${coopPassMode.targetColor}44`,
+            borderRadius: 10, animation: "fadeUp 0.2s ease both",
+          }}>
+            <span style={{
+              width: 10, height: 10, borderRadius: "50%", backgroundColor: coopPassMode.targetColor,
+              display: "inline-block", flexShrink: 0,
+            }} />
+            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text }}>
+              Tap your cell to pass to {coopPassMode.targetName}
+            </span>
+            <button onClick={() => { setCoopPassMode(null); setCoopPassPlayerPicker(false); }} style={{
+              background: "none", border: "none", color: C.textDim, cursor: "pointer",
+              fontSize: 14, padding: "2px 6px", lineHeight: 1, fontFamily: "'Space Mono', monospace",
+            }}>Cancel</button>
+          </div>
+        )}
+        {/* Pending pass indicator */}
+        {coopPendingPassCell && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6, padding: "6px 16px",
+            backgroundColor: `${COOP_MY_COLOR}18`, border: `1px solid ${COOP_MY_COLOR}44`,
+            borderRadius: 10, animation: "fadeUp 0.2s ease both",
+          }}>
+            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.textDim }}>
+              Waiting for response...
+            </span>
+            <button onClick={() => {
+              cancelCoopPassRequest(coopSessionId, coopPendingPassCell).catch(() => {});
+              setCoopPendingPassCell(null);
+            }} style={{
+              background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
+              color: C.textDim, cursor: "pointer", fontSize: 10, padding: "3px 8px",
+              fontFamily: "'Space Mono', monospace", fontWeight: 600,
+            }}>Cancel</button>
+          </div>
         )}
         {gameState === "playing" && (
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -14317,66 +14519,36 @@ export default function Pattrn() {
                 Reset
               </button>
             )}
-            {/* Pass cell to friend button */}
-            {isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0 && selectedCell && coopMyBlanks?.has(selectedCell) && (
-              <div style={{ position: "relative" }}>
-                <button
-                  onClick={() => setCoopPassingCell(coopPassingCell ? null : selectedCell)}
-                  style={{
-                    background: "none", border: `1px solid ${C.border}`, borderRadius: 10,
-                    padding: "10px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
-                    color: C.textDim, fontSize: 12, fontWeight: 600, fontFamily: "'Space Mono', monospace",
-                    textTransform: "uppercase", letterSpacing: 1,
-                  }}
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M11 13l-7 7"/><path d="M3 16v5h5"/>
-                  </svg>
-                  Pass
-                </button>
-                {coopPassingCell && (
-                  <div style={{
-                    position: "absolute", bottom: "100%", right: 0, marginBottom: 8,
-                    backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: 12,
-                    padding: 10, minWidth: 160, zIndex: 30,
-                    boxShadow: "0 6px 24px rgba(0,0,0,0.4)",
-                  }}>
-                    <div style={{ fontSize: 10, color: C.textDim, fontWeight: 600, marginBottom: 8, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
-                      Pass to a friend
-                    </div>
-                    {Object.entries(coopPlayers).map(([uid, p]) => {
-                      const playerColor = coopPlayerColorMap[uid] || "#FF9FF3";
-                      return (
-                        <button key={uid} onClick={() => {
-                          const cellToPass = coopPassingCell;
-                          passCoopCell(coopSessionId, cellToPass, uid).catch(() => {});
-                          setFills(prev => { const next = { ...prev }; delete next[cellToPass]; return next; });
-                          setCoopPassingCell(null);
-                          setSelectedCell(null);
-                        }} style={{
-                          display: "flex", alignItems: "center", gap: 8, width: "100%",
-                          padding: "8px 10px", borderRadius: 8, border: "none",
-                          backgroundColor: "transparent", cursor: "pointer",
-                          color: C.text, fontSize: 13, fontWeight: 600,
-                          fontFamily: "'Space Mono', monospace",
-                        }}
-                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${playerColor}22`; }}
-                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                        >
-                          <div style={{
-                            width: 18, height: 18, borderRadius: "50%",
-                            backgroundColor: playerColor,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0,
-                          }}>{(p.username || "P")[0].toUpperCase()}</div>
-                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {p.username || "Player"}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+            {/* Accept/reject incoming pass request */}
+            {isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                animation: "fadeUp 0.2s ease both",
+              }}>
+                <span style={{
+                  fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.textDim,
+                  fontWeight: 600, letterSpacing: 0.5,
+                }}>
+                  <span style={{ color: coopIncomingPass.fromColor, fontWeight: 700 }}>{coopIncomingPass.fromName}</span> wants to pass this cell
+                </span>
+                <button onClick={() => {
+                  respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, true).catch(() => {});
+                  setSelectedCell(null);
+                }} style={{
+                  backgroundColor: C.correct, color: "#fff", border: "none",
+                  padding: "8px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase",
+                }}>Accept</button>
+                <button onClick={() => {
+                  respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, false).catch(() => {});
+                  setSelectedCell(null);
+                }} style={{
+                  backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                  padding: "8px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                  textTransform: "uppercase",
+                }}>Reject</button>
               </div>
             )}
           </div>
