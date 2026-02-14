@@ -14076,7 +14076,7 @@ export default function Pattrn() {
       {/* Info row: flex child below header */}
       <div ref={infoRowRef} style={{
         flexShrink: 0, zIndex: 10,
-        backgroundColor: C.bg, display: "flex", justifyContent: "center",
+        backgroundColor: C.bg, display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: 4, paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: gridTotalWidth }}>
