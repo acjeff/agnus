@@ -4381,7 +4381,7 @@ export default function Pattrn() {
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
               <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
-            {activeCoopSessions.length > 0 && (
+            {activeCoopSessions.filter(s => s.status !== "complete").length > 0 && (
               <div style={{
                 position: "absolute", top: -4, right: -8,
                 minWidth: 16, height: 16, borderRadius: 8,
@@ -4389,7 +4389,7 @@ export default function Pattrn() {
                 padding: "0 4px", boxSizing: "border-box",
               }}>
                 <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "'Space Mono', monospace", lineHeight: 1 }}>
-                  {activeCoopSessions.length}
+                  {activeCoopSessions.filter(s => s.status !== "complete").length}
                 </span>
               </div>
             )}
