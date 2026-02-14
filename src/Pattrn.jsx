@@ -6541,6 +6541,7 @@ export default function Pattrn() {
   const availH = parentH - 2 * edgePad - (gridSize - 1) * gridGap - 2 * gridPad;
   const dynamicCell = Math.min(Math.floor(availW / gridSize), Math.floor(availH / gridSize));
   const cellSize = Math.max(28, Math.min(dynamicCell, 80));
+  const gridTotalWidth = cellSize * gridSize + (gridSize - 1) * gridGap + 2 * gridPad;
   const iconSize = Math.max(14, Math.round(cellSize * 0.5));
   const pickerSize = 48;
 
@@ -13276,7 +13277,7 @@ export default function Pattrn() {
         display: "flex", justifyContent: "center", boxSizing: "border-box",
         touchAction: "manipulation",
       }}>
-        <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridSize >= 7 ? 380 : 360, animation: "fadeUp 0.3s ease" }}>
+        <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridTotalWidth, animation: "fadeUp 0.3s ease" }}>
         <button onClick={() => {
           if (isCoop) { setShowLeaveConfirm(true); return; }
           if (difficulty === "cascade") {
@@ -14078,7 +14079,7 @@ export default function Pattrn() {
         backgroundColor: C.bg, display: "flex", justifyContent: "center",
         paddingTop: 4, paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
       }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: gridSize >= 7 ? 380 : 360 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: gridTotalWidth }}>
           <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 18, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, letterSpacing: 2 }}>
             {formatTime(elapsedTime)}
           </div>
@@ -14100,7 +14101,7 @@ export default function Pattrn() {
           const isSinglePartner = otherEntries.length === 1;
           const isMultiPartner = otherEntries.length > 1;
           return (
-            <div style={{ marginTop: 6, width: "100%", maxWidth: gridSize >= 7 ? 380 : 360, position: "relative" }}>
+            <div style={{ marginTop: 6, width: "100%", maxWidth: gridTotalWidth, position: "relative" }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
                 {/* You indicator */}
                 <div style={{
