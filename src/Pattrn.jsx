@@ -25,6 +25,7 @@ import {
   joinCoopSession,
   subscribeToCoopSession,
   updateCoopFill,
+  passCoopCell,
   lockInCoopPlayer,
   unlockCoopPlayer,
   updateCoopAttempts,
@@ -1801,7 +1802,7 @@ function computeAchievements(progress, times, savedIds) {
 
 // --- Components ---
 
-function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0, colorMap, shapesArr, isJustPlaced, isRemoving, removingToken, themeId }) {
+function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isRevealed, isLocked, onClick, onPointerDown, onPointerUp, onPointerEnter, cellSize, iconSize, mode, isPrefilled, fallDelay = 0, wrongFallDelay = 0, emptyCellDelay, isWon, winCelebrateDelay = 0, colorMap, shapesArr, isJustPlaced, isRemoving, removingToken, themeId, coopOwnerColor, coopBorderColor }) {
   const effectiveToken = isRemoving ? removingToken : token;
   const showContent = isRemoving || isRevealed || isLocked || !isBlank || isFilled;
   const parsed = showContent && effectiveToken ? parseToken(effectiveToken) : null;
@@ -1853,12 +1854,14 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
       style={{
         width: cellSize, height: cellSize,
         borderRadius: isEnigma ? enigmaBorderRadius : (cellSize > 44 ? 10 : 8),
-        backgroundColor: showContent && displayColor ? displayColor : (isEnigma ? "rgba(12,12,8,0.7)" : C.surfaceLight),
+        backgroundColor: showContent && displayColor ? displayColor
+          : coopOwnerColor && isBlank && !isFilled && !isRevealed && !isLocked ? coopOwnerColor
+          : (isEnigma ? "rgba(12,12,8,0.7)" : C.surfaceLight),
         border: isEnigma ? enigmaActiveBorder
           : isLocked ? `2.5px solid ${C.correct}`
           : isSelected ? `2.5px solid ${C.accent}`
           : isWrong ? `2.5px solid ${C.incorrect}`
-          : isBlank && !isFilled && !isRevealed && !isRemoving ? `2.5px dashed ${C.border}`
+          : isBlank && !isFilled && !isRevealed && !isRemoving ? `2.5px dashed ${coopBorderColor || C.border}`
           : "2.5px solid transparent",
         cursor: isBlank && !isRevealed && !isLocked ? "pointer" : "default",
         transition: "transform 0.15s cubic-bezier(0.4,0,0.2,1), box-shadow 0.15s cubic-bezier(0.4,0,0.2,1)",
@@ -2769,6 +2772,12 @@ export default function Pattrn() {
   const [coopPlayers, setCoopPlayers] = useState({}); // { uid: { username, lockedIn, correct, ... } } — all OTHER players in normal coop
   const [coopInvitedUids, setCoopInvitedUids] = useState(new Set()); // UIDs invited to normal coop session
   const coopPlayerUidsRef = useRef(""); // serialized sorted player UIDs for detecting changes
+  const [coopPlayerColorMap, setCoopPlayerColorMap] = useState({}); // { uid: neonColor } — unique color per OTHER player
+  const [coopCellOwnerMap, setCoopCellOwnerMap] = useState({}); // { cellKey: uid } — which player owns each blank cell
+  const [coopCellOverrides, setCoopCellOverrides] = useState({}); // { cellKey: uid } — manual cell reassignments from Firebase
+  const [coopPassingCell, setCoopPassingCell] = useState(null); // cellKey being passed to another player
+  const COOP_NEON_COLORS = ["#FF6B6B", "#00E676", "#FF9100", "#E040FB", "#FFEA00", "#00E5FF", "#FF4081", "#76FF03"];
+  const COOP_MY_COLOR = "#54A0FF";
 
   // --- Mosaic Creator state ---
   const CREATOR_GRID_SIZE = 25; // 25x25 grid → 25 tiles of 5x5, matching mosaic mode
@@ -5013,6 +5022,10 @@ export default function Pattrn() {
     setShowCoopInvite(false);
     setCoopPlayers({});
     setCoopInvitedUids(new Set());
+    setCoopPlayerColorMap({});
+    setCoopCellOwnerMap({});
+    setCoopCellOverrides({});
+    setCoopPassingCell(null);
     coopPlayerUidsRef.current = "";
     setShowLeaveConfirm(false);
     coopWriteThrottleRef.current = {};
@@ -5148,6 +5161,17 @@ export default function Pattrn() {
       const otherPlayerCount = Object.keys(otherPlayers).length;
       setCoopPartnerConnected(otherPlayerCount > 0);
       setCoopStatus(data.status);
+
+      // Build per-player color map (deterministic: sorted other UIDs → neon colors)
+      const sortedOtherUids = Object.keys(otherPlayers).sort();
+      const colorMap = {};
+      sortedOtherUids.forEach((uid, i) => {
+        colorMap[uid] = COOP_NEON_COLORS[i % COOP_NEON_COLORS.length];
+      });
+      setCoopPlayerColorMap(colorMap);
+
+      // Sync cell overrides from Firebase
+      setCoopCellOverrides(data.cellOverrides || {});
 
       // Sync invited UIDs
       const invited = data.invitedUids || {};
@@ -5290,6 +5314,7 @@ export default function Pattrn() {
   }, [coopRole, coopStatus, firebaseUser, coopSessionId]);
 
   // Once player has joined/rejoined and puzzle is loaded, split blanks among N players
+  // Cell overrides (from "pass cell" feature) are applied on top of the round-robin split
   useEffect(() => {
     if (!coopRole || !puzzle || !firebaseUser) return;
     // Non-host waits until status is "playing" before splitting
@@ -5299,11 +5324,32 @@ export default function Pattrn() {
     const playerMap = { [myUid]: true, ...coopPlayers };
     const sortedUids = Object.keys(playerMap).sort();
     const uidsKey = sortedUids.join(",");
-    // Only re-split if player list changed or blanks haven't been set yet
-    if (coopMyBlanks && uidsKey === coopPlayerUidsRef.current) return;
-    coopPlayerUidsRef.current = uidsKey;
-    // Split blanks evenly among all players
+    const overridesKey = JSON.stringify(coopCellOverrides);
+    // Only re-split if player list or overrides changed, or blanks haven't been set yet
+    const fullKey = `${uidsKey}|${overridesKey}`;
+    if (coopMyBlanks && fullKey === coopPlayerUidsRef.current) return;
+    coopPlayerUidsRef.current = fullKey;
+    // Split blanks evenly among all players (base round-robin)
     const blanksMap = splitBlanksForNPlayers(puzzle.blanks, sortedUids);
+    // Apply cell overrides: move cells to their overridden owner
+    for (const [cellKey, toUid] of Object.entries(coopCellOverrides)) {
+      if (!puzzle.blanks.has(cellKey)) continue;
+      if (!blanksMap[toUid]) continue; // target player must still be in the session
+      // Remove from current owner
+      for (const uid of sortedUids) {
+        if (blanksMap[uid]?.has(cellKey)) {
+          blanksMap[uid].delete(cellKey);
+          break;
+        }
+      }
+      blanksMap[toUid].add(cellKey);
+    }
+    // Build cell owner map (cellKey → uid) for per-cell color lookup
+    const ownerMap = {};
+    for (const [uid, blanks] of Object.entries(blanksMap)) {
+      for (const k of blanks) ownerMap[k] = uid;
+    }
+    setCoopCellOwnerMap(ownerMap);
     setCoopMyBlanks(blanksMap[myUid] || new Set());
     const otherBlanks = new Set();
     for (const [uid, blanks] of Object.entries(blanksMap)) {
@@ -5313,7 +5359,7 @@ export default function Pattrn() {
     }
     setCoopPartnerBlanks(otherBlanks);
     // Timer is synced from host's hostTimerStart via the subscription handler
-  }, [coopRole, coopStatus, puzzle, coopMyBlanks, coopPlayers, firebaseUser, splitBlanksForNPlayers]);
+  }, [coopRole, coopStatus, puzzle, coopMyBlanks, coopPlayers, firebaseUser, splitBlanksForNPlayers, coopCellOverrides]);
 
   // Sync my fills to Firebase when they change in coop mode
   useEffect(() => {
@@ -14027,6 +14073,15 @@ export default function Pattrn() {
                 // Coop ownership visual hints
                 const isCoopMine = isCoop && coopMyBlanks?.has(key);
                 const isCoopPartner = isCoop && coopPartnerBlanks?.has(key);
+                // Per-player color: blue for self, unique neon for each other player
+                const cellOwnerUid = isCoop && isBlankCell ? coopCellOwnerMap[key] : null;
+                const cellOwnerColor = cellOwnerUid
+                  ? (cellOwnerUid === firebaseUser?.uid ? COOP_MY_COLOR : (coopPlayerColorMap[cellOwnerUid] || "#FF9FF3"))
+                  : null;
+                // Subtle background tint for unfilled blank cells (12% opacity)
+                const coopBgTint = isCoop && isBlankCell && cellOwnerColor
+                  ? (cellOwnerColor + "1F")  // ~12% opacity hex suffix
+                  : undefined;
                 // Mosaic coop: show if cell was filled by partner (not by me)
                 const isMosaicCoopPartnerFill = isCoopMosaic && isBlankCell && !myFill && !!mosaicPartnerFill;
                 return (
@@ -14056,22 +14111,19 @@ export default function Pattrn() {
                       isJustPlaced={justPlacedCells.has(key)}
                       isRemoving={!!removingCells[key]}
                       removingToken={removingCells[key] || null}
+                      coopOwnerColor={coopBgTint}
+                      coopBorderColor={isCoop && isBlankCell && cellOwnerColor ? (cellOwnerColor + "66") : undefined}
                     />
-                    {/* Coop ownership indicator — initial letter */}
+                    {/* Coop ownership indicator — per-player colored badge */}
                     {isCoop && isBlankCell && gameState === "playing" && !isWon && (() => {
-                      const myInitial = (username || "Y")[0].toUpperCase();
-                      const partnerInitial = (coopPartnerName || "P")[0].toUpperCase();
                       const isMe = isCoopMine;
-                      const pic = isMe ? profilePicture : coopPartnerPic;
-                      const bgColor = isMe ? "#54A0FF" : "#FF9FF3";
-                      const letter = isMe ? myInitial : partnerInitial;
-                      return pic ? (
-                        <img src={pic} alt="" style={{
-                          position: "absolute", top: 1, right: 1,
-                          width: 12, height: 12, borderRadius: "50%", objectFit: "cover",
-                          border: `1px solid ${bgColor}`, opacity: 0.85, pointerEvents: "none",
-                        }} />
-                      ) : (
+                      const ownerUid = coopCellOwnerMap[key];
+                      const ownerPlayer = ownerUid && ownerUid !== firebaseUser?.uid ? coopPlayers[ownerUid] : null;
+                      const letter = isMe
+                        ? (username || "Y")[0].toUpperCase()
+                        : (ownerPlayer?.username || "P")[0].toUpperCase();
+                      const bgColor = cellOwnerColor || "#FF9FF3";
+                      return (
                         <div style={{
                           position: "absolute", top: 1, right: 1,
                           width: 12, height: 12, borderRadius: "50%",
@@ -14114,6 +14166,71 @@ export default function Pattrn() {
       </div>
       </div>
       </div>
+
+      {/* Pass cell to friend — icon + popup */}
+      {isCoop && gameState === "playing" && !coopMyLockedIn && Object.keys(coopPlayers).length > 0 && selectedCell && coopMyBlanks?.has(selectedCell) && (
+        <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 12px 0" }}>
+          <div style={{ position: "relative" }}>
+            <button
+              onClick={() => setCoopPassingCell(coopPassingCell ? null : selectedCell)}
+              style={{
+                background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+                padding: "4px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                color: C.textDim, fontSize: 11, fontWeight: 600, fontFamily: "'Space Mono', monospace",
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M7 11l5-5 5 5"/><path d="M12 6v12"/><path d="M17 17l-5 5-5-5"/>
+              </svg>
+              Pass
+            </button>
+            {coopPassingCell && (
+              <div style={{
+                position: "absolute", bottom: "100%", right: 0, marginBottom: 6,
+                backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
+                padding: 8, minWidth: 140, zIndex: 20,
+                boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+              }}>
+                <div style={{ fontSize: 10, color: C.textDim, fontWeight: 600, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
+                  Pass to a friend
+                </div>
+                {Object.entries(coopPlayers).map(([uid, p]) => {
+                  const playerColor = coopPlayerColorMap[uid] || "#FF9FF3";
+                  return (
+                    <button key={uid} onClick={() => {
+                      const cellToPass = coopPassingCell;
+                      passCoopCell(coopSessionId, cellToPass, uid).catch(() => {});
+                      // Clear local fill for the passed cell
+                      setFills(prev => { const next = { ...prev }; delete next[cellToPass]; return next; });
+                      setCoopPassingCell(null);
+                      setSelectedCell(null);
+                    }} style={{
+                      display: "flex", alignItems: "center", gap: 6, width: "100%",
+                      padding: "6px 8px", borderRadius: 6, border: "none",
+                      backgroundColor: "transparent", cursor: "pointer",
+                      color: C.text, fontSize: 12, fontWeight: 600,
+                      fontFamily: "'Space Mono', monospace",
+                    }}
+                      onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${playerColor}22`; }}
+                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                    >
+                      <div style={{
+                        width: 16, height: 16, borderRadius: "50%",
+                        backgroundColor: playerColor,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 9, fontWeight: 700, color: "#fff", flexShrink: 0,
+                      }}>{(p.username || "P")[0].toUpperCase()}</div>
+                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {p.username || "Player"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Fixed bottom bar: token picker + actions */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
