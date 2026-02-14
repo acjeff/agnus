@@ -14167,71 +14167,6 @@ export default function Pattrn() {
       </div>
       </div>
 
-      {/* Pass cell to friend — icon + popup */}
-      {isCoop && gameState === "playing" && !coopMyLockedIn && Object.keys(coopPlayers).length > 0 && selectedCell && coopMyBlanks?.has(selectedCell) && (
-        <div style={{ display: "flex", justifyContent: "flex-end", padding: "4px 12px 0" }}>
-          <div style={{ position: "relative" }}>
-            <button
-              onClick={() => setCoopPassingCell(coopPassingCell ? null : selectedCell)}
-              style={{
-                background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
-                padding: "4px 10px", cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
-                color: C.textDim, fontSize: 11, fontWeight: 600, fontFamily: "'Space Mono', monospace",
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M7 11l5-5 5 5"/><path d="M12 6v12"/><path d="M17 17l-5 5-5-5"/>
-              </svg>
-              Pass
-            </button>
-            {coopPassingCell && (
-              <div style={{
-                position: "absolute", bottom: "100%", right: 0, marginBottom: 6,
-                backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
-                padding: 8, minWidth: 140, zIndex: 20,
-                boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
-              }}>
-                <div style={{ fontSize: 10, color: C.textDim, fontWeight: 600, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
-                  Pass to a friend
-                </div>
-                {Object.entries(coopPlayers).map(([uid, p]) => {
-                  const playerColor = coopPlayerColorMap[uid] || "#FF9FF3";
-                  return (
-                    <button key={uid} onClick={() => {
-                      const cellToPass = coopPassingCell;
-                      passCoopCell(coopSessionId, cellToPass, uid).catch(() => {});
-                      // Clear local fill for the passed cell
-                      setFills(prev => { const next = { ...prev }; delete next[cellToPass]; return next; });
-                      setCoopPassingCell(null);
-                      setSelectedCell(null);
-                    }} style={{
-                      display: "flex", alignItems: "center", gap: 6, width: "100%",
-                      padding: "6px 8px", borderRadius: 6, border: "none",
-                      backgroundColor: "transparent", cursor: "pointer",
-                      color: C.text, fontSize: 12, fontWeight: 600,
-                      fontFamily: "'Space Mono', monospace",
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${playerColor}22`; }}
-                      onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                    >
-                      <div style={{
-                        width: 16, height: 16, borderRadius: "50%",
-                        backgroundColor: playerColor,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 9, fontWeight: 700, color: "#fff", flexShrink: 0,
-                      }}>{(p.username || "P")[0].toUpperCase()}</div>
-                      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {p.username || "Player"}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
       {/* Fixed bottom bar: token picker + actions */}
       <div style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
         {/* Token picker row */}
@@ -14285,6 +14220,68 @@ export default function Pattrn() {
               >
                 Reset
               </button>
+            )}
+            {/* Pass cell to friend button */}
+            {isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0 && selectedCell && coopMyBlanks?.has(selectedCell) && (
+              <div style={{ position: "relative" }}>
+                <button
+                  onClick={() => setCoopPassingCell(coopPassingCell ? null : selectedCell)}
+                  style={{
+                    background: "none", border: `1px solid ${C.border}`, borderRadius: 10,
+                    padding: "10px 16px", cursor: "pointer", display: "flex", alignItems: "center", gap: 5,
+                    color: C.textDim, fontSize: 12, fontWeight: 600, fontFamily: "'Space Mono', monospace",
+                    textTransform: "uppercase", letterSpacing: 1,
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M11 13l-7 7"/><path d="M3 16v5h5"/>
+                  </svg>
+                  Pass
+                </button>
+                {coopPassingCell && (
+                  <div style={{
+                    position: "absolute", bottom: "100%", right: 0, marginBottom: 8,
+                    backgroundColor: C.surface, border: `1px solid ${C.border}`, borderRadius: 12,
+                    padding: 10, minWidth: 160, zIndex: 30,
+                    boxShadow: "0 6px 24px rgba(0,0,0,0.4)",
+                  }}>
+                    <div style={{ fontSize: 10, color: C.textDim, fontWeight: 600, marginBottom: 8, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
+                      Pass to a friend
+                    </div>
+                    {Object.entries(coopPlayers).map(([uid, p]) => {
+                      const playerColor = coopPlayerColorMap[uid] || "#FF9FF3";
+                      return (
+                        <button key={uid} onClick={() => {
+                          const cellToPass = coopPassingCell;
+                          passCoopCell(coopSessionId, cellToPass, uid).catch(() => {});
+                          setFills(prev => { const next = { ...prev }; delete next[cellToPass]; return next; });
+                          setCoopPassingCell(null);
+                          setSelectedCell(null);
+                        }} style={{
+                          display: "flex", alignItems: "center", gap: 8, width: "100%",
+                          padding: "8px 10px", borderRadius: 8, border: "none",
+                          backgroundColor: "transparent", cursor: "pointer",
+                          color: C.text, fontSize: 13, fontWeight: 600,
+                          fontFamily: "'Space Mono', monospace",
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${playerColor}22`; }}
+                          onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                        >
+                          <div style={{
+                            width: 18, height: 18, borderRadius: "50%",
+                            backgroundColor: playerColor,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontSize: 10, fontWeight: 700, color: "#fff", flexShrink: 0,
+                          }}>{(p.username || "P")[0].toUpperCase()}</div>
+                          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {p.username || "Player"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
             )}
           </div>
         )}
