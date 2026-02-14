@@ -2834,6 +2834,7 @@ export default function Pattrn() {
   const coopPartnerLockToastTimer = useRef(null);
   const prevCoopPartnerLockedRef = useRef(false); // track partner lock state changes
   const coopGuestJoinedRef = useRef(false); // tracks whether guest has actually joined (prevents false kick detection)
+  const [coopCompletedBreakdown, setCoopCompletedBreakdown] = useState(null); // session object to show completed breakdown modal
 
   // --- Global co-op invite toast (shown on any view) ---
   const [coopInviteToast, setCoopInviteToast] = useState(null); // notification object for the toast
@@ -2855,6 +2856,7 @@ export default function Pattrn() {
   const coopMosaicWriteThrottleRef = useRef({});
   const coopMosaicCurrentTileRef = useRef(null); // tracks which tile index the local player is in (-1 for overview)
   const coopMosaicJoinedRef = useRef(false); // tracks whether we've actually joined (prevents false kick detection)
+  const coopMosaicPrevSolvedRef = useRef(new Set()); // tracks tiles already seen as solved to detect partner completions
   const isCoopMosaic = !!coopMosaicSessionId;
   // Derived: number of other connected players (currentTile != null means connected)
   const coopMosaicOtherPlayerCount = Object.keys(coopMosaicPlayers).length;
@@ -4344,31 +4346,37 @@ export default function Pattrn() {
   const progressKey = isCascade ? cascadeRunIndex : isDaily ? (currentDailyDate ? getDailySeedForDate(currentDailyDate) : null) : currentPuzzle;
 
   // How many of each token still need to be placed (only counts blanks, not full grid)
+  // In coop modes, count ALL blanks and ALL fills (mine + partner) for a global view
   const tokenRemaining = useMemo(() => {
     if (!puzzle) return {};
-    // In coop mode, only count tokens needed for my blanks
-    const blanksToCount = coopMyBlanks || puzzle.blanks;
+    // Always count all blanks for needed tokens (gives global picture in coop)
     const neededInBlanks = {};
-    for (const key of blanksToCount) {
+    for (const key of puzzle.blanks) {
       const [r, c] = key.split("-").map(Number);
       const token = puzzle.solution[r][c];
       if (token) neededInBlanks[token] = (neededInBlanks[token] || 0) + 1;
     }
     const usedCounts = {};
-    for (const key of blanksToCount) {
+    for (const key of puzzle.blanks) {
       let token;
       if (lockedCells.has(key)) {
         const [r, c] = key.split("-").map(Number);
         token = puzzle.solution[r][c];
       } else if (fills[key]) {
         token = fills[key];
+      } else if (isCoop && coopPartnerFills[key]) {
+        // In non-mosaic coop, count partner's placed tokens
+        token = coopPartnerFills[key];
+      } else if (isCoopMosaic && coopMosaicOtherFills[key]) {
+        // In coop mosaic, count other players' placed tokens
+        token = coopMosaicOtherFills[key];
       }
       if (token) usedCounts[token] = (usedCounts[token] || 0) + 1;
     }
     const remaining = {};
     puzzle.usedTokens.forEach(t => { remaining[t] = (neededInBlanks[t] || 0) - (usedCounts[t] || 0); });
     return remaining;
-  }, [puzzle, fills, lockedCells, coopMyBlanks]);
+  }, [puzzle, fills, lockedCells, isCoop, coopPartnerFills, isCoopMosaic, coopMosaicOtherFills]);
 
   // Default to first tile when game loads with no selection
   useEffect(() => {
@@ -5301,6 +5309,7 @@ export default function Pattrn() {
     setCustomMosaicProgress({});
     coopMosaicCurrentTileRef.current = -1;
     coopMosaicJoinedRef.current = false;
+    coopMosaicPrevSolvedRef.current = new Set();
     // Optimistically add the new session to activeCoopSessions so it appears
     // immediately on the menu, without waiting for async Firebase reads
     setActiveCoopSessions(prev => {
@@ -5369,6 +5378,7 @@ export default function Pattrn() {
     coopMosaicWriteThrottleRef.current = {};
     coopMosaicCurrentTileRef.current = null;
     coopMosaicJoinedRef.current = false;
+    coopMosaicPrevSolvedRef.current = new Set();
   }, [coopMosaicSessionId, firebaseUser, coopMosaicRole]);
 
   // Rejoin an existing coop mosaic session from the active sessions panel
@@ -5417,6 +5427,12 @@ export default function Pattrn() {
     coopMosaicCurrentTileRef.current = -1;
     coopMosaicJoinedRef.current = true;
     coopMosaicWriteThrottleRef.current = {};
+    // Initialize prev-solved with tiles already solved in the session
+    const alreadySolved = new Set();
+    for (const [k, v] of Object.entries(session.tileProgress || {})) {
+      if (v > 0) alreadySolved.add(Number(k));
+    }
+    coopMosaicPrevSolvedRef.current = alreadySolved;
     // Signal we're back online by updating our current tile to -1 (overview)
     updateCoopMosaicCurrentTile(session.id, firebaseUser.uid, -1).catch(() => {});
     customMosaicReturnViewRef.current = "menu";
@@ -5485,6 +5501,34 @@ export default function Pattrn() {
         return changed ? merged : prev;
       });
 
+      // Detect if the tile we're currently viewing was just completed by another player
+      const myTileForCompletion = coopMosaicCurrentTileRef.current;
+      if (myTileForCompletion != null && myTileForCompletion >= 0) {
+        const tileKey = String(myTileForCompletion);
+        const tileSolvedNow = (tp[tileKey] || tp[myTileForCompletion] || 0) > 0;
+        const tileSolvedBefore = coopMosaicPrevSolvedRef.current.has(myTileForCompletion);
+        if (tileSolvedNow && !tileSolvedBefore) {
+          // This tile was just completed (by another player) while we're viewing it
+          // Transition to "won" state so the player sees completion instead of a reset
+          const tilePuzzle = customMosaicPuzzlesRef.current?.[myTileForCompletion];
+          if (tilePuzzle) {
+            setFills(solutionFillsFromPuzzle(tilePuzzle));
+            setGameState("won");
+            setLockedCells(new Set(tilePuzzle.blanks));
+            setWrongCells(new Set());
+            setShowParticles(true);
+            setTimeout(() => setShowParticles(false), 1500);
+            stopTimer();
+          }
+        }
+      }
+      // Update the set of previously-seen solved tiles
+      const newSolved = new Set();
+      for (const [k, v] of Object.entries(tp)) {
+        if (v > 0) newSolved.add(Number(k));
+      }
+      coopMosaicPrevSolvedRef.current = newSolved;
+
       // Sync other players' fills for the current tile
       const myTile = coopMosaicCurrentTileRef.current;
       if (myTile != null && myTile >= 0) {
@@ -5515,7 +5559,7 @@ export default function Pattrn() {
       unsub();
       coopMosaicUnsubRef.current = null;
     };
-  }, [coopMosaicSessionId, firebaseUser, leaveCoopMosaicSession]);
+  }, [coopMosaicSessionId, firebaseUser, leaveCoopMosaicSession, stopTimer]);
 
   // Handle guest joining coop mosaic: once auth ready + session ID set with role=guest, join
   useEffect(() => {
@@ -5572,6 +5616,12 @@ export default function Pattrn() {
       coopMosaicCurrentTileRef.current = -1;
       coopMosaicJoinedRef.current = true;
       coopMosaicWriteThrottleRef.current = {};
+      // Initialize prev-solved with tiles already solved in the session
+      const guestAlreadySolved = new Set();
+      for (const [k, v] of Object.entries(session.tileProgress || {})) {
+        if (v > 0) guestAlreadySolved.add(Number(k));
+      }
+      coopMosaicPrevSolvedRef.current = guestAlreadySolved;
       customMosaicReturnViewRef.current = "menu";
       setView("custom-mosaic");
     })();
@@ -9836,100 +9886,245 @@ export default function Pattrn() {
           )}
 
           {/* Active Co-op Sessions */}
-          {firebaseUser && (
-            <div style={{ marginBottom: 20 }}>
-              <div style={{
-                fontSize: 9, color: C.coop, textTransform: "uppercase",
-                letterSpacing: 1.5, marginBottom: 10,
-                fontFamily: "'Space Mono', monospace", fontWeight: 700,
-              }}>Active Sessions {activeCoopSessions.length > 0 && `(${activeCoopSessions.length})`}</div>
-
-              {activeCoopSessions.length === 0 ? (
-                <div style={{
-                  textAlign: "center", padding: "24px 16px", borderRadius: 12,
-                  backgroundColor: C.surface, border: `1px solid ${C.border}`,
+          {firebaseUser && (() => {
+            const activeSessions = activeCoopSessions.filter(s => s.status !== "complete");
+            const completedSessions = activeCoopSessions.filter(s => s.status === "complete");
+            const renderSessionCard = (session, isCompleted) => {
+              const isHost = session.hostUid === firebaseUser.uid;
+              const isMosaicSession = session._type === "mosaic";
+              const mosaicPlayerCount = isMosaicSession ? Object.keys(session.players || {}).length : 0;
+              const partnerName = isMosaicSession
+                ? (mosaicPlayerCount > 1 ? `${mosaicPlayerCount} players` : null)
+                : (isHost ? (session.guestUsername || null) : (session.hostUsername || null));
+              const modeLabel = isMosaicSession ? "Mosaic" : ((DIFFICULTIES.find(d => d.key === session.mode)?.label) || session.mode);
+              const titleLabel = isMosaicSession
+                ? (session.mosaicTitle || "Untitled")
+                : `${modeLabel} #${(session.level ?? 0) + 1}`;
+              const statusLabel = session.status === "waiting" ? "Waiting for partner" : session.status === "playing" ? "In progress" : session.status === "complete" ? "Complete" : session.status;
+              const statusColor = session.status === "waiting" ? C.textDim : session.status === "playing" ? C.coop : session.status === "complete" ? C.correct : C.textDim;
+              const mosaicSolved = isMosaicSession ? Object.values(session.tileProgress || {}).filter(v => v > 0).length : 0;
+              return (
+                <div key={session.id} style={{
+                  display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
+                  borderRadius: 12, backgroundColor: C.surface,
+                  border: `1px solid ${isCompleted ? C.correct + "22" : isMosaicSession ? C.coop + "22" : C.border}`,
                 }}>
-                  <div style={{ fontSize: 12, color: C.textDim }}>
-                    No active sessions
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                      {isMosaicSession && (
+                        <span style={{ fontSize: 9, color: isCompleted ? C.correct : C.coop, fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                          {isCompleted ? "Mosaic" : "Co-op Mosaic"}
+                        </span>
+                      )}
+                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>
+                        {titleLabel}
+                      </span>
+                      {!isCompleted && (
+                        <span style={{ fontSize: 9, color: isHost ? C.coop : "#FF9FF3", fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                          {isHost ? "Host" : "Guest"}
+                        </span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: 10, color: statusColor, fontFamily: "'Space Mono', monospace" }}>
+                      {isCompleted ? (
+                        <>
+                          {"\u2713"} Complete
+                          {isMosaicSession && <span style={{ color: C.textDim }}> {"\u2022"} 25/25 tiles</span>}
+                          {partnerName && <span style={{ color: C.textDim }}> {"\u2022"} with {partnerName}</span>}
+                        </>
+                      ) : (
+                        <>
+                          {statusLabel}
+                          {isMosaicSession && session.status === "playing" && <span style={{ color: C.textDim }}> {"\u2022"} {mosaicSolved}/25 tiles</span>}
+                          {partnerName && <span style={{ color: C.textDim }}> {"\u2022"} with {partnerName}</span>}
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 11, color: C.textDim, marginTop: 4, opacity: 0.7 }}>
-                    Start a puzzle above to create one
+                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    {isCompleted && isMosaicSession && (
+                      <button
+                        onClick={() => setCoopCompletedBreakdown(session)}
+                        style={{
+                          background: C.correct, border: "none", borderRadius: 8,
+                          padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 10,
+                          fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
+                        }}>
+                        View
+                      </button>
+                    )}
+                    {!isCompleted && (
+                      <button
+                        onClick={() => isMosaicSession ? rejoinCoopMosaicSession(session) : rejoinCoopSession(session)}
+                        style={{
+                          background: C.coop, border: "none", borderRadius: 8,
+                          padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 10,
+                          fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
+                        }}>
+                        Rejoin
+                      </button>
+                    )}
+                    {isHost && (
+                      <button
+                        onClick={() => isMosaicSession ? closeCoopMosaicSessionPermanently(session.id, session) : closeCoopSessionPermanently(session.id, session)}
+                        style={{
+                          background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+                          padding: "8px 10px", color: C.textDim, cursor: "pointer", fontSize: 10,
+                          fontFamily: "'Space Mono', monospace",
+                        }}
+                        title="Close session"
+                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.color = "#f87171"; }}
+                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                      >{"\u2715"}</button>
+                    )}
                   </div>
                 </div>
-              ) : (
-                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  {activeCoopSessions.map(session => {
-                    const isHost = session.hostUid === firebaseUser.uid;
-                    const isMosaicSession = session._type === "mosaic";
-                    const mosaicPlayerCount = isMosaicSession ? Object.keys(session.players || {}).length : 0;
-                    const partnerName = isMosaicSession
-                      ? (mosaicPlayerCount > 1 ? `${mosaicPlayerCount} players` : null)
-                      : (isHost ? (session.guestUsername || null) : (session.hostUsername || null));
-                    const modeLabel = isMosaicSession ? "Mosaic" : ((DIFFICULTIES.find(d => d.key === session.mode)?.label) || session.mode);
-                    const titleLabel = isMosaicSession
-                      ? (session.mosaicTitle || "Untitled")
-                      : `${modeLabel} #${(session.level ?? 0) + 1}`;
-                    const statusLabel = session.status === "waiting" ? "Waiting for partner" : session.status === "playing" ? "In progress" : session.status === "complete" ? "Complete" : session.status;
-                    const statusColor = session.status === "waiting" ? C.textDim : session.status === "playing" ? C.coop : session.status === "complete" ? C.correct : C.textDim;
-                    const mosaicSolved = isMosaicSession ? Object.values(session.tileProgress || {}).filter(v => v > 0).length : 0;
-                    return (
-                      <div key={session.id} style={{
-                        display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
-                        borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${isMosaicSession ? C.coop + "22" : C.border}`,
-                      }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                            {isMosaicSession && (
-                              <span style={{ fontSize: 9, color: C.coop, fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
-                                Co-op Mosaic
-                              </span>
-                            )}
-                            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>
-                              {titleLabel}
-                            </span>
-                            <span style={{ fontSize: 9, color: isHost ? C.coop : "#FF9FF3", fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
-                              {isHost ? "Host" : "Guest"}
-                            </span>
-                          </div>
-                          <div style={{ fontSize: 10, color: statusColor, fontFamily: "'Space Mono', monospace" }}>
-                            {statusLabel}
-                            {isMosaicSession && session.status === "playing" && <span style={{ color: C.textDim }}> {"\u2022"} {mosaicSolved}/25 tiles</span>}
-                            {partnerName && <span style={{ color: C.textDim }}> {"\u2022"} with {partnerName}</span>}
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                          {session.status !== "complete" && (
-                            <button
-                              onClick={() => isMosaicSession ? rejoinCoopMosaicSession(session) : rejoinCoopSession(session)}
-                              style={{
-                                background: C.coop, border: "none", borderRadius: 8,
-                                padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 10,
-                                fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
-                              }}>
-                              Rejoin
-                            </button>
-                          )}
-                          {isHost && (
-                            <button
-                              onClick={() => isMosaicSession ? closeCoopMosaicSessionPermanently(session.id, session) : closeCoopSessionPermanently(session.id, session)}
-                              style={{
-                                background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
-                                padding: "8px 10px", color: C.textDim, cursor: "pointer", fontSize: 10,
-                                fontFamily: "'Space Mono', monospace",
-                              }}
-                              title="Close session"
-                              onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.color = "#f87171"; }}
-                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-                            >{"\u2715"}</button>
-                          )}
-                        </div>
+              );
+            };
+            return (
+              <>
+                <div style={{ marginBottom: 20 }}>
+                  <div style={{
+                    fontSize: 9, color: C.coop, textTransform: "uppercase",
+                    letterSpacing: 1.5, marginBottom: 10,
+                    fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                  }}>Active Sessions {activeSessions.length > 0 && `(${activeSessions.length})`}</div>
+
+                  {activeSessions.length === 0 ? (
+                    <div style={{
+                      textAlign: "center", padding: "24px 16px", borderRadius: 12,
+                      backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                    }}>
+                      <div style={{ fontSize: 12, color: C.textDim }}>
+                        No active sessions
                       </div>
-                    );
-                  })}
+                      <div style={{ fontSize: 11, color: C.textDim, marginTop: 4, opacity: 0.7 }}>
+                        Start a puzzle above to create one
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {activeSessions.map(session => renderSessionCard(session, false))}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          )}
+
+                {/* Completed Co-op Sessions */}
+                {completedSessions.length > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{
+                      fontSize: 9, color: C.correct, textTransform: "uppercase",
+                      letterSpacing: 1.5, marginBottom: 10,
+                      fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                    }}>Completed Sessions ({completedSessions.length})</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {completedSessions.map(session => renderSessionCard(session, true))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Completed session breakdown modal */}
+                {coopCompletedBreakdown && (() => {
+                  const bs = coopCompletedBreakdown;
+                  const tp = bs.tileProgress || {};
+                  const tt = bs.tileTimes || {};
+                  const players = bs.players || {};
+                  const playerNames = Object.values(players).map(p => p.username || "Player").filter(Boolean);
+                  const totalAttempts = Object.values(tp).reduce((a, b) => a + (b || 0), 0);
+                  const totalTime = Object.values(tt).reduce((a, b) => a + (b || 0), 0);
+                  const avgAttempts = Object.keys(tp).length > 0 ? (totalAttempts / Object.keys(tp).length).toFixed(1) : "0";
+                  const perfectTiles = Object.values(tp).filter(v => v === 1).length;
+                  const formatTime = (s) => { const m = Math.floor(s / 60); const sec = s % 60; return m > 0 ? `${m}m ${sec}s` : `${sec}s`; };
+                  return (
+                    <div onClick={() => setCoopCompletedBreakdown(null)} style={{
+                      position: "fixed", inset: 0, zIndex: 1200, backgroundColor: "rgba(0,0,0,0.7)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      animation: "fadeUp 0.2s ease both",
+                    }}>
+                      <div onClick={e => e.stopPropagation()} style={{
+                        backgroundColor: C.surface, borderRadius: 16, padding: 24, maxWidth: 380, width: "90%",
+                        border: `1px solid ${C.correct}33`, boxShadow: "0 8px 40px rgba(0,0,0,0.6)",
+                        maxHeight: "80vh", overflowY: "auto",
+                      }}>
+                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.correct, marginBottom: 4 }}>
+                          {"\u2713"} {bs.mosaicTitle || "Untitled"}
+                        </div>
+                        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace" }}>
+                          Co-op mosaic completed{playerNames.length > 0 ? ` with ${playerNames.join(", ")}` : ""}
+                        </div>
+
+                        {/* Summary stats */}
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                          {[
+                            { label: "Total Time", value: formatTime(totalTime) },
+                            { label: "Total Attempts", value: totalAttempts },
+                            { label: "Perfect Tiles", value: `${perfectTiles}/25` },
+                            { label: "Avg Attempts", value: avgAttempts },
+                          ].map(stat => (
+                            <div key={stat.label} style={{
+                              padding: "10px 12px", borderRadius: 10,
+                              backgroundColor: C.bg, border: `1px solid ${C.border}`,
+                              textAlign: "center",
+                            }}>
+                              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.text }}>
+                                {stat.value}
+                              </div>
+                              <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>
+                                {stat.label}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Per-tile breakdown */}
+                        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                          Tile Breakdown
+                        </div>
+                        <div style={{
+                          display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 4,
+                          padding: 8, borderRadius: 10, backgroundColor: C.bg, border: `1px solid ${C.border}`,
+                        }}>
+                          {Array.from({ length: 25 }, (_, i) => {
+                            const tileAttempts = tp[i] || tp[String(i)] || 0;
+                            const tileTime = tt[i] || tt[String(i)] || 0;
+                            const isPerfect = tileAttempts === 1;
+                            return (
+                              <div key={i} style={{
+                                padding: "6px 2px", borderRadius: 6, textAlign: "center",
+                                backgroundColor: isPerfect ? C.correct + "15" : C.surface,
+                                border: `1px solid ${isPerfect ? C.correct + "44" : C.border}`,
+                              }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: isPerfect ? C.correct : C.text }}>
+                                  {i + 1}
+                                </div>
+                                <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                                  {tileAttempts === 1 ? "\u2713" : `${tileAttempts}x`}
+                                </div>
+                                <div style={{ fontSize: 7, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                                  {formatTime(tileTime)}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <button onClick={() => setCoopCompletedBreakdown(null)}
+                          style={{
+                            width: "100%", marginTop: 16, padding: "10px 0", borderRadius: 10,
+                            backgroundColor: C.correct, color: "#fff", border: "none",
+                            fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
+                            letterSpacing: 1, cursor: "pointer",
+                          }}
+                        >
+                          Close
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            );
+          })()}
         </div>
         {accountModalEl}
         {usernameModalEl}
