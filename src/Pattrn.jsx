@@ -111,15 +111,52 @@ function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
   const backdropRef = useRef(null);
   const handleRef = useRef(null);
   const dragState = useRef({ active: false, startY: 0, current: 0 });
+  const [visible, setVisible] = useState(isOpen);
+  const closingRef = useRef(false);
+  const prevIsOpen = useRef(isOpen);
+
+  // Track open/close with animation delay
+  useEffect(() => {
+    if (isOpen && !prevIsOpen.current) {
+      closingRef.current = false;
+      setVisible(true);
+    } else if (!isOpen && prevIsOpen.current && visible && !closingRef.current) {
+      // isOpen went false from a button click — animate out
+      closingRef.current = true;
+      if (drawerRef.current) {
+        drawerRef.current.style.transition = "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)";
+        drawerRef.current.style.transform = "translateY(100%)";
+      }
+      if (backdropRef.current) {
+        backdropRef.current.style.transition = "opacity 0.3s";
+        backdropRef.current.style.opacity = "0";
+      }
+      setTimeout(() => { setVisible(false); closingRef.current = false; }, 300);
+    }
+    prevIsOpen.current = isOpen;
+  }, [isOpen, visible]);
+
+  const animateClose = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    if (drawerRef.current) {
+      drawerRef.current.style.transition = "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)";
+      drawerRef.current.style.transform = "translateY(100%)";
+    }
+    if (backdropRef.current) {
+      backdropRef.current.style.transition = "opacity 0.3s";
+      backdropRef.current.style.opacity = "0";
+    }
+    setTimeout(() => {
+      setVisible(false);
+      closingRef.current = false;
+      onClose();
+    }, 300);
+  }, [onClose]);
 
   const onTouchStart = useCallback((e) => {
-    const handleEl = handleRef.current;
     const drawerEl = drawerRef.current;
-    if (!handleEl || !drawerEl) return;
-    const isHandle = handleEl.contains(e.target);
-    const scrollEl = drawerEl.querySelector("[data-drawer-scroll]");
-    const isScrolledToTop = !scrollEl || scrollEl.scrollTop <= 0;
-    if (!isHandle && !isScrolledToTop) return;
+    if (!drawerEl) return;
     dragState.current = { active: true, startY: e.touches[0].clientY, current: 0 };
     drawerEl.style.transition = "none";
     drawerEl.style.animation = "none";
@@ -144,7 +181,7 @@ function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
     if (dy > 100) {
       if (drawerRef.current) drawerRef.current.style.transform = "translateY(100%)";
       if (backdropRef.current) { backdropRef.current.style.transition = "opacity 0.3s"; backdropRef.current.style.opacity = "0"; }
-      setTimeout(() => onClose(), 300);
+      setTimeout(() => { setVisible(false); closingRef.current = false; onClose(); }, 300);
     } else {
       if (drawerRef.current) drawerRef.current.style.transform = "translateY(0)";
       if (backdropRef.current) backdropRef.current.style.opacity = "1";
@@ -152,22 +189,22 @@ function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
     dragState.current.current = 0;
   }, [onClose]);
 
-  // Attach non-passive touch listeners so e.preventDefault() works on mobile
+  // Attach touch listeners to handle only so scrollable content works
   useEffect(() => {
-    const el = drawerRef.current;
-    if (!el) return;
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
-    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    const handleEl = handleRef.current;
+    if (!handleEl) return;
+    handleEl.addEventListener("touchstart", onTouchStart, { passive: true });
+    handleEl.addEventListener("touchmove", onTouchMove, { passive: false });
+    handleEl.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", onTouchEnd);
+      handleEl.removeEventListener("touchstart", onTouchStart);
+      handleEl.removeEventListener("touchmove", onTouchMove);
+      handleEl.removeEventListener("touchend", onTouchEnd);
     };
-  }, [isOpen, onTouchStart, onTouchMove, onTouchEnd]);
+  }, [visible, onTouchStart, onTouchMove, onTouchEnd]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!visible) return;
     const scrollY = window.scrollY;
     const body = document.body;
     body.style.position = "fixed";
@@ -183,14 +220,14 @@ function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
       body.style.overflow = "";
       window.scrollTo(0, scrollY);
     };
-  }, [isOpen]);
+  }, [visible]);
 
-  if (!isOpen) return null;
+  if (!visible) return null;
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: zIndex || 1100, display: "flex", flexDirection: "column", justifyContent: "flex-end" }} role="dialog" aria-modal="true">
       <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } } @keyframes drawerOverlayFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
-      <div ref={backdropRef} onClick={onClose} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", animation: "drawerOverlayFade 0.25s ease both" }} />
+      <div ref={backdropRef} onClick={animateClose} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", animation: "drawerOverlayFade 0.25s ease both" }} />
       <div ref={drawerRef} onClick={e => e.stopPropagation()} style={{
         position: "relative", backgroundColor: C.bg, borderRadius: "20px 20px 0 0",
         border: `1px solid ${C.border}`, borderBottom: "none",
@@ -4455,15 +4492,22 @@ export default function Pattrn() {
   const BottomTabBar = ({ active }) => (
     <nav className="bottom-tab-bar" style={{
       position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
-      backgroundColor: C.bg + "f0",
-      borderTop: `1px solid ${C.border}`,
-      paddingBottom: "env(safe-area-inset-bottom, 0px)",
       display: "flex", justifyContent: "center",
+      paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))",
+      paddingLeft: 12, paddingRight: 12,
+      pointerEvents: "none",
     }}>
       <div style={{
-        display: "flex", width: "100%", maxWidth: 480,
+        display: "flex", width: "100%", maxWidth: 420,
         justifyContent: "space-around", alignItems: "center",
-        padding: "6px 0 4px",
+        padding: "8px 8px 6px",
+        backgroundColor: "rgba(20, 20, 35, 0.65)",
+        borderRadius: 24,
+        border: `1px solid rgba(255, 255, 255, 0.08)`,
+        boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
+        backdropFilter: "blur(24px) saturate(1.5)",
+        WebkitBackdropFilter: "blur(24px) saturate(1.5)",
+        pointerEvents: "auto",
       }}>
         {/* Home */}
         <button onClick={() => setView("menu")}
@@ -9201,9 +9245,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(84px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{
@@ -9402,52 +9446,62 @@ export default function Pattrn() {
           </div>
         </div>
 
-        {/* Actions */}
-        <div style={{ width: "100%", maxWidth: 400, display: "flex", flexDirection: "column", gap: 8, animation: "fadeUp 0.3s 0.08s ease both" }}>
-          {mosaicMsg && (
-            <div style={{
-              textAlign: "center", padding: "8px 12px", borderRadius: 8,
-              backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, letterSpacing: 0.5,
-            }}>
-              {mosaicMsg}
+        {/* Spacer for fixed bottom bar */}
+        <div style={{ height: 80 }} />
+
+        {/* Fixed bottom action bar */}
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 80,
+          backgroundColor: C.bg + "ee", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+          borderTop: `1px solid ${C.border}`,
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          display: "flex", justifyContent: "center",
+        }}>
+          <div style={{ width: "100%", maxWidth: 400, padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
+            {mosaicMsg && (
+              <div style={{
+                textAlign: "center", padding: "6px 12px", borderRadius: 8,
+                backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
+                fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, letterSpacing: 0.5,
+              }}>
+                {mosaicMsg}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={handleSaveMosaic}
+                disabled={mosaicLoading}
+                style={{
+                  flex: 1, padding: "12px 0", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1.5,
+                  background: C.accent, color: C.bg, border: "none", cursor: mosaicLoading ? "not-allowed" : "pointer",
+                  textTransform: "uppercase", transition: "all 0.15s", opacity: mosaicLoading ? 0.6 : 1,
+                }}
+              >
+                {mosaicLoading ? "Saving..." : creatorEditingId ? "Update" : "Save"}
+              </button>
+              <button
+                onClick={() => { resetCreator(); }}
+                style={{
+                  padding: "12px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                  background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                  textTransform: "uppercase", transition: "all 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+              >
+                Clear
+              </button>
             </div>
-          )}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handleSaveMosaic}
-              disabled={mosaicLoading}
-              style={{
-                flex: 1, padding: "12px 0", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1.5,
-                background: C.accent, color: C.bg, border: "none", cursor: mosaicLoading ? "not-allowed" : "pointer",
-                textTransform: "uppercase", transition: "all 0.15s", opacity: mosaicLoading ? 0.6 : 1,
-              }}
-            >
-              {mosaicLoading ? "Saving..." : creatorEditingId ? "Update" : "Save"}
-            </button>
-            <button
-              onClick={() => { resetCreator(); }}
-              style={{
-                padding: "12px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                textTransform: "uppercase", transition: "all 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-            >
-              Clear
-            </button>
+            {!firebaseUser && firebaseConfigured && (
+              <div style={{ textAlign: "center", fontSize: 11, color: C.textDim }}>
+                Sign in from the menu to save your creations
+              </div>
+            )}
           </div>
-          {!firebaseUser && firebaseConfigured && (
-            <div style={{ textAlign: "center", fontSize: 11, color: C.textDim, marginTop: 4 }}>
-              Sign in from the menu to save your creations
-            </div>
-          )}
         </div>
 
-      <BottomTabBar active="mosaic" />
       {globalModalsEl}
       </div>
     );
@@ -9464,9 +9518,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(84px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{
@@ -10659,9 +10713,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(84px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{
@@ -11019,9 +11073,9 @@ export default function Pattrn() {
                         <button onClick={() => setCoopCompletedBreakdown(null)}
                           style={{
                             width: "100%", marginTop: 16, padding: "10px 0", borderRadius: 10,
-                            backgroundColor: C.correct, color: "#fff", border: "none",
+                            backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
                             fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
-                            letterSpacing: 1, cursor: "pointer",
+                            letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
                           }}
                         >
                           Close
@@ -11052,9 +11106,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(84px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{
@@ -11469,9 +11523,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 0, paddingRight: 0,
+        paddingBottom: "calc(84px + env(safe-area-inset-bottom, 0px))", paddingLeft: 0, paddingRight: 0,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); } `}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } `}</style>
 
         {/* ── Compact top app bar ── */}
         <div style={{
@@ -13768,7 +13822,7 @@ export default function Pattrn() {
                 <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
                   Friends on this puzzle
                 </div>
-                <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+                <div className="hide-scrollbar" style={{ display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: 4 }}>
                   {Object.entries(friendsPuzzleData).map(([uid, data]) => {
                     const friend = friendsList.find(f => f.uid === uid);
                     if (!friend) return null;
@@ -13780,6 +13834,7 @@ export default function Pattrn() {
                         borderRadius: 8, backgroundColor: C.surface,
                         border: `1px solid ${theyWereFaster ? C.incorrect + "33" : iWasFaster ? C.correct + "33" : C.border}`,
                         fontSize: 11, fontFamily: "'Space Mono', monospace",
+                        flexShrink: 0, whiteSpace: "nowrap",
                       }}>
                         {friend.profilePicture ? (
                           <img src={friend.profilePicture} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} />
