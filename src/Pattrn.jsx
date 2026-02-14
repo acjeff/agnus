@@ -14244,8 +14244,8 @@ export default function Pattrn() {
         </div>
       )}
 
-      {/* Grid area: fills available space between fixed header and footer, centers grid */}
-      <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", paddingTop: headerHeight, paddingBottom: footerHeight, width: "calc(100% + 32px)", margin: "0 -16px", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, position: "relative", boxSizing: "border-box" }}>
+      {/* Grid area: absolutely positioned between fixed header and footer, centers grid */}
+      <div style={{ position: "absolute", top: headerHeight, bottom: footerHeight, left: 0, right: 0, display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, boxSizing: "border-box" }}>
         <GridDecoration decoration={activeTheme.decoration} />
         {/* Coop mosaic players indicator — positioned top-left of puzzle panel */}
         {isCoopMosaic && coopMosaicAnyConnected && gameState === "playing" && (
@@ -14255,7 +14255,7 @@ export default function Pattrn() {
               if (anyOnOtherTile) setShowCoopMosaicNavigate(true);
             }}
             style={{
-              position: "absolute", top: headerHeight + 8, left: 12, zIndex: 10,
+              position: "absolute", top: 8, left: 12, zIndex: 10,
               display: "flex", flexDirection: "column", gap: 3,
               padding: "4px 10px", borderRadius: 8,
               backgroundColor: C.coop + "18", border: `1px solid ${C.coop}44`,
