@@ -4488,8 +4488,12 @@ export default function Pattrn() {
     cascadeAttemptsRef.current = attempts;
     cascadeRunIndexRef.current = cascadeRunIndex;
   }
-  // --- Bottom Tab Bar helper ---
-  const BottomTabBar = ({ active }) => (
+  // --- Bottom Tab Bar helper (Apple Liquid Glass style) ---
+  const TAB_KEYS = ["home", "mosaic", "coop", "profile"];
+  const BottomTabBar = ({ active }) => {
+    const activeIdx = TAB_KEYS.indexOf(active);
+    const activeColor = active === "coop" ? C.coop : C.accent;
+    return (
     <nav className="bottom-tab-bar" style={{
       position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
       display: "flex", justifyContent: "center",
@@ -4498,71 +4502,88 @@ export default function Pattrn() {
       pointerEvents: "none",
     }}>
       <div style={{
-        display: "flex", width: "100%", maxWidth: 420,
+        display: "flex", width: "100%", maxWidth: 420, position: "relative",
         justifyContent: "space-around", alignItems: "center",
-        padding: "8px 8px 6px",
-        backgroundColor: "rgba(20, 20, 35, 0.65)",
-        borderRadius: 24,
-        border: `1px solid rgba(255, 255, 255, 0.08)`,
-        boxShadow: "0 8px 32px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.05)",
-        backdropFilter: "blur(24px) saturate(1.5)",
-        WebkitBackdropFilter: "blur(24px) saturate(1.5)",
+        padding: "6px 6px 5px",
+        backgroundColor: "rgba(18, 18, 32, 0.55)",
+        borderRadius: 28,
+        border: `1px solid rgba(255, 255, 255, 0.1)`,
+        boxShadow: "0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
+        backdropFilter: "blur(28px) saturate(1.8)",
+        WebkitBackdropFilter: "blur(28px) saturate(1.8)",
         pointerEvents: "auto",
+        overflow: "hidden",
       }}>
+        {/* Sliding pill indicator */}
+        {activeIdx >= 0 && (
+          <div style={{
+            position: "absolute", top: 4, bottom: 4,
+            left: `calc(${activeIdx * 25}% + 4px)`,
+            width: "calc(25% - 8px)",
+            borderRadius: 22,
+            background: `radial-gradient(ellipse at 50% 0%, ${activeColor}18 0%, ${activeColor}0a 70%, transparent 100%)`,
+            border: `1px solid ${activeColor}22`,
+            boxShadow: `0 0 20px ${activeColor}12, inset 0 1px 0 ${activeColor}15, inset 0 -1px 0 rgba(0,0,0,0.1)`,
+            transition: "left 0.35s cubic-bezier(0.32, 0.72, 0, 1), background 0.3s, border-color 0.3s, box-shadow 0.3s",
+            pointerEvents: "none",
+            zIndex: 0,
+          }} />
+        )}
         {/* Home */}
         <button onClick={() => setView("menu")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "home" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
+          <svg width="21" height="21" viewBox="0 0 24 24" fill={active === "home" ? C.accent + "22" : "none"} stroke={active === "home" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "all 0.25s" }}>
             <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
           </svg>
-          <span style={{ fontSize: 10, fontWeight: active === "home" ? 700 : 500, color: active === "home" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Home</span>
+          <span style={{ fontSize: 9, fontWeight: active === "home" ? 700 : 500, color: active === "home" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace", transition: "color 0.25s", letterSpacing: 0.3 }}>Home</span>
         </button>
         {/* Mosaic (Gallery) */}
         <button onClick={() => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); }}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "mosaic" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
+          <svg width="21" height="21" viewBox="0 0 24 24" fill={active === "mosaic" ? C.accent + "22" : "none"} stroke={active === "mosaic" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "all 0.25s" }}>
             <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
           </svg>
-          <span style={{ fontSize: 10, fontWeight: active === "mosaic" ? 700 : 500, color: active === "mosaic" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Mosaic</span>
+          <span style={{ fontSize: 9, fontWeight: active === "mosaic" ? 700 : 500, color: active === "mosaic" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace", transition: "color 0.25s", letterSpacing: 0.3 }}>Mosaic</span>
         </button>
         {/* Co-op */}
         <button onClick={() => setView("coop")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative" }}>
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
           <div style={{ position: "relative", display: "inline-flex" }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "coop" ? C.coop : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill={active === "coop" ? C.coop + "22" : "none"} stroke={active === "coop" ? C.coop : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "all 0.25s" }}>
               <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
               <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
             {activeCoopSessions.filter(s => s.status !== "complete").length > 0 && (
               <div style={{
                 position: "absolute", top: -4, right: -8,
-                minWidth: 16, height: 16, borderRadius: 8,
+                minWidth: 14, height: 14, borderRadius: 7,
                 backgroundColor: C.coop, display: "flex", alignItems: "center", justifyContent: "center",
-                padding: "0 4px", boxSizing: "border-box",
+                padding: "0 3px", boxSizing: "border-box",
               }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "'Space Mono', monospace", lineHeight: 1, paddingTop: 1 }}>
+                <span style={{ fontSize: 8, fontWeight: 700, color: "#fff", fontFamily: "'Space Mono', monospace", lineHeight: 1, paddingTop: 1 }}>
                   {activeCoopSessions.filter(s => s.status !== "complete").length}
                 </span>
               </div>
             )}
           </div>
-          <span style={{ fontSize: 10, fontWeight: active === "coop" ? 700 : 500, color: active === "coop" ? C.coop : C.textDim, fontFamily: "'Space Mono', monospace" }}>Co-op</span>
+          <span style={{ fontSize: 9, fontWeight: active === "coop" ? 700 : 500, color: active === "coop" ? C.coop : C.textDim, fontFamily: "'Space Mono', monospace", transition: "color 0.25s", letterSpacing: 0.3 }}>Co-op</span>
         </button>
         {/* Profile */}
         <button onClick={() => setView("profile")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative" }}>
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
           {firebaseUser && profilePicture ? (
-            <img src={profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: 11, objectFit: "cover", border: `1.5px solid ${active === "profile" ? C.accent : C.border}` }} />
+            <img src={profilePicture} alt="" style={{ width: 21, height: 21, borderRadius: 11, objectFit: "cover", border: `1.5px solid ${active === "profile" ? C.accent : "transparent"}`, transition: "border-color 0.25s" }} />
           ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "profile" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="21" height="21" viewBox="0 0 24 24" fill={active === "profile" ? C.accent + "22" : "none"} stroke={active === "profile" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "all 0.25s" }}>
               <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
             </svg>
           )}
-          <span style={{ fontSize: 10, fontWeight: active === "profile" ? 700 : 500, color: active === "profile" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Profile</span>
+          <span style={{ fontSize: 9, fontWeight: active === "profile" ? 700 : 500, color: active === "profile" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace", transition: "color 0.25s", letterSpacing: 0.3 }}>Profile</span>
         </button>
       </div>
     </nav>
-  );
+    );
+  };
 
   const isMosaic = difficulty === "mosaic";
   const mosaicMainPuzzles = isMosaic ? (staffPickPuzzlesRef.current || PUZZLE_SETS.mosaic) : null;
