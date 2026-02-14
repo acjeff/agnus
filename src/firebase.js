@@ -938,6 +938,14 @@ export async function updateCoopFill(sessionId, cellKey, token) {
   }
 }
 
+// Pass a cell to another player (cell override)
+export async function passCoopCell(sessionId, cellKey, toUid) {
+  if (!db) return;
+  await set(ref(db, `coopSessions/${sessionId}/cellOverrides/${cellKey}`), toUid);
+  // Clear the fill for this cell since it's changing owner
+  await remove(ref(db, `coopSessions/${sessionId}/fills/${cellKey}`)).catch(() => {});
+}
+
 // Lock in a player's blanks (supports multi-player via uid)
 export async function lockInCoopPlayer(sessionId, role, isCorrect, uid) {
   if (!db) return;
