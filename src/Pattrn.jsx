@@ -4505,6 +4505,7 @@ export default function Pattrn() {
     check: (c) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
     refresh: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
     forward: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 6 15 12 9 18"/></svg>,
+    pass: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M11 13l-7 7"/><path d="M3 16v5h5"/></svg>,
   };
 
   // Quick Play sub-menu — shared across all views (accessed from nav)
@@ -4559,6 +4560,24 @@ export default function Pattrn() {
     }
     if (isCoop) {
       playRoot.push({ id: "coop-invite", icon: "user-plus", label: "Invite", action: () => { setShowCoopInvite(true); } });
+    }
+    if (gameState === "playing" && isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0) {
+      playRoot.push({ id: "pass-cell", icon: "pass", label: "Pass Cell", action: () => {
+        if (coopPassMode) {
+          setCoopPassMode(null);
+          setSelectedToken(null);
+          return;
+        }
+        setSelectedToken(null);
+        setSelectedCell(null);
+        const entries = Object.entries(coopPlayers);
+        if (entries.length === 1) {
+          const [uid, p] = entries[0];
+          setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
+        } else {
+          setCoopPassPlayerPicker(prev => !prev);
+        }
+      }});
     }
     playRoot.push({ id: "back", icon: "back", label: customMosaicPuzzlesRef.current && isMosaic ? "Mosaic" : "Puzzles", action: () => {
       if (isCoop) { setShowLeaveConfirm(true); return; }
@@ -13790,43 +13809,6 @@ export default function Pattrn() {
               fontFamily: "'Space Mono', monospace", fontWeight: 600,
             }}>Cancel</button>
           </div>
-        )}
-        {/* Pass this cell — own row above lock in */}
-        {gameState === "playing" && isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0 && (
-          <button
-            onClick={() => {
-              if (coopPassMode) {
-                setCoopPassMode(null);
-                setSelectedToken(null);
-                return;
-              }
-              setSelectedToken(null);
-              setSelectedCell(null);
-              const entries = Object.entries(coopPlayers);
-              if (entries.length === 1) {
-                const [uid, p] = entries[0];
-                setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
-              } else {
-                setCoopPassPlayerPicker(prev => !prev);
-              }
-            }}
-            style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "8px 20px",
-              borderRadius: 10, cursor: "pointer",
-              backgroundColor: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF18" : "transparent",
-              border: (coopPassMode || coopPassPlayerPicker) ? "1px solid #54A0FF44" : `1px solid ${C.border}`,
-              color: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF" : C.textDim,
-              fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600,
-              letterSpacing: 1, textTransform: "uppercase",
-              transition: "all 0.2s",
-            }}
-          >
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M11 13l-7 7"/><path d="M3 16v5h5"/>
-            </svg>
-            Pass Cell
-          </button>
         )}
         {/* Accept/reject incoming pass request — own row above lock in */}
         {gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey && (
