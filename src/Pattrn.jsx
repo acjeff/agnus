@@ -13307,7 +13307,7 @@ export default function Pattrn() {
       {/* Info row: now the top element of the play view */}
       <div ref={infoRowRef} style={{
         flexShrink: 0, zIndex: 10,
-        backgroundColor: C.bg, display: "flex", flexDirection: "column", alignItems: "center",
+        display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: gridTotalWidth }}>
@@ -13691,7 +13691,7 @@ export default function Pattrn() {
       </div>
 
       {/* Fixed bottom bar: coop UI + game state info */}
-      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
+      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(140px + env(safe-area-inset-bottom, 0px))` : `calc(100px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
         {/* Pass player picker dropdown (multi-partner) */}
         {coopPassPlayerPicker && !coopPassMode && (
           <div style={{
