@@ -5371,6 +5371,17 @@ export default function Pattrn() {
 
     return (
       <>
+        {/* SVG filter for liquid glass effect */}
+        <svg style={{ position: "absolute", width: 0, height: 0 }}>
+          <filter id="frosted" primitiveUnits="objectBoundingBox">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="0.02" result="blur" />
+            <feDisplacementMap id="disp" in="blur" in2="map" scale="1" xChannelSelector="R" yChannelSelector="G">
+              <animate attributeName="scale" to="1.4" dur="0.3s" begin="liquid-glass-panel.mouseover" fill="freeze" />
+              <animate attributeName="scale" to="1" dur="0.3s" begin="liquid-glass-panel.mouseout" fill="freeze" />
+            </feDisplacementMap>
+          </filter>
+        </svg>
+
         {/* Click-away layer — blocks scrolling underneath */}
         {isOpen && (
           <div
@@ -5382,6 +5393,7 @@ export default function Pattrn() {
 
         {/* Expanding Liquid Glass panel / pill */}
         <div
+          id="liquid-glass-panel"
           style={{
             position: "fixed",
             bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
@@ -5391,8 +5403,8 @@ export default function Pattrn() {
             maxHeight: isOpen ? `calc(100vh - ${bottomPx}px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 20px)` : undefined,
             borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
             background: activeTheme.gridBg || C.surface,
-            backdropFilter: "blur(28px) saturate(200%)",
-            WebkitBackdropFilter: "blur(28px) saturate(200%)",
+            backdropFilter: "url(#frosted)",
+            WebkitBackdropFilter: "url(#frosted)",
             border: isOpen ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(255,255,255,0.16)",
             boxShadow: defaultShadow,
             zIndex: 85,
@@ -6952,32 +6964,44 @@ export default function Pattrn() {
     const springOpen = "cubic-bezier(0.175, 0.885, 0.32, 1.175)";
     const strokeColor = "#fff";
     return (
-      <div
-        onClick={onClick}
-        style={{
-          position: "fixed",
-          bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
-          left: 20,
-          width: fabSize,
-          height: fabSize,
-          borderRadius: fabSize / 2,
-          background: activeTheme.gridBg || C.surface,
-          backdropFilter: "blur(28px) saturate(200%)",
-          WebkitBackdropFilter: "blur(28px) saturate(200%)",
-          border: "1px solid rgba(255,255,255,0.16)",
-          boxShadow: "none",
-          zIndex: 85,
-          overflow: "hidden",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          transition: `transform 0.15s ${springOpen}, box-shadow 0.15s ease`,
-        }}
-        onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
-        aria-label="Go back"
-      >
+      <>
+        {/* SVG filter for back button liquid glass effect */}
+        <svg style={{ position: "absolute", width: 0, height: 0 }}>
+          <filter id="frosted-back" primitiveUnits="objectBoundingBox">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="0.02" result="blur" />
+            <feDisplacementMap id="disp-back" in="blur" in2="map" scale="1" xChannelSelector="R" yChannelSelector="G">
+              <animate attributeName="scale" to="1.4" dur="0.3s" begin="liquid-glass-back.mouseover" fill="freeze" />
+              <animate attributeName="scale" to="1" dur="0.3s" begin="liquid-glass-back.mouseout" fill="freeze" />
+            </feDisplacementMap>
+          </filter>
+        </svg>
+        <div
+          id="liquid-glass-back"
+          onClick={onClick}
+          style={{
+            position: "fixed",
+            bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
+            left: 20,
+            width: fabSize,
+            height: fabSize,
+            borderRadius: fabSize / 2,
+            background: activeTheme.gridBg || C.surface,
+            backdropFilter: "url(#frosted-back)",
+            WebkitBackdropFilter: "url(#frosted-back)",
+            border: "1px solid rgba(255,255,255,0.16)",
+            boxShadow: "none",
+            zIndex: 85,
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            transition: `transform 0.15s ${springOpen}, box-shadow 0.15s ease`,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+          aria-label="Go back"
+        >
         {/* Liquid Glass sheen highlight */}
         <div style={{
           position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none",
@@ -6990,6 +7014,7 @@ export default function Pattrn() {
         </div>
         <ChevronLeft size={22} color={strokeColor} strokeWidth={2.5} />
       </div>
+      </>
     );
   };
 
@@ -6998,32 +7023,44 @@ export default function Pattrn() {
     const springOpen = "cubic-bezier(0.175, 0.885, 0.32, 1.175)";
     const strokeColor = "#fff";
     return (
-      <div
-        onClick={() => setView("menu")}
-        style={{
-          position: "fixed",
-          bottom: `calc(${bottomPx + 68}px + env(safe-area-inset-bottom, 0px))`,
-          left: 20,
-          width: fabSize,
-          height: fabSize,
-          borderRadius: fabSize / 2,
-          background: activeTheme.gridBg || C.surface,
-          backdropFilter: "blur(28px) saturate(200%)",
-          WebkitBackdropFilter: "blur(28px) saturate(200%)",
-          border: "1px solid rgba(255,255,255,0.16)",
-          boxShadow: "none",
-          zIndex: 85,
-          overflow: "hidden",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          transition: `transform 0.15s ${springOpen}, box-shadow 0.15s ease`,
-        }}
-        onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
-        aria-label="Go home"
-      >
+      <>
+        {/* SVG filter for home button liquid glass effect */}
+        <svg style={{ position: "absolute", width: 0, height: 0 }}>
+          <filter id="frosted-home" primitiveUnits="objectBoundingBox">
+            <feGaussianBlur in="SourceGraphic" stdDeviation="0.02" result="blur" />
+            <feDisplacementMap id="disp-home" in="blur" in2="map" scale="1" xChannelSelector="R" yChannelSelector="G">
+              <animate attributeName="scale" to="1.4" dur="0.3s" begin="liquid-glass-home.mouseover" fill="freeze" />
+              <animate attributeName="scale" to="1" dur="0.3s" begin="liquid-glass-home.mouseout" fill="freeze" />
+            </feDisplacementMap>
+          </filter>
+        </svg>
+        <div
+          id="liquid-glass-home"
+          onClick={() => setView("menu")}
+          style={{
+            position: "fixed",
+            bottom: `calc(${bottomPx + 68}px + env(safe-area-inset-bottom, 0px))`,
+            left: 20,
+            width: fabSize,
+            height: fabSize,
+            borderRadius: fabSize / 2,
+            background: activeTheme.gridBg || C.surface,
+            backdropFilter: "url(#frosted-home)",
+            WebkitBackdropFilter: "url(#frosted-home)",
+            border: "1px solid rgba(255,255,255,0.16)",
+            boxShadow: "none",
+            zIndex: 85,
+            overflow: "hidden",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            transition: `transform 0.15s ${springOpen}, box-shadow 0.15s ease`,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
+          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+          aria-label="Go home"
+        >
         {/* Liquid Glass sheen highlight */}
         <div style={{
           position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none",
@@ -7036,6 +7073,7 @@ export default function Pattrn() {
         </div>
         <Home size={22} color={strokeColor} strokeWidth={2.5} />
       </div>
+      </>
     );
   };
 
