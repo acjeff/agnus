@@ -2853,6 +2853,9 @@ export default function Pattrn() {
   const [birthdayInput, setBirthdayInput] = useState("");
   const goToDateRef = useRef(null);
 
+  // Radial context button state
+  const [radialOpen, setRadialOpen] = useState(false);
+
   // Theme state
   const [activeThemeId, setActiveThemeId] = useState(() => loadTheme());
   const [showThemePicker, setShowThemePicker] = useState(false);
@@ -4518,6 +4521,191 @@ export default function Pattrn() {
       </div>
     </nav>
   );
+
+  // --- Radial Context Button (Liquid Glass FAB) ---
+  // Close radial menu when view changes
+  const prevViewRef = useRef(view);
+  if (prevViewRef.current !== view) {
+    prevViewRef.current = view;
+    if (radialOpen) setRadialOpen(false);
+  }
+
+  // Context-aware menu items per view
+  const getRadialItems = (currentView) => {
+    switch (currentView) {
+      case "menu":
+        return [
+          { icon: "\u{1F3B2}", label: "Quick Play", action: () => { setDifficulty("easy"); setCurrentPuzzle(0); setView("play"); } },
+          { icon: "\u{1F3A8}", label: "Create", action: () => { setView("creator"); } },
+          { icon: "\u{1F4CA}", label: "Profile", action: () => { setView("profile"); } },
+        ];
+      case "gallery":
+        return [
+          { icon: "\u2795", label: "New Mosaic", action: () => { setView("creator"); } },
+          { icon: "\u{1F30D}", label: "Public", action: () => { setMosaicGalleryTab("public"); loadMosaicData("public"); } },
+          { icon: "\u{1F4C1}", label: "My Mosaics", action: () => { setMosaicGalleryTab("mine"); loadMosaicData("mine"); } },
+        ];
+      case "creator":
+        return [
+          { icon: "\u{1F5BC}", label: "Gallery", action: () => { setView("gallery"); } },
+          { icon: "\u{1F3E0}", label: "Home", action: () => { setView("menu"); } },
+        ];
+      case "profile":
+        return [
+          { icon: "\u{1F3C6}", label: "Achievements", action: () => { setShowAchievements(true); } },
+          { icon: "\u{1F3E0}", label: "Home", action: () => { setView("menu"); } },
+          { icon: "\u{1F3A8}", label: "Gallery", action: () => { setView("gallery"); } },
+        ];
+      case "coop":
+        return [
+          { icon: "\u{1F3E0}", label: "Home", action: () => { setView("menu"); } },
+          { icon: "\u{1F3A8}", label: "Gallery", action: () => { setView("gallery"); } },
+        ];
+      case "custom-mosaic":
+        return [
+          { icon: "\u{1F5BC}", label: "Gallery", action: () => { setView("gallery"); } },
+          { icon: "\u{1F3E0}", label: "Home", action: () => { setView("menu"); } },
+        ];
+      default:
+        return [];
+    }
+  };
+
+  const RadialContextButton = ({ currentView }) => {
+    const items = getRadialItems(currentView);
+    if (!items || items.length === 0) return null;
+
+    const isOpen = radialOpen;
+    const itemCount = items.length;
+    // Arc configuration: items fan out in a quarter-circle arc going up-left from FAB
+    const arcSpread = Math.min(itemCount * 32, 120); // total arc degrees
+    const startAngle = -90 - arcSpread / 2; // center the arc above the button
+    const angleStep = itemCount > 1 ? arcSpread / (itemCount - 1) : 0;
+    const radius = 88;
+
+    return (
+      <>
+        {/* Radial button animations */}
+        <style>{`
+          @keyframes radialBackdropIn { from { opacity: 0; } to { opacity: 1; } }
+          @keyframes radialItemPop { 0% { opacity: 0; transform: scale(0.2); } 100% { opacity: 1; transform: scale(1); } }
+          @keyframes radialFabPulse { 0%, 100% { box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), 0 0 0px rgba(200,240,62,0), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1); } 50% { box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), 0 0 18px rgba(200,240,62,0.12), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1); } }
+        `}</style>
+
+        {/* Backdrop overlay */}
+        {isOpen && (
+          <div
+            onClick={() => setRadialOpen(false)}
+            style={{
+              position: "fixed", inset: 0, zIndex: 84,
+              backgroundColor: "rgba(0,0,0,0.35)",
+              backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+              animation: "radialBackdropIn 0.25s ease both",
+            }}
+          />
+        )}
+
+        {/* Radial menu items */}
+        {isOpen && items.map((item, i) => {
+          const angleDeg = itemCount === 1 ? -90 : startAngle + i * angleStep;
+          const angleRad = angleDeg * (Math.PI / 180);
+          const x = Math.cos(angleRad) * radius;
+          const y = Math.sin(angleRad) * radius;
+
+          return (
+            <div
+              key={i}
+              style={{
+                position: "fixed",
+                // Position: offset from FAB center (FAB is 56px, so center is at right:20+28=48, bottom:80+28=108 from safe area)
+                bottom: `calc(${80 + 28 - y}px + env(safe-area-inset-bottom, 0px))`,
+                right: 20 + 28 - x,
+                zIndex: 86,
+                animation: `radialItemPop 0.3s ${i * 0.06}s cubic-bezier(0.34, 1.56, 0.64, 1) both`,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                pointerEvents: "auto",
+                // Center the item on its computed position
+                transform: "translate(50%, 50%)",
+              }}
+            >
+              <button
+                onClick={() => { item.action(); setRadialOpen(false); }}
+                style={{
+                  width: 50, height: 50, borderRadius: 25,
+                  background: `linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 100%)`,
+                  backdropFilter: "blur(24px) saturate(180%)",
+                  WebkitBackdropFilter: "blur(24px) saturate(180%)",
+                  border: "1px solid rgba(255,255,255,0.18)",
+                  boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.08)`,
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 20, lineHeight: 1,
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.12)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2), 0 0 20px ${C.accent}33, inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.08)`; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.08)`; }}
+              >
+                {item.icon}
+              </button>
+              <span style={{
+                fontSize: 9, fontWeight: 700, color: C.text,
+                fontFamily: "'Space Mono', monospace",
+                letterSpacing: 0.5, textTransform: "uppercase",
+                textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+                whiteSpace: "nowrap",
+              }}>
+                {item.label}
+              </span>
+            </div>
+          );
+        })}
+
+        {/* Main FAB — Liquid Glass */}
+        <button
+          onClick={() => setRadialOpen(!isOpen)}
+          style={{
+            position: "fixed",
+            bottom: `calc(${80}px + env(safe-area-inset-bottom, 0px))`,
+            right: 20,
+            width: 56, height: 56, borderRadius: 28,
+            background: isOpen
+              ? `linear-gradient(135deg, rgba(200,240,62,0.18) 0%, rgba(200,240,62,0.06) 100%)`
+              : `linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.08) 100%)`,
+            backdropFilter: "blur(28px) saturate(200%)",
+            WebkitBackdropFilter: "blur(28px) saturate(200%)",
+            border: isOpen
+              ? `1px solid ${C.accent}44`
+              : "1px solid rgba(255,255,255,0.16)",
+            boxShadow: isOpen
+              ? `0 8px 32px rgba(0,0,0,0.5), 0 0 24px ${C.accent}22, inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`
+              : `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`,
+            zIndex: 85,
+            cursor: "pointer",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
+            transform: isOpen ? "rotate(45deg) scale(1.05)" : "rotate(0deg) scale(1)",
+          }}
+          onMouseEnter={e => { if (!isOpen) { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.5), 0 0 16px ${C.accent}22, inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.1)`; } }}
+          onMouseLeave={e => { if (!isOpen) { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`; } }}
+          aria-label="Quick actions"
+        >
+          {/* Liquid Glass sheen highlight */}
+          <div style={{
+            position: "absolute", inset: 0, borderRadius: 28, overflow: "hidden", pointerEvents: "none",
+          }}>
+            <div style={{
+              position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%",
+              background: "linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 100%)",
+              borderRadius: "28px 28px 50% 50%",
+            }} />
+          </div>
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={isOpen ? C.accent : "rgba(255,255,255,0.85)"} strokeWidth="2.5" strokeLinecap="round">
+            <path d="M12 5v14M5 12h14"/>
+          </svg>
+        </button>
+      </>
+    );
+  };
 
   const isMosaic = difficulty === "mosaic";
   const mosaicMainPuzzles = isMosaic ? (staffPickPuzzlesRef.current || PUZZLE_SETS.mosaic) : null;
@@ -9150,6 +9338,7 @@ export default function Pattrn() {
           );
         })()}
 
+        <RadialContextButton currentView="custom-mosaic" />
         {globalModalsEl}
       </div>
     );
@@ -9410,6 +9599,7 @@ export default function Pattrn() {
           )}
         </div>
 
+      <RadialContextButton currentView="creator" />
       <BottomTabBar active="mosaic" />
       {globalModalsEl}
       </div>
@@ -9789,6 +9979,7 @@ export default function Pattrn() {
           </svg>
         </button>
       )}
+      <RadialContextButton currentView="gallery" />
       <BottomTabBar active="mosaic" />
       {globalModalsEl}
       </div>
@@ -11037,6 +11228,7 @@ export default function Pattrn() {
             );
           })()}
         </div>
+        <RadialContextButton currentView="coop" />
         <BottomTabBar active="coop" />
         {globalModalsEl}
       </div>
@@ -11459,6 +11651,7 @@ export default function Pattrn() {
 
         {/* Delete Account confirmation dialog */}
 
+        <RadialContextButton currentView="profile" />
         <BottomTabBar active="profile" />
         {globalModalsEl}
       </div>
@@ -12750,6 +12943,7 @@ export default function Pattrn() {
         </div>
       )}
 
+      <RadialContextButton currentView="menu" />
       <BottomTabBar active="home" />
       {globalModalsEl}
       </div>
