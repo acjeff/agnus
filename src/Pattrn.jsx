@@ -13690,13 +13690,8 @@ export default function Pattrn() {
       </div>
       </div>
 
-      {/* Fixed bottom bar: token picker + actions */}
+      {/* Fixed bottom bar: coop UI + game state info */}
       <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
-        {/* Token picker row */}
-        {gameState === "playing" && (
-          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId}
-          />
-        )}
         {/* Pass player picker dropdown (multi-partner) */}
         {coopPassPlayerPicker && !coopPassMode && (
           <div style={{
@@ -13940,6 +13935,27 @@ export default function Pattrn() {
         )}
       </div>
 
+      {/* Token picker — Liquid Glass pill below the action pill */}
+      {gameState === "playing" && puzzle && (
+        <div style={{
+          position: "fixed",
+          bottom: `calc(16px + env(safe-area-inset-bottom, 0px))`,
+          right: 20,
+          borderRadius: 28,
+          background: `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.55) 100%)`,
+          backdropFilter: "blur(28px) saturate(200%)",
+          WebkitBackdropFilter: "blur(28px) saturate(200%)",
+          border: "1px solid rgba(255,255,255,0.16)",
+          boxShadow: `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`,
+          zIndex: 85,
+          padding: "6px 4px",
+          maxWidth: "calc(100vw - 40px)",
+          overflow: "hidden",
+        }}>
+          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId}
+          />
+        </div>
+      )}
       {renderContextButton("play", playPillButtons)}
       {globalModalsEl}
     </div>
