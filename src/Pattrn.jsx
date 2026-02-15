@@ -4722,8 +4722,8 @@ export default function Pattrn() {
       );
     };
 
-    const defaultShadow = `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`;
-    const hoverShadow = `0 8px 32px rgba(0,0,0,0.5), 0 0 16px ${C.accent}22, inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.1)`;
+    const defaultShadow = `0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15)`;
+    const hoverShadow = `0 6px 20px rgba(0,0,0,0.35), 0 0 8px ${C.accent}18`;
 
     return (
       <>
@@ -13946,7 +13946,7 @@ export default function Pattrn() {
           backdropFilter: "blur(28px) saturate(200%)",
           WebkitBackdropFilter: "blur(28px) saturate(200%)",
           border: "1px solid rgba(255,255,255,0.16)",
-          boxShadow: `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`,
+          boxShadow: `0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15)`,
           zIndex: 85,
           padding: "6px 4px",
           maxWidth: "calc(100vw - 40px)",
