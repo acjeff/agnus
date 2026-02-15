@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock } from "lucide-react";
+import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell } from "lucide-react";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -4508,6 +4508,7 @@ export default function Pattrn() {
     refresh: (c) => <RotateCcw size={18} color={c} strokeWidth={2} />,
     forward: (c) => <ChevronRight size={18} color={c} strokeWidth={2} />,
     pass: (c) => <HandHelping size={18} color={c} strokeWidth={2} />,
+    bell: (c) => <Bell size={18} color={c} strokeWidth={2} />,
     "pass-pending": (c) => (
       <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
         <HandHelping size={18} color={c} strokeWidth={2} />
@@ -4592,10 +4593,54 @@ export default function Pattrn() {
       } else { setView("menu"); }
     }});
 
+    // Menu view items
+    const menuRoot = [];
+    if (firebaseConfigured && firebaseUser) {
+      menuRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
+      menuRoot.push({ id: "notifications", icon: "bell", label: "Notifications", action: () => { setShowNotifications(!showNotifications); } });
+    }
+
+    // Creator view items
+    const creatorRoot = [];
+    creatorRoot.push({ id: "back", icon: "back", label: creatorReturnView === "gallery" ? "Gallery" : "Home", action: () => {
+      const returnTo = creatorReturnView || "menu";
+      resetCreator(); setCreatorReturnView("menu");
+      if (returnTo === "gallery") { setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine"); } else { setView("menu"); }
+    }});
+    if (firebaseConfigured && firebaseUser) {
+      creatorRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
+    }
+
+    // Custom mosaic view items
+    const customMosaicRoot = [];
+    customMosaicRoot.push({ id: "back", icon: "back", label: "Back", action: () => {
+      if (isCoopMosaic) { setShowMosaicLeaveConfirm(true); return; }
+      const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
+    }});
+    if (firebaseConfigured && firebaseUser && !isCoopMosaic) {
+      customMosaicRoot.push({ id: "coop-mosaic", icon: "user-plus", label: "Co-op", action: () => { setShowCoopFriendPicker(true); } });
+      customMosaicRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
+    }
+
+    // Admin view items
+    const adminReviewRoot = [
+      { id: "back", icon: "back", label: "Home", action: () => { setView("menu"); } },
+      { id: "refresh", icon: "refresh", label: "Refresh", action: () => { loadMosaicData("admin"); } },
+    ];
+    const adminManageRoot = [
+      { id: "back", icon: "back", label: "Home", action: () => { setView("menu"); } },
+      { id: "refresh", icon: "refresh", label: "Refresh", action: () => { loadMosaicData("manage"); } },
+    ];
+    const adminMetricsRoot = [
+      { id: "back", icon: "back", label: "Home", action: () => { setView("menu"); } },
+      { id: "refresh", icon: "refresh", label: "Refresh", action: () => { loadAdminMetricsData(); } },
+    ];
+    const adminUsersRoot = [
+      { id: "back", icon: "back", label: "Home", action: () => { setView("menu"); } },
+    ];
+
     const trees = {
-      menu: {
-        root: [],
-      },
+      menu: { root: menuRoot },
       gallery: {
         root: [
           { id: "new", icon: "plus", label: "Create New", action: () => { setView("creator"); } },
@@ -4603,14 +4648,21 @@ export default function Pattrn() {
           { id: "mine", icon: "folder", label: "My Mosaics", action: () => { setMosaicGalleryTab("mine"); loadMosaicData("mine"); } },
         ],
       },
-      play: {
-        root: playRoot,
-      },
+      play: { root: playRoot },
       profile: {
         root: [
           { id: "achievements", icon: "trophy", label: "Achievements", action: () => { setShowAchievements(true); } },
         ],
       },
+      creator: { root: creatorRoot },
+      "custom-mosaic": { root: customMosaicRoot },
+      coop: { root: firebaseConfigured && firebaseUser ? [
+        { id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } },
+      ] : [] },
+      "admin-review": { root: adminReviewRoot },
+      "admin-manage": { root: adminManageRoot },
+      "admin-metrics": { root: adminMetricsRoot },
+      "admin-users": { root: adminUsersRoot },
     };
     return trees[currentView] || { root: [] };
   };
@@ -9194,20 +9246,6 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => {
-            if (isCoopMosaic) { setShowMosaicLeaveConfirm(true); return; }
-            const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
-          }}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <div style={{ flex: 1 }}>
             <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, margin: 0, color: isCoopMosaic ? C.coop : C.accent }}>
               {customMosaicPlay.title || "Untitled"}
@@ -9216,59 +9254,6 @@ export default function Pattrn() {
               <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorUsername}</div>
             )}
           </div>
-          {/* Co-op button */}
-          {firebaseConfigured && firebaseUser && !isCoopMosaic && (
-            <button
-              onClick={() => setShowCoopFriendPicker(true)}
-              style={{
-                background: "none", border: `1px solid ${C.coop}55`,
-                borderRadius: 8, padding: "5px 10px", cursor: "pointer",
-                transition: "all 0.15s", display: "flex", alignItems: "center", gap: 4, height: 30,
-                fontFamily: "'Space Mono', monospace", fontSize: 10, fontWeight: 700,
-                color: C.coop, letterSpacing: 1, textTransform: "uppercase",
-              }}
-              title="Start co-op mosaic session"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.coop; e.currentTarget.style.backgroundColor = C.coop + "11"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.coop + "55"; e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.coop} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              Co-op
-            </button>
-          )}
-          {firebaseConfigured && firebaseUser && !isCoopMosaic && (
-            <button
-              onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }}
-              style={{
-                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
-                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
-                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
-                position: "relative", minWidth: 32, height: 30,
-              }}
-              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
-              aria-label="Friends"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              {onlineFriendsCount > 0 && (
-                <span style={{
-                  position: "absolute", top: -4, right: -4,
-                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
-                  backgroundColor: C.correct, color: "#fff",
-                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: "'Space Mono', monospace",
-                }}>
-                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
-                </span>
-              )}
-            </button>
-          )}
         </div>
 
         {/* Coop mosaic status bar — n-player */}
@@ -9627,61 +9612,9 @@ export default function Pattrn() {
           backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
           animation: "fadeUp 0.3s ease",
         }}>
-          <button onClick={() => {
-            const returnTo = creatorReturnView || "menu";
-            resetCreator();
-            setCreatorReturnView("menu");
-            if (returnTo === "gallery") {
-              setView("gallery");
-              loadMosaicData(mosaicGalleryTab || "mine");
-            } else {
-              setView("menu");
-            }
-          }}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             {creatorEditingId ? "Edit Mosaic" : "Create Mosaic"}
           </h2>
-          {firebaseConfigured && firebaseUser && (
-            <button
-              onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }}
-              style={{
-                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
-                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
-                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
-                position: "relative", minWidth: 32, height: 30,
-              }}
-              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
-              aria-label="Friends"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              {onlineFriendsCount > 0 && (
-                <span style={{
-                  position: "absolute", top: -4, right: -4,
-                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
-                  backgroundColor: C.correct, color: "#fff",
-                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: "'Space Mono', monospace",
-                }}>
-                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
-                </span>
-              )}
-            </button>
-          )}
         </div>
 
         {/* Title input */}
@@ -10219,7 +10152,7 @@ export default function Pattrn() {
           </div>
         )}
 
-      {renderContextButton("gallery")}
+      {renderContextButton("admin-review")}
       {globalModalsEl}
       </div>
     );
@@ -10238,31 +10171,9 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 480, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => setView("menu")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             Review Mosaics
           </h2>
-          <button onClick={() => loadMosaicData("admin")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            Refresh
-          </button>
         </div>
 
         {mosaicMsg && (
@@ -10335,7 +10246,7 @@ export default function Pattrn() {
             ))}
           </div>
         )}
-        {renderContextButton("gallery")}
+        {renderContextButton("admin-manage")}
         {globalModalsEl}
       </div>
     );
@@ -10354,31 +10265,9 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 480, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => setView("menu")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             Manage Public
           </h2>
-          <button onClick={() => loadMosaicData("manage")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            Refresh
-          </button>
         </div>
 
         {mosaicMsg && (
@@ -10521,31 +10410,9 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 520, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => setView("menu")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             Game Metrics
           </h2>
-          <button onClick={loadAdminMetricsData}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            Refresh
-          </button>
         </div>
 
         {/* Tab bar */}
@@ -10859,17 +10726,6 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 520, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => setView("menu")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             User Activity
           </h2>
@@ -11923,74 +11779,6 @@ export default function Pattrn() {
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
             Agnus
           </h1>
-          {/* Right: action buttons */}
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {/* Friends button */}
-            {firebaseConfigured && firebaseUser && (
-              <button
-                onClick={() => {
-                  setShowFriendsModal(true);
-                  setFriendsModalTab("list");
-                }}
-                style={{
-                  background: "none", border: "none", borderRadius: 10,
-                  width: 36, height: 36, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all 0.15s", position: "relative",
-                  backgroundColor: friendsList.length > 0 ? C.accent + "15" : "transparent",
-                }}
-                aria-label="Friends"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={friendsList.length > 0 ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
-                {onlineFriendsCount > 0 && (
-                  <span style={{
-                    position: "absolute", top: 2, right: 2,
-                    minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
-                    backgroundColor: C.correct, color: "#fff",
-                    fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                    fontFamily: "'Space Mono', monospace",
-                  }}>
-                    {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
-                  </span>
-                )}
-              </button>
-            )}
-            {/* Notification bell */}
-            {firebaseConfigured && firebaseUser && (
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                style={{
-                  background: "none", border: "none", borderRadius: 10,
-                  width: 36, height: 36, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all 0.15s", position: "relative",
-                  backgroundColor: notifications.length > 0 ? "#54A0FF15" : "transparent",
-                }}
-                aria-label="Notifications"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={notifications.length > 0 ? "#54A0FF" : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                </svg>
-                {notifications.length > 0 && (
-                  <span style={{
-                    position: "absolute", top: 2, right: 2,
-                    width: 14, height: 14, borderRadius: "50%",
-                    backgroundColor: "#f87171", color: "#fff",
-                    fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                    fontFamily: "'Space Mono', monospace",
-                  }}>
-                    {notifications.length > 9 ? "9+" : notifications.length}
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
         </div>
 
         {/* ── Scrollable content area ── */}
