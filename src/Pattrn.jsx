@@ -4629,7 +4629,6 @@ export default function Pattrn() {
     startPuzzle(idx, diff, true, dailyDate);
   };
   const playSubMenu = [
-    { id: "back", icon: "back", label: "Back", isBack: true },
     { id: "easy", icon: "grid", label: "Easy", action: () => { quickPlayStart("easy", getRandomUncompletedPuzzle("easy")); } },
     { id: "medium", icon: "layers", label: "Medium", action: () => { quickPlayStart("medium", getRandomUncompletedPuzzle("medium")); } },
     { id: "hard", icon: "zap", label: "Hard", action: () => { quickPlayStart("hard", getRandomUncompletedPuzzle("hard")); } },
@@ -4640,7 +4639,6 @@ export default function Pattrn() {
   // Theme sub-menu — select a theme inline
   const themeAchList = computeAchievements(progress, times, savedAchievementIds);
   const themeSubMenu = [
-    { id: "back", icon: "back", label: "Back", isBack: true },
     ...PUZZLE_THEMES.map(theme => {
       const unlocked = isThemeUnlocked(theme, themeAchList);
       const isActive = activeThemeId === theme.id;
@@ -4799,8 +4797,7 @@ export default function Pattrn() {
     );
     const coopStartContentHeight = (() => {
       if (!isCoopStartMenu) return 0;
-      let h = panelPad + fabSize; // padding + bottom bar
-      h += 44; // back button row
+      let h = panelPad + fabSize; // padding + bottom bar (includes sub-menu back button)
       h += 24 + 4 + 18 + 12; // header + gap + subtitle + margin
       if (coopHasActiveSession) {
         h += 18 + 6; // "Invite Link" label + margin
@@ -4950,8 +4947,6 @@ export default function Pattrn() {
               const invitedUids = isMosaicSession ? coopMosaicInvitedUids : coopInvitedUids;
               return (
                 <>
-                  {/* Back button */}
-                  {renderItem({ id: "coop-back", icon: "back", label: "Back", isBack: true }, 0, true)}
                   {/* Coop friend picker / invite content */}
                   <div style={{
                     padding: "0 16px 12px",
@@ -5246,6 +5241,34 @@ export default function Pattrn() {
               <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
             )}
 
+            {/* Sub-menu back button — shown at bottom of menu when in a sub-menu */}
+            {isOpen && isSubMenu && (
+              <>
+                <div
+                  onClick={(e) => { e.stopPropagation(); setRadialMenuStack(prev => prev.slice(0, -1)); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    height: fabSize, padding: "0 16px",
+                    cursor: "pointer",
+                    color: C.text,
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: 11, fontWeight: 600,
+                    letterSpacing: 0.5, textTransform: "uppercase",
+                    flexShrink: 0,
+                    transition: "background 0.15s",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
+                >
+                  <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, flexShrink: 0 }}>
+                    {renderIcon("back", strokeColor)}
+                  </span>
+                  <span>Back</span>
+                </div>
+                <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
+              </>
+            )}
+
             {/* Menu toggle button */}
             <div
               onClick={(e) => { e.stopPropagation(); handleToggle(); }}
@@ -5268,6 +5291,53 @@ export default function Pattrn() {
           </div>
         </div>
       </>
+    );
+  };
+
+  // Standalone Liquid Glass back button — mirrors the FAB on the bottom-left
+  const renderBackButton = (onClick, bottomPx = 16) => {
+    const fabSize = 56;
+    const springOpen = "cubic-bezier(0.175, 0.885, 0.32, 1.175)";
+    const strokeColor = "#fff";
+    return (
+      <div
+        onClick={onClick}
+        style={{
+          position: "fixed",
+          bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
+          left: 20,
+          width: fabSize,
+          height: fabSize,
+          borderRadius: fabSize / 2,
+          background: activeTheme.gridBg || C.surface,
+          backdropFilter: "blur(28px) saturate(200%)",
+          WebkitBackdropFilter: "blur(28px) saturate(200%)",
+          border: "1px solid rgba(255,255,255,0.16)",
+          boxShadow: "none",
+          zIndex: 85,
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          transition: `transform 0.15s ${springOpen}, box-shadow 0.15s ease`,
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+        aria-label="Go back"
+      >
+        {/* Liquid Glass sheen highlight */}
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none",
+        }}>
+          <div style={{
+            position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%",
+            background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)",
+            borderRadius: "inherit",
+          }} />
+        </div>
+        <ChevronLeft size={22} color={strokeColor} strokeWidth={2.5} />
+      </div>
     );
   };
 
@@ -9619,10 +9689,11 @@ export default function Pattrn() {
           );
         })()}
 
-        {renderContextButton("custom-mosaic", [{ id: "back", icon: "back", color: "#fff", onClick: () => {
+        {renderBackButton(() => {
           if (isCoopMosaic) { setShowMosaicLeaveConfirm(true); return; }
           const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
-        }}])}
+        })}
+        {renderContextButton("custom-mosaic")}
         {globalModalsEl}
       </div>
     );
@@ -9815,11 +9886,11 @@ export default function Pattrn() {
         </div>
       </div>
 
+      {renderBackButton(() => {
+        resetCreator(); setCreatorReturnView("menu");
+        setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine");
+      })}
       {renderContextButton("creator", [
-        { id: "back", icon: "back", color: "#fff", onClick: () => {
-          resetCreator(); setCreatorReturnView("menu");
-          setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine");
-        }},
         { id: "clear", icon: "refresh", color: "#fff", onClick: () => resetCreator() },
         { id: "save", icon: "upload", color: C.accent, onClick: handleSaveClick, disabled: mosaicLoading },
       ])}
@@ -10322,7 +10393,8 @@ export default function Pattrn() {
             ))}
           </div>
         )}
-        {renderContextButton("admin-review", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
+        {renderBackButton(() => setView("menu"))}
+        {renderContextButton("admin-review")}
         {globalModalsEl}
       </div>
     );
@@ -10467,7 +10539,8 @@ export default function Pattrn() {
             })}
           </div>
         )}
-        {renderContextButton("admin-manage", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
+        {renderBackButton(() => setView("menu"))}
+        {renderContextButton("admin-manage")}
         {globalModalsEl}
       </div>
     );
@@ -10739,7 +10812,8 @@ export default function Pattrn() {
             )}
           </div>
         )}
-        {renderContextButton("admin-metrics", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
+        {renderBackButton(() => setView("menu"))}
+        {renderContextButton("admin-metrics")}
         {globalModalsEl}
       </div>
     );
@@ -10973,7 +11047,8 @@ export default function Pattrn() {
             })}
           </div>
         )}
-        {renderContextButton("admin-users", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
+        {renderBackButton(() => setView("menu"))}
+        {renderContextButton("admin-users")}
         {globalModalsEl}
       </div>
     );
@@ -12845,7 +12920,7 @@ export default function Pattrn() {
       setView("custom-mosaic");
     } else { setView("menu"); }
   };
-  const playPillButtons = [{ id: "back", icon: "back", color: "#fff", onClick: playBackAction }];
+  const playPillButtons = [];
   if (gameState === "playing") {
     if (isCoop && coopMyLockedIn) {
       playPillButtons.push({ id: "locked", icon: "check", color: C.correct });
@@ -13632,6 +13707,7 @@ export default function Pattrn() {
           />
         </div>
       )}
+      {renderBackButton(playBackAction)}
       {renderContextButton("play", playPillButtons)}
       {globalModalsEl}
     </div>
