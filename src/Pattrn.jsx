@@ -4505,7 +4505,7 @@ export default function Pattrn() {
     check: (c) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
     refresh: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
     forward: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 6 15 12 9 18"/></svg>,
-    pass: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M11 13l-7 7"/><path d="M3 16v5h5"/></svg>,
+    pass: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg>,
   };
 
   // Quick Play sub-menu — shared across all views (accessed from nav)
@@ -4521,13 +4521,17 @@ export default function Pattrn() {
     return uncompleted[Math.floor(Math.random() * uncompleted.length)];
   };
 
+  const quickPlayStart = (diff, idx, dailyDate) => {
+    if (coopSessionId) leaveCoopSession();
+    startPuzzle(idx, diff, true, dailyDate);
+  };
   const playSubMenu = [
     { id: "back", icon: "back", label: "Back", isBack: true },
-    { id: "easy", icon: "grid", label: "Easy", action: () => { const idx = getRandomUncompletedPuzzle("easy"); setDifficulty("easy"); setCurrentPuzzle(idx); setView("play"); } },
-    { id: "medium", icon: "layers", label: "Medium", action: () => { const idx = getRandomUncompletedPuzzle("medium"); setDifficulty("medium"); setCurrentPuzzle(idx); setView("play"); } },
-    { id: "hard", icon: "zap", label: "Hard", action: () => { const idx = getRandomUncompletedPuzzle("hard"); setDifficulty("hard"); setCurrentPuzzle(idx); setView("play"); } },
-    { id: "daily", icon: "calendar", label: "Daily", action: () => { setDifficulty("daily"); setCurrentDailyDate(getTodayDailyDateStr()); setView("play"); } },
-    { id: "cascade", icon: "layers", label: "Cascade", action: () => { setDifficulty("cascade"); setView("play"); } },
+    { id: "easy", icon: "grid", label: "Easy", action: () => { quickPlayStart("easy", getRandomUncompletedPuzzle("easy")); } },
+    { id: "medium", icon: "layers", label: "Medium", action: () => { quickPlayStart("medium", getRandomUncompletedPuzzle("medium")); } },
+    { id: "hard", icon: "zap", label: "Hard", action: () => { quickPlayStart("hard", getRandomUncompletedPuzzle("hard")); } },
+    { id: "daily", icon: "calendar", label: "Daily", action: () => { quickPlayStart("daily", null, getTodayDailyDateStr()); } },
+    { id: "cascade", icon: "layers", label: "Cascade", action: () => { quickPlayStart("cascade", cascadeRunIndex); } },
   ];
 
   // Theme sub-menu — select a theme inline
