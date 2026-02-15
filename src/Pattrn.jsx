@@ -8863,32 +8863,26 @@ export default function Pattrn() {
   }, [view]);
 
   const playViewGoBack = useCallback(() => {
-    const el = playViewContainerRef.current;
-    if (!el) return;
-    el.style.transition = "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)";
-    el.style.transform = "translateX(100%)";
-    setTimeout(() => {
-      if (isCoop) { setShowLeaveConfirm(true); el.style.transition = "none"; el.style.transform = ""; return; }
-      if (difficulty === "cascade") {
-        const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
-        const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
-        setProgress(nextProgress);
-        saveProgress(nextProgress);
+    if (isCoop) { setShowLeaveConfirm(true); return; }
+    if (difficulty === "cascade") {
+      const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
+      const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
+      setProgress(nextProgress);
+      saveProgress(nextProgress);
+    }
+    stopTimer();
+    setShowMosaicPreviewOverlay(false);
+    if (customMosaicPuzzlesRef.current && isMosaic) {
+      if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
+        coopMosaicCurrentTileRef.current = -1;
+        updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
+        setCoopMosaicOtherFills({});
+        coopMosaicWriteThrottleRef.current = {};
       }
-      stopTimer();
-      setShowMosaicPreviewOverlay(false);
-      if (customMosaicPuzzlesRef.current && isMosaic) {
-        if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
-          coopMosaicCurrentTileRef.current = -1;
-          updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
-          setCoopMosaicOtherFills({});
-          coopMosaicWriteThrottleRef.current = {};
-        }
-        setView("custom-mosaic");
-      } else {
-        setView("menu");
-      }
-    }, 300);
+      setView("custom-mosaic");
+    } else {
+      setView("menu");
+    }
   }, [isCoop, difficulty, cascadeLevel, fills, attempts, progress, cascadeRunIndex, isMosaic, isCoopMosaic, coopMosaicSessionId, firebaseUser]);
 
   const onPlaySwipeStart = useCallback((e) => {
