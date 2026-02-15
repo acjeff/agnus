@@ -13526,20 +13526,42 @@ export default function Pattrn() {
         </div>
       </div>
       </div>
+      {/* Puzzle complete overlay — blurry area on top of finished grid */}
+      {gameState === "won" && (
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          backgroundColor: (C.surface || C.bg) + "BB",
+          zIndex: 5,
+          animation: "fadeUp 0.5s ease both",
+          pointerEvents: "none",
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 8, animation: "fadeUp 0.4s ease" }}>🎉</div>
+          <div style={{ fontSize: 11, fontWeight: 600, fontFamily: "'Inter', sans-serif", color: C.textDim, textTransform: "uppercase", letterSpacing: 2, marginBottom: 6, animation: "fadeUp 0.45s ease both" }}>
+            Puzzle Complete
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.correct, animation: "fadeUp 0.5s 0.05s ease both" }}>
+            {isCoop ? "Co-op complete!" : isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : isSpin ? "Nailed it!" : isMosaic ? "Tile complete!" : (attempts === 1 ? "Perfect!" : attempts === 2 ? "Brilliant!" : attempts === 3 ? "Great!" : attempts === 4 ? "Not bad!" : "Solved!")}
+          </div>
+          {isCoop && (
+            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 6, animation: "fadeUp 0.55s 0.1s ease both" }}>
+              Session complete — well played!
+            </div>
+          )}
+        </div>
+      )}
       </div>
 
       {/* Fixed bottom bar: coop UI + game state info */}
       <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: activeTheme.gridBg || C.surface, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
         {gameState === "won" && (
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.correct, marginBottom: isCoop ? 4 : 12, animation: "fadeUp 0.4s ease" }}>
-              &#x2713; {isCoop ? "Co-op complete!" : isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : isSpin ? "Nailed it!" : isMosaic ? "Tile complete!" : "Perfect"}
-            </div>
-            {isCoop && (
-              <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginBottom: 12, animation: "fadeUp 0.5s 0.1s ease both" }}>
-                Session complete — well played!
-              </div>
-            )}
             {/* Global ranking display */}
             {puzzleRanking && !isCoop && !isCascade && !isMosaic && (
               <div style={{
