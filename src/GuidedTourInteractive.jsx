@@ -49,7 +49,8 @@ export function GuidedTourInteractive({
         targetSelector: "[data-tour-id='easy-puzzle-1']",
         position: "bottom",
         showArrow: true,
-        autoAdvance: false, // Wait for user to manually advance
+        autoAdvance: true, // Auto-advance when user clicks button
+        condition: () => view === "play",
       },
       {
         id: "in-puzzle",
@@ -308,20 +309,67 @@ export function GuidedTourInteractive({
     };
   }, [targetElement, currentStep]);
 
+  // Raise target element's z-index to make it clickable above overlay
+  useEffect(() => {
+    if (!targetElement) return;
+
+    const originalZIndex = targetElement.style.zIndex;
+    const originalPosition = targetElement.style.position;
+
+    targetElement.style.position = originalPosition || "relative";
+    targetElement.style.zIndex = "9999";
+
+    return () => {
+      targetElement.style.zIndex = originalZIndex;
+      targetElement.style.position = originalPosition;
+    };
+  }, [targetElement]);
+
   const isCenterPosition = currentStep.position === "center" || !currentStep.targetSelector;
+
+  // Calculate spotlight cutout for target element
+  const spotlightStyle = targetElement ? (() => {
+    const rect = targetElement.getBoundingClientRect();
+    const padding = 8; // Padding around the element
+    return {
+      left: rect.left - padding,
+      top: rect.top - padding,
+      width: rect.width + padding * 2,
+      height: rect.height + padding * 2,
+    };
+  })() : null;
 
   return (
     <>
-      {/* Subtle overlay - only slightly dims, doesn't block */}
+      {/* Blocking overlay with spotlight cutout */}
       <div
         style={{
           position: "fixed",
           inset: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.3)",
+          backgroundColor: "rgba(0, 0, 0, 0.7)",
           zIndex: 9998,
-          pointerEvents: "none",
+          pointerEvents: "auto", // Block all clicks
         }}
       />
+
+      {/* Spotlight cutout - allows clicks through to target */}
+      {spotlightStyle && (
+        <div
+          style={{
+            position: "fixed",
+            left: spotlightStyle.left,
+            top: spotlightStyle.top,
+            width: spotlightStyle.width,
+            height: spotlightStyle.height,
+            zIndex: 9998,
+            pointerEvents: "none", // Allow clicks through
+            border: `3px solid ${colors.accent}`,
+            borderRadius: 12,
+            boxShadow: `0 0 0 9999px rgba(0, 0, 0, 0.7), 0 0 20px ${colors.accent}`,
+            animation: "pulse 2s ease-in-out infinite",
+          }}
+        />
+      )}
 
       {/* Animated arrow pointer */}
       {currentStep.showArrow && arrowPosition && (
@@ -504,6 +552,17 @@ export function GuidedTourInteractive({
         @keyframes spin {
           from { transform: rotate(0deg); }
           to { transform: rotate(360deg); }
+        }
+
+        @keyframes pulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.8;
+            transform: scale(1.02);
+          }
         }
       `}</style>
     </>
