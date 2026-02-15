@@ -4708,8 +4708,8 @@ export default function Pattrn() {
       );
     };
 
-    const defaultShadow = `0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15)`;
-    const hoverShadow = `0 6px 20px rgba(0,0,0,0.35), 0 0 8px ${C.accent}18`;
+    const defaultShadow = "none";
+    const hoverShadow = "none";
 
     return (
       <>
