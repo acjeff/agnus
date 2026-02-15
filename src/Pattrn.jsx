@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell, PaintBucket, Eraser } from "lucide-react";
+import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell, PaintBucket, Eraser, Settings, Cake, Trash2, Edit3, Award, X, Copy } from "lucide-react";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -2812,7 +2812,6 @@ export default function Pattrn() {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [shareMsg, setShareMsg] = useState("");
   const [dailyShareMsg, setDailyShareMsg] = useState("");
-  const [showShareModal, setShowShareModal] = useState(false);
   const [cascadeLevel, setCascadeLevel] = useState(0);
   const [cascadeLives, setCascadeLives] = useState(3);
   const [cascadeRunIndex, setCascadeRunIndex] = useState(0);
@@ -2844,11 +2843,7 @@ export default function Pattrn() {
   const [birthday, setBirthday] = useState(() => {
     try { return localStorage.getItem(BIRTHDAY_KEY) || null; } catch { return null; }
   });
-  const [showBirthdayPrompt, setShowBirthdayPrompt] = useState(false);
-  const [showAchievements, setShowAchievements] = useState(false);
   const [showGameMenu, setShowGameMenu] = useState(false);
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
-  const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [deleteAccountPassword, setDeleteAccountPassword] = useState("");
   const [deleteAccountError, setDeleteAccountError] = useState("");
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false);
@@ -2882,7 +2877,6 @@ export default function Pattrn() {
 
   // Theme state
   const [activeThemeId, setActiveThemeId] = useState(() => loadTheme());
-  const [showThemePicker, setShowThemePicker] = useState(false);
   const [themeToast, setThemeToast] = useState(null); // { id, name, icon, key }
   const [themeToastDismissing, setThemeToastDismissing] = useState(false);
   const themeToastTimer = useRef(null);
@@ -2921,18 +2915,15 @@ export default function Pattrn() {
   const cloudSyncInFlight = useRef(false);
   const firebaseConfigured = isFirebaseConfigured();
   // Sync choice prompt state (shown when both local + cloud data exist on login)
-  const [showSyncChoice, setShowSyncChoice] = useState(false);
   const [syncChoiceData, setSyncChoiceData] = useState(null); // { uid, localData, cloudData, localSummary, cloudSummary }
 
   // --- Username & Profile state ---
   const [username, setUsername] = useState(null); // current user's username
   const [profilePicture, setProfilePicture] = useState(null); // base64 data URL
-  const [showUsernameModal, setShowUsernameModal] = useState(false); // mandatory username prompt
   const [usernameInput, setUsernameInput] = useState("");
   const [usernameError, setUsernameError] = useState("");
   const [usernameLoading, setUsernameLoading] = useState(false);
   const [usernameAvailable, setUsernameAvailable] = useState(null); // null | true | false
-  const [showProfilePage, setShowProfilePage] = useState(false);
   const [profilePictureLoading, setProfilePictureLoading] = useState(false);
   const usernameCheckTimer = useRef(null);
   const hasCheckedUsername = useRef(false);
@@ -3010,7 +3001,6 @@ export default function Pattrn() {
   const [addFriendLoading, setAddFriendLoading] = useState(false);
 
   // --- Friends Modal & Comparison state ---
-  const [showFriendsModal, setShowFriendsModal] = useState(false);
   const [friendsModalTab, setFriendsModalTab] = useState("list"); // "list" | "compare"
   const [compareFriend, setCompareFriend] = useState(null); // friend object being compared
   const [compareFriendStats, setCompareFriendStats] = useState(null); // loaded public stats for comparison
@@ -3044,8 +3034,6 @@ export default function Pattrn() {
   const [activeSessionsLoading, setActiveSessionsLoading] = useState(false);
   const [showCoopFriendPicker, setShowCoopFriendPicker] = useState(false); // friend picker for coop
   const [coopSelectedFriends, setCoopSelectedFriends] = useState(new Set()); // multi-select friends for coop invites
-  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false); // leave coop confirmation
-  const [showMosaicLeaveConfirm, setShowMosaicLeaveConfirm] = useState(false); // leave coop mosaic confirmation
   const [coopPartnerLockToast, setCoopPartnerLockToast] = useState(null); // toast when partner locks in
   const coopPartnerLockToastTimer = useRef(null);
   const prevCoopPartnerLockedRef = useRef(false); // track partner lock state changes
@@ -3069,7 +3057,6 @@ export default function Pattrn() {
   const [coopMosaicOtherFills, setCoopMosaicOtherFills] = useState({}); // merged fills from all other players for current tile { "r-c": token }
   const prevCoopMosaicOtherFillsRef = useRef({}); // previous mosaic fills for animation diffing
   const [showCoopMosaicInvite, setShowCoopMosaicInvite] = useState(false);
-  const [showCoopMosaicNavigate, setShowCoopMosaicNavigate] = useState(false); // modal to navigate to a player's tile
   const coopMosaicUnsubRef = useRef(null);
   const coopMosaicWriteThrottleRef = useRef({});
   const coopMosaicCurrentTileRef = useRef(null); // tracks which tile index the local player is in (-1 for overview)
@@ -3186,11 +3173,11 @@ export default function Pattrn() {
         setProfilePicture(profile.profilePicture || null);
       } else {
         // User has no username — show mandatory modal
-        setShowUsernameModal(true);
+        setRadialMenuStack(["root", "account", "username-edit"]);
         setProfilePicture(profile?.profilePicture || null);
       }
     }).catch(() => {
-      setShowUsernameModal(true);
+      setRadialMenuStack(["root", "account", "username-edit"]);
     });
   }, [firebaseUser, firebaseConfigured]);
 
@@ -3881,7 +3868,7 @@ export default function Pattrn() {
       setSyncStatus("synced");
       setTimeout(() => setSyncStatus(""), 2000);
       // New account has no username yet — show the mandatory modal
-      setShowUsernameModal(true);
+      setRadialMenuStack(["root", "account", "username-edit"]);
     } catch (e) {
       setAccountError(friendlyAuthError(e.code));
     } finally {
@@ -3901,7 +3888,7 @@ export default function Pattrn() {
     if (hasLocal && hasCloud) {
       // Both sides have progress — ask the user what to do
       setSyncChoiceData({ uid, localData, cloudData, localSummary, cloudSummary });
-      setShowSyncChoice(true);
+      setRadialMenuStack(["root", "sync-choice"]);
       setRadialMenuStack([]);
       setAccountEmail("");
       setAccountPassword("");
@@ -3954,7 +3941,7 @@ export default function Pattrn() {
     if (!syncChoiceData) return;
     const { uid, localData, cloudData } = syncChoiceData;
     setSyncStatus("syncing");
-    setShowSyncChoice(false);
+    setRadialMenuStack([]);
     try {
       let dataToApply;
       if (choice === "local") {
@@ -3985,7 +3972,7 @@ export default function Pattrn() {
     try {
       await logOut();
       setRadialMenuStack([]);
-      setShowProfilePage(false);
+      setRadialMenuStack([]);
       setSyncStatus("");
       setUsername(null);
       setProfilePicture(null);
@@ -4025,9 +4012,9 @@ export default function Pattrn() {
       setSavedAchievementIds(new Set());
       setBirthday(null);
       setActiveThemeId("classic");
-      setShowDeleteAccountConfirm(false);
       setRadialMenuStack([]);
-      setShowProfilePage(false);
+      setRadialMenuStack([]);
+      setRadialMenuStack([]);
       setShowGameMenu(false);
       setSyncStatus("");
       setUsername(null);
@@ -4097,7 +4084,7 @@ export default function Pattrn() {
       // Also update publicStats so admin view reflects the username immediately
       savePublicStats(firebaseUser.uid, { username: trimmed }).catch(() => {});
       setUsername(trimmed);
-      setShowUsernameModal(false);
+      setRadialMenuStack([]);
       setUsernameInput("");
       setUsernameAvailable(null);
     } catch (e) {
@@ -4557,6 +4544,13 @@ export default function Pattrn() {
         <Clock size={10} color="#f59e0b" strokeWidth={2.5} style={{ position: "absolute", bottom: -2, right: -4 }} />
       </span>
     ),
+    settings: (c) => <Settings size={18} color={c} strokeWidth={2} />,
+    cake: (c) => <Cake size={18} color={c} strokeWidth={2} />,
+    trash: (c) => <Trash2 size={18} color={c} strokeWidth={2} />,
+    edit: (c) => <Edit3 size={18} color={c} strokeWidth={2} />,
+    award: (c) => <Award size={18} color={c} strokeWidth={2} />,
+    close: (c) => <X size={18} color={c} strokeWidth={2} />,
+    copy: (c) => <Copy size={18} color={c} strokeWidth={2} />,
   };
 
   // Quick Play sub-menu — shared across all views (accessed from nav)
@@ -4600,6 +4594,16 @@ export default function Pattrn() {
     }),
   ];
 
+  // Account sub-menu — nested account management options
+  const accountSubMenu = [
+    { id: "account-profile", icon: "profile", label: "View Profile", sub: "profile-view" },
+    { id: "account-username", icon: "edit", label: "Change Username", sub: "username-edit" },
+    { id: "account-birthday", icon: "cake", label: "Set Birthday", sub: "birthday-edit" },
+    { id: "account-delete", icon: "trash", label: "Delete Account", sub: "delete-account" },
+    { id: "account-signout", icon: "logout", label: "Sign Out", action: () => { handleSignOut(); } },
+    ...(progress && Object.keys(progress).length > 0 ? [{ id: "account-clear", icon: "trash", label: "Clear All Data", sub: "clear-confirm" }] : []),
+  ];
+
   // Contextual menu items per view — page-specific actions
   const getContextualMenuTree = (currentView) => {
     // Build play contextual items dynamically (some are conditional)
@@ -4620,14 +4624,14 @@ export default function Pattrn() {
     // Menu view items
     const menuRoot = [];
     if (firebaseConfigured && firebaseUser) {
-      menuRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
+      menuRoot.push({ id: "friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } });
       menuRoot.push({ id: "notifications", icon: "bell", label: "Notifications", action: () => { setShowNotifications(!showNotifications); } });
     }
 
     // Creator view items
     const creatorRoot = [];
     if (firebaseConfigured && firebaseUser) {
-      creatorRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
+      creatorRoot.push({ id: "friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } });
     }
 
     // Custom mosaic view items
@@ -4637,7 +4641,7 @@ export default function Pattrn() {
         setCoopSelectedFriends(new Set());
         return true;
       } });
-      customMosaicRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
+      customMosaicRoot.push({ id: "friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } });
     }
 
     // Admin view items
@@ -4654,24 +4658,51 @@ export default function Pattrn() {
     const adminUsersRoot = [];
 
     const trees = {
-      menu: { root: menuRoot },
+      menu: {
+        root: menuRoot,
+        "friends-view": [],
+      },
       gallery: {
         root: [
           { id: "public", icon: "globe", label: "Public", action: () => { setMosaicGalleryTab("public"); loadMosaicData("public"); } },
           { id: "mine", icon: "folder", label: "My Mosaics", action: () => { setMosaicGalleryTab("mine"); loadMosaicData("mine"); } },
         ],
       },
-      play: { root: playRoot },
+      play: {
+        root: playRoot,
+        "theme-list": [],
+      },
       profile: {
         root: [
-          { id: "achievements", icon: "trophy", label: "Achievements", action: () => { setShowAchievements(true); } },
+          { id: "achievements", icon: "trophy", label: "Achievements", sub: "achievements-view" },
+          { id: "share-stats", icon: "share", label: "Share Stats", sub: "share-stats" },
+          ...(firebaseConfigured && firebaseUser ? [
+            { id: "account", icon: "settings", label: "Account", sub: "account" },
+          ] : []),
         ],
+        account: accountSubMenu,
+        "achievements-view": [],
+        "share-stats": [],
+        "profile-view": [],
+        "username-edit": [],
+        "birthday-edit": [],
+        "delete-account": [],
+        "clear-confirm": [],
       },
-      creator: { root: creatorRoot },
-      "custom-mosaic": { root: customMosaicRoot },
-      coop: { root: firebaseConfigured && firebaseUser ? [
-        { id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } },
-      ] : [] },
+      creator: {
+        root: creatorRoot,
+        "friends-view": [],
+      },
+      "custom-mosaic": {
+        root: customMosaicRoot,
+        "friends-view": [],
+      },
+      coop: {
+        root: firebaseConfigured && firebaseUser ? [
+          { id: "friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } },
+        ] : [],
+        "friends-view": [],
+      },
       "admin-review": { root: adminReviewRoot },
       "admin-manage": { root: adminManageRoot },
       "admin-metrics": { root: adminMetricsRoot },
@@ -4702,8 +4733,21 @@ export default function Pattrn() {
     const isMosaicSaveMenu = currentMenuKey === "mosaic-save";
     const isSignInMenu = currentMenuKey === "sign-in";
     const isMosaicPreviewMenu = currentMenuKey === "mosaic-preview";
-    const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu || isMosaicPreviewMenu;
-    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
+    const isAchievementsView = currentMenuKey === "achievements-view";
+    const isFriendsView = currentMenuKey === "friends-view";
+    const isShareStats = currentMenuKey === "share-stats";
+    const isProfileView = currentMenuKey === "profile-view";
+    const isUsernameEdit = currentMenuKey === "username-edit";
+    const isBirthdayEdit = currentMenuKey === "birthday-edit";
+    const isDeleteAccount = currentMenuKey === "delete-account";
+    const isClearConfirm = currentMenuKey === "clear-confirm";
+    const isThemeList = currentMenuKey === "theme-list";
+    const isSyncChoice = currentMenuKey === "sync-choice";
+    const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu || isMosaicPreviewMenu ||
+                          isAchievementsView || isFriendsView || isShareStats || isProfileView ||
+                          isUsernameEdit || isBirthdayEdit || isDeleteAccount || isClearConfirm ||
+                          isThemeList || isSyncChoice;
+    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : currentMenuKey === "account" ? accountSubMenu : isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
     const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-gallery", "custom-mosaic": "nav-gallery" };
@@ -4808,7 +4852,144 @@ export default function Pattrn() {
       return h;
     })();
 
-    const contentHeight = isMosaicPreviewMenu ? mosaicPreviewContentHeight : isSignInMenu ? signInContentHeight : isMosaicSaveMenu ? mosaicSaveContentHeight : isCoopStartMenu ? coopStartContentHeight : (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
+    // Achievements view height — header + subtitle + scrollable list
+    const achievementsContentHeight = (() => {
+      if (!isAchievementsView) return 0;
+      const achList = computeAchievements(progress, times, savedAchievementIds);
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 4; // header + margin
+      h += 12 + 16; // subtitle + margin
+      h += Math.min(achList.length, 6) * 58; // achievement items (cap at 6, rest scrolls)
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Friends view height — header + tabs + content
+    const friendsContentHeight = (() => {
+      if (!isFriendsView) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 32 + 12; // tabs + margin
+      if (friendsModalTab === "list") {
+        h += 36 + 8; // add friend input + margin
+        h += Math.min(friendsList.length, 5) * 46 + 16; // friend list items (cap at 5, rest scrolls)
+      } else { // compare tab
+        h += 300; // comparison content
+      }
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Share stats height — header + stats display + buttons
+    const shareStatsContentHeight = (() => {
+      if (!isShareStats) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 200; // stats content
+      h += 48 + 8; // buttons + margin
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Profile view height — header + profile info + buttons
+    const profileViewContentHeight = (() => {
+      if (!isProfileView) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 80 + 16; // profile picture + margin
+      h += 200; // profile info
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Username edit height — header + input + button
+    const usernameEditContentHeight = (() => {
+      if (!isUsernameEdit) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 44 + 12; // input + margin
+      h += 14 + 12; // availability status + margin
+      h += 42; // save button
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Birthday edit height — header + date input + buttons
+    const birthdayEditContentHeight = (() => {
+      if (!isBirthdayEdit) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 44 + 16; // date input + margin
+      h += 42 + 8; // save button + margin
+      if (userBirthday) h += 42 + 8; // remove button if exists
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Delete account height — header + warning + password + button
+    const deleteAccountContentHeight = (() => {
+      if (!isDeleteAccount) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 60 + 12; // warning message + margin
+      h += 44 + 12; // password input + margin
+      if (accountError) h += 32 + 8; // error display + margin
+      h += 42; // delete button
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Clear confirm height — header + warning + buttons
+    const clearConfirmContentHeight = (() => {
+      if (!isClearConfirm) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 80 + 16; // warning message + margin
+      h += 42 + 8; // clear button + margin
+      h += 42; // cancel button
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Theme list height — header + theme list
+    const themeListContentHeight = (() => {
+      if (!isThemeList) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 4; // header + margin
+      h += 12 + 16; // subtitle + margin
+      h += Math.min(PUZZLE_THEMES.length, 5) * 66; // theme items (cap at 5, rest scrolls)
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Sync choice height — header + options
+    const syncChoiceContentHeight = (() => {
+      if (!isSyncChoice) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 80 + 16; // description + margin
+      h += 60 + 8; // local option + margin
+      h += 60 + 8; // cloud option + margin
+      h += 60; // merge option
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    const contentHeight = isAchievementsView ? achievementsContentHeight :
+                          isFriendsView ? friendsContentHeight :
+                          isShareStats ? shareStatsContentHeight :
+                          isProfileView ? profileViewContentHeight :
+                          isUsernameEdit ? usernameEditContentHeight :
+                          isBirthdayEdit ? birthdayEditContentHeight :
+                          isDeleteAccount ? deleteAccountContentHeight :
+                          isClearConfirm ? clearConfirmContentHeight :
+                          isThemeList ? themeListContentHeight :
+                          isSyncChoice ? syncChoiceContentHeight :
+                          isMosaicPreviewMenu ? mosaicPreviewContentHeight :
+                          isSignInMenu ? signInContentHeight :
+                          isMosaicSaveMenu ? mosaicSaveContentHeight :
+                          isCoopStartMenu ? coopStartContentHeight :
+                          (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
     const bottomOffset = bottomPx; // matches the bottom positioning
     const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
@@ -5169,6 +5350,569 @@ export default function Pattrn() {
                       ctx.strokeStyle = C.accent; ctx.lineWidth = 2;
                       ctx.strokeRect(tileCol * 5 * cellSz, tileRow * 5 * cellSz, 5 * cellSz, 5 * cellSz);
                     }} style={{ borderRadius: 8, border: `1px solid ${C.border}`, width: canvasSize, height: canvasSize, display: "block" }} />
+                  </div>
+                </>
+              );
+            })() : isAchievementsView ? (() => {
+              const achievements = computeAchievements(progress, times, savedAchievementIds);
+              const unlocked = achievements.filter(a => a.unlocked).length;
+              const total = achievements.length;
+              const tierColors = { 1: C.bronze, 2: C.silver, 3: C.gold };
+              const tierSymbols = { 1: "\u25C6", 2: "\u25CF", 3: "\u2605" };
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, marginBottom: 4, textAlign: "center", letterSpacing: 2 }}>
+                      Achievements
+                    </div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginBottom: 12, textAlign: "center", letterSpacing: 1 }}>{unlocked}/{total} unlocked</div>
+                    <div style={{ height: 6, borderRadius: 3, backgroundColor: C.surfaceLight, marginBottom: 16, overflow: "hidden" }}>
+                      <div style={{ height: "100%", borderRadius: 3, backgroundColor: C.accent, width: `${(unlocked / total) * 100}%`, transition: "width 0.5s" }} />
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {achievements.map(a => {
+                        const tc = tierColors[a.tier] || C.textDim;
+                        const ts = tierSymbols[a.tier] || "";
+                        return (
+                          <div key={a.id} style={{
+                            display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
+                            borderRadius: 10, backgroundColor: a.unlocked ? tc + "12" : C.surface,
+                            border: `1px solid ${a.unlocked ? tc + "44" : C.border}`,
+                            opacity: a.unlocked ? 1 : 0.5,
+                          }}>
+                            <span style={{ fontSize: 14, color: tc, fontFamily: "'Inter', sans-serif" }}>{ts}</span>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, color: a.unlocked ? C.text : C.textDim }}>{a.label}</div>
+                              <div style={{ fontSize: 10, color: C.textDim, marginTop: 1 }}>{a.desc}</div>
+                            </div>
+                            {a.unlocked && <span style={{ fontSize: 10, color: tc, fontFamily: "'Inter', sans-serif" }}>{"\u2713"}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              );
+            })() : isFriendsView ? (() => {
+              // Friends modal with tabs
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>Friends</div>
+                    {/* Tabs */}
+                    <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}`, marginBottom: 12 }}>
+                      {["list", "compare"].map(tab => (
+                        <button
+                          key={tab}
+                          onClick={() => setFriendsModalTab(tab)}
+                          style={{
+                            flex: 1, padding: "8px 0", fontSize: 10, fontWeight: 700,
+                            fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                            background: friendsModalTab === tab ? C.accent : "transparent",
+                            color: friendsModalTab === tab ? C.bg : C.textDim,
+                            border: "none", cursor: "pointer", textTransform: "uppercase",
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          {tab === "list" ? "Your Friends" : "Compare"}
+                        </button>
+                      ))}
+                    </div>
+                    {friendsModalTab === "list" ? (
+                      <>
+                        {/* Add friend input */}
+                        <input
+                          type="text"
+                          placeholder="Add friend by username..."
+                          value={addFriendUsername}
+                          onChange={(e) => setAddFriendUsername(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter") handleAddFriend(); }}
+                          style={{
+                            width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 13,
+                            fontFamily: "'Inter', sans-serif",
+                            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: C.text,
+                            outline: "none", marginBottom: 12, boxSizing: "border-box",
+                          }}
+                        />
+                        {/* Friends list */}
+                        <div style={{ maxHeight: 230, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+                          {friendsList.length === 0 ? (
+                            <div style={{ textAlign: "center", padding: "20px 0", color: C.textDim, fontSize: 11 }}>No friends yet. Add one above!</div>
+                          ) : (
+                            friendsList.map(friend => (
+                              <div key={friend.uid} style={{
+                                display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10,
+                                backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                              }}>
+                                {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
+                                <div style={{ flex: 1 }}>
+                                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text }}>{friend.username}</div>
+                                  {friend.lastActiveAt && <div style={{ fontSize: 9, color: C.textDim }}>Active {formatRelativeTime(friend.lastActiveAt)}</div>}
+                                </div>
+                                <button onClick={() => handleRemoveFriend(friend.uid)} style={{
+                                  padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
+                                  fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                  background: C.incorrect + "22", color: C.incorrect,
+                                  border: "none", cursor: "pointer", textTransform: "uppercase",
+                                }}>Remove</button>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        {/* Compare tab - select friend to compare with */}
+                        {compareFriend ? (
+                          <div>Comparison view would go here</div>
+                        ) : (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                            {friendsList.map(friend => (
+                              <button key={friend.uid} onClick={() => setCompareFriend(friend)} style={{
+                                display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10,
+                                backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                                cursor: "pointer", transition: "all 0.15s",
+                              }}>
+                                {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
+                                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </>
+              );
+            })() : isShareStats ? (() => {
+              const { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll } = getShareData();
+              const gridColors = { none: C.border, failed: C.incorrect, gold: C.gold, silver: C.silver, bronze: C.bronze };
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, marginBottom: 4, textAlign: "center", letterSpacing: 2 }}>Agnus</div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginBottom: 12, textAlign: "center", letterSpacing: 1 }}>my stats</div>
+                    <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginBottom: 16, padding: "10px 16px", borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}` }}>
+                      {[{ label: "Solved", value: totalSolved, color: C.correct }, { label: "Best", value: bestTimeAll ? formatTime(bestTimeAll) : "--", color: C.gold }].map((stat, i) => (
+                        <div key={i} style={{ textAlign: "center" }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, color: stat.color, fontFamily: "'Inter', sans-serif" }}>{stat.value}</div>
+                          <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>{stat.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
+                      <button onClick={handleShareAll} style={{
+                        flex: 1, padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: C.accent, color: C.bg, border: "none",
+                        cursor: "pointer", textTransform: "uppercase",
+                      }}>Share All</button>
+                      <button onClick={handleShareDaily} style={{
+                        flex: 1, padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: "rgba(255,255,255,0.08)", color: C.text, border: "1px solid rgba(255,255,255,0.08)",
+                        cursor: "pointer", textTransform: "uppercase",
+                      }}>Share Daily</button>
+                    </div>
+                  </div>
+                </>
+              );
+            })() : isUsernameEdit ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>Change Username</div>
+                    <input
+                      type="text"
+                      placeholder="Enter new username..."
+                      value={usernameInput}
+                      onChange={(e) => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20); setUsernameInput(v); if (v) checkUsernameAvailability(v); }}
+                      style={{
+                        width: "100%", padding: "10px 14px", borderRadius: 8,
+                        backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                        color: C.text, fontSize: 14, fontFamily: "'Inter', sans-serif",
+                        outline: "none", boxSizing: "border-box", marginBottom: 12,
+                      }}
+                    />
+                    {usernameInput && (
+                      <div style={{
+                        fontSize: 11, marginBottom: 12,
+                        color: usernameAvailable === true ? C.correct : usernameAvailable === false ? C.incorrect : C.textDim,
+                      }}>
+                        {usernameAvailable === true ? "✓ Available" : usernameAvailable === false ? "✗ Taken" : "Checking..."}
+                      </div>
+                    )}
+                    <button
+                      onClick={handleSaveUsername}
+                      disabled={!usernameInput || usernameAvailable !== true}
+                      style={{
+                        width: "100%", padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: C.accent, color: C.bg, border: "none",
+                        cursor: (!usernameInput || usernameAvailable !== true) ? "not-allowed" : "pointer",
+                        opacity: (!usernameInput || usernameAvailable !== true) ? 0.5 : 1,
+                        textTransform: "uppercase",
+                      }}
+                    >Save Username</button>
+                  </div>
+                </>
+              );
+            })() : isBirthdayEdit ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4, textAlign: "center" }}>🎂</div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 12, textAlign: "center" }}>Set Your Birthday</div>
+                    <input
+                      type="date"
+                      defaultValue={userBirthday || ""}
+                      max={getMaxBirthdayDate()}
+                      id="birthday-date-input"
+                      style={{
+                        width: "100%", padding: "10px 14px", borderRadius: 8,
+                        backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                        color: C.text, fontSize: 14, fontFamily: "'Inter', sans-serif",
+                        outline: "none", boxSizing: "border-box", marginBottom: 12,
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const input = document.getElementById("birthday-date-input");
+                        if (input && input.value) handleSaveBirthday(input.value);
+                      }}
+                      style={{
+                        width: "100%", padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: C.accent, color: C.bg, border: "none",
+                        cursor: "pointer", textTransform: "uppercase", marginBottom: 8,
+                      }}
+                    >Save Birthday</button>
+                    {userBirthday && (
+                      <button
+                        onClick={handleRemoveBirthday}
+                        style={{
+                          width: "100%", padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                          fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                          background: "rgba(255,255,255,0.08)", color: C.text, border: "1px solid rgba(255,255,255,0.08)",
+                          cursor: "pointer", textTransform: "uppercase",
+                        }}
+                      >Remove Birthday</button>
+                    )}
+                  </div>
+                </>
+              );
+            })() : isDeleteAccount ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.incorrect, marginBottom: 12 }}>Delete Account</div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12, padding: "12px", borderRadius: 8, backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44` }}>
+                      ⚠️ This action cannot be undone. All your progress, mosaics, and account data will be permanently deleted.
+                    </div>
+                    {firebaseUser && !firebaseUser.providerData?.some(p => p.providerId === "google.com") && (
+                      <>
+                        <input
+                          type="password"
+                          placeholder="Enter password to confirm..."
+                          value={accountPassword}
+                          onChange={(e) => setAccountPassword(e.target.value)}
+                          style={{
+                            width: "100%", padding: "10px 14px", borderRadius: 8,
+                            backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                            color: C.text, fontSize: 13, fontFamily: "'Inter', sans-serif",
+                            outline: "none", boxSizing: "border-box", marginBottom: 12,
+                          }}
+                        />
+                        {accountError && (
+                          <div style={{
+                            padding: "6px 10px", borderRadius: 6, marginBottom: 8,
+                            backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
+                            fontSize: 10, color: C.incorrect, textAlign: "center",
+                          }}>
+                            {accountError}
+                          </div>
+                        )}
+                      </>
+                    )}
+                    <button
+                      onClick={handleDeleteAccount}
+                      disabled={accountLoading || (!firebaseUser.providerData?.some(p => p.providerId === "google.com") && !accountPassword)}
+                      style={{
+                        width: "100%", padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: C.incorrect, color: "#fff", border: "none",
+                        cursor: (accountLoading || (!firebaseUser.providerData?.some(p => p.providerId === "google.com") && !accountPassword)) ? "not-allowed" : "pointer",
+                        opacity: (accountLoading || (!firebaseUser.providerData?.some(p => p.providerId === "google.com") && !accountPassword)) ? 0.5 : 1,
+                        textTransform: "uppercase",
+                      }}
+                    >{accountLoading ? "Deleting..." : "Delete Account"}</button>
+                  </div>
+                </>
+              );
+            })() : isClearConfirm ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.incorrect, marginBottom: 12 }}>Clear All Data</div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, padding: "16px", borderRadius: 8, backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`, textAlign: "center" }}>
+                      <div style={{ fontSize: 24, marginBottom: 8 }}>⚠️</div>
+                      <div>This will permanently delete all your local progress, achievements, and game data. This action cannot be undone.</div>
+                    </div>
+                    <button
+                      onClick={handleClearData}
+                      style={{
+                        width: "100%", padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: C.incorrect, color: "#fff", border: "none",
+                        cursor: "pointer", textTransform: "uppercase", marginBottom: 8,
+                      }}
+                    >Clear Everything</button>
+                    <button
+                      onClick={() => setRadialMenuStack(prev => prev.slice(0, -1))}
+                      style={{
+                        width: "100%", padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: "rgba(255,255,255,0.08)", color: C.text, border: "1px solid rgba(255,255,255,0.08)",
+                        cursor: "pointer", textTransform: "uppercase",
+                      }}
+                    >Cancel</button>
+                  </div>
+                </>
+              );
+            })() : isProfileView ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 16, textAlign: "center" }}>Profile</div>
+                    {/* Profile picture */}
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 16 }}>
+                      {profilePicture ? (
+                        <img src={profilePicture} alt="Profile" style={{ width: 80, height: 80, borderRadius: "50%", objectFit: "cover", marginBottom: 8 }} />
+                      ) : (
+                        <div style={{ width: 80, height: 80, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32, color: C.accent, fontWeight: 700, marginBottom: 8 }}>
+                          {(username || firebaseUser?.email || "?")[0].toUpperCase()}
+                        </div>
+                      )}
+                      <label htmlFor="profile-pic-upload" style={{
+                        fontSize: 10, color: C.accent, fontFamily: "'Inter', sans-serif", fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", cursor: "pointer",
+                      }}>Change Photo</label>
+                      <input id="profile-pic-upload" type="file" accept="image/*" onChange={handleProfilePictureUpload} style={{ display: "none" }} />
+                    </div>
+                    {/* User info */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      <div>
+                        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Username</div>
+                        <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{username || "Not set"}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Email</div>
+                        <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>{firebaseUser?.email || "Not set"}</div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Cloud Sync</div>
+                        <div style={{ fontSize: 14, color: syncEnabled ? C.correct : C.textDim, fontWeight: 600 }}>{syncEnabled ? "✓ Enabled" : "Disabled"}</div>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              );
+            })() : isThemeList ? (() => {
+              const achList = computeAchievements(progress, times, savedAchievementIds);
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>Themes</div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginBottom: 12 }}>Unlock themes through achievements or play on themed days</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                      {PUZZLE_THEMES.map(theme => {
+                        const unlocked = isThemeUnlocked(theme, achList);
+                        const isActive = activeThemeId === theme.id;
+                        const seasonalMonth = theme.unlock?.seasonal;
+                        const achId = theme.unlock?.achievement;
+                        const ach = achId ? ACHIEVEMENTS.find(a => a.id === achId) : null;
+                        let unlockHint = "";
+                        if (theme.unlock) {
+                          const parts = [];
+                          if (seasonalMonth) {
+                            const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                            parts.push(`Play in ${monthNames[seasonalMonth]}`);
+                          }
+                          if (ach) parts.push(`"${ach.label}" achievement`);
+                          unlockHint = parts.join(" or ");
+                        }
+                        return (
+                          <button
+                            key={theme.id}
+                            onClick={() => {
+                              if (unlocked) {
+                                setActiveThemeId(theme.id);
+                                saveTheme(theme.id);
+                              }
+                            }}
+                            style={{
+                              width: "100%", padding: "12px 14px", borderRadius: 12,
+                              backgroundColor: isActive ? (theme.gridBg || C.surface) : C.surface,
+                              border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
+                              cursor: unlocked ? "pointer" : "default",
+                              display: "flex", alignItems: "center", gap: 12,
+                              transition: "all 0.15s",
+                              opacity: unlocked ? 1 : 0.5,
+                            }}
+                          >
+                            <div style={{
+                              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
+                              backgroundColor: theme.gridBg || C.surfaceLight,
+                              border: `1.5px solid ${theme.gridBorder || C.border}`,
+                              display: "flex", alignItems: "center", justifyContent: "center", gap: 2,
+                              flexWrap: "wrap", padding: 4, position: "relative", overflow: "hidden",
+                            }}>
+                              {theme.icon ? (
+                                <span style={{ fontSize: 16, lineHeight: 1 }}>{theme.icon}</span>
+                              ) : (
+                                <>
+                                  {(theme.palettes || PALETTES)[0].slice(0, 4).map((col, ci) => (
+                                    <div key={ci} style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: col }} />
+                                  ))}
+                                </>
+                              )}
+                              {!unlocked && (
+                                <div style={{
+                                  position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                }}>
+                                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                                    <rect x="2" y="6" width="10" height="7" rx="1.5" fill="none" stroke={C.textDim} strokeWidth="1.5"/>
+                                    <path d="M4.5,6 V4 C4.5,2.3 5.6,1 7,1 C8.4,1 9.5,2.3 9.5,4 V6" fill="none" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round"/>
+                                  </svg>
+                                </div>
+                              )}
+                            </div>
+                            <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
+                              <div style={{
+                                fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700,
+                                color: isActive ? C.accent : C.text, letterSpacing: 0.5,
+                                display: "flex", alignItems: "center", gap: 6,
+                              }}>
+                                {theme.name}
+                                {isActive && <span style={{ fontSize: 9, color: C.accent, fontWeight: 400 }}>(active)</span>}
+                              </div>
+                              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
+                                {!unlocked ? unlockHint : theme.desc}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              );
+            })() : isSyncChoice ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 8 }}>Sync Conflict</div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16 }}>
+                      Your local progress differs from cloud. Choose which to keep:
+                    </div>
+                    {syncChoiceData && (
+                      <>
+                        <button onClick={() => handleSyncChoice("local")} style={{
+                          width: "100%", padding: "12px", borderRadius: 10, marginBottom: 8,
+                          backgroundColor: "rgba(255,255,255,0.04)", border: `1px solid rgba(255,255,255,0.08)`,
+                          cursor: "pointer", textAlign: "left",
+                        }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 4 }}>Keep Local</div>
+                          <div style={{ fontSize: 10, color: C.textDim }}>Local progress: {syncChoiceData.localSolved} puzzles</div>
+                        </button>
+                        <button onClick={() => handleSyncChoice("cloud")} style={{
+                          width: "100%", padding: "12px", borderRadius: 10, marginBottom: 8,
+                          backgroundColor: "rgba(255,255,255,0.04)", border: `1px solid rgba(255,255,255,0.08)`,
+                          cursor: "pointer", textAlign: "left",
+                        }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 4 }}>Keep Cloud</div>
+                          <div style={{ fontSize: 10, color: C.textDim }}>Cloud progress: {syncChoiceData.cloudSolved} puzzles</div>
+                        </button>
+                        <button onClick={() => handleSyncChoice("merge")} style={{
+                          width: "100%", padding: "12px", borderRadius: 10,
+                          backgroundColor: C.accent + "22", border: `1px solid ${C.accent}`,
+                          cursor: "pointer", textAlign: "left",
+                        }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: C.accent, marginBottom: 4 }}>Merge Both</div>
+                          <div style={{ fontSize: 10, color: C.textDim }}>Combine best results from both</div>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </>
               );
@@ -7710,134 +8454,6 @@ export default function Pattrn() {
   const iconSize = Math.max(14, Math.round(cellSize * 0.5));
   const pickerSize = 48;
 
-  // --- Theme Picker (shared across views) ---
-  const themePickerEl = showThemePicker ? (() => {
-    const achList = computeAchievements(progress, times, savedAchievementIds);
-    return (
-      <DraggableDrawer isOpen={true} onClose={() => setShowThemePicker(false)} maxHeight="75vh">
-          <div style={{ padding: "4px 24px 0", flexShrink: 0 }}>
-            <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, margin: "0 0 4px", letterSpacing: 1 }}>
-              Themes
-            </h2>
-            <p style={{ fontSize: 11, color: C.textDim, margin: "0 0 16px", lineHeight: 1.5 }}>
-              Unlock themes through achievements or play on themed days
-            </p>
-          </div>
-
-          <div data-drawer-scroll style={{ flex: 1, overflowY: "auto", padding: "0 24px 8px", display: "flex", flexDirection: "column", gap: 8 }}>
-            {PUZZLE_THEMES.map(theme => {
-              const unlocked = isThemeUnlocked(theme, achList);
-              const isActive = activeThemeId === theme.id;
-              const seasonalMonth = theme.unlock?.seasonal;
-              const achId = theme.unlock?.achievement;
-              const ach = achId ? ACHIEVEMENTS.find(a => a.id === achId) : null;
-              let unlockHint = "";
-              if (theme.unlock) {
-                const parts = [];
-                if (seasonalMonth) {
-                  const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-                  parts.push(`Play in ${monthNames[seasonalMonth]}`);
-                }
-                if (ach) parts.push(`"${ach.label}" achievement`);
-                unlockHint = parts.join(" or ");
-              }
-
-              return (
-                <button
-                  key={theme.id}
-                  onClick={() => {
-                    if (unlocked) {
-                      setActiveThemeId(theme.id);
-                      saveTheme(theme.id);
-                    }
-                  }}
-                  style={{
-                    width: "100%", padding: "14px 16px", borderRadius: 12,
-                    backgroundColor: isActive ? (theme.gridBg || C.surface) : C.surface,
-                    border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
-                    cursor: unlocked ? "pointer" : "default",
-                    display: "flex", alignItems: "center", gap: 12,
-                    transition: "all 0.15s",
-                    opacity: unlocked ? 1 : 0.5,
-                  }}
-                  onMouseEnter={e => { if (unlocked && !isActive) e.currentTarget.style.borderColor = C.accent + "88"; }}
-                  onMouseLeave={e => { if (!isActive) e.currentTarget.style.borderColor = C.border; }}
-                >
-                  <div style={{
-                    width: 38, height: 38, borderRadius: 10, flexShrink: 0,
-                    backgroundColor: theme.gridBg || C.surfaceLight,
-                    border: `1.5px solid ${theme.gridBorder || C.border}`,
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 2,
-                    flexWrap: "wrap", padding: 4, position: "relative", overflow: "hidden",
-                  }}>
-                    {theme.icon ? (
-                      <span style={{ fontSize: 18, lineHeight: 1 }}>{theme.icon}</span>
-                    ) : (
-                      <>
-                        {(theme.palettes || PALETTES)[0].slice(0, 4).map((col, ci) => (
-                          <div key={ci} style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: col }} />
-                        ))}
-                      </>
-                    )}
-                    {!unlocked && (
-                      <div style={{
-                        position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                          <rect x="2" y="6" width="10" height="7" rx="1.5" fill="none" stroke={C.textDim} strokeWidth="1.5"/>
-                          <path d="M4.5,6 V4 C4.5,2.3 5.6,1 7,1 C8.4,1 9.5,2.3 9.5,4 V6" fill="none" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round"/>
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-
-                  <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700,
-                      color: isActive ? C.accent : C.text, letterSpacing: 0.5,
-                      display: "flex", alignItems: "center", gap: 6,
-                    }}>
-                      {theme.name}
-                      {isActive && <span style={{ fontSize: 9, color: C.accent, fontWeight: 400 }}>(active)</span>}
-                    </div>
-                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                      {!unlocked ? unlockHint : theme.desc}
-                    </div>
-                  </div>
-
-                  {unlocked && !isActive && (
-                    <span style={{ color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif", flexShrink: 0 }}>Select</span>
-                  )}
-                  {isActive && (
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
-                      <path d="M3 8.5L6.5 12L13 4" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )}
-                </button>
-              );
-            })}
-          </div>
-
-          <div style={{
-            padding: "16px 24px", paddingBottom: "max(16px, env(safe-area-inset-bottom))",
-            borderTop: `1px solid ${C.border}`, marginTop: 8, flexShrink: 0,
-          }}>
-            <button onClick={() => setShowThemePicker(false)}
-              style={{
-                width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer",
-                textTransform: "uppercase", transition: "all 0.15s",
-              }}
-            >
-              Close
-            </button>
-          </div>
-      </DraggableDrawer>
-    );
-  })() : null;
-
   // --- Global co-op invite toast (appears on any view) ---
   const coopInviteToastEl = coopInviteToast && firebaseUser && (() => {
     const isMosaicInvite = coopInviteToast.type === "coop_mosaic_invite";
@@ -8093,114 +8709,6 @@ export default function Pattrn() {
   }, [isAdmin, view, buildAdminActivityList]);
 
   // Shared modal elements — computed before any view early-returns so they're available everywhere.
-  let usernameModalEl = null;
-
-  // --- Username modal (non-dismissible when logged in without username, dismissible when changing) ---
-  usernameModalEl = showUsernameModal && firebaseUser && firebaseConfigured && (
-    <DraggableDrawer isOpen={true} onClose={username ? () => { setShowUsernameModal(false); setUsernameError(""); } : () => {}} zIndex={1200}>
-      <div style={{ padding: "0 24px 24px" }}>
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
-            backgroundColor: C.accent + "22", display: "flex", alignItems: "center", justifyContent: "center",
-            border: `2px solid ${C.accent}44`,
-          }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="8" r="4" stroke={C.accent} strokeWidth="2" fill="none"/>
-              <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={C.accent} strokeWidth="2" fill="none" strokeLinecap="round"/>
-            </svg>
-          </div>
-          <h3 style={{
-            fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
-          }}>
-            Choose a Username
-          </h3>
-          <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5 }}>
-            Pick a unique username. This will be your public identity for sharing and invites.
-          </p>
-        </div>
-
-        <div style={{ position: "relative", marginBottom: 12 }}>
-          <input
-            type="text"
-            placeholder="Username"
-            value={usernameInput}
-            onChange={e => {
-              const v = e.target.value.replace(/[^a-zA-Z0-9_]/g, "").slice(0, 20);
-              setUsernameInput(v);
-              checkUsernameDebounced(v);
-            }}
-            autoComplete="username"
-            style={{
-              width: "100%", padding: "11px 14px", paddingRight: 40, borderRadius: 10, fontSize: 16,
-              fontFamily: "'Inter', sans-serif",
-              background: C.surface, border: `1px solid ${usernameError ? C.incorrect : usernameAvailable === true ? C.correct : C.border}`,
-              color: C.text, outline: "none", boxSizing: "border-box",
-              transition: "border-color 0.15s",
-            }}
-          />
-          {usernameInput.trim().length >= 3 && usernameAvailable !== null && (
-            <div style={{
-              position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)",
-              fontSize: 16, lineHeight: 1,
-            }}>
-              {usernameAvailable ? (
-                <span style={{ color: C.correct }}>{"\u2713"}</span>
-              ) : (
-                <span style={{ color: C.incorrect }}>{"\u2717"}</span>
-              )}
-            </div>
-          )}
-        </div>
-
-        <div style={{ fontSize: 10, color: C.textDim, marginBottom: 8, paddingLeft: 2 }}>
-          3-20 characters. Letters, numbers, and underscores only.
-        </div>
-
-        {usernameError && (
-          <div style={{
-            padding: "8px 12px", borderRadius: 8, marginBottom: 12,
-            backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
-            fontSize: 11, color: C.incorrect, textAlign: "center",
-          }}>
-            {usernameError}
-          </div>
-        )}
-
-        <button
-          onClick={handleSaveUsername}
-          disabled={usernameLoading || !usernameInput.trim() || usernameInput.trim().length < 3 || usernameAvailable !== true}
-          style={{
-            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 2,
-            background: (usernameAvailable === true && usernameInput.trim().length >= 3) ? C.accent : C.surfaceLight,
-            color: (usernameAvailable === true && usernameInput.trim().length >= 3) ? C.bg : C.textDim,
-            border: "none",
-            cursor: (usernameAvailable === true && usernameInput.trim().length >= 3 && !usernameLoading) ? "pointer" : "not-allowed",
-            opacity: usernameLoading ? 0.5 : 1,
-            textTransform: "uppercase", transition: "all 0.15s",
-          }}
-        >
-          {usernameLoading ? "Saving..." : username ? "Update Username" : "Set Username"}
-        </button>
-
-        {/* Close button only when user already has a username (changing it) */}
-        {username && (
-          <button
-            onClick={() => { setShowUsernameModal(false); setUsernameError(""); }}
-            style={{
-              width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
-              fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-              background: "none", border: "none", color: C.textDim, cursor: "pointer",
-              textTransform: "uppercase", transition: "all 0.15s", marginTop: 8,
-            }}
-          >
-            Cancel
-          </button>
-        )}
-      </div>
-    </DraggableDrawer>
-  );
 
   // Helper: format "time ago" from a timestamp
   const formatTimeAgo = (ts) => {
@@ -8229,897 +8737,9 @@ export default function Pattrn() {
     return `${modeLabel} #${(parseInt(puzzleKey) || 0) + 1}`;
   };
 
-  // --- Profile page modal ---
-  const profilePageEl = showProfilePage && firebaseUser && firebaseConfigured && (
-    <DraggableDrawer isOpen={true} onClose={() => setShowProfilePage(false)}>
-      <div data-drawer-scroll style={{ padding: "0 24px", overflowY: "auto", flex: 1 }}>
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
-          {/* Profile picture */}
-          <div style={{ position: "relative", display: "inline-block", marginBottom: 12 }}>
-            <div style={{
-              width: 80, height: 80, borderRadius: "50%", margin: "0 auto",
-              backgroundColor: C.surface, display: "flex", alignItems: "center", justifyContent: "center",
-              border: `2px solid ${C.border}`, overflow: "hidden", position: "relative",
-            }}>
-              {profilePicture ? (
-                <img src={profilePicture} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-              ) : (
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="8" r="4" stroke={C.textDim} strokeWidth="2" fill="none"/>
-                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke={C.textDim} strokeWidth="2" fill="none" strokeLinecap="round"/>
-                </svg>
-              )}
-            </div>
-            <label style={{
-              position: "absolute", bottom: -2, right: -2,
-              width: 28, height: 28, borderRadius: "50%",
-              backgroundColor: C.accent, display: "flex", alignItems: "center", justifyContent: "center",
-              cursor: profilePictureLoading ? "not-allowed" : "pointer",
-              border: `2px solid ${C.bg}`,
-              opacity: profilePictureLoading ? 0.5 : 1,
-            }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" stroke={C.bg} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={handleProfilePictureUpload}
-                disabled={profilePictureLoading}
-                style={{ position: "absolute", inset: 0, opacity: 0, cursor: "pointer" }}
-              />
-            </label>
-          </div>
-
-          {profilePicture && (
-            <button
-              onClick={handleRemoveProfilePicture}
-              disabled={profilePictureLoading}
-              style={{
-                display: "block", margin: "4px auto 0", background: "none", border: "none",
-                color: C.textDim, fontSize: 10, cursor: "pointer", textDecoration: "underline",
-              }}
-            >
-              Remove photo
-            </button>
-          )}
-
-          <h3 style={{
-            fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent,
-            margin: profilePicture ? "8px 0 4px" : "0 0 4px",
-          }}>
-            Profile
-          </h3>
-          <p style={{ color: C.textDim, fontSize: 12, margin: 0, wordBreak: "break-all" }}>
-            {firebaseUser.email}
-          </p>
-        </div>
-
-        {/* Username section */}
-        <div style={{
-          padding: "14px 16px", borderRadius: 10, backgroundColor: C.surface,
-          border: `1px solid ${C.border}`, marginBottom: 12,
-        }}>
-          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>Username</div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-              flex: 1, fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700,
-              color: username ? C.text : C.textDim,
-            }}>
-              {username || "Not set"}
-            </div>
-            <button
-              onClick={() => {
-                setUsernameInput(username || "");
-                setUsernameError("");
-                setUsernameAvailable(null);
-                setShowProfilePage(false);
-                setShowUsernameModal(true);
-              }}
-              style={{
-                padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                fontFamily: "'Inter', sans-serif",
-                background: "none", border: `1px solid ${C.border}`, color: C.textDim,
-                cursor: "pointer", textTransform: "uppercase", letterSpacing: 0.5,
-              }}
-            >
-              {username ? "Change" : "Set"}
-            </button>
-          </div>
-        </div>
-
-        {/* Cloud sync section */}
-        <div style={{
-          padding: "12px 16px", borderRadius: 10, backgroundColor: C.surface,
-          border: `1px solid ${C.border}`, marginBottom: 16, textAlign: "center",
-        }}>
-          <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
-          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.correct }}>
-            {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
-          </div>
-        </div>
-
-        {/* Sign out */}
-        <button
-          onClick={handleSignOut}
-          style={{
-            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-            background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-            textTransform: "uppercase", transition: "all 0.15s", marginBottom: 8,
-          }}
-        >
-          Sign out
-        </button>
-
-        <button
-          onClick={() => setShowProfilePage(false)}
-          style={{
-            width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-            background: "none", border: "none", color: C.textDim, cursor: "pointer",
-            textTransform: "uppercase", transition: "all 0.15s",
-          }}
-        >
-          Close
-        </button>
-      </div>
-    </DraggableDrawer>
-  );
-
-  // --- Friends Modal ---
-  const friendsModalEl = showFriendsModal && firebaseUser && firebaseConfigured && (
-    <DraggableDrawer isOpen={true} onClose={() => setShowFriendsModal(false)}>
-      <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
-        {/* Header */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, margin: 0 }}>
-            {friendsModalTab === "compare" && compareFriend ? `vs ${compareFriend.username}` : "Friends"}
-          </h2>
-          <div style={{ display: "flex", gap: 6 }}>
-            {friendsModalTab === "compare" && (
-              <button onClick={() => { setFriendsModalTab("list"); setCompareFriend(null); setCompareFriendStats(null); }}
-                style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "4px 10px", color: C.textDim, cursor: "pointer", fontSize: 10, fontFamily: "'Inter', sans-serif", transition: "all 0.15s" }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-              >Back</button>
-            )}
-            <button onClick={() => setShowFriendsModal(false)}
-              style={{ background: "none", border: "none", color: C.textDim, cursor: "pointer", fontSize: 18, lineHeight: 1 }}
-            >&times;</button>
-          </div>
-        </div>
-
-        {/* Unified friends list + activity view */}
-        {friendsModalTab === "list" && (
-          <div style={{ marginBottom: 16 }}>
-            {/* Add friend input */}
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", gap: 8 }}>
-                <input
-                  type="text" value={addFriendInput}
-                  onChange={e => setAddFriendInput(e.target.value)}
-                  placeholder="Add friend by username"
-                  style={{
-                    flex: 1, padding: "10px 14px", borderRadius: 10,
-                    backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                    color: C.text, fontSize: 13, fontFamily: "'Inter', sans-serif", outline: "none",
-                  }}
-                  onFocus={e => { e.target.style.borderColor = C.accent; }}
-                  onBlur={e => { e.target.style.borderColor = C.border; }}
-                  onKeyDown={e => { if (e.key === "Enter" && addFriendInput.trim()) handleAddFriend(); }}
-                />
-                <button onClick={handleAddFriend}
-                  disabled={!addFriendInput.trim() || addFriendLoading}
-                  style={{
-                    padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-                    background: addFriendInput.trim() ? C.accent : C.surfaceLight,
-                    color: addFriendInput.trim() ? C.bg : C.textDim,
-                    border: "none", cursor: addFriendInput.trim() ? "pointer" : "not-allowed",
-                    textTransform: "uppercase", flexShrink: 0,
-                  }}
-                >{addFriendLoading ? "..." : "Add"}</button>
-              </div>
-              {addFriendMsg && (
-                <div style={{ fontSize: 11, color: C.accent, marginTop: 6, fontFamily: "'Inter', sans-serif" }}>
-                  {addFriendMsg}
-                </div>
-              )}
-            </div>
-
-            {/* Friends list with activity */}
-            {friendsList.length === 0 ? (
-              <div style={{ textAlign: "center", padding: "30px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
-                No friends added yet.<br/>Add friends by their username to see their activity and compare stats.
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
-                  Friends ({friendsList.length})
-                </div>
-                {/* Sort: online first, then by lastSeen */}
-                {friendsList
-                  .slice()
-                  .sort((a, b) => {
-                    const pa = friendPresence[a.uid];
-                    const pb = friendPresence[b.uid];
-                    const onlineA = isFriendOnline(pa) ? 1 : 0;
-                    const onlineB = isFriendOnline(pb) ? 1 : 0;
-                    if (onlineA !== onlineB) return onlineB - onlineA;
-                    return ((pb?.lastSeen || 0) - (pa?.lastSeen || 0));
-                  })
-                  .map(friend => {
-                    const presence = friendPresence[friend.uid];
-                    const online = isFriendOnline(presence);
-                    const lastSolvedLabel = presence ? formatPuzzleLabel(presence.lastSolvedMode, presence.lastSolvedPuzzle) : null;
-                    const currentLabel = (online && presence?.status === "playing") ? formatPuzzleLabel(presence.currentMode, presence.currentPuzzle) : null;
-                    return (
-                      <div key={friend.uid} style={{
-                        padding: "12px 14px", borderRadius: 12,
-                        backgroundColor: C.surface,
-                        border: `1px solid ${online ? C.correct + "33" : C.border}`,
-                        transition: "border-color 0.2s",
-                      }}>
-                        {/* Top row: avatar, name + status, action buttons */}
-                        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                          {/* Avatar with online dot */}
-                          <div style={{ position: "relative", flexShrink: 0 }}>
-                            {friend.profilePicture ? (
-                              <img src={friend.profilePicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
-                            ) : (
-                              <div style={{ width: 36, height: 36, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, color: C.accent, fontWeight: 700 }}>
-                                {(friend.username || "?")[0].toUpperCase()}
-                              </div>
-                            )}
-                            <div style={{
-                              position: "absolute", bottom: -1, right: -1, width: 12, height: 12,
-                              borderRadius: "50%", border: `2px solid ${C.surface}`,
-                              backgroundColor: online ? C.correct : C.textDim,
-                            }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <span style={{ fontSize: 14, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                {friend.username}
-                              </span>
-                              <span style={{ fontSize: 10, color: online ? C.correct : C.textDim, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>
-                                {online ? "ONLINE" : "OFFLINE"}
-                              </span>
-                            </div>
-                            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 2 }}>
-                              {online ? (
-                                currentLabel ? `Playing ${currentLabel}` : "In menus"
-                              ) : (
-                                presence?.lastSeen ? `Last seen ${formatTimeAgo(presence.lastSeen)}` : "No activity yet"
-                              )}
-                            </div>
-                          </div>
-                          {/* Action buttons */}
-                          <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
-                            <button onClick={() => {
-                              setCompareFriend(friend);
-                              setFriendsModalTab("compare");
-                              setCompareFriendLoading(true);
-                              setCompareFriendStats(null);
-                              loadPublicStats(friend.uid)
-                                .then(setCompareFriendStats)
-                                .catch(() => setCompareFriendStats(null))
-                                .finally(() => setCompareFriendLoading(false));
-                            }}
-                              style={{
-                                background: "none", border: `1px solid ${C.accent}55`, borderRadius: 6,
-                                padding: "4px 10px", color: C.accent, cursor: "pointer", fontSize: 10,
-                                fontFamily: "'Inter', sans-serif", transition: "all 0.15s", fontWeight: 700,
-                              }}
-                              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.backgroundColor = C.accent + "11"; }}
-                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "55"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                            >Stats</button>
-                            <button onClick={() => handleRemoveFriend(friend.uid)}
-                              title="Remove friend"
-                              style={{
-                                background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
-                                padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 13,
-                                lineHeight: 1, transition: "all 0.15s",
-                              }}
-                              onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
-                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-                            >&times;</button>
-                          </div>
-                        </div>
-                        {/* Activity details row */}
-                        {(lastSolvedLabel || currentLabel) && (
-                          <div style={{ display: "flex", gap: 8, marginLeft: 48, marginTop: 8 }}>
-                            {lastSolvedLabel && (
-                              <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.surfaceLight, border: `1px solid ${C.border}` }}>
-                                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Inter', sans-serif", marginBottom: 2 }}>Last Solved</div>
-                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>{lastSolvedLabel}</div>
-                                {presence?.lastSolvedAt && (
-                                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>{formatTimeAgo(presence.lastSolvedAt)}</div>
-                                )}
-                              </div>
-                            )}
-                            {currentLabel && (
-                              <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.correct + "0a", border: `1px solid ${C.correct}22` }}>
-                                <div style={{ fontSize: 9, color: C.correct, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Inter', sans-serif", marginBottom: 2 }}>Now Playing</div>
-                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>{currentLabel}</div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Comparison view */}
-        {friendsModalTab === "compare" && compareFriend && (() => {
-          const myStats = summariseGameData({ progress, times, achievements: [...savedAchievementIds] });
-          const theirProgress = compareFriendStats?.progress || {};
-          const theirTotalSolved = compareFriendStats?.totalSolved || 0;
-          const theirAchievements = compareFriendStats?.achievements || 0;
-          const theirTimes = compareFriendStats?.times || {};
-          const statModes = [
-            { key: "easy", label: "Easy" },
-            { key: "medium", label: "Medium" },
-            { key: "hard", label: "Hard" },
-            { key: "blind", label: "Blind" },
-            { key: "daily", label: "Daily" },
-            { key: "cascade", label: "Cascade" },
-            { key: "spin", label: "Spin" },
-            { key: "mosaic", label: "Mosaic" },
-          ];
-
-          if (compareFriendLoading) {
-            return (
-              <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13 }}>
-                Loading stats...
-              </div>
-            );
-          }
-
-          if (!compareFriendStats) {
-            return (
-              <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
-                No stats available for this friend yet.<br/>They need to sign in and solve some puzzles first.
-              </div>
-            );
-          }
-
-          const CompareRow = ({ label, myVal, theirVal, isBetter }) => {
-            const myWins = myVal > theirVal;
-            const theyWin = theirVal > myVal;
-            const tie = myVal === theirVal && myVal > 0;
-            return (
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between",
-                padding: "8px 12px", borderRadius: 8,
-                backgroundColor: tie ? C.surface : myWins ? C.correct + "0a" : theyWin ? C.incorrect + "0a" : C.surface,
-                border: `1px solid ${tie ? C.border : myWins ? C.correct + "22" : theyWin ? C.incorrect + "22" : C.border}`,
-              }}>
-                <div style={{ fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: myWins ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
-                  {isBetter ? (myVal ? formatTime(myVal) : "--") : myVal}
-                </div>
-                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
-                  {label}
-                </div>
-                <div style={{ fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: theyWin ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
-                  {isBetter ? (theirVal ? formatTime(theirVal) : "--") : theirVal}
-                </div>
-              </div>
-            );
-          };
-
-          // Calculate best times per mode
-          const getBestTime = (timesObj, mode) => {
-            const modeTimes = timesObj[mode] || {};
-            const vals = Object.values(modeTimes).filter(t => t > 0);
-            return vals.length > 0 ? Math.min(...vals) : null;
-          };
-
-          return (
-            <div style={{ animation: "fadeUp 0.25s ease" }}>
-              {/* Header row */}
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, padding: "0 12px" }}>
-                <div style={{ fontSize: 11, color: C.accent, fontFamily: "'Inter', sans-serif", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
-                  You
-                </div>
-                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
-                  {compareFriend.username}
-                </div>
-              </div>
-
-              {/* Total solved */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
-                <CompareRow label="Total Solved" myVal={myStats.totalSolved} theirVal={theirTotalSolved} />
-                <CompareRow label="Achievements" myVal={myStats.achievements} theirVal={theirAchievements} />
-              </div>
-
-              {/* Per-mode solved */}
-              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
-                Puzzles Solved by Mode
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
-                {statModes.map(m => (
-                  <CompareRow key={m.key} label={m.label} myVal={myStats.modes[m.key] || 0} theirVal={theirProgress[m.key] || 0} />
-                ))}
-              </div>
-
-              {/* Best times */}
-              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
-                Best Times (lower is better)
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                {["easy", "medium", "hard", "blind", "daily"].map(mode => {
-                  const myBest = getBestTime(times, mode);
-                  const theirBest = getBestTime(theirTimes, mode);
-                  const myWins = myBest && theirBest ? myBest < theirBest : false;
-                  const theyWin = myBest && theirBest ? theirBest < myBest : false;
-                  return (
-                    <div key={mode} style={{
-                      display: "flex", alignItems: "center", justifyContent: "space-between",
-                      padding: "8px 12px", borderRadius: 8,
-                      backgroundColor: myWins ? C.correct + "0a" : theyWin ? C.incorrect + "0a" : C.surface,
-                      border: `1px solid ${myWins ? C.correct + "22" : theyWin ? C.incorrect + "22" : C.border}`,
-                    }}>
-                      <div style={{ fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: myWins ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
-                        {myBest ? formatTime(myBest) : "--"}
-                      </div>
-                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
-                        {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                      </div>
-                      <div style={{ fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: theyWin ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
-                        {theirBest ? formatTime(theirBest) : "--"}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          );
-        })()}
-      </div>
-    </DraggableDrawer>
-  );
-
   // --- Extracted Global Modals (DraggableDrawer-based, rendered once at top level) ---
 
-  const clearConfirmEl = showClearConfirm && (
-    <DraggableDrawer isOpen={true} onClose={() => setShowClearConfirm(false)}>
-      <div style={{ padding: "0 24px 24px" }}>
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
-            backgroundColor: C.incorrect + "22", display: "flex", alignItems: "center", justifyContent: "center",
-            border: `2px solid ${C.incorrect}44`,
-          }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M12 9v4m0 4h.01M12 3L2 21h20L12 3z" stroke={C.incorrect} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <h3 style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.incorrect, margin: "0 0 8px" }}>
-            Clear All Data?
-          </h3>
-          <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
-            This will permanently delete <strong style={{ color: C.text }}>all your progress</strong>, solve times, achievements, streak, birthday, and saved data. This cannot be undone.
-          </p>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button onClick={async () => {
-            try {
-              localStorage.removeItem(STORAGE_KEY);
-              localStorage.removeItem(TIMES_KEY);
-              localStorage.removeItem(BIRTHDAY_KEY);
-              localStorage.removeItem(THEME_KEY);
-              localStorage.removeItem(ACHIEV_KEY);
-            } catch { /* ignore */ }
-            if (firebaseUser) { try { await logOut(); } catch { /* ignore */ } }
-            setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
-            setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
-            setSavedAchievementIds(new Set());
-            setBirthday(null);
-            setActiveThemeId("classic");
-            setShowClearConfirm(false);
-            setShowGameMenu(false);
-            setView("menu");
-          }} style={{
-            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 2,
-            background: C.incorrect, color: "#fff", border: "none", cursor: "pointer",
-            textTransform: "uppercase", transition: "all 0.15s",
-          }}>
-            Clear everything
-          </button>
-          <button onClick={() => setShowClearConfirm(false)} style={{
-            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-            background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-            textTransform: "uppercase", transition: "all 0.15s",
-          }}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </DraggableDrawer>
-  );
-
-  const deleteAccountConfirmEl = showDeleteAccountConfirm && firebaseUser && (
-    <DraggableDrawer isOpen={true} onClose={() => { setShowDeleteAccountConfirm(false); setDeleteAccountError(""); setDeleteAccountPassword(""); }}>
-      <div style={{ padding: "0 24px 24px" }}>
-        <div style={{ textAlign: "center", marginBottom: 20 }}>
-          <div style={{
-            width: 48, height: 48, borderRadius: 12, margin: "0 auto 12px",
-            backgroundColor: "#dc262622", display: "flex", alignItems: "center", justifyContent: "center",
-            border: "2px solid #dc262644",
-          }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-              <path d="M12 9v4m0 4h.01M12 3L2 21h20L12 3z" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </div>
-          <h3 style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: "#dc2626", margin: "0 0 8px" }}>
-            Delete Account?
-          </h3>
-          <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
-            This will <strong style={{ color: C.text }}>permanently delete your account</strong>, all progress, cloud data, friends, and mosaics. This cannot be undone.
-          </p>
-        </div>
-        {firebaseUser.providerData.some(p => p.providerId === "password") && (
-          <div style={{ marginBottom: 12 }}>
-            <input type="password" placeholder="Enter your password to confirm" value={deleteAccountPassword}
-              onChange={e => setDeleteAccountPassword(e.target.value)}
-              style={{
-                width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 12,
-                fontFamily: "'Inter', sans-serif",
-                background: C.surface, border: `1px solid ${C.border}`, color: C.text,
-                outline: "none", boxSizing: "border-box",
-              }}
-            />
-          </div>
-        )}
-        {deleteAccountError && (
-          <div style={{ color: "#dc2626", fontSize: 11, textAlign: "center", marginBottom: 12 }}>{deleteAccountError}</div>
-        )}
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <button onClick={handleDeleteAccount} disabled={deleteAccountLoading} style={{
-            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 2,
-            background: deleteAccountLoading ? "#dc262688" : "#dc2626", color: "#fff", border: "none",
-            cursor: deleteAccountLoading ? "not-allowed" : "pointer",
-            textTransform: "uppercase", transition: "all 0.15s",
-          }}>
-            {deleteAccountLoading ? "Deleting..." : "Delete my account"}
-          </button>
-          <button onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountError(""); setDeleteAccountPassword(""); }}
-            disabled={deleteAccountLoading} style={{
-            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-            background: "none", border: `1px solid ${C.border}`, color: C.textDim,
-            cursor: deleteAccountLoading ? "not-allowed" : "pointer",
-            textTransform: "uppercase", transition: "all 0.15s",
-          }}>
-            Cancel
-          </button>
-        </div>
-      </div>
-    </DraggableDrawer>
-  );
-
-  const achievementsEl = showAchievements ? (() => {
-    const achievements = computeAchievements(progress, times, savedAchievementIds);
-    const unlocked = achievements.filter(a => a.unlocked).length;
-    const total = achievements.length;
-    const tierColors = { 1: C.bronze, 2: C.silver, 3: C.gold };
-    const tierSymbols = { 1: "\u25C6", 2: "\u25CF", 3: "\u2605" };
-    return (
-      <DraggableDrawer isOpen={true} onClose={() => setShowAchievements(false)}>
-        <div data-drawer-scroll style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
-          <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Achievements</h2>
-            <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>{unlocked}/{total} unlocked</p>
-          </div>
-          <div style={{ height: 6, borderRadius: 3, backgroundColor: C.surfaceLight, marginBottom: 20, overflow: "hidden" }}>
-            <div style={{ height: "100%", borderRadius: 3, backgroundColor: C.accent, width: `${(unlocked / total) * 100}%`, transition: "width 0.5s" }} />
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingBottom: 20 }}>
-            {achievements.map(a => {
-              const tc = tierColors[a.tier] || C.textDim;
-              const ts = tierSymbols[a.tier] || "";
-              return (
-                <div key={a.id} style={{
-                  display: "flex", alignItems: "center", gap: 12, padding: "10px 12px",
-                  borderRadius: 10, backgroundColor: a.unlocked ? tc + "12" : C.surface,
-                  border: `1px solid ${a.unlocked ? tc + "44" : C.border}`,
-                  opacity: a.unlocked ? 1 : 0.5,
-                }}>
-                  <span style={{ fontSize: 14, color: tc, fontFamily: "'Inter', sans-serif" }}>{ts}</span>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, color: a.unlocked ? C.text : C.textDim }}>{a.label}</div>
-                    <div style={{ fontSize: 10, color: C.textDim, marginTop: 1 }}>{a.desc}</div>
-                  </div>
-                  {a.unlocked && <span style={{ fontSize: 10, color: tc, fontFamily: "'Inter', sans-serif" }}>{"\u2713"}</span>}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-        <div style={{ padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))", borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
-          <button onClick={() => setShowAchievements(false)} style={{
-            width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-            padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
-          }}>Close</button>
-        </div>
-      </DraggableDrawer>
-    );
-  })() : null;
-
-  const shareModalEl = showShareModal ? (() => {
-    const { sections, totalSolved, totalGold, totalSilver, totalBronze, totalFailed, bestTimeAll } = getShareData();
-    const gridColors = { none: C.border, failed: C.incorrect, gold: C.gold, silver: C.silver, bronze: C.bronze };
-    return (
-      <DraggableDrawer isOpen={true} onClose={() => setShowShareModal(false)}>
-        <div data-drawer-scroll style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
-          <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Agnus</h2>
-            <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>my stats</p>
-          </div>
-          <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginBottom: 20, padding: "10px 16px", borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}` }}>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, color: C.accent }}>{totalSolved}</div>
-              <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>solved</div>
-            </div>
-            <div style={{ width: 1, backgroundColor: C.border }} />
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700 }}>300</div>
-              <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>total</div>
-            </div>
-            {getDailyStreak(progress) > 0 && (
-              <>
-                <div style={{ width: 1, backgroundColor: C.border }} />
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, color: C.gold }}>{"\uD83D\uDD25"} {getDailyStreak(progress)}</div>
-                  <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>day streak</div>
-                </div>
-              </>
-            )}
-            {bestTimeAll != null && (
-              <>
-                <div style={{ width: 1, backgroundColor: C.border }} />
-                <div style={{ textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, color: C.correct }}>{formatTime(bestTimeAll)}</div>
-                  <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>fastest</div>
-                </div>
-              </>
-            )}
-          </div>
-          {sections.map(s => (
-            <div key={s.key} style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: s.key === "blind" ? "#e06040" : C.text, letterSpacing: 1, textTransform: "uppercase" }}>
-                  {s.label}
-                </span>
-                <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>{s.solved}/{s.total}</span>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
-                {s.grid.map((g, gi) => (
-                  <div key={gi} style={{ width: 10, height: 10, borderRadius: 2, backgroundColor: gridColors[g] || C.border }} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div style={{ padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={copyShareText} style={{ flex: 1, backgroundColor: C.accent, color: C.bg, border: "none", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>{shareMsg || "Share all"}</button>
-            <button onClick={copyDailyShareText} style={{ flex: 1, backgroundColor: "transparent", color: C.accent, border: `1.5px solid ${C.accent}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>Share Daily</button>
-          </div>
-          <button onClick={() => setShowShareModal(false)} style={{ width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Close</button>
-        </div>
-      </DraggableDrawer>
-    );
-  })() : null;
-
-  const birthdayPromptEl = showBirthdayPrompt && (
-    <DraggableDrawer isOpen={true} onClose={() => { setShowBirthdayPrompt(false); setBirthdayInput(""); }}>
-      <div style={{ padding: "0 24px 0", overflow: "hidden" }}>
-        <div style={{ textAlign: "center", marginBottom: 16 }}>
-          <span style={{ fontSize: 32 }}>{"\uD83C\uDF82"}</span>
-          <h3 style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: "#F472B6", margin: "8px 0 4px" }}>
-            Set your birthday
-          </h3>
-          <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
-            We'll highlight it on the calendar and let you play &amp; share the puzzle from your birth date.
-          </p>
-        </div>
-        <input type="date" value={birthdayInput} onChange={e => setBirthdayInput(e.target.value)}
-          max={(() => { const n = new Date(); return `${n.getUTCFullYear()}-${String(n.getUTCMonth()+1).padStart(2,"0")}-${String(n.getUTCDate()).padStart(2,"0")}`; })()}
-          style={{
-            width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`,
-            backgroundColor: C.surface, color: C.text, fontFamily: "'Inter', sans-serif", fontSize: 16,
-            outline: "none", boxSizing: "border-box", minWidth: 0, colorScheme: "dark",
-          }}
-        />
-      </div>
-      <div style={{ padding: "16px 24px", paddingBottom: "max(16px, env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", gap: 8 }}>
-        <button onClick={() => {
-          if (!birthdayInput) return;
-          const [y, m, d] = birthdayInput.split("-").map(Number);
-          const bdStr = `${String(d).padStart(2, "0")}-${String(m).padStart(2, "0")}-${y}`;
-          setBirthday(bdStr);
-          try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
-          if (bdStr === CHEAT_BIRTHDAY) {
-            const saved = loadSavedAchievements();
-            if (!saved.has("cheat_turing")) {
-              achievementQueueRef.current.push({ id: "cheat_turing", label: "Welcome Back, Alan", desc: "The enigma has been decoded", tier: 3 });
-              if (!achievementToastTimer.current) advanceAchievementQueue();
-              saved.add("cheat_turing");
-              saveSavedAchievements(saved);
-              setSavedAchievementIds(new Set(saved));
-              const enigmaTheme = PUZZLE_THEMES.find(t => t.id === "enigma");
-              if (enigmaTheme) { setTimeout(() => showThemeToast(enigmaTheme), 3800); }
-            }
-          }
-          setShowBirthdayPrompt(false);
-          setBirthdayInput("");
-          setCalendarYear(y);
-          setCalendarMonth(m - 1);
-        }} disabled={!birthdayInput} style={{
-          width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-          fontFamily: "'Inter', sans-serif", letterSpacing: 2,
-          background: birthdayInput ? "#F472B6" : C.surfaceLight, color: birthdayInput ? "#fff" : C.textDim,
-          border: "none", cursor: birthdayInput ? "pointer" : "not-allowed", textTransform: "uppercase",
-        }}>
-          Save
-        </button>
-        {birthday && (
-          <button onClick={() => { setBirthday(null); try { localStorage.removeItem(BIRTHDAY_KEY); } catch { /* ignore */ } setShowBirthdayPrompt(false); setBirthdayInput(""); }} style={{
-            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-            background: "none", border: `1px solid ${C.incorrect}`, color: C.incorrect,
-            cursor: "pointer", textTransform: "uppercase",
-          }}>
-            Remove
-          </button>
-        )}
-        <button onClick={() => { setShowBirthdayPrompt(false); setBirthdayInput(""); }} style={{
-          width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-          fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-          background: "none", border: `1px solid ${C.border}`, color: C.textDim,
-          cursor: "pointer", textTransform: "uppercase",
-        }}>
-          Cancel
-        </button>
-      </div>
-    </DraggableDrawer>
-  );
-
-  const syncChoiceEl = showSyncChoice && syncChoiceData ? (() => {
-    const { localSummary, cloudSummary } = syncChoiceData;
-    const localMore = localSummary.totalSolved > cloudSummary.totalSolved;
-    const cloudMore = cloudSummary.totalSolved > localSummary.totalSolved;
-    const SyncOption = ({ label, tag, summary, highlight, onClick }) => (
-      <button onClick={onClick} style={{
-        width: "100%", padding: "14px 16px", borderRadius: 12, textAlign: "left",
-        background: highlight ? C.accent + "14" : C.surface,
-        border: `1px solid ${highlight ? C.accent + "66" : C.border}`,
-        cursor: "pointer", transition: "all 0.15s", marginBottom: 8, position: "relative",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.text }}>{label}</span>
-          {tag && (
-            <span style={{ fontSize: 9, fontWeight: 700, fontFamily: "'Inter', sans-serif", padding: "2px 6px", borderRadius: 4, backgroundColor: C.correct + "22", color: C.correct, textTransform: "uppercase", letterSpacing: 0.5 }}>{tag}</span>
-          )}
-        </div>
-        <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
-          {summary.totalSolved} puzzle{summary.totalSolved !== 1 ? "s" : ""} solved
-          {summary.achievements > 0 && (<span> &middot; {summary.achievements} achievement{summary.achievements !== 1 ? "s" : ""}</span>)}
-        </div>
-      </button>
-    );
-    return (
-      <DraggableDrawer isOpen={true} onClose={() => {}} zIndex={1100}>
-        <div style={{ padding: "0 24px 24px" }}>
-          <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <div style={{
-              width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
-              backgroundColor: "#F59E0B22", display: "flex", alignItems: "center", justifyContent: "center",
-              border: "2px solid #F59E0B44",
-            }}>
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                <path d="M12 3L4 9v12h16V9l-8-6z" stroke="#F59E0B" strokeWidth="2" fill="none" strokeLinejoin="round"/>
-                <path d="M9 21v-6h6v6" stroke="#F59E0B" strokeWidth="2" fill="none" strokeLinejoin="round"/>
-              </svg>
-            </div>
-            <h3 style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, margin: "0 0 6px" }}>
-              Existing Save Found
-            </h3>
-            <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5, maxWidth: 300, marginInline: "auto" }}>
-              You have progress saved in the cloud and on this device. Which would you like to keep?
-            </p>
-          </div>
-          <SyncOption label="Use This Device" tag={localMore ? "More progress" : null} summary={localSummary} highlight={localMore} onClick={() => handleSyncChoice("local")} />
-          <SyncOption label="Use Cloud Save" tag={cloudMore ? "More progress" : null} summary={cloudSummary} highlight={cloudMore} onClick={() => handleSyncChoice("cloud")} />
-          <button onClick={() => handleSyncChoice("merge")} style={{
-            width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-            background: C.accent, color: C.bg, border: "none",
-            cursor: "pointer", textTransform: "uppercase", transition: "all 0.15s", marginTop: 4,
-          }}>
-            Merge Both
-          </button>
-          <p style={{ fontSize: 10, color: C.textDim, textAlign: "center", margin: "10px 0 0", lineHeight: 1.5, fontFamily: "'Inter', sans-serif" }}>
-            Merge keeps the best results from both saves
-          </p>
-        </div>
-      </DraggableDrawer>
-    );
-  })() : null;
-
   const coopInviteEl = null; // Moved to Liquid Glass menu
-
-  const leaveConfirmEl = showLeaveConfirm && (
-    <DraggableDrawer isOpen={true} onClose={() => setShowLeaveConfirm(false)} zIndex={1200}>
-      <div style={{ padding: "0 24px 24px" }}>
-        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>Leave Co-op?</div>
-        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
-          {coopRole === "host" ? "The session will stay active. You can rejoin from the main menu." : "You will leave this session and your partner will need to invite you again to rejoin."}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { leaveCoopSession(); if (customMosaicPuzzlesRef.current && isMosaic) { setView("custom-mosaic"); } else { setView("menu"); } }} style={{ flex: 1, backgroundColor: "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Leave</button>
-          <button onClick={() => setShowLeaveConfirm(false)} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
-        </div>
-      </div>
-    </DraggableDrawer>
-  );
-
-  const coopMosaicNavigateEl = showCoopMosaicNavigate ? (() => {
-    const playersOnTiles = Object.entries(coopMosaicPlayers).filter(([, p]) => p.currentTile != null && p.currentTile >= 0 && p.currentTile !== currentPuzzle);
-    return playersOnTiles.length > 0 ? (
-      <DraggableDrawer isOpen={true} onClose={() => setShowCoopMosaicNavigate(false)} zIndex={1200}>
-        <div style={{ padding: "0 24px 24px", textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>Go to player</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-            {playersOnTiles.map(([uid, p]) => (
-              <button key={uid} onClick={() => {
-                const targetTile = p.currentTile;
-                setShowCoopMosaicNavigate(false);
-                coopMosaicCurrentTileRef.current = targetTile;
-                updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser?.uid, targetTile).catch(() => {});
-                coopMosaicWriteThrottleRef.current = {};
-                startPuzzle(targetTile, "mosaic", true);
-              }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.coop + "11", border: `1px solid ${C.coop}44`, borderRadius: 8, padding: "10px 16px", cursor: "pointer", transition: "all 0.15s" }}>
-                <span style={{ color: C.coop, fontWeight: 700, fontFamily: "'Inter', sans-serif", fontSize: 12 }}>{p.username || "Player"}</span>
-                <span style={{ color: C.textDim, fontFamily: "'Inter', sans-serif", fontSize: 11 }}>tile {p.currentTile + 1}</span>
-              </button>
-            ))}
-          </div>
-          <button onClick={() => setShowCoopMosaicNavigate(false)} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 18px", color: C.textDim, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 11, letterSpacing: 1 }}>Stay</button>
-        </div>
-      </DraggableDrawer>
-    ) : null;
-  })() : null;
-
-  const mosaicLeaveConfirmEl = showMosaicLeaveConfirm && (
-    <DraggableDrawer isOpen={true} onClose={() => setShowMosaicLeaveConfirm(false)} zIndex={1200}>
-      <div style={{ padding: "0 24px 24px" }}>
-        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>
-          {coopMosaicRole === "host" ? "Go to Menu?" : "Leave Co-op?"}
-        </div>
-        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
-          {coopMosaicRole === "host" ? "Your session will stay active. You can rejoin anytime from the Active Co-op Sessions panel on the main menu." : "You will leave this session and your partner will need to invite you again to rejoin."}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { setShowMosaicLeaveConfirm(false); leaveCoopMosaicSession(); loadActiveCoopSessions(); setView("menu"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; }} style={{ flex: 1, backgroundColor: coopMosaicRole === "host" ? C.coop : "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
-            {coopMosaicRole === "host" ? "Go to Menu" : "Leave"}
-          </button>
-          <button onClick={() => setShowMosaicLeaveConfirm(false)} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
-        </div>
-      </div>
-    </DraggableDrawer>
-  );
 
   const coopMosaicInviteUrl = isCoopMosaic && coopMosaicSessionId ? `${typeof window !== "undefined" ? window.location.origin + window.location.pathname : ""}?coopMosaic=${coopMosaicSessionId}` : "";
 
@@ -9130,21 +8750,8 @@ export default function Pattrn() {
   // --- Global modals element (included in every return) ---
   const globalModalsEl = (
     <>
-      {themePickerEl}
-      {usernameModalEl}
-      {profilePageEl}
-      {friendsModalEl}
-      {clearConfirmEl}
-      {deleteAccountConfirmEl}
-      {achievementsEl}
-      {shareModalEl}
-      {birthdayPromptEl}
-      {syncChoiceEl}
       {coopInviteEl}
       {coopFriendPickerEl}
-      {leaveConfirmEl}
-      {coopMosaicNavigateEl}
-      {mosaicLeaveConfirmEl}
       {coopMosaicInviteEl}
       {coopInviteToastEl}
     </>
@@ -11412,7 +11019,7 @@ export default function Pattrn() {
             {firebaseConfigured && (
               <button onClick={() => {
                 if (firebaseUser) {
-                  setShowProfilePage(true);
+                  setRadialMenuStack(["root", "account", "profile-view"]);
                 } else {
                   setRadialMenuStack(["root", "sign-in"]); setAccountTab("login"); setAccountError("");
                 }
@@ -11448,7 +11055,7 @@ export default function Pattrn() {
             )}
 
             {/* Achievements */}
-            <button onClick={() => setShowAchievements(true)} style={{
+            <button onClick={() => setRadialMenuStack(["root", "achievements-view"])} style={{
               width: "100%", padding: "14px 16px", borderRadius: 12,
               backgroundColor: C.surface, border: `1px solid ${C.border}`,
               cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -11476,7 +11083,7 @@ export default function Pattrn() {
             </button>
 
             {/* Statistics */}
-            <button onClick={() => setShowShareModal(true)} style={{
+            <button onClick={() => setRadialMenuStack(["root", "share-stats"])} style={{
               width: "100%", padding: "14px 16px", borderRadius: 12,
               backgroundColor: C.surface, border: `1px solid ${C.border}`,
               cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -11508,7 +11115,7 @@ export default function Pattrn() {
             </button>
 
             {/* Birthday Puzzle */}
-            <button onClick={() => setShowBirthdayPrompt(true)} style={{
+            <button onClick={() => setRadialMenuStack(["root", "account", "birthday-edit"])} style={{
               width: "100%", padding: "14px 16px", borderRadius: 12,
               backgroundColor: C.surface, border: `1px solid ${C.border}`,
               cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -11536,7 +11143,7 @@ export default function Pattrn() {
             </button>
 
             {/* Themes */}
-            <button onClick={() => setShowThemePicker(true)} style={{
+            <button onClick={() => setRadialMenuStack(["root", "theme-list"])} style={{
               width: "100%", padding: "14px 16px", borderRadius: 12,
               backgroundColor: C.surface, border: `1px solid ${C.border}`,
               cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -11569,7 +11176,7 @@ export default function Pattrn() {
 
             {/* Friends */}
             {firebaseConfigured && firebaseUser && (
-              <button onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }} style={{
+              <button onClick={() => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); }} style={{
                 width: "100%", padding: "14px 16px", borderRadius: 12,
                 backgroundColor: C.surface, border: `1px solid ${C.border}`,
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -11686,7 +11293,7 @@ export default function Pattrn() {
             )}
 
             {/* Clear All Data */}
-            <button onClick={() => setShowClearConfirm(true)} style={{
+            <button onClick={() => setRadialMenuStack(["root", "account", "clear-confirm"])} style={{
               width: "100%", padding: "14px 16px", borderRadius: 12,
               backgroundColor: C.surface, border: `1px solid ${C.border}`,
               cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -11716,7 +11323,7 @@ export default function Pattrn() {
 
             {/* Delete Account */}
             {firebaseUser && (
-              <button onClick={() => { setShowDeleteAccountConfirm(true); setDeleteAccountError(""); setDeleteAccountPassword(""); }} style={{
+              <button onClick={() => { setRadialMenuStack(["root", "account", "delete-account"]); setAccountError(""); setAccountPassword(""); }} style={{
                 width: "100%", padding: "14px 16px", borderRadius: 12,
                 backgroundColor: C.surface, border: `1px solid ${C.border}`,
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
