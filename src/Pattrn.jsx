@@ -4628,155 +4628,140 @@ export default function Pattrn() {
     const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
     const items = menuTree[currentMenuKey] || [];
 
-    const itemCount = items.length;
-    const itemSize = 48;
-    // Vertical spacing between item centers (going upward from FAB)
-    const itemGap = 60;
-
     const fabIconKey = isOpen ? null : getFabIcon(currentView);
     const strokeColor = "rgba(255,255,255,0.85)";
     const activeStroke = C.accent;
-
-    // Render an icon by key
     const renderIcon = (key, color) => radialIcons[key] ? radialIcons[key](color) : null;
+
+    // Panel sizing
+    const fabSize = 56;
+    const panelWidth = 200;
+    const itemHeight = 44;
+    const panelPad = 8;
+    const openHeight = items.length * itemHeight + panelPad + fabSize;
+
+    const handleToggle = () => {
+      if (isOpen) setRadialMenuStack([]);
+      else setRadialMenuStack(["root"]);
+    };
 
     return (
       <>
-        {/* Menu item animation */}
         <style>{`
-          @keyframes radialItemPop { 0% { opacity: 0; transform: scale(0.3); } 100% { opacity: 1; transform: scale(1); } }
+          @keyframes ctxItemFade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         `}</style>
 
-        {/* Invisible click-away layer (no blur, no background — page stays usable) */}
+        {/* Click-away layer — transparent, page stays usable */}
         {isOpen && (
           <div
             onClick={() => setRadialMenuStack([])}
-            style={{
-              position: "fixed", inset: 0, zIndex: 84,
-            }}
+            style={{ position: "fixed", inset: 0, zIndex: 84 }}
           />
         )}
 
-        {/* Radial menu items */}
-        {isOpen && items.map((item, i) => {
-          // Vertical offset: each item goes up from above the FAB
-          const offsetFromFab = (i + 1) * itemGap;
-
-          const handleClick = () => {
-            if (item.isBack) {
-              setRadialMenuStack(prev => prev.slice(0, -1));
-            } else if (item.sub) {
-              setRadialMenuStack(prev => [...prev, item.sub]);
-            } else if (item.action) {
-              item.action();
-              setRadialMenuStack([]);
-            }
-          };
-
-          return (
-            <div
-              key={item.id}
-              style={{
-                position: "fixed",
-                bottom: `calc(${80 + 56 + 8 + offsetFromFab - itemGap}px + env(safe-area-inset-bottom, 0px))`,
-                right: 20,
-                width: 56,
-                zIndex: 86,
-                animation: `radialItemPop 0.28s ${i * 0.04}s cubic-bezier(0.34, 1.56, 0.64, 1) both`,
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-                pointerEvents: "auto",
-              }}
-            >
-              <button
-                onClick={handleClick}
-                style={{
-                  width: itemSize, height: itemSize, borderRadius: itemSize / 2,
-                  background: item.isBack
-                    ? `linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)`
-                    : `linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 100%)`,
-                  backdropFilter: "blur(24px) saturate(180%)",
-                  WebkitBackdropFilter: "blur(24px) saturate(180%)",
-                  border: item.isBack
-                    ? `1px solid rgba(255,255,255,0.10)`
-                    : "1px solid rgba(255,255,255,0.18)",
-                  boxShadow: `0 6px 24px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.06)`,
-                  cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "transform 0.15s, box-shadow 0.15s, border-color 0.15s",
-                  padding: 0,
-                }}
-                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.12)"; e.currentTarget.style.borderColor = `${C.accent}66`; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = item.isBack ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.18)"; }}
-              >
-                {renderIcon(item.icon, item.isBack ? C.textDim : strokeColor)}
-              </button>
-              <span style={{
-                fontSize: 8, fontWeight: 700, color: item.isBack ? C.textDim : C.text,
-                fontFamily: "'Space Mono', monospace",
-                letterSpacing: 0.5, textTransform: "uppercase",
-                textShadow: "0 1px 4px rgba(0,0,0,0.9)",
-                whiteSpace: "nowrap",
-              }}>
-                {item.label}
-              </span>
-            </div>
-          );
-        })}
-
-        {/* Main FAB — Liquid Glass */}
-        <button
-          onClick={() => {
-            if (isOpen) {
-              setRadialMenuStack([]);
-            } else {
-              setRadialMenuStack(["root"]);
-            }
-          }}
+        {/* Expanding Liquid Glass panel */}
+        <div
           style={{
             position: "fixed",
             bottom: `calc(80px + env(safe-area-inset-bottom, 0px))`,
             right: 20,
-            width: 56, height: 56, borderRadius: 28,
-            background: isOpen
-              ? `linear-gradient(135deg, rgba(200,240,62,0.18) 0%, rgba(200,240,62,0.06) 100%)`
-              : `linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.08) 100%)`,
+            width: isOpen ? panelWidth : fabSize,
+            height: isOpen ? openHeight : fabSize,
+            borderRadius: isOpen ? 22 : fabSize / 2,
+            background: `linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.08) 100%)`,
             backdropFilter: "blur(28px) saturate(200%)",
             WebkitBackdropFilter: "blur(28px) saturate(200%)",
             border: isOpen
-              ? `1px solid ${C.accent}44`
+              ? `1px solid rgba(255,255,255,0.18)`
               : "1px solid rgba(255,255,255,0.16)",
-            boxShadow: isOpen
-              ? `0 8px 32px rgba(0,0,0,0.5), 0 0 24px ${C.accent}22, inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`
-              : `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`,
             zIndex: 85,
-            cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
-            transform: isOpen ? "rotate(0deg) scale(1.05)" : "rotate(0deg) scale(1)",
-            padding: 0,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            cursor: isOpen ? "default" : "pointer",
+            transition: "width 0.35s cubic-bezier(0.32, 0.72, 0, 1), height 0.35s cubic-bezier(0.32, 0.72, 0, 1), border-radius 0.35s cubic-bezier(0.32, 0.72, 0, 1), transform 0.15s ease, box-shadow 0.15s ease",
           }}
+          onClick={isOpen ? undefined : handleToggle}
           onMouseEnter={e => { if (!isOpen) { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.5), 0 0 16px ${C.accent}22, inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.1)`; } }}
           onMouseLeave={e => { if (!isOpen) { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`; } }}
           aria-label="Quick actions"
         >
           {/* Liquid Glass sheen highlight */}
           <div style={{
-            position: "absolute", inset: 0, borderRadius: 28, overflow: "hidden", pointerEvents: "none",
+            position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none",
           }}>
             <div style={{
               position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%",
-              background: "linear-gradient(180deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0) 100%)",
-              borderRadius: "28px 28px 50% 50%",
+              background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)",
+              borderRadius: "inherit",
             }} />
           </div>
-          {isOpen ? (
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={activeStroke} strokeWidth="2.5" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-            </svg>
-          ) : (
-            renderIcon(fabIconKey, strokeColor)
+
+          {/* Menu items — icon + label rows */}
+          {isOpen && (
+            <div style={{ padding: `${panelPad}px 0 0 0`, flex: 1, display: "flex", flexDirection: "column" }}>
+              {items.map((item, i) => {
+                const handleClick = () => {
+                  if (item.isBack) setRadialMenuStack(prev => prev.slice(0, -1));
+                  else if (item.sub) setRadialMenuStack(prev => [...prev, item.sub]);
+                  else if (item.action) { item.action(); setRadialMenuStack([]); }
+                };
+
+                return (
+                  <button
+                    key={item.id}
+                    onClick={handleClick}
+                    style={{
+                      width: "100%", height: itemHeight,
+                      display: "flex", alignItems: "center", gap: 12,
+                      padding: "0 16px",
+                      background: "none", border: "none",
+                      cursor: "pointer",
+                      color: item.isBack ? C.textDim : C.text,
+                      fontFamily: "'Space Mono', monospace",
+                      fontSize: 11, fontWeight: 600,
+                      letterSpacing: 0.5, textTransform: "uppercase",
+                      transition: "background 0.15s",
+                      animation: `ctxItemFade 0.25s ${0.06 + i * 0.035}s ease both`,
+                    }}
+                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+                    onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
+                  >
+                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, flexShrink: 0 }}>
+                      {renderIcon(item.icon, item.isBack ? C.textDim : strokeColor)}
+                    </span>
+                    <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
+                    {item.sub && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           )}
-        </button>
+
+          {/* Toggle button — sits at the bottom of the panel */}
+          <div
+            onClick={isOpen ? handleToggle : undefined}
+            style={{
+              width: "100%", height: fabSize, flexShrink: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              borderTop: isOpen ? "1px solid rgba(255,255,255,0.06)" : "none",
+              cursor: "pointer",
+            }}
+          >
+            {isOpen ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={activeStroke} strokeWidth="2.5" strokeLinecap="round">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            ) : (
+              renderIcon(fabIconKey, strokeColor)
+            )}
+          </div>
+        </div>
       </>
     );
   };
