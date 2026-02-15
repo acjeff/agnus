@@ -3173,11 +3173,11 @@ export default function Pattrn() {
         setProfilePicture(profile.profilePicture || null);
       } else {
         // User has no username — show mandatory modal
-        setRadialMenuStack(["root", "account", "username-edit"]);
+        setRadialMenuStack(["root", "profile", "username-edit"]);
         setProfilePicture(profile?.profilePicture || null);
       }
     }).catch(() => {
-      setRadialMenuStack(["root", "account", "username-edit"]);
+      setRadialMenuStack(["root", "profile", "username-edit"]);
     });
   }, [firebaseUser, firebaseConfigured]);
 
@@ -3868,7 +3868,7 @@ export default function Pattrn() {
       setSyncStatus("synced");
       setTimeout(() => setSyncStatus(""), 2000);
       // New account has no username yet — show the mandatory modal
-      setRadialMenuStack(["root", "account", "username-edit"]);
+      setRadialMenuStack(["root", "profile", "username-edit"]);
     } catch (e) {
       setAccountError(friendlyAuthError(e.code));
     } finally {
@@ -4652,13 +4652,25 @@ export default function Pattrn() {
   ];
 
   // Account sub-menu — nested account management options
-  const accountSubMenu = [
-    { id: "account-profile", icon: "profile", label: "View Profile", sub: "profile-view" },
-    { id: "account-username", icon: "edit", label: "Change Username", sub: "username-edit" },
-    { id: "account-birthday", icon: "cake", label: "Set Birthday", sub: "birthday-edit" },
-    { id: "account-delete", icon: "trash", label: "Delete Account", sub: "delete-account" },
-    { id: "account-signout", icon: "logout", label: "Sign Out", action: () => { handleSignOut(); } },
-    ...(progress && Object.keys(progress).length > 0 ? [{ id: "account-clear", icon: "trash", label: "Clear All Data", sub: "clear-confirm" }] : []),
+  // Admin submenu — nested under Profile
+  const adminSubMenu = [
+    { id: "admin-review", icon: "star", label: "Review", action: () => { setView("admin-review"); loadMosaicData("admin"); } },
+    { id: "admin-manage", icon: "list", label: "Manage", action: () => { setView("admin-manage"); loadMosaicData("manage"); } },
+    { id: "admin-metrics", icon: "chart", label: "Metrics", action: () => { setView("admin-metrics"); loadAdminMetricsData(); } },
+    { id: "admin-users", icon: "users", label: "Users", action: () => { setView("admin-users"); } },
+  ];
+
+  // Profile submenu — now global, includes account items + admin
+  const profileSubMenu = [
+    { id: "profile-view-item", icon: "profile", label: "View Profile", sub: "profile-view" },
+    { id: "profile-achievements", icon: "trophy", label: "Achievements", sub: "achievements-view" },
+    { id: "profile-share", icon: "share", label: "Share Stats", sub: "share-stats" },
+    { id: "profile-username", icon: "edit", label: "Change Username", sub: "username-edit" },
+    { id: "profile-birthday", icon: "cake", label: "Set Birthday", sub: "birthday-edit" },
+    ...(progress && Object.keys(progress).length > 0 ? [{ id: "profile-clear", icon: "trash", label: "Clear All Data", sub: "clear-confirm" }] : []),
+    { id: "profile-delete", icon: "trash", label: "Delete Account", sub: "delete-account" },
+    { id: "profile-signout", icon: "logout", label: "Sign Out", action: () => { handleSignOut(); } },
+    ...(isAdmin ? [{ id: "profile-admin", icon: "shield", label: "Admin", sub: "admin" }] : []),
   ];
 
   // Contextual menu items per view — page-specific actions
@@ -4714,56 +4726,90 @@ export default function Pattrn() {
     ];
     const adminUsersRoot = [];
 
+    // Global menu structure — available in all views (profile, themes, etc.)
+    const globalMenuStructure = {
+      play: playSubMenu,
+      profile: firebaseConfigured && firebaseUser ? profileSubMenu : [],
+      admin: adminSubMenu,
+      "achievements-view": [],
+      "share-stats": [],
+      "profile-view": [],
+      "username-edit": [],
+      "birthday-edit": [],
+      "delete-account": [],
+      "clear-confirm": [],
+      "friends-view": [],
+      "theme-list": [],
+      theme: themeSubMenu,
+      "coop-start": [],
+      "sign-in": [],
+      "mosaic-save": [],
+      "mosaic-preview": [],
+      "mosaic-leave-confirm": [],
+      "coop-leave-confirm": [],
+      "coop-mosaic-navigate": [],
+    };
+
+    // Build root menu with global Profile item
+    const buildRootWithProfile = (viewSpecificItems) => {
+      const items = [...viewSpecificItems];
+      // Add Profile as a permanent item if signed in
+      if (firebaseConfigured && firebaseUser) {
+        items.push({ id: "nav-profile-menu", icon: "profile", label: "Profile", sub: "profile" });
+      }
+      return items;
+    };
+
     const trees = {
       menu: {
-        root: menuRoot,
-        "friends-view": [],
+        root: buildRootWithProfile(menuRoot),
+        ...globalMenuStructure,
       },
       gallery: {
-        root: [
+        root: buildRootWithProfile([
           { id: "public", icon: "globe", label: "Public", action: () => { setMosaicGalleryTab("public"); loadMosaicData("public"); } },
           { id: "mine", icon: "folder", label: "My Mosaics", action: () => { setMosaicGalleryTab("mine"); loadMosaicData("mine"); } },
-        ],
+        ]),
+        ...globalMenuStructure,
       },
       play: {
-        root: playRoot,
-        "theme-list": [],
+        root: buildRootWithProfile(playRoot),
+        ...globalMenuStructure,
       },
       profile: {
-        root: [
-          { id: "achievements", icon: "trophy", label: "Achievements", sub: "achievements-view" },
-          { id: "share-stats", icon: "share", label: "Share Stats", sub: "share-stats" },
-          ...(firebaseConfigured && firebaseUser ? [
-            { id: "account", icon: "settings", label: "Account", sub: "account" },
-          ] : []),
-        ],
-        account: accountSubMenu,
-        "achievements-view": [],
-        "share-stats": [],
-        "profile-view": [],
-        "username-edit": [],
-        "birthday-edit": [],
-        "delete-account": [],
-        "clear-confirm": [],
+        root: buildRootWithProfile([]),
+        ...globalMenuStructure,
       },
       creator: {
-        root: creatorRoot,
-        "friends-view": [],
+        root: buildRootWithProfile(creatorRoot),
+        ...globalMenuStructure,
       },
       "custom-mosaic": {
-        root: customMosaicRoot,
-        "friends-view": [],
+        root: buildRootWithProfile(customMosaicRoot),
+        ...globalMenuStructure,
       },
       coop: {
-        root: firebaseConfigured && firebaseUser ? [
+        root: buildRootWithProfile(firebaseConfigured && firebaseUser ? [
           { id: "friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } },
-        ] : [],
-        "friends-view": [],
+        ] : []),
+        ...globalMenuStructure,
       },
-      "admin-review": { root: adminReviewRoot },
-      "admin-manage": { root: adminManageRoot },
-      "admin-metrics": { root: adminMetricsRoot },
-      "admin-users": { root: adminUsersRoot },
+      "admin-review": {
+        root: buildRootWithProfile(adminReviewRoot),
+        ...globalMenuStructure,
+      },
+      "admin-manage": {
+        root: buildRootWithProfile(adminManageRoot),
+        ...globalMenuStructure,
+      },
+      "admin-metrics": {
+        root: buildRootWithProfile(adminMetricsRoot),
+        ...globalMenuStructure,
+      },
+      "admin-users": {
+        root: buildRootWithProfile(adminUsersRoot),
+        ...globalMenuStructure,
+      },
     };
     return trees[currentView] || { root: [] };
   };
@@ -4774,7 +4820,6 @@ export default function Pattrn() {
     { id: "nav-home", icon: "home", label: "Home", action: () => { setView("menu"); } },
     { id: "nav-gallery", icon: "gallery", label: "Mosaic", action: () => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); } },
     { id: "nav-coop", icon: "users", label: "Co-op", action: () => { setView("coop"); } },
-    { id: "nav-profile", icon: "profile", label: "Profile", action: () => { setView("profile"); } },
     ...(firebaseConfigured && !firebaseUser ? [{ id: "nav-sign-in", icon: "login", label: "Sign In", sub: "sign-in", beforeSub: () => { setAccountTab("login"); setAccountError(""); return true; } }] : []),
   ];
 
@@ -4807,10 +4852,10 @@ export default function Pattrn() {
                           isAchievementsView || isFriendsView || isShareStats || isProfileView ||
                           isUsernameEdit || isBirthdayEdit || isDeleteAccount || isClearConfirm ||
                           isThemeList || isSyncChoice || isMosaicLeaveConfirm || isCoopLeaveConfirm || isCoopMosaicNavigate;
-    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : currentMenuKey === "account" ? accountSubMenu : isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
+    const contextualItems = isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
-    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-gallery", "custom-mosaic": "nav-gallery" };
+    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", creator: "nav-gallery", "custom-mosaic": "nav-gallery" };
     const filteredNav = navItems.filter(item => item.id !== viewToNavId[currentView]);
 
     const fabIconKey = isOpen ? null : getFabIcon();
@@ -11204,7 +11249,7 @@ export default function Pattrn() {
             {firebaseConfigured && (
               <button onClick={() => {
                 if (firebaseUser) {
-                  setRadialMenuStack(["root", "account", "profile-view"]);
+                  setRadialMenuStack(["root", "profile", "profile-view"]);
                 } else {
                   setRadialMenuStack(["root", "sign-in"]); setAccountTab("login"); setAccountError("");
                 }
@@ -11300,7 +11345,7 @@ export default function Pattrn() {
             </button>
 
             {/* Birthday Puzzle */}
-            <button onClick={() => setRadialMenuStack(["root", "account", "birthday-edit"])} style={{
+            <button onClick={() => setRadialMenuStack(["root", "profile", "birthday-edit"])} style={{
               width: "100%", padding: "14px 16px", borderRadius: 12,
               backgroundColor: C.surface, border: `1px solid ${C.border}`,
               cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -11478,7 +11523,7 @@ export default function Pattrn() {
             )}
 
             {/* Clear All Data */}
-            <button onClick={() => setRadialMenuStack(["root", "account", "clear-confirm"])} style={{
+            <button onClick={() => setRadialMenuStack(["root", "profile", "clear-confirm"])} style={{
               width: "100%", padding: "14px 16px", borderRadius: 12,
               backgroundColor: C.surface, border: `1px solid ${C.border}`,
               cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
@@ -11508,7 +11553,7 @@ export default function Pattrn() {
 
             {/* Delete Account */}
             {firebaseUser && (
-              <button onClick={() => { setRadialMenuStack(["root", "account", "delete-account"]); setAccountError(""); setAccountPassword(""); }} style={{
+              <button onClick={() => { setRadialMenuStack(["root", "profile", "delete-account"]); setAccountError(""); setAccountPassword(""); }} style={{
                 width: "100%", padding: "14px 16px", borderRadius: 12,
                 backgroundColor: C.surface, border: `1px solid ${C.border}`,
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
