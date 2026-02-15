@@ -4454,75 +4454,7 @@ export default function Pattrn() {
     cascadeRunIndexRef.current = cascadeRunIndex;
   }
   // --- Bottom Tab Bar helper ---
-  const BottomTabBar = ({ active }) => (
-    <nav className="bottom-tab-bar" style={{
-      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
-      backgroundColor: C.bg + "f0",
-      borderTop: `1px solid ${C.border}`,
-      paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      display: "flex", justifyContent: "center",
-    }}>
-      <div style={{
-        display: "flex", width: "100%", maxWidth: 480,
-        justifyContent: "space-around", alignItems: "center",
-        padding: "6px 0 4px",
-      }}>
-        {/* Home */}
-        <button onClick={() => setView("menu")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "home" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-          <span style={{ fontSize: 10, fontWeight: active === "home" ? 700 : 500, color: active === "home" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Home</span>
-        </button>
-        {/* Mosaic (Gallery) */}
-        <button onClick={() => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); }}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "mosaic" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-          </svg>
-          <span style={{ fontSize: 10, fontWeight: active === "mosaic" ? 700 : 500, color: active === "mosaic" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Mosaic</span>
-        </button>
-        {/* Co-op */}
-        <button onClick={() => setView("coop")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative" }}>
-          <div style={{ position: "relative", display: "inline-flex" }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "coop" ? C.coop : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            {activeCoopSessions.filter(s => s.status !== "complete").length > 0 && (
-              <div style={{
-                position: "absolute", top: -4, right: -8,
-                minWidth: 16, height: 16, borderRadius: 8,
-                backgroundColor: C.coop, display: "flex", alignItems: "center", justifyContent: "center",
-                padding: "0 4px", boxSizing: "border-box",
-              }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "'Space Mono', monospace", lineHeight: 1, paddingTop: 1 }}>
-                  {activeCoopSessions.filter(s => s.status !== "complete").length}
-                </span>
-              </div>
-            )}
-          </div>
-          <span style={{ fontSize: 10, fontWeight: active === "coop" ? 700 : 500, color: active === "coop" ? C.coop : C.textDim, fontFamily: "'Space Mono', monospace" }}>Co-op</span>
-        </button>
-        {/* Profile */}
-        <button onClick={() => setView("profile")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative" }}>
-          {firebaseUser && profilePicture ? (
-            <img src={profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: 11, objectFit: "cover", border: `1.5px solid ${active === "profile" ? C.accent : C.border}` }} />
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "profile" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-            </svg>
-          )}
-          <span style={{ fontSize: 10, fontWeight: active === "profile" ? 700 : 500, color: active === "profile" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Profile</span>
-        </button>
-      </div>
-    </nav>
-  );
-
-  // --- Radial Context Button (Liquid Glass FAB) ---
+  // --- Context Button (Liquid Glass FAB) ---
   // Close radial menu when view changes
   const prevViewRef = useRef(view);
   if (prevViewRef.current !== view) {
@@ -4554,16 +4486,13 @@ export default function Pattrn() {
     burger: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
   };
 
-  // Nested menu tree per view — items can have `sub` key to open a sub-menu
-  const getRadialMenuTree = (currentView) => {
+  // Contextual menu items per view — page-specific actions + sub-menus
+  const getContextualMenuTree = (currentView) => {
     const trees = {
       menu: {
         root: [
           { id: "play", icon: "play", label: "Play", sub: "play" },
-          { id: "gallery", icon: "gallery", label: "Mosaic", action: () => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); } },
           { id: "create", icon: "create", label: "Create", action: () => { setView("creator"); } },
-          { id: "coop", icon: "users", label: "Co-op", action: () => { setView("coop"); } },
-          { id: "profile", icon: "profile", label: "Profile", action: () => { setView("profile"); } },
         ],
         play: [
           { id: "back", icon: "back", label: "Back", isBack: true },
@@ -4576,39 +4505,30 @@ export default function Pattrn() {
       },
       gallery: {
         root: [
-          { id: "new", icon: "plus", label: "Create", action: () => { setView("creator"); } },
+          { id: "new", icon: "plus", label: "Create New", action: () => { setView("creator"); } },
           { id: "public", icon: "globe", label: "Public", action: () => { setMosaicGalleryTab("public"); loadMosaicData("public"); } },
           { id: "mine", icon: "folder", label: "My Mosaics", action: () => { setMosaicGalleryTab("mine"); loadMosaicData("mine"); } },
-          { id: "home", icon: "home", label: "Home", action: () => { setView("menu"); } },
-        ],
-      },
-      creator: {
-        root: [
-          { id: "gallery", icon: "gallery", label: "Gallery", action: () => { setView("gallery"); } },
-          { id: "home", icon: "home", label: "Home", action: () => { setView("menu"); } },
         ],
       },
       profile: {
         root: [
           { id: "achievements", icon: "trophy", label: "Achievements", action: () => { setShowAchievements(true); } },
-          { id: "home", icon: "home", label: "Home", action: () => { setView("menu"); } },
-          { id: "gallery", icon: "gallery", label: "Gallery", action: () => { setView("gallery"); } },
-        ],
-      },
-      coop: {
-        root: [
-          { id: "home", icon: "home", label: "Home", action: () => { setView("menu"); } },
-          { id: "gallery", icon: "gallery", label: "Gallery", action: () => { setView("gallery"); } },
-        ],
-      },
-      "custom-mosaic": {
-        root: [
-          { id: "gallery", icon: "gallery", label: "Gallery", action: () => { setView("gallery"); } },
-          { id: "home", icon: "home", label: "Home", action: () => { setView("menu"); } },
         ],
       },
     };
     return trees[currentView] || { root: [] };
+  };
+
+  // Persistent nav items — core page links, excluding the current page
+  const getNavItems = (currentView) => {
+    const allNav = [
+      { id: "nav-home", icon: "home", label: "Home", action: () => { setView("menu"); } },
+      { id: "nav-gallery", icon: "gallery", label: "Mosaic", action: () => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); } },
+      { id: "nav-coop", icon: "users", label: "Co-op", action: () => { setView("coop"); } },
+      { id: "nav-profile", icon: "profile", label: "Profile", action: () => { setView("profile"); } },
+    ];
+    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-home", "custom-mosaic": "nav-gallery" };
+    return allNav.filter(item => item.id !== viewToNavId[currentView]);
   };
 
   // Context-aware FAB icon per view
@@ -4625,10 +4545,12 @@ export default function Pattrn() {
   };
 
   const RadialContextButton = ({ currentView }) => {
-    const menuTree = getRadialMenuTree(currentView);
+    const menuTree = getContextualMenuTree(currentView);
+    const navItems = getNavItems(currentView);
     const isOpen = radialMenuStack.length > 0;
     const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
-    const items = menuTree[currentMenuKey] || [];
+    const isSubMenu = currentMenuKey !== "root";
+    const contextualItems = menuTree[currentMenuKey] || [];
 
     const fabIconKey = isOpen ? null : getFabIcon(currentView);
     const strokeColor = "rgba(255,255,255,0.85)";
@@ -4640,11 +4562,56 @@ export default function Pattrn() {
     const panelWidth = 200;
     const itemHeight = 44;
     const panelPad = 8;
-    const openHeight = items.length * itemHeight + panelPad + fabSize;
+    const dividerHeight = 13;
+    const showNav = !isSubMenu;
+    const hasContextual = contextualItems.length > 0;
+    const showDivider = showNav && hasContextual;
+    const visibleItemCount = contextualItems.length + (showNav ? navItems.length : 0);
+    const openHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize;
 
     const handleToggle = () => {
       if (isOpen) setRadialMenuStack([]);
       else setRadialMenuStack(["root"]);
+    };
+
+    // Shared item renderer
+    const renderItem = (item, animIndex, dimmed) => {
+      const handleClick = () => {
+        if (item.isBack) setRadialMenuStack(prev => prev.slice(0, -1));
+        else if (item.sub) setRadialMenuStack(prev => [...prev, item.sub]);
+        else if (item.action) { item.action(); setRadialMenuStack([]); }
+      };
+      return (
+        <button
+          key={item.id}
+          onClick={handleClick}
+          style={{
+            width: "100%", height: itemHeight,
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "0 16px",
+            background: "none", border: "none",
+            cursor: "pointer",
+            color: dimmed ? C.textDim : C.text,
+            fontFamily: "'Space Mono', monospace",
+            fontSize: 11, fontWeight: 600,
+            letterSpacing: 0.5, textTransform: "uppercase",
+            transition: "background 0.15s",
+            animation: `ctxItemFade 0.25s ${0.06 + animIndex * 0.035}s ease both`,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
+        >
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, flexShrink: 0 }}>
+            {renderIcon(item.icon, dimmed ? C.textDim : strokeColor)}
+          </span>
+          <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
+          {item.sub && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <polyline points="9 18 15 12 9 6"/>
+            </svg>
+          )}
+        </button>
+      );
     };
 
     return (
@@ -4700,48 +4667,21 @@ export default function Pattrn() {
             }} />
           </div>
 
-          {/* Menu items — icon + label rows */}
+          {/* Menu content */}
           {isOpen && (
             <div style={{ padding: `${panelPad}px 0 0 0`, flex: 1, display: "flex", flexDirection: "column" }}>
-              {items.map((item, i) => {
-                const handleClick = () => {
-                  if (item.isBack) setRadialMenuStack(prev => prev.slice(0, -1));
-                  else if (item.sub) setRadialMenuStack(prev => [...prev, item.sub]);
-                  else if (item.action) { item.action(); setRadialMenuStack([]); }
-                };
+              {/* Contextual items — page-specific actions */}
+              {contextualItems.map((item, i) => renderItem(item, i, item.isBack))}
 
-                return (
-                  <button
-                    key={item.id}
-                    onClick={handleClick}
-                    style={{
-                      width: "100%", height: itemHeight,
-                      display: "flex", alignItems: "center", gap: 12,
-                      padding: "0 16px",
-                      background: "none", border: "none",
-                      cursor: "pointer",
-                      color: item.isBack ? C.textDim : C.text,
-                      fontFamily: "'Space Mono', monospace",
-                      fontSize: 11, fontWeight: 600,
-                      letterSpacing: 0.5, textTransform: "uppercase",
-                      transition: "background 0.15s",
-                      animation: `ctxItemFade 0.25s ${0.06 + i * 0.035}s ease both`,
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
-                    onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
-                  >
-                    <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, flexShrink: 0 }}>
-                      {renderIcon(item.icon, item.isBack ? C.textDim : strokeColor)}
-                    </span>
-                    <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
-                    {item.sub && (
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
-                        <polyline points="9 18 15 12 9 6"/>
-                      </svg>
-                    )}
-                  </button>
-                );
-              })}
+              {/* Divider between contextual and nav */}
+              {showDivider && (
+                <div style={{ padding: "6px 16px", animation: `ctxItemFade 0.25s ${0.06 + contextualItems.length * 0.035}s ease both` }}>
+                  <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
+                </div>
+              )}
+
+              {/* Persistent nav items */}
+              {showNav && navItems.map((item, i) => renderItem(item, contextualItems.length + (showDivider ? 1 : 0) + i, false))}
             </div>
           )}
 
@@ -9414,9 +9354,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -9661,7 +9601,6 @@ export default function Pattrn() {
         </div>
 
       <RadialContextButton currentView="creator" />
-      <BottomTabBar active="mosaic" />
       {globalModalsEl}
       </div>
     );
@@ -9678,9 +9617,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -10041,7 +9980,6 @@ export default function Pattrn() {
         </button>
       )}
       <RadialContextButton currentView="gallery" />
-      <BottomTabBar active="mosaic" />
       {globalModalsEl}
       </div>
     );
@@ -10874,9 +10812,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -11290,7 +11228,6 @@ export default function Pattrn() {
           })()}
         </div>
         <RadialContextButton currentView="coop" />
-        <BottomTabBar active="coop" />
         {globalModalsEl}
       </div>
     );
@@ -11308,9 +11245,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -11713,7 +11650,6 @@ export default function Pattrn() {
         {/* Delete Account confirmation dialog */}
 
         <RadialContextButton currentView="profile" />
-        <BottomTabBar active="profile" />
         {globalModalsEl}
       </div>
     );
