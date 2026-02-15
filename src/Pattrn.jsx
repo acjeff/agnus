@@ -196,6 +196,7 @@ function BottomTabBar({ active, onNavigate, coopBadgeCount, firebaseUser, profil
     if (nearest !== activeIdx) {
       onNavigate(TAB_KEYS[nearest]);
     }
+    ds.moved = false;
   };
 
   // Pointer events on the pill
