@@ -4756,7 +4756,7 @@ export default function Pattrn() {
     const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : isCoopStartMenu ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
-    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-home", "custom-mosaic": "nav-gallery" };
+    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-gallery", "custom-mosaic": "nav-gallery" };
     const filteredNav = navItems.filter(item => item.id !== viewToNavId[currentView]);
 
     const fabIconKey = isOpen ? null : getFabIcon();
