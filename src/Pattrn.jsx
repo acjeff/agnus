@@ -4680,7 +4680,7 @@ export default function Pattrn() {
             display: "flex",
             flexDirection: "column",
             cursor: isOpen ? "default" : "pointer",
-            transition: "width 0.35s cubic-bezier(0.32, 0.72, 0, 1), height 0.35s cubic-bezier(0.32, 0.72, 0, 1), border-radius 0.35s cubic-bezier(0.32, 0.72, 0, 1), transform 0.15s ease, box-shadow 0.15s ease",
+            transition: "width 0.4s cubic-bezier(0.34, 1.15, 0.64, 1), height 0.4s cubic-bezier(0.34, 1.15, 0.64, 1), border-radius 0.4s cubic-bezier(0.34, 1.15, 0.64, 1), transform 0.15s ease, box-shadow 0.15s ease",
           }}
           onClick={isOpen ? undefined : handleToggle}
           onMouseEnter={e => { if (!isOpen) { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.5), 0 0 16px ${C.accent}22, inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.1)`; } }}
