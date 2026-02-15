@@ -4629,33 +4629,9 @@ export default function Pattrn() {
     const items = menuTree[currentMenuKey] || [];
 
     const itemCount = items.length;
-    // Item sizing — slightly smaller buttons for dense menus
-    const isLargeMenu = itemCount > 4;
-    const itemSize = isLargeMenu ? 44 : 48;
-    // Dynamic radius — more items = bigger radius to use more of the screen
-    const radius = isLargeMenu ? 150 : (90 + itemCount * 12);
-    // Safe arc boundaries for bottom-right FAB (angles in degrees, -90=up, -180=left)
-    // Items must stay on-screen: arcMax ~ -80 keeps rightmost item from overflowing
-    const arcMin = -175;
-    const arcMax = -80;
-    const availableArc = arcMax - arcMin; // 95°
-    const arcCenter = (arcMin + arcMax) / 2; // ~-127.5°
-    // Minimum pixel spacing between item centers
-    const minSpacingPx = itemSize + 12;
-    const minAngleDeg = (minSpacingPx / radius) * (180 / Math.PI);
-    const idealAngleStep = Math.max(minAngleDeg, 28);
-    // Compute arc spread & angle step
-    let arcSpread, angleStep;
-    if (itemCount <= 1) {
-      arcSpread = 0;
-      angleStep = 0;
-    } else {
-      const desiredSpread = (itemCount - 1) * idealAngleStep;
-      const minTotalSpread = 60; // always at least 60° for visual clarity
-      arcSpread = Math.min(Math.max(desiredSpread, minTotalSpread), availableArc);
-      angleStep = arcSpread / (itemCount - 1);
-    }
-    const startAngle = itemCount === 1 ? -110 : arcCenter - arcSpread / 2;
+    const itemSize = 48;
+    // Vertical spacing between item centers (going upward from FAB)
+    const itemGap = 60;
 
     const fabIconKey = isOpen ? null : getFabIcon(currentView);
     const strokeColor = "rgba(255,255,255,0.85)";
@@ -4666,31 +4642,25 @@ export default function Pattrn() {
 
     return (
       <>
-        {/* Radial button animations */}
+        {/* Menu item animation */}
         <style>{`
-          @keyframes radialBackdropIn { from { opacity: 0; } to { opacity: 1; } }
           @keyframes radialItemPop { 0% { opacity: 0; transform: scale(0.3); } 100% { opacity: 1; transform: scale(1); } }
         `}</style>
 
-        {/* Backdrop overlay */}
+        {/* Invisible click-away layer (no blur, no background — page stays usable) */}
         {isOpen && (
           <div
             onClick={() => setRadialMenuStack([])}
             style={{
               position: "fixed", inset: 0, zIndex: 84,
-              backgroundColor: "rgba(0,0,0,0.35)",
-              backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
-              animation: "radialBackdropIn 0.25s ease both",
             }}
           />
         )}
 
         {/* Radial menu items */}
         {isOpen && items.map((item, i) => {
-          const angleDeg = itemCount === 1 ? -110 : startAngle + i * angleStep;
-          const angleRad = angleDeg * (Math.PI / 180);
-          const x = Math.cos(angleRad) * radius;
-          const y = Math.sin(angleRad) * radius;
+          // Vertical offset: each item goes up from above the FAB
+          const offsetFromFab = (i + 1) * itemGap;
 
           const handleClick = () => {
             if (item.isBack) {
@@ -4703,19 +4673,18 @@ export default function Pattrn() {
             }
           };
 
-          // FAB center position: right: 20 + 28 = 48px from right edge, bottom: 80 + 28 = 108px from bottom
           return (
             <div
               key={item.id}
               style={{
                 position: "fixed",
-                bottom: `calc(${108 - y}px + env(safe-area-inset-bottom, 0px))`,
-                right: 48 - x,
+                bottom: `calc(${80 + 56 + 8 + offsetFromFab - itemGap}px + env(safe-area-inset-bottom, 0px))`,
+                right: 20,
+                width: 56,
                 zIndex: 86,
                 animation: `radialItemPop 0.28s ${i * 0.04}s cubic-bezier(0.34, 1.56, 0.64, 1) both`,
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
                 pointerEvents: "auto",
-                transform: `translate(${itemSize / 2}px, ${itemSize / 2}px)`,
               }}
             >
               <button
