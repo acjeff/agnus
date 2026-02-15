@@ -89,7 +89,7 @@ import {
 } from "./firebase.js";
 
 // --- Theme ---
-const C = {
+const BASE_COLORS = {
   bg: "#0a0a0f",
   surface: "#14141f",
   surfaceLight: "#1e1e2e",
@@ -105,6 +105,7 @@ const C = {
   inProgress: "#eab308", // amber for cascade "started but not completed"
   coop: "#60a5fa", // blue for co-op completions
 };
+const C = { ...BASE_COLORS };
 
 // --- Draggable Drawer (mobile bottom sheet with drag-to-dismiss) ---
 function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
@@ -950,6 +951,7 @@ const PUZZLE_THEMES = [
     gridBg: null,
     gridBorder: null,
     unlock: null,
+    uiColors: null,
   },
   {
     id: "christmas",
@@ -962,6 +964,7 @@ const PUZZLE_THEMES = [
     gridBg: "#0d1a12",
     gridBorder: "#2E7D3266",
     unlock: { seasonal: 12, achievement: "streak_7" },
+    uiColors: { bg: "#0a100a", surface: "#141f14", surfaceLight: "#1e2e1e", accent: "#d4a017", text: "#e8efe8", textDim: "#5b7b5b", border: "#2a3a2a" },
   },
   {
     id: "halloween",
@@ -974,6 +977,7 @@ const PUZZLE_THEMES = [
     gridBg: "#14080a",
     gridBorder: "#7B1FA266",
     unlock: { seasonal: 10, achievement: "total_100" },
+    uiColors: { bg: "#0f0a10", surface: "#1a1420", surfaceLight: "#2a1e30", accent: "#ff8c00", text: "#e8e0ef", textDim: "#7b6b8b", border: "#3a2a4a" },
   },
   {
     id: "neon",
@@ -986,6 +990,7 @@ const PUZZLE_THEMES = [
     gridBg: "#050510",
     gridBorder: "#FF008066",
     unlock: { achievement: "gold_25" },
+    uiColors: { bg: "#050510", surface: "#0a0a1f", surfaceLight: "#14142e", accent: "#ff0080", text: "#e0e8ff", textDim: "#6b6bab", border: "#2a2a5a" },
   },
   {
     id: "ocean",
@@ -998,6 +1003,7 @@ const PUZZLE_THEMES = [
     gridBg: "#071318",
     gridBorder: "#0277BD44",
     unlock: { achievement: "med_50" },
+    uiColors: { bg: "#060d14", surface: "#0e1820", surfaceLight: "#162230", accent: "#00bcd4", text: "#d8e8f0", textDim: "#5b7b8b", border: "#1a3040" },
   },
   // --- Easy unlocks ---
   {
@@ -1011,6 +1017,7 @@ const PUZZLE_THEMES = [
     gridBg: "#18141e",
     gridBorder: "#E8BAFF44",
     unlock: { achievement: "first_try" },
+    uiColors: { bg: "#100e14", surface: "#1a1820", surfaceLight: "#24202e", accent: "#e8a0d0", text: "#f0e8f5", textDim: "#8b7b9b", border: "#302a3a" },
   },
   {
     id: "sunset",
@@ -1023,6 +1030,7 @@ const PUZZLE_THEMES = [
     gridBg: "#1a120a",
     gridBorder: "#FF6B3544",
     unlock: { achievement: "easy_5" },
+    uiColors: { bg: "#100a06", surface: "#1f1410", surfaceLight: "#2e1e18", accent: "#ff8c42", text: "#f0e8e0", textDim: "#8b7b6b", border: "#3a2a1a" },
   },
   {
     id: "mono",
@@ -1035,6 +1043,7 @@ const PUZZLE_THEMES = [
     gridBg: "#111114",
     gridBorder: "#52525B44",
     unlock: { achievement: "under_30" },
+    uiColors: { bg: "#0c0c0e", surface: "#161618", surfaceLight: "#202022", accent: "#a0a0a8", text: "#d8d8dc", textDim: "#68686e", border: "#303034" },
   },
   // --- Medium unlocks ---
   {
@@ -1048,6 +1057,7 @@ const PUZZLE_THEMES = [
     gridBg: "#0a0a14",
     gridBorder: "#FF005444",
     unlock: { achievement: "med_5" },
+    uiColors: { bg: "#0a0a14", surface: "#14142a", surfaceLight: "#1e1e3a", accent: "#ff0054", text: "#e8e8ff", textDim: "#6b6b9b", border: "#2a2a4a" },
   },
   {
     id: "forest",
@@ -1060,6 +1070,7 @@ const PUZZLE_THEMES = [
     gridBg: "#0c140e",
     gridBorder: "#2D6A4F44",
     unlock: { achievement: "streak_3" },
+    uiColors: { bg: "#080e0a", surface: "#101a12", surfaceLight: "#18241a", accent: "#4caf50", text: "#d8e8da", textDim: "#5b7b5d", border: "#1a3a1e" },
   },
   {
     id: "galaxy",
@@ -1072,6 +1083,7 @@ const PUZZLE_THEMES = [
     gridBg: "#080810",
     gridBorder: "#7B2FF744",
     unlock: { achievement: "gold_10" },
+    uiColors: { bg: "#080810", surface: "#10101e", surfaceLight: "#1a1a2e", accent: "#9c6bff", text: "#e0e0f0", textDim: "#7070a0", border: "#2a2a50" },
   },
   {
     id: "candy",
@@ -1084,6 +1096,7 @@ const PUZZLE_THEMES = [
     gridBg: "#1a0e16",
     gridBorder: "#FF6B9D44",
     unlock: { achievement: "cascade_1" },
+    uiColors: { bg: "#120a10", surface: "#1e1218", surfaceLight: "#2a1a22", accent: "#ff6b9d", text: "#f0e0ea", textDim: "#9b6b8b", border: "#3a2232" },
   },
   // --- Harder / Seasonal unlocks ---
   {
@@ -1097,6 +1110,7 @@ const PUZZLE_THEMES = [
     gridBg: "#060d14",
     gridBorder: "#38BDF844",
     unlock: { seasonal: 1, achievement: "hard_5" },
+    uiColors: { bg: "#060a10", surface: "#0c1420", surfaceLight: "#141e30", accent: "#38bdf8", text: "#d8e8f8", textDim: "#5b7b9b", border: "#1a2a40" },
   },
   {
     id: "valentine",
@@ -1109,6 +1123,7 @@ const PUZZLE_THEMES = [
     gridBg: "#1a0a10",
     gridBorder: "#FF2D5544",
     unlock: { seasonal: 2, achievement: "daily_7" },
+    uiColors: { bg: "#100608", surface: "#1e0e12", surfaceLight: "#2e161e", accent: "#ff4d6d", text: "#f0e0e4", textDim: "#9b6b7b", border: "#3a1a24" },
   },
   {
     id: "spring",
@@ -1121,6 +1136,7 @@ const PUZZLE_THEMES = [
     gridBg: "#0a1410",
     gridBorder: "#10B98144",
     unlock: { seasonal: [3, 4, 5], achievement: "all_modes" },
+    uiColors: { bg: "#080e08", surface: "#101a10", surfaceLight: "#182418", accent: "#10b981", text: "#d8f0d8", textDim: "#5b8b5b", border: "#1a3a1a" },
   },
   {
     id: "birthday",
@@ -1133,6 +1149,7 @@ const PUZZLE_THEMES = [
     gridBg: "#1a0e18",
     gridBorder: "#FF6B9D44",
     unlock: { achievement: "birthday_puzzle" },
+    uiColors: { bg: "#100810", surface: "#1e1018", surfaceLight: "#2a1822", accent: "#ff69b4", text: "#f0e0f0", textDim: "#9b6b9b", border: "#3a1a3a" },
   },
   {
     id: "glitch",
@@ -1145,6 +1162,7 @@ const PUZZLE_THEMES = [
     gridBg: "#080008",
     gridBorder: "#FF004044",
     unlock: { achievement: "first_fail" },
+    uiColors: { bg: "#080008", surface: "#140010", surfaceLight: "#1e0018", accent: "#ff0040", text: "#e0d0e0", textDim: "#8b5b7b", border: "#3a0a2a" },
   },
   // --- Secret Enigma theme — unlocked via Alan Turing birthday easter egg ---
   {
@@ -1158,6 +1176,7 @@ const PUZZLE_THEMES = [
     gridBg: "#0c0c08",
     gridBorder: "#C9A84C33",
     unlock: { achievement: "cheat_turing" },
+    uiColors: { bg: "#0a0a06", surface: "#14140e", surfaceLight: "#1e1e16", accent: "#c9a84c", text: "#e8e8d8", textDim: "#7b7b5b", border: "#2a2a1a" },
   },
 ];
 
@@ -2886,6 +2905,23 @@ export default function Pattrn() {
   const activeTheme = useMemo(() => PUZZLE_THEMES.find(t => t.id === activeThemeId) || PUZZLE_THEMES[0], [activeThemeId]);
   const themeColorMap = useMemo(() => buildColorMap(activeTheme.palettes), [activeTheme]);
   const themedShapes = activeTheme.shapes || SHAPES;
+
+  // Apply theme UI colors to the shared C object so all components pick them up
+  useMemo(() => {
+    const themed = activeTheme.uiColors || {};
+    Object.keys(BASE_COLORS).forEach(k => { C[k] = themed[k] || BASE_COLORS[k]; });
+  }, [activeTheme]);
+
+  // Sync document background color with theme
+  useEffect(() => {
+    const bg = C.bg;
+    document.body.style.backgroundColor = bg;
+    document.documentElement.style.backgroundColor = bg;
+    return () => {
+      document.body.style.backgroundColor = "";
+      document.documentElement.style.backgroundColor = "";
+    };
+  }, [activeThemeId]);
 
   // --- Account / Firebase state ---
   const [firebaseAuthReady, setFirebaseAuthReady] = useState(false);
