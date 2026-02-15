@@ -2853,8 +2853,8 @@ export default function Pattrn() {
   const [birthdayInput, setBirthdayInput] = useState("");
   const goToDateRef = useRef(null);
 
-  // Radial context button state
-  const [radialOpen, setRadialOpen] = useState(false);
+  // Radial context button state — stack for nested menus (empty = closed, ["root"] = top level, ["root","play"] = sub-menu)
+  const [radialMenuStack, setRadialMenuStack] = useState([]);
 
   // Theme state
   const [activeThemeId, setActiveThemeId] = useState(() => loadTheme());
@@ -4527,75 +4527,135 @@ export default function Pattrn() {
   const prevViewRef = useRef(view);
   if (prevViewRef.current !== view) {
     prevViewRef.current = view;
-    if (radialOpen) setRadialOpen(false);
+    if (radialMenuStack.length > 0) setRadialMenuStack([]);
   }
 
-  // Context-aware menu items per view
-  const getRadialItems = (currentView) => {
+  // SVG icon components for radial menu (minimal, monochrome stroke icons)
+  const radialIcons = {
+    play: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
+    create: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>,
+    profile: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+    home: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>,
+    gallery: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>,
+    trophy: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 22V8a6 6 0 0 0-6-2v4a6 6 0 0 0 6 6"/><path d="M14 22V8a6 6 0 0 1 6-2v4a6 6 0 0 1-6 6"/></svg>,
+    globe: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+    folder: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>,
+    plus: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><path d="M12 5v14M5 12h14"/></svg>,
+    users: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+    back: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>,
+    grid: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>,
+    eye: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+    zap: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>,
+    shuffle: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>,
+    calendar: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+    layers: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>,
+    star: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
+    compass: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>,
+  };
+
+  // Nested menu tree per view — items can have `sub` key to open a sub-menu
+  const getRadialMenuTree = (currentView) => {
+    const trees = {
+      menu: {
+        root: [
+          { id: "play", icon: "play", label: "Play", sub: "play" },
+          { id: "create", icon: "create", label: "Create", action: () => { setView("creator"); } },
+          { id: "profile", icon: "profile", label: "Profile", action: () => { setView("profile"); } },
+          { id: "coop", icon: "users", label: "Co-op", action: () => { setView("coop"); } },
+        ],
+        play: [
+          { id: "back", icon: "back", label: "Back", isBack: true },
+          { id: "easy", icon: "grid", label: "Easy", action: () => { setDifficulty("easy"); setCurrentPuzzle(0); setView("play"); } },
+          { id: "medium", icon: "layers", label: "Medium", action: () => { setDifficulty("medium"); setCurrentPuzzle(0); setView("play"); } },
+          { id: "hard", icon: "zap", label: "Hard", action: () => { setDifficulty("hard"); setCurrentPuzzle(0); setView("play"); } },
+          { id: "daily", icon: "calendar", label: "Daily", action: () => { setDifficulty("daily"); setView("play"); } },
+          { id: "cascade", icon: "layers", label: "Cascade", action: () => { setDifficulty("cascade"); setView("play"); } },
+        ],
+      },
+      gallery: {
+        root: [
+          { id: "new", icon: "plus", label: "Create", action: () => { setView("creator"); } },
+          { id: "public", icon: "globe", label: "Public", action: () => { setMosaicGalleryTab("public"); loadMosaicData("public"); } },
+          { id: "mine", icon: "folder", label: "My Mosaics", action: () => { setMosaicGalleryTab("mine"); loadMosaicData("mine"); } },
+          { id: "home", icon: "home", label: "Home", action: () => { setView("menu"); } },
+        ],
+      },
+      creator: {
+        root: [
+          { id: "gallery", icon: "gallery", label: "Gallery", action: () => { setView("gallery"); } },
+          { id: "home", icon: "home", label: "Home", action: () => { setView("menu"); } },
+        ],
+      },
+      profile: {
+        root: [
+          { id: "achievements", icon: "trophy", label: "Achievements", action: () => { setShowAchievements(true); } },
+          { id: "home", icon: "home", label: "Home", action: () => { setView("menu"); } },
+          { id: "gallery", icon: "gallery", label: "Gallery", action: () => { setView("gallery"); } },
+        ],
+      },
+      coop: {
+        root: [
+          { id: "home", icon: "home", label: "Home", action: () => { setView("menu"); } },
+          { id: "gallery", icon: "gallery", label: "Gallery", action: () => { setView("gallery"); } },
+        ],
+      },
+      "custom-mosaic": {
+        root: [
+          { id: "gallery", icon: "gallery", label: "Gallery", action: () => { setView("gallery"); } },
+          { id: "home", icon: "home", label: "Home", action: () => { setView("menu"); } },
+        ],
+      },
+    };
+    return trees[currentView] || { root: [] };
+  };
+
+  // Context-aware FAB icon per view
+  const getFabIcon = (currentView) => {
     switch (currentView) {
-      case "menu":
-        return [
-          { icon: "\u{1F3B2}", label: "Quick Play", action: () => { setDifficulty("easy"); setCurrentPuzzle(0); setView("play"); } },
-          { icon: "\u{1F3A8}", label: "Create", action: () => { setView("creator"); } },
-          { icon: "\u{1F4CA}", label: "Profile", action: () => { setView("profile"); } },
-        ];
-      case "gallery":
-        return [
-          { icon: "\u2795", label: "New Mosaic", action: () => { setView("creator"); } },
-          { icon: "\u{1F30D}", label: "Public", action: () => { setMosaicGalleryTab("public"); loadMosaicData("public"); } },
-          { icon: "\u{1F4C1}", label: "My Mosaics", action: () => { setMosaicGalleryTab("mine"); loadMosaicData("mine"); } },
-        ];
-      case "creator":
-        return [
-          { icon: "\u{1F5BC}", label: "Gallery", action: () => { setView("gallery"); } },
-          { icon: "\u{1F3E0}", label: "Home", action: () => { setView("menu"); } },
-        ];
-      case "profile":
-        return [
-          { icon: "\u{1F3C6}", label: "Achievements", action: () => { setShowAchievements(true); } },
-          { icon: "\u{1F3E0}", label: "Home", action: () => { setView("menu"); } },
-          { icon: "\u{1F3A8}", label: "Gallery", action: () => { setView("gallery"); } },
-        ];
-      case "coop":
-        return [
-          { icon: "\u{1F3E0}", label: "Home", action: () => { setView("menu"); } },
-          { icon: "\u{1F3A8}", label: "Gallery", action: () => { setView("gallery"); } },
-        ];
-      case "custom-mosaic":
-        return [
-          { icon: "\u{1F5BC}", label: "Gallery", action: () => { setView("gallery"); } },
-          { icon: "\u{1F3E0}", label: "Home", action: () => { setView("menu"); } },
-        ];
-      default:
-        return [];
+      case "menu": return "compass";
+      case "gallery": return "gallery";
+      case "creator": return "create";
+      case "profile": return "profile";
+      case "coop": return "users";
+      case "custom-mosaic": return "gallery";
+      default: return "plus";
     }
   };
 
   const RadialContextButton = ({ currentView }) => {
-    const items = getRadialItems(currentView);
-    if (!items || items.length === 0) return null;
+    const menuTree = getRadialMenuTree(currentView);
+    const isOpen = radialMenuStack.length > 0;
+    const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
+    const items = menuTree[currentMenuKey] || [];
+    const isSubMenu = radialMenuStack.length > 1;
 
-    const isOpen = radialOpen;
     const itemCount = items.length;
-    // Arc configuration: items fan out in a quarter-circle arc going up-left from FAB
-    const arcSpread = Math.min(itemCount * 32, 120); // total arc degrees
-    const startAngle = -90 - arcSpread / 2; // center the arc above the button
+    // Arc config — compact arc that stays on-screen, fanning upward-left from bottom-right FAB
+    const maxArc = 140;
+    const arcSpread = Math.min(itemCount * 34, maxArc);
+    const startAngle = -90 - arcSpread / 2;
     const angleStep = itemCount > 1 ? arcSpread / (itemCount - 1) : 0;
-    const radius = 88;
+    const radius = 76;
+
+    const fabIconKey = isOpen ? null : getFabIcon(currentView);
+    const strokeColor = "rgba(255,255,255,0.85)";
+    const activeStroke = C.accent;
+
+    // Render an icon by key
+    const renderIcon = (key, color) => radialIcons[key] ? radialIcons[key](color) : null;
 
     return (
       <>
         {/* Radial button animations */}
         <style>{`
           @keyframes radialBackdropIn { from { opacity: 0; } to { opacity: 1; } }
-          @keyframes radialItemPop { 0% { opacity: 0; transform: scale(0.2); } 100% { opacity: 1; transform: scale(1); } }
-          @keyframes radialFabPulse { 0%, 100% { box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), 0 0 0px rgba(200,240,62,0), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1); } 50% { box-shadow: 0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), 0 0 18px rgba(200,240,62,0.12), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1); } }
+          @keyframes radialItemPop { 0% { opacity: 0; transform: scale(0.3); } 100% { opacity: 1; transform: scale(1); } }
         `}</style>
 
         {/* Backdrop overlay */}
         {isOpen && (
           <div
-            onClick={() => setRadialOpen(false)}
+            onClick={() => setRadialMenuStack([])}
             style={{
               position: "fixed", inset: 0, zIndex: 84,
               backgroundColor: "rgba(0,0,0,0.35)",
@@ -4612,46 +4672,59 @@ export default function Pattrn() {
           const x = Math.cos(angleRad) * radius;
           const y = Math.sin(angleRad) * radius;
 
+          const handleClick = () => {
+            if (item.isBack) {
+              setRadialMenuStack(prev => prev.slice(0, -1));
+            } else if (item.sub) {
+              setRadialMenuStack(prev => [...prev, item.sub]);
+            } else if (item.action) {
+              item.action();
+              setRadialMenuStack([]);
+            }
+          };
+
           return (
             <div
-              key={i}
+              key={item.id}
               style={{
                 position: "fixed",
-                // Position: offset from FAB center (FAB is 56px, so center is at right:20+28=48, bottom:80+28=108 from safe area)
                 bottom: `calc(${80 + 28 - y}px + env(safe-area-inset-bottom, 0px))`,
                 right: 20 + 28 - x,
                 zIndex: 86,
-                animation: `radialItemPop 0.3s ${i * 0.06}s cubic-bezier(0.34, 1.56, 0.64, 1) both`,
-                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+                animation: `radialItemPop 0.28s ${i * 0.04}s cubic-bezier(0.34, 1.56, 0.64, 1) both`,
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
                 pointerEvents: "auto",
-                // Center the item on its computed position
                 transform: "translate(50%, 50%)",
               }}
             >
               <button
-                onClick={() => { item.action(); setRadialOpen(false); }}
+                onClick={handleClick}
                 style={{
-                  width: 50, height: 50, borderRadius: 25,
-                  background: `linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 100%)`,
+                  width: 48, height: 48, borderRadius: 24,
+                  background: item.isBack
+                    ? `linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0.02) 100%)`
+                    : `linear-gradient(135deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.04) 100%)`,
                   backdropFilter: "blur(24px) saturate(180%)",
                   WebkitBackdropFilter: "blur(24px) saturate(180%)",
-                  border: "1px solid rgba(255,255,255,0.18)",
-                  boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.08)`,
+                  border: item.isBack
+                    ? `1px solid rgba(255,255,255,0.10)`
+                    : "1px solid rgba(255,255,255,0.18)",
+                  boxShadow: `0 6px 24px rgba(0,0,0,0.35), 0 2px 6px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.06)`,
                   cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 20, lineHeight: 1,
-                  transition: "transform 0.15s, box-shadow 0.15s",
+                  transition: "transform 0.15s, box-shadow 0.15s, border-color 0.15s",
+                  padding: 0,
                 }}
-                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.12)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2), 0 0 20px ${C.accent}33, inset 0 1px 0 rgba(255,255,255,0.2), inset 0 -1px 0 rgba(0,0,0,0.08)`; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.4), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.08)`; }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.12)"; e.currentTarget.style.borderColor = `${C.accent}66`; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = item.isBack ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.18)"; }}
               >
-                {item.icon}
+                {renderIcon(item.icon, item.isBack ? C.textDim : strokeColor)}
               </button>
               <span style={{
-                fontSize: 9, fontWeight: 700, color: C.text,
+                fontSize: 8, fontWeight: 700, color: item.isBack ? C.textDim : C.text,
                 fontFamily: "'Space Mono', monospace",
                 letterSpacing: 0.5, textTransform: "uppercase",
-                textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+                textShadow: "0 1px 4px rgba(0,0,0,0.9)",
                 whiteSpace: "nowrap",
               }}>
                 {item.label}
@@ -4662,10 +4735,16 @@ export default function Pattrn() {
 
         {/* Main FAB — Liquid Glass */}
         <button
-          onClick={() => setRadialOpen(!isOpen)}
+          onClick={() => {
+            if (isOpen) {
+              setRadialMenuStack([]);
+            } else {
+              setRadialMenuStack(["root"]);
+            }
+          }}
           style={{
             position: "fixed",
-            bottom: `calc(${80}px + env(safe-area-inset-bottom, 0px))`,
+            bottom: `calc(80px + env(safe-area-inset-bottom, 0px))`,
             right: 20,
             width: 56, height: 56, borderRadius: 28,
             background: isOpen
@@ -4683,7 +4762,8 @@ export default function Pattrn() {
             cursor: "pointer",
             display: "flex", alignItems: "center", justifyContent: "center",
             transition: "all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)",
-            transform: isOpen ? "rotate(45deg) scale(1.05)" : "rotate(0deg) scale(1)",
+            transform: isOpen ? "rotate(0deg) scale(1.05)" : "rotate(0deg) scale(1)",
+            padding: 0,
           }}
           onMouseEnter={e => { if (!isOpen) { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.5), 0 0 16px ${C.accent}22, inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.1)`; } }}
           onMouseLeave={e => { if (!isOpen) { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`; } }}
@@ -4699,9 +4779,13 @@ export default function Pattrn() {
               borderRadius: "28px 28px 50% 50%",
             }} />
           </div>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={isOpen ? C.accent : "rgba(255,255,255,0.85)"} strokeWidth="2.5" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
+          {isOpen ? (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={activeStroke} strokeWidth="2.5" strokeLinecap="round">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          ) : (
+            renderIcon(fabIconKey, strokeColor)
+          )}
         </button>
       </>
     );
