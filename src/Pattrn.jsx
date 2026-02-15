@@ -4537,6 +4537,10 @@ export default function Pattrn() {
     const isSubMenu = currentMenuKey !== "root";
     const contextualItems = menuTree[currentMenuKey] || [];
 
+    // Filter out the current page from nav
+    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-home", "custom-mosaic": "nav-gallery", play: "nav-home" };
+    const filteredNav = navItems.filter(item => item.id !== viewToNavId[currentView]);
+
     const fabIconKey = isOpen ? null : getFabIcon();
     const strokeColor = "rgba(255,255,255,0.85)";
     const activeStroke = C.accent;
@@ -4551,7 +4555,7 @@ export default function Pattrn() {
     const showNav = !isSubMenu;
     const hasContextual = contextualItems.length > 0;
     const showDivider = showNav && hasContextual;
-    const visibleItemCount = contextualItems.length + (showNav ? navItems.length : 0);
+    const visibleItemCount = (showNav ? filteredNav.length : 0) + contextualItems.length;
     const openHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize;
 
     // Liquid Glass spring curves — fast initial movement, subtle overshoot, quick settle
@@ -4661,24 +4665,24 @@ export default function Pattrn() {
 
           {/* Menu content — always rendered, animated via transitions */}
           <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
-            {/* Contextual items — page-specific actions */}
-            {contextualItems.map((item, i) => renderItem(item, i, item.isBack))}
+            {/* Persistent nav items — always first */}
+            {showNav && filteredNav.map((item, i) => renderItem(item, i, false))}
 
-            {/* Divider between contextual and nav */}
+            {/* Divider between nav and contextual */}
             {showDivider && (
               <div style={{
                 padding: "6px 16px",
                 opacity: isOpen ? 1 : 0,
                 transition: isOpen
-                  ? `opacity 0.2s ease ${0.04 + contextualItems.length * 0.03}s`
+                  ? `opacity 0.2s ease ${0.04 + filteredNav.length * 0.03}s`
                   : "opacity 0.08s ease 0s",
               }}>
                 <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
               </div>
             )}
 
-            {/* Persistent nav items */}
-            {showNav && navItems.map((item, i) => renderItem(item, contextualItems.length + (showDivider ? 1 : 0) + i, false))}
+            {/* Contextual items — page-specific actions */}
+            {contextualItems.map((item, i) => renderItem(item, filteredNav.length + (showDivider ? 1 : 0) + i, item.isBack))}
           </div>
 
           {/* Toggle button — sits at the bottom of the panel */}
