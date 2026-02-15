@@ -4660,10 +4660,10 @@ export default function Pattrn() {
     const playRoot = [];
     playRoot.push({ id: "theme", icon: "palette", label: "Theme", sub: "theme" });
     if (!isCoop && gameState === "playing" && !isCascade && !isMosaic) {
-      playRoot.push({ id: "coop-start", icon: "user-plus", label: "Play w/ Friends", action: () => {
-        if (!firebaseUser) { coopPendingLoginRef.current = true; setShowAccountModal(true); return; }
+      playRoot.push({ id: "coop-start", icon: "user-plus", label: "Play w/ Friends", sub: "coop-start", beforeSub: () => {
+        if (!firebaseUser) { coopPendingLoginRef.current = true; setShowAccountModal(true); return false; }
         setCoopSelectedFriends(new Set());
-        setRadialMenuStack(prev => [...prev, "coop-start"]);
+        return true;
       }});
     }
     if (isCoop) {
@@ -4690,9 +4690,9 @@ export default function Pattrn() {
     // Custom mosaic view items
     const customMosaicRoot = [];
     if (firebaseConfigured && firebaseUser && !isCoopMosaic) {
-      customMosaicRoot.push({ id: "coop-mosaic", icon: "user-plus", label: "Co-op", action: () => {
+      customMosaicRoot.push({ id: "coop-mosaic", icon: "user-plus", label: "Co-op", sub: "coop-start", beforeSub: () => {
         setCoopSelectedFriends(new Set());
-        setRadialMenuStack(prev => [...prev, "coop-start"]);
+        return true;
       } });
       customMosaicRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
     }
@@ -4831,7 +4831,10 @@ export default function Pattrn() {
     const renderItem = (item, animIndex, dimmed) => {
       const handleClick = () => {
         if (item.isBack) setRadialMenuStack(prev => prev.slice(0, -1));
-        else if (item.sub) setRadialMenuStack(prev => [...prev, item.sub]);
+        else if (item.sub) {
+          if (item.beforeSub && !item.beforeSub()) return; // guard check — return false to cancel
+          setRadialMenuStack(prev => [...prev, item.sub]);
+        }
         else if (item.action) { item.action(); setRadialMenuStack([]); }
       };
       const staggerIn = 0.04 + animIndex * 0.03;
