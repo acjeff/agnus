@@ -13401,6 +13401,44 @@ export default function Pattrn() {
               Session complete — well played!
             </div>
           )}
+          {/* Friends who completed this puzzle */}
+          {Object.keys(friendsPuzzleData).length > 0 && !isCoop && !isCascade && !isMosaic && (
+            <div style={{
+              marginTop: 16, animation: "fadeUp 0.5s 0.2s ease both", pointerEvents: "auto",
+            }}>
+              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
+                Friends on this puzzle
+              </div>
+              <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+                {Object.entries(friendsPuzzleData).map(([uid, data]) => {
+                  const friend = friendsList.find(f => f.uid === uid);
+                  if (!friend) return null;
+                  const theyWereFaster = data.time && elapsedTime && data.time < elapsedTime;
+                  const iWasFaster = data.time && elapsedTime && elapsedTime < data.time;
+                  return (
+                    <div key={uid} style={{
+                      display: "flex", alignItems: "center", gap: 6, padding: "5px 10px",
+                      borderRadius: 8, backgroundColor: C.surface,
+                      border: `1px solid ${theyWereFaster ? C.incorrect + "33" : iWasFaster ? C.correct + "33" : C.border}`,
+                      fontSize: 11, fontFamily: "'Inter', sans-serif",
+                    }}>
+                      {friend.profilePicture ? (
+                        <img src={friend.profilePicture} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} />
+                      ) : (
+                        <div style={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: C.accent, fontWeight: 700 }}>
+                          {(friend.username || "?")[0].toUpperCase()}
+                        </div>
+                      )}
+                      <span style={{ color: C.text, fontWeight: 700 }}>{friend.username}</span>
+                      <span style={{ color: C.textDim }}>{formatTime(data.time)}</span>
+                      {theyWereFaster && <span style={{ color: C.incorrect, fontSize: 9 }}>faster</span>}
+                      {iWasFaster && <span style={{ color: C.correct, fontSize: 9 }}>slower</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
       </div>
@@ -13433,44 +13471,6 @@ export default function Pattrn() {
             {puzzleRankingLoading && !isCoop && !isCascade && !isMosaic && (
               <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", marginBottom: 10, animation: "fadeUp 0.3s ease" }}>
                 Loading ranking...
-              </div>
-            )}
-            {/* Friends who completed this puzzle */}
-            {Object.keys(friendsPuzzleData).length > 0 && !isCoop && !isCascade && !isMosaic && (
-              <div style={{
-                marginBottom: 12, animation: "fadeUp 0.5s 0.15s ease both",
-              }}>
-                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 6 }}>
-                  Friends on this puzzle
-                </div>
-                <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
-                  {Object.entries(friendsPuzzleData).map(([uid, data]) => {
-                    const friend = friendsList.find(f => f.uid === uid);
-                    if (!friend) return null;
-                    const theyWereFaster = data.time && elapsedTime && data.time < elapsedTime;
-                    const iWasFaster = data.time && elapsedTime && elapsedTime < data.time;
-                    return (
-                      <div key={uid} style={{
-                        display: "flex", alignItems: "center", gap: 6, padding: "5px 10px",
-                        borderRadius: 8, backgroundColor: C.surface,
-                        border: `1px solid ${theyWereFaster ? C.incorrect + "33" : iWasFaster ? C.correct + "33" : C.border}`,
-                        fontSize: 11, fontFamily: "'Inter', sans-serif",
-                      }}>
-                        {friend.profilePicture ? (
-                          <img src={friend.profilePicture} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} />
-                        ) : (
-                          <div style={{ width: 20, height: 20, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, color: C.accent, fontWeight: 700 }}>
-                            {(friend.username || "?")[0].toUpperCase()}
-                          </div>
-                        )}
-                        <span style={{ color: C.text, fontWeight: 700 }}>{friend.username}</span>
-                        <span style={{ color: C.textDim }}>{formatTime(data.time)}</span>
-                        {theyWereFaster && <span style={{ color: C.incorrect, fontSize: 9 }}>faster</span>}
-                        {iWasFaster && <span style={{ color: C.correct, fontSize: 9 }}>slower</span>}
-                      </div>
-                    );
-                  })}
-                </div>
               </div>
             )}
           </div>
