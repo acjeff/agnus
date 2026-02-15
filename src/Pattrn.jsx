@@ -4507,17 +4507,6 @@ export default function Pattrn() {
     // Build play contextual items dynamically (some are conditional)
     const playRoot = [];
     playRoot.push({ id: "theme", icon: "palette", label: "Theme", action: () => { setShowThemePicker(true); } });
-    if (firebaseConfigured && firebaseUser) {
-      playRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
-    }
-    playRoot.push({ id: "share", icon: "share", label: "Share", action: async () => {
-      const url = typeof window !== "undefined" ? window.location.href : "";
-      const result = await tryNativeShare({ title: "Agnus", text: "Check out this puzzle", url: url || undefined });
-      if (result === "shared") { setShareMsg("Shared!"); setTimeout(() => setShareMsg(""), 2000); return; }
-      if (result === "cancelled") return;
-      try { await navigator.clipboard.writeText(url); } catch { /* fallback */ }
-      setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
-    }});
     if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
       playRoot.push({ id: "preview", icon: "search", label: "Preview", action: () => { setShowMosaicPreviewOverlay(true); } });
     }
