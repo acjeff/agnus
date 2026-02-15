@@ -5532,36 +5532,44 @@ export default function Pattrn() {
   };
 
   // Standalone Liquid Glass back button — mirrors the FAB on the bottom-left
-  const renderBackButton = (onClick, bottomPx = 16) => {
+  // confirmConfig: { title, description, confirmLabel, confirmColor, onConfirm, onCancel } — when truthy the button expands to show inline confirmation
+  const renderBackButton = (onClick, bottomPx = 16, confirmConfig = null) => {
     const fabSize = 56;
     const springOpen = "cubic-bezier(0.175, 0.885, 0.32, 1.175)";
+    const springClose = "cubic-bezier(0.4, 0, 0.7, 1)";
     const strokeColor = "#fff";
+    const isOpen = !!confirmConfig;
+    const expandedWidth = 260;
+    const expandedHeight = 158;
     return (
       <div
-        onClick={onClick}
+        onClick={isOpen ? undefined : onClick}
         style={{
           position: "fixed",
           bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
           left: 20,
-          width: fabSize,
-          height: fabSize,
-          borderRadius: fabSize / 2,
+          width: isOpen ? expandedWidth : fabSize,
+          height: isOpen ? expandedHeight : fabSize,
+          borderRadius: isOpen ? 22 : fabSize / 2,
           background: activeTheme.gridBg || C.surface,
           backdropFilter: "blur(28px) saturate(200%)",
           WebkitBackdropFilter: "blur(28px) saturate(200%)",
-          border: "1px solid rgba(255,255,255,0.16)",
+          border: isOpen ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(255,255,255,0.16)",
           boxShadow: "none",
           zIndex: 85,
           overflow: "hidden",
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          cursor: "pointer",
-          transition: `transform 0.15s ${springOpen}, box-shadow 0.15s ease`,
+          alignItems: isOpen ? "stretch" : "center",
+          justifyContent: isOpen ? "flex-start" : "center",
+          flexDirection: "column",
+          cursor: isOpen ? "default" : "pointer",
+          transition: isOpen
+            ? `width 0.35s ${springOpen}, height 0.35s ${springOpen}, border-radius 0.35s ${springOpen}, transform 0.15s ${springOpen}`
+            : `width 0.2s ${springClose}, height 0.2s ${springClose}, border-radius 0.2s ${springClose}, transform 0.15s ${springOpen}`,
         }}
-        onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
-        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
-        aria-label="Go back"
+        onMouseEnter={e => { if (!isOpen) e.currentTarget.style.transform = "scale(1.08)"; }}
+        onMouseLeave={e => { if (!isOpen) e.currentTarget.style.transform = "scale(1)"; }}
+        aria-label={isOpen ? confirmConfig.title : "Go back"}
       >
         {/* Liquid Glass sheen highlight */}
         <div style={{
@@ -5573,7 +5581,31 @@ export default function Pattrn() {
             borderRadius: "inherit",
           }} />
         </div>
-        <ChevronLeft size={22} color={strokeColor} strokeWidth={2.5} />
+        {isOpen ? (
+          <div style={{ padding: "16px 18px", opacity: 1, transition: "opacity 0.25s ease 0.1s" }}>
+            <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 6 }}>
+              {confirmConfig.title}
+            </div>
+            <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, lineHeight: 1.5 }}>
+              {confirmConfig.description}
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={confirmConfig.onConfirm} style={{
+                flex: 1, backgroundColor: confirmConfig.confirmColor, color: "#fff", border: "none",
+                padding: "10px 14px", borderRadius: 10, fontSize: 11, fontWeight: 700,
+                fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+              }}>{confirmConfig.confirmLabel}</button>
+              <button onClick={confirmConfig.onCancel} style={{
+                flex: 1, backgroundColor: "transparent", color: C.textDim,
+                border: `1px solid ${C.border}`, padding: "10px 14px", borderRadius: 10,
+                fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                cursor: "pointer", textTransform: "uppercase",
+              }}>Stay</button>
+            </div>
+          </div>
+        ) : (
+          <ChevronLeft size={22} color={strokeColor} strokeWidth={2.5} />
+        )}
       </div>
     );
   };
@@ -9060,20 +9092,7 @@ export default function Pattrn() {
 
   const coopInviteEl = null; // Moved to Liquid Glass menu
 
-  const leaveConfirmEl = showLeaveConfirm && (
-    <DraggableDrawer isOpen={true} onClose={() => setShowLeaveConfirm(false)} zIndex={1200}>
-      <div style={{ padding: "0 24px 24px" }}>
-        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>Leave Co-op?</div>
-        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
-          {coopRole === "host" ? "The session will stay active. You can rejoin from the main menu." : "You will leave this session and your partner will need to invite you again to rejoin."}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { leaveCoopSession(); if (customMosaicPuzzlesRef.current && isMosaic) { setView("custom-mosaic"); } else { setView("menu"); } }} style={{ flex: 1, backgroundColor: "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Leave</button>
-          <button onClick={() => setShowLeaveConfirm(false)} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
-        </div>
-      </div>
-    </DraggableDrawer>
-  );
+  const leaveConfirmEl = null; // Moved to inline Liquid Glass back button expansion
 
   const coopMosaicNavigateEl = showCoopMosaicNavigate ? (() => {
     const playersOnTiles = Object.entries(coopMosaicPlayers).filter(([, p]) => p.currentTile != null && p.currentTile >= 0 && p.currentTile !== currentPuzzle);
@@ -9102,24 +9121,7 @@ export default function Pattrn() {
     ) : null;
   })() : null;
 
-  const mosaicLeaveConfirmEl = showMosaicLeaveConfirm && (
-    <DraggableDrawer isOpen={true} onClose={() => setShowMosaicLeaveConfirm(false)} zIndex={1200}>
-      <div style={{ padding: "0 24px 24px" }}>
-        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>
-          {coopMosaicRole === "host" ? "Go to Menu?" : "Leave Co-op?"}
-        </div>
-        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
-          {coopMosaicRole === "host" ? "Your session will stay active. You can rejoin anytime from the Active Co-op Sessions panel on the main menu." : "You will leave this session and your partner will need to invite you again to rejoin."}
-        </div>
-        <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { setShowMosaicLeaveConfirm(false); leaveCoopMosaicSession(); loadActiveCoopSessions(); setView("menu"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; }} style={{ flex: 1, backgroundColor: coopMosaicRole === "host" ? C.coop : "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
-            {coopMosaicRole === "host" ? "Go to Menu" : "Leave"}
-          </button>
-          <button onClick={() => setShowMosaicLeaveConfirm(false)} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
-        </div>
-      </div>
-    </DraggableDrawer>
-  );
+  const mosaicLeaveConfirmEl = null; // Moved to inline Liquid Glass back button expansion
 
   const coopMosaicInviteUrl = isCoopMosaic && coopMosaicSessionId ? `${typeof window !== "undefined" ? window.location.origin + window.location.pathname : ""}?coopMosaic=${coopMosaicSessionId}` : "";
 
@@ -9586,7 +9588,14 @@ export default function Pattrn() {
         {renderBackButton(() => {
           if (isCoopMosaic) { setShowMosaicLeaveConfirm(true); return; }
           const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
-        })}
+        }, 16, isCoopMosaic && showMosaicLeaveConfirm ? {
+          title: coopMosaicRole === "host" ? "Go to Menu?" : "Leave Co-op?",
+          description: coopMosaicRole === "host" ? "Your session will stay active. You can rejoin anytime from the Active Co-op Sessions panel on the main menu." : "You will leave this session and your partner will need to invite you again to rejoin.",
+          confirmLabel: coopMosaicRole === "host" ? "Go to Menu" : "Leave",
+          confirmColor: coopMosaicRole === "host" ? C.coop : "#f87171",
+          onConfirm: () => { setShowMosaicLeaveConfirm(false); leaveCoopMosaicSession(); loadActiveCoopSessions(); setView("menu"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; },
+          onCancel: () => setShowMosaicLeaveConfirm(false),
+        } : null)}
         {renderContextButton("custom-mosaic")}
         {globalModalsEl}
       </div>
@@ -13512,7 +13521,14 @@ export default function Pattrn() {
           />
         </div>
       )}
-      {renderBackButton(playBackAction)}
+      {renderBackButton(playBackAction, 16, isCoop && showLeaveConfirm ? {
+        title: "Leave Co-op?",
+        description: coopRole === "host" ? "The session will stay active. You can rejoin from the main menu." : "You will leave this session and your partner will need to invite you again to rejoin.",
+        confirmLabel: "Leave",
+        confirmColor: "#f87171",
+        onConfirm: () => { leaveCoopSession(); if (customMosaicPuzzlesRef.current && isMosaic) { setView("custom-mosaic"); } else { setView("menu"); } },
+        onCancel: () => setShowLeaveConfirm(false),
+      } : null)}
       {renderContextButton("play", playPillButtons)}
       {globalModalsEl}
     </div>
