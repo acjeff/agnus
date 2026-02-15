@@ -5581,8 +5581,8 @@ export default function Pattrn() {
                         <input
                           type="text"
                           placeholder="Add friend by username..."
-                          value={addFriendUsername}
-                          onChange={(e) => setAddFriendUsername(e.target.value)}
+                          value={addFriendInput}
+                          onChange={(e) => setAddFriendInput(e.target.value)}
                           onKeyDown={(e) => { if (e.key === "Enter") handleAddFriend(); }}
                           style={{
                             width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 13,
