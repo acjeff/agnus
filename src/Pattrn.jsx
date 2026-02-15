@@ -5263,7 +5263,6 @@ export default function Pattrn() {
                   <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, flexShrink: 0 }}>
                     {renderIcon("back", strokeColor)}
                   </span>
-                  <span>Back</span>
                 </div>
                 <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
               </>
