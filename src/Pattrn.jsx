@@ -4544,7 +4544,7 @@ export default function Pattrn() {
     }
   };
 
-  const RadialContextButton = ({ currentView }) => {
+  const renderContextButton = (currentView) => {
     const menuTree = getContextualMenuTree(currentView);
     const navItems = getNavItems(currentView);
     const isOpen = radialMenuStack.length > 0;
@@ -9339,7 +9339,7 @@ export default function Pattrn() {
           );
         })()}
 
-        <RadialContextButton currentView="custom-mosaic" />
+        {renderContextButton("custom-mosaic")}
         {globalModalsEl}
       </div>
     );
@@ -9600,7 +9600,7 @@ export default function Pattrn() {
           )}
         </div>
 
-      <RadialContextButton currentView="creator" />
+      {renderContextButton("creator")}
       {globalModalsEl}
       </div>
     );
@@ -9979,7 +9979,7 @@ export default function Pattrn() {
           </svg>
         </button>
       )}
-      <RadialContextButton currentView="gallery" />
+      {renderContextButton("gallery")}
       {globalModalsEl}
       </div>
     );
@@ -11227,7 +11227,7 @@ export default function Pattrn() {
             );
           })()}
         </div>
-        <RadialContextButton currentView="coop" />
+        {renderContextButton("coop")}
         {globalModalsEl}
       </div>
     );
@@ -11649,7 +11649,7 @@ export default function Pattrn() {
 
         {/* Delete Account confirmation dialog */}
 
-        <RadialContextButton currentView="profile" />
+        {renderContextButton("profile")}
         {globalModalsEl}
       </div>
     );
@@ -12940,7 +12940,7 @@ export default function Pattrn() {
         </div>
       )}
 
-      <RadialContextButton currentView="menu" />
+      {renderContextButton("menu")}
       {globalModalsEl}
       </div>
     );
