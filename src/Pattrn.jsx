@@ -3060,6 +3060,40 @@ export default function Pattrn() {
   const guidedTourLoadedRef = useRef(false); // track if we've loaded tour status from Firebase
   const TOUR_STORAGE_KEY = "pattrn_has_seen_basic_tour"; // localStorage key for non-authenticated users
 
+  // Helper function to manually start/restart the tour (useful for testing)
+  const startGuidedTour = useCallback((phase = "basic") => {
+    setShowGuidedTour(true);
+    setGuidedTourStep(0);
+    setTourPhase(phase);
+    setRadialMenuStack(["root"]);
+    setView("menu");
+  }, []);
+
+  // Expose tour controls to window for easy testing in browser console
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.startTour = () => startGuidedTour("basic");
+      window.startCoopTour = () => startGuidedTour("coop");
+      window.resetTour = () => {
+        try { localStorage.removeItem(TOUR_STORAGE_KEY); } catch {}
+        if (firebaseUser) {
+          saveGuidedTourStatus(firebaseUser.uid, false, "basic").catch(() => {});
+          saveGuidedTourStatus(firebaseUser.uid, false, "coop").catch(() => {});
+        }
+        setHasSeenGuidedTour(false);
+        setHasSeenCoopTour(false);
+        startGuidedTour("basic");
+      };
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        delete window.startTour;
+        delete window.startCoopTour;
+        delete window.resetTour;
+      }
+    };
+  }, [startGuidedTour, firebaseUser]);
+
   // --- Coop Mosaic state (n-player) ---
   const [coopMosaicSessionId, setCoopMosaicSessionId] = useState(null);
   const [coopMosaicRole, setCoopMosaicRole] = useState(null); // "host" | "guest"
@@ -3205,12 +3239,15 @@ export default function Pattrn() {
         setHasSeenGuidedTour(hasSeenBasic);
         setHasSeenCoopTour(true); // co-op tour only for logged-in users
 
-        // Show tour for first-time logged-out visitors
-        if (!hasSeenBasic && view === "menu") {
-          setShowGuidedTour(true);
-          setGuidedTourStep(0);
-          setTourPhase("basic");
-          setRadialMenuStack(["root"]);
+        // Show tour for first-time logged-out visitors on menu view
+        if (!hasSeenBasic && view === "menu" && !showGuidedTour) {
+          // Small delay to ensure UI is ready
+          setTimeout(() => {
+            setShowGuidedTour(true);
+            setGuidedTourStep(0);
+            setTourPhase("basic");
+            setRadialMenuStack(["root"]);
+          }, 500);
         }
       } catch {
         setHasSeenGuidedTour(false);
@@ -3227,24 +3264,28 @@ export default function Pattrn() {
       setHasSeenCoopTour(tourStatus.coop);
 
       // If user just created account and hasn't seen co-op tour, show it
-      if (tourStatus.basic && !tourStatus.coop && username) {
-        setShowGuidedTour(true);
-        setGuidedTourStep(0);
-        setTourPhase("coop");
-        setRadialMenuStack(["root"]);
+      if (tourStatus.basic && !tourStatus.coop && username && view === "menu") {
+        setTimeout(() => {
+          setShowGuidedTour(true);
+          setGuidedTourStep(0);
+          setTourPhase("coop");
+          setRadialMenuStack(["root"]);
+        }, 500);
       }
       // If user hasn't seen basic tour and has username (not first-time setup), show it
-      else if (!tourStatus.basic && username) {
-        setShowGuidedTour(true);
-        setGuidedTourStep(0);
-        setTourPhase("basic");
-        setRadialMenuStack(["root"]);
+      else if (!tourStatus.basic && username && view === "menu") {
+        setTimeout(() => {
+          setShowGuidedTour(true);
+          setGuidedTourStep(0);
+          setTourPhase("basic");
+          setRadialMenuStack(["root"]);
+        }, 500);
       }
     }).catch(() => {
       setHasSeenGuidedTour(false);
       setHasSeenCoopTour(false);
     });
-  }, [firebaseUser, firebaseConfigured, username, view]);
+  }, [firebaseUser, firebaseConfigured, username, view, showGuidedTour]);
 
   // Subscribe to real-time notifications when user is signed in
   useEffect(() => {
