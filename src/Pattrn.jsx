@@ -3054,6 +3054,7 @@ export default function Pattrn() {
   const playViewScrollRef = useRef(null);
   const playViewContainerRef = useRef(null);
   const playViewSlideRef = useRef(null);
+  const homePreviewRef = useRef(null);
   const swipeBackState = useRef({ active: false, startX: 0, startY: 0, confirmed: false, moved: false });
   const [playViewEntering, setPlayViewEntering] = useState(false); // true during slide-in
 
@@ -8899,7 +8900,10 @@ export default function Pattrn() {
     if (!s.confirmed && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) {
       s.active = false; return;
     }
-    if (!s.confirmed && dx > 10) s.confirmed = true;
+    if (!s.confirmed && dx > 10) {
+      s.confirmed = true;
+      if (homePreviewRef.current) homePreviewRef.current.style.visibility = "visible";
+    }
     if (!s.confirmed) return;
     s.moved = true;
     const el = playViewSlideRef.current;
@@ -8917,9 +8921,12 @@ export default function Pattrn() {
     const el = playViewSlideRef.current;
     if (dx > 100) {
       playViewGoBack();
-    } else if (el) {
-      el.style.transition = "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)";
-      el.style.transform = "translateX(0)";
+    } else {
+      if (homePreviewRef.current) homePreviewRef.current.style.visibility = "hidden";
+      if (el) {
+        el.style.transition = "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)";
+        el.style.transform = "translateX(0)";
+      }
     }
   }, [playViewGoBack]);
 
@@ -13072,11 +13079,12 @@ export default function Pattrn() {
         overflow: "hidden",
       }}
     >
-    {/* Home page preview — visible when play content slides right */}
-    <div style={{
+    {/* Home page preview — only visible during swipe-back gesture */}
+    <div ref={homePreviewRef} style={{
       position: "absolute", inset: 0, backgroundColor: C.bg,
       display: "flex", flexDirection: "column", alignItems: "center",
       paddingTop: "calc(12px + env(safe-area-inset-top, 0px))",
+      visibility: "hidden",
     }}>
       <div style={{ width: "100%", maxWidth: 480, padding: "0 16px", display: "flex", justifyContent: "space-between", alignItems: "center", boxSizing: "border-box" }}>
         <div style={{
