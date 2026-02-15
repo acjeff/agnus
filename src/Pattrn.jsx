@@ -4699,7 +4699,7 @@ export default function Pattrn() {
             width: isOpen ? panelWidth : closedWidth,
             height: isOpen ? openHeight : fabSize,
             borderRadius: isOpen ? 22 : fabSize / 2,
-            background: `linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.08) 100%)`,
+            background: `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.55) 100%)`,
             backdropFilter: "blur(28px) saturate(200%)",
             WebkitBackdropFilter: "blur(28px) saturate(200%)",
             border: isOpen
