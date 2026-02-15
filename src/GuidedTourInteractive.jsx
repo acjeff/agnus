@@ -44,19 +44,27 @@ export function GuidedTourInteractive({
       },
       {
         id: "start-puzzle",
-        title: "Tap to Begin",
-        description: "Click 'Let's Go!' to start your first puzzle!",
+        title: "Your First Puzzle",
+        description: "This is the easiest puzzle - perfect for learning! Tap 'Let's Go!' to begin.",
         targetSelector: "[data-tour-id='easy-puzzle-1']",
         position: "bottom",
         showArrow: true,
-        autoAdvance: true,
+        autoAdvance: false, // Wait for user to manually advance
+      },
+      {
+        id: "in-puzzle",
+        title: "Study the Pattern",
+        description: "Look at the filled cells. Can you see the pattern? Each row and column follows a rule!",
+        position: "center",
+        showArrow: false,
+        autoAdvance: false,
         condition: () => view === "play",
       },
       {
         id: "tap-cell",
-        title: "Tap a Cell",
-        description: "Look at the pattern! Try tapping the cells to fill them in.",
-        targetSelector: null, // Will point to a specific cell
+        title: "Tap an Empty Cell",
+        description: "Tap any empty white cell to select it. Let's fill it in!",
+        targetSelector: "[data-tour-id='grid']",
         position: "top",
         showArrow: true,
         autoAdvance: true,
@@ -65,7 +73,7 @@ export function GuidedTourInteractive({
       {
         id: "enter-value",
         title: "Enter a Number",
-        description: "Use the keypad at the bottom to enter your answer!",
+        description: "Use the keypad below to fill in your answer. Pick a number!",
         targetSelector: "[data-tour-id='keypad']",
         position: "top",
         showArrow: true,
@@ -73,11 +81,11 @@ export function GuidedTourInteractive({
         condition: () => fills && Object.keys(fills).length > 0,
       },
       {
-        id: "complete-puzzle",
-        title: "Check Your Answer",
-        description: "Once you've filled in the cells, tap the checkmark to verify your solution!",
+        id: "complete-more",
+        title: "Keep Going!",
+        description: "Great! Fill in more cells until the grid is complete. When done, tap the checkmark ✓ at the top!",
         targetSelector: "[data-tour-id='check-button']",
-        position: "bottom",
+        position: "left",
         showArrow: true,
         autoAdvance: true,
         condition: () => gameState === "won",
@@ -159,19 +167,33 @@ export function GuidedTourInteractive({
     if (!currentStep.targetSelector) {
       setTargetElement(null);
       setArrowPosition(null);
+      setTooltipPosition(null);
       return;
     }
+
+    let retryCount = 0;
+    const maxRetries = 20; // Try for 2 seconds max
 
     const findElement = () => {
       const element = document.querySelector(currentStep.targetSelector);
       if (element) {
         setTargetElement(element);
         updatePositions(element);
+        return true;
       }
+      return false;
     };
 
-    findElement();
-    const interval = setInterval(findElement, 200);
+    // Try immediately
+    if (findElement()) return;
+
+    // If not found, retry with backoff
+    const interval = setInterval(() => {
+      retryCount++;
+      if (findElement() || retryCount >= maxRetries) {
+        clearInterval(interval);
+      }
+    }, 100);
 
     return () => clearInterval(interval);
   }, [currentStep.targetSelector, step]);
@@ -266,14 +288,25 @@ export function GuidedTourInteractive({
     return () => clearInterval(interval);
   }, [currentStep, onAdvance]);
 
-  // Handle resize
+  // Handle resize and element changes
   useEffect(() => {
     if (!targetElement) return;
 
     const handleResize = () => updatePositions(targetElement);
+
+    // Use ResizeObserver for smoother position updates
+    const resizeObserver = new ResizeObserver(() => {
+      updatePositions(targetElement);
+    });
+
+    resizeObserver.observe(targetElement);
     window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [targetElement]);
+
+    return () => {
+      resizeObserver.disconnect();
+      window.removeEventListener("resize", handleResize);
+    };
+  }, [targetElement, currentStep]);
 
   const isCenterPosition = currentStep.position === "center" || !currentStep.targetSelector;
 

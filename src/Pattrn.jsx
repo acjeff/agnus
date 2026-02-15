@@ -9373,7 +9373,7 @@ export default function Pattrn() {
       onAdvance={() => {
         const isBasicTour = tourPhase === "basic";
         const isCoopIntro = tourPhase === "coopIntro";
-        const maxBasicSteps = 11;
+        const maxBasicSteps = 12; // Updated for new tour flow with gameplay guidance
         const maxCoopSteps = 1;
         const maxSteps = isCoopIntro ? maxCoopSteps : maxBasicSteps;
         const isLastStep = guidedTourStep === maxSteps - 1;
@@ -13582,7 +13582,7 @@ export default function Pattrn() {
             )}
           </div>
         )}
-      <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
+      <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }} data-tour-id="grid">
       <div style={{
         transform: isSpin ? `rotate(${spinAngle}deg)` : undefined,
         transition: isSpin ? "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
