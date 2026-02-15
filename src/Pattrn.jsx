@@ -3053,6 +3053,7 @@ export default function Pattrn() {
   const wrongCellClearTimeoutRef = useRef(null);
   const playViewScrollRef = useRef(null);
   const playViewContainerRef = useRef(null);
+  const playViewSlideRef = useRef(null);
   const swipeBackState = useRef({ active: false, startX: 0, startY: 0, confirmed: false, moved: false });
   const [playViewEntering, setPlayViewEntering] = useState(false); // true during slide-in
 
@@ -8901,7 +8902,7 @@ export default function Pattrn() {
     if (!s.confirmed && dx > 10) s.confirmed = true;
     if (!s.confirmed) return;
     s.moved = true;
-    const el = playViewContainerRef.current;
+    const el = playViewSlideRef.current;
     if (el) {
       el.style.transition = "none";
       el.style.transform = `translateX(${Math.max(0, dx)}px)`;
@@ -8913,7 +8914,7 @@ export default function Pattrn() {
     if (!s.active || !s.confirmed) { s.active = false; return; }
     s.active = false;
     const dx = (e.clientX || 0) - s.startX;
-    const el = playViewContainerRef.current;
+    const el = playViewSlideRef.current;
     if (dx > 100) {
       playViewGoBack();
     } else if (el) {
@@ -13068,8 +13069,49 @@ export default function Pattrn() {
       onPointerCancel={onPlaySwipeEnd}
       style={{
         position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 60,
+        overflow: "hidden",
+      }}
+    >
+    {/* Home page preview — visible when play content slides right */}
+    <div style={{
+      position: "absolute", inset: 0, backgroundColor: C.bg,
+      display: "flex", flexDirection: "column", alignItems: "center",
+      paddingTop: "calc(12px + env(safe-area-inset-top, 0px))",
+    }}>
+      <div style={{ width: "100%", maxWidth: 480, padding: "0 16px", display: "flex", justifyContent: "space-between", alignItems: "center", boxSizing: "border-box" }}>
+        <div style={{
+          display: "flex", alignItems: "center", padding: 4,
+          backgroundColor: "rgba(18, 18, 32, 0.5)", borderRadius: 100,
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07)",
+          backdropFilter: "blur(28px) saturate(1.8)", WebkitBackdropFilter: "blur(28px) saturate(1.8)",
+        }}>
+          <img src="/app-icon.png" alt="" style={{ width: 34, height: 34, borderRadius: 17, display: "block" }} />
+        </div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 2, padding: 4,
+          backgroundColor: "rgba(18, 18, 32, 0.5)", borderRadius: 100,
+          border: "1px solid rgba(255, 255, 255, 0.1)",
+          boxShadow: "0 4px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07)",
+          backdropFilter: "blur(28px) saturate(1.8)", WebkitBackdropFilter: "blur(28px) saturate(1.8)",
+        }}>
+          <div style={{ width: 36, height: 36, borderRadius: 100 }} />
+          <div style={{ width: 36, height: 36, borderRadius: 100 }} />
+        </div>
+      </div>
+      <div style={{ width: "100%", maxWidth: 480, padding: "20px 20px 0", boxSizing: "border-box" }}>
+        <div style={{ borderRadius: 16, height: 140, background: `linear-gradient(135deg, ${C.surface} 0%, ${C.accent}11 100%)`, border: `1px solid ${C.accent}33` }} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 16 }}>
+          {[1,2,3,4].map(i => <div key={i} style={{ height: 80, borderRadius: 14, background: C.surface, border: `1px solid ${C.border}` }} />)}
+        </div>
+      </div>
+    </div>
+    {/* Play content — slides over the home preview */}
+    <div
+      ref={playViewSlideRef}
+      style={{
+        position: "relative", zIndex: 1, height: "100%", width: "100%",
         animation: playViewEntering ? "playViewSlideIn 0.35s cubic-bezier(0.32, 0.72, 0, 1) both" : undefined,
-        willChange: "transform",
       }}
       onAnimationEnd={() => setPlayViewEntering(false)}
     >
@@ -14354,6 +14396,7 @@ export default function Pattrn() {
       </div>
 
       {globalModalsEl}
+    </div>
     </div>
     </div>
   );
