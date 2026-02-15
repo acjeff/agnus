@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell } from "lucide-react";
+import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell, PaintBucket, Eraser } from "lucide-react";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -2978,6 +2978,7 @@ export default function Pattrn() {
   const [customMosaicProgress, setCustomMosaicProgress] = useState({}); // { tileIndex: attempts }
   const customMosaicPuzzlesRef = useRef(null); // array of 25 puzzle objects when playing custom mosaic
   const [creatorReturnView, setCreatorReturnView] = useState("menu"); // where to go when leaving creator
+  const [showSaveDrawer, setShowSaveDrawer] = useState(false); // drawer for naming mosaic on save
   const [friendsList, setFriendsList] = useState([]); // array of { uid, username, profilePicture }
   const [addFriendInput, setAddFriendInput] = useState("");
   const [addFriendMsg, setAddFriendMsg] = useState("");
@@ -3373,15 +3374,27 @@ export default function Pattrn() {
     setView("custom-mosaic");
   }, [buildCustomMosaicPuzzles, progress.mosaicCompletions]);
 
-  const handleSaveMosaic = useCallback(async () => {
+  // Pre-save validation — opens the naming drawer if valid
+  const handleSaveClick = useCallback(() => {
     if (!firebaseUser) { setMosaicMsg("Sign in to save mosaics"); setTimeout(() => setMosaicMsg(""), 2500); return; }
-    if (!creatorTitle.trim()) { setMosaicMsg("Give your mosaic a name first!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    const allFilled = creatorGrid.every(row => row.every(c => c !== null));
+    if (!allFilled) { setMosaicMsg("Fill in all cells before saving!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    // Pre-fill title for edits
+    if (creatorEditingId && !creatorTitle.trim()) setCreatorTitle("");
+    setShowSaveDrawer(true);
+  }, [firebaseUser, creatorGrid, creatorEditingId, creatorTitle]);
+
+  const handleSaveMosaic = useCallback(async (titleFromDrawer) => {
+    const title = (titleFromDrawer || "").trim();
+    if (!firebaseUser) { setMosaicMsg("Sign in to save mosaics"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    if (!title) { setMosaicMsg("Give your mosaic a name first!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
     const allFilled = creatorGrid.every(row => row.every(c => c !== null));
     if (!allFilled) { setMosaicMsg("Fill in all cells before saving!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
     setMosaicLoading(true);
+    setShowSaveDrawer(false);
     try {
       const mosaicData = {
-        title: creatorTitle.trim(),
+        title,
         grid: creatorGrid,
         gridSize: 25,
         authorUsername: username || "",
@@ -3394,6 +3407,7 @@ export default function Pattrn() {
         setCreatorEditingId(id);
         setMosaicMsg("Mosaic saved!");
       }
+      setCreatorTitle(title);
     } catch (e) {
       console.error("Save mosaic failed:", e);
       const isPermErr = e?.message?.includes("PERMISSION_DENIED");
@@ -3402,7 +3416,7 @@ export default function Pattrn() {
       setMosaicLoading(false);
       setTimeout(() => setMosaicMsg(""), 4000);
     }
-  }, [firebaseUser, creatorGrid, creatorTitle, creatorEditingId]);
+  }, [firebaseUser, creatorGrid, creatorEditingId]);
 
   const handleDeleteMosaic = useCallback(async (mosaicId) => {
     if (!firebaseUser) return;
@@ -4509,6 +4523,9 @@ export default function Pattrn() {
     forward: (c) => <ChevronRight size={18} color={c} strokeWidth={2} />,
     pass: (c) => <HandHelping size={18} color={c} strokeWidth={2} />,
     bell: (c) => <Bell size={18} color={c} strokeWidth={2} />,
+    pencil: (c) => <Pencil size={18} color={c} strokeWidth={2} />,
+    "paint-bucket": (c) => <PaintBucket size={18} color={c} strokeWidth={2} />,
+    eraser: (c) => <Eraser size={18} color={c} strokeWidth={2} />,
     "pass-pending": (c) => (
       <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
         <HandHelping size={18} color={c} strokeWidth={2} />
@@ -9589,95 +9606,6 @@ export default function Pattrn() {
           </h2>
         </div>
 
-        {/* Title input */}
-        <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, animation: "fadeUp 0.3s 0.02s ease both" }}>
-          <input
-            type="text"
-            value={creatorTitle}
-            onChange={e => setCreatorTitle(e.target.value)}
-            placeholder="Mosaic title..."
-            maxLength={40}
-            style={{
-              width: "100%", padding: "10px 14px", borderRadius: 10,
-              backgroundColor: C.surface, border: `1px solid ${C.border}`,
-              color: C.text, fontSize: 16, fontFamily: "'Space Mono', monospace",
-              outline: "none", boxSizing: "border-box", letterSpacing: 0.5,
-            }}
-            onFocus={e => { e.target.style.borderColor = C.accent; }}
-            onBlur={e => { e.target.style.borderColor = C.border; }}
-          />
-        </div>
-
-        {/* Color palette */}
-        <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, animation: "fadeUp 0.3s 0.04s ease both" }}>
-          <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
-            Colors
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {CREATOR_COLORS.map(color => (
-              <button
-                key={color}
-                onClick={() => setCreatorColor(color)}
-                style={{
-                  width: 28, height: 28, borderRadius: 6, backgroundColor: color, border: creatorColor === color ? `2.5px solid ${C.accent}` : `1.5px solid ${C.border}`,
-                  cursor: "pointer", transition: "all 0.15s",
-                  boxShadow: creatorColor === color ? `0 0 8px ${C.accent}66` : "none",
-                }}
-              />
-            ))}
-            {/* Eraser */}
-            <button
-              onClick={() => setCreatorColor(null)}
-              style={{
-                width: 28, height: 28, borderRadius: 6, backgroundColor: C.surface,
-                border: creatorColor === null ? `2.5px solid ${C.accent}` : `1.5px solid ${C.border}`,
-                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 14, color: C.textDim, transition: "all 0.15s",
-              }}
-              title="Eraser"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2-8 8-3 1 1-3z" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Tools */}
-        <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, animation: "fadeUp 0.3s 0.045s ease both" }}>
-          <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
-            Tools
-          </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {/* Draw tool */}
-            <button
-              onClick={() => setCreatorTool("draw")}
-              style={{
-                display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 6,
-                backgroundColor: creatorTool === "draw" ? C.accent + "22" : C.surface,
-                border: creatorTool === "draw" ? `2px solid ${C.accent}` : `1.5px solid ${C.border}`,
-                cursor: "pointer", fontSize: 11, color: creatorTool === "draw" ? C.accent : C.textDim,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, transition: "all 0.15s",
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 13.5l1-3 8-8 2 2-8 8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Draw
-            </button>
-            {/* Fill tool */}
-            <button
-              onClick={() => setCreatorTool("fill")}
-              style={{
-                display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 6,
-                backgroundColor: creatorTool === "fill" ? C.accent + "22" : C.surface,
-                border: creatorTool === "fill" ? `2px solid ${C.accent}` : `1.5px solid ${C.border}`,
-                cursor: "pointer", fontSize: 11, color: creatorTool === "fill" ? C.accent : C.textDim,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, transition: "all 0.15s",
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13 9c0 2-1.5 4-3 4s-3-2-3-4 3-7 3-7 3 5 3 7z" stroke="currentColor" strokeWidth="1.3" fill="currentColor" fillOpacity="0.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M1.5 11l4-4 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Fill
-            </button>
-          </div>
-        </div>
-
         {/* 25x25 info */}
         <div style={{ width: "100%", maxWidth: 400, marginBottom: 6, animation: "fadeUp 0.3s 0.05s ease both" }}>
           <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, fontFamily: "'Space Mono', monospace", textAlign: "center" }}>
@@ -9737,6 +9665,96 @@ export default function Pattrn() {
           </div>
         )}
 
+      {/* Tool toggle — bottom left Liquid Glass pill */}
+      <div style={{
+        position: "fixed",
+        bottom: `calc(16px + env(safe-area-inset-bottom, 0px))`,
+        left: 20,
+        display: "flex",
+        borderRadius: 28,
+        background: activeTheme.gridBg || C.surface,
+        backdropFilter: "blur(28px) saturate(200%)",
+        WebkitBackdropFilter: "blur(28px) saturate(200%)",
+        border: "1px solid rgba(255,255,255,0.16)",
+        zIndex: 85,
+        overflow: "hidden",
+      }}>
+        {/* Liquid Glass sheen */}
+        <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none" }}>
+          <div style={{ position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%", background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)", borderRadius: "inherit" }} />
+        </div>
+        <div
+          onClick={() => setCreatorTool("draw")}
+          style={{
+            width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", position: "relative",
+            backgroundColor: creatorTool === "draw" ? "rgba(255,255,255,0.12)" : "transparent",
+            transition: "background-color 0.15s",
+          }}
+        >
+          <Pencil size={18} color={creatorTool === "draw" ? C.accent : "#fff"} strokeWidth={2} />
+        </div>
+        <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.12)", alignSelf: "center" }} />
+        <div
+          onClick={() => setCreatorTool("fill")}
+          style={{
+            width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", position: "relative",
+            backgroundColor: creatorTool === "fill" ? "rgba(255,255,255,0.12)" : "transparent",
+            transition: "background-color 0.15s",
+          }}
+        >
+          <PaintBucket size={18} color={creatorTool === "fill" ? C.accent : "#fff"} strokeWidth={2} />
+        </div>
+      </div>
+
+      {/* Color picker — Liquid Glass row above main menu */}
+      <div style={{
+        position: "fixed",
+        bottom: `calc(${16 + 56 + 8}px + env(safe-area-inset-bottom, 0px))`,
+        right: 20,
+        display: "flex", alignItems: "center", gap: 4,
+        padding: "6px 8px",
+        borderRadius: 18,
+        background: activeTheme.gridBg || C.surface,
+        backdropFilter: "blur(28px) saturate(200%)",
+        WebkitBackdropFilter: "blur(28px) saturate(200%)",
+        border: "1px solid rgba(255,255,255,0.16)",
+        zIndex: 85,
+        flexWrap: "wrap",
+        maxWidth: "calc(100vw - 40px)",
+      }}>
+        {/* Liquid Glass sheen */}
+        <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none" }}>
+          <div style={{ position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%", background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)", borderRadius: "inherit" }} />
+        </div>
+        {CREATOR_COLORS.map(color => (
+          <div
+            key={color}
+            onClick={() => setCreatorColor(color)}
+            style={{
+              width: 22, height: 22, borderRadius: 6, backgroundColor: color,
+              border: creatorColor === color ? `2px solid ${C.accent}` : `1.5px solid rgba(255,255,255,0.15)`,
+              cursor: "pointer", transition: "all 0.15s", flexShrink: 0,
+              boxShadow: creatorColor === color ? `0 0 8px ${C.accent}66` : "none",
+            }}
+          />
+        ))}
+        {/* Eraser */}
+        <div
+          onClick={() => setCreatorColor(null)}
+          style={{
+            width: 22, height: 22, borderRadius: 6,
+            backgroundColor: creatorColor === null ? "rgba(255,255,255,0.15)" : "transparent",
+            border: creatorColor === null ? `2px solid ${C.accent}` : `1.5px solid rgba(255,255,255,0.15)`,
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            transition: "all 0.15s", flexShrink: 0,
+          }}
+        >
+          <Eraser size={12} color={creatorColor === null ? C.accent : "rgba(255,255,255,0.5)"} strokeWidth={2} />
+        </div>
+      </div>
+
       {renderContextButton("creator", [
         { id: "back", icon: "back", color: "#fff", onClick: () => {
           const returnTo = creatorReturnView || "menu";
@@ -9744,8 +9762,55 @@ export default function Pattrn() {
           if (returnTo === "gallery") { setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine"); } else { setView("menu"); }
         }},
         { id: "clear", icon: "refresh", color: "#fff", onClick: () => resetCreator() },
-        { id: "save", icon: "upload", color: C.accent, onClick: handleSaveMosaic, disabled: mosaicLoading },
+        { id: "save", icon: "upload", color: C.accent, onClick: handleSaveClick, disabled: mosaicLoading },
       ])}
+
+      {/* Save mosaic drawer — name prompt */}
+      <DraggableDrawer isOpen={showSaveDrawer} onClose={() => setShowSaveDrawer(false)} maxHeight="50vh">
+        <div style={{ padding: "8px 20px 24px" }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, letterSpacing: 1, marginBottom: 16 }}>
+            {creatorEditingId ? "Update Mosaic" : "Name Your Mosaic"}
+          </div>
+          <input
+            type="text"
+            defaultValue={creatorTitle}
+            placeholder="Mosaic title..."
+            maxLength={40}
+            autoFocus
+            id="save-drawer-title-input"
+            style={{
+              width: "100%", padding: "12px 14px", borderRadius: 10,
+              backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              color: C.text, fontSize: 16, fontFamily: "'Space Mono', monospace",
+              outline: "none", boxSizing: "border-box", letterSpacing: 0.5,
+            }}
+            onFocus={e => { e.target.style.borderColor = C.accent; }}
+            onBlur={e => { e.target.style.borderColor = C.border; }}
+            onKeyDown={e => {
+              if (e.key === "Enter") {
+                handleSaveMosaic(e.target.value);
+              }
+            }}
+          />
+          <button
+            onClick={() => {
+              const input = document.getElementById("save-drawer-title-input");
+              handleSaveMosaic(input ? input.value : "");
+            }}
+            disabled={mosaicLoading}
+            style={{
+              width: "100%", marginTop: 12, padding: "12px 0", borderRadius: 10,
+              backgroundColor: C.accent, color: "#fff", border: "none",
+              fontSize: 14, fontWeight: 700, fontFamily: "'Space Mono', monospace",
+              letterSpacing: 1, textTransform: "uppercase", cursor: mosaicLoading ? "default" : "pointer",
+              opacity: mosaicLoading ? 0.5 : 1, transition: "opacity 0.15s",
+            }}
+          >
+            {mosaicLoading ? "Saving..." : (creatorEditingId ? "Update" : "Save")}
+          </button>
+        </div>
+      </DraggableDrawer>
+
       {globalModalsEl}
       </div>
     );
