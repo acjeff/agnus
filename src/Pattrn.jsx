@@ -4490,6 +4490,8 @@ export default function Pattrn() {
     "user-plus": (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>,
     upload: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>,
     logout: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+    check: (c) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
+    refresh: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
   };
 
   // Quick Play sub-menu — shared across all views (accessed from nav)
@@ -4575,7 +4577,7 @@ export default function Pattrn() {
   // FAB icon — always the burger menu
   const getFabIcon = () => "burger";
 
-  const renderContextButton = (currentView) => {
+  const renderContextButton = (currentView, pillButtons = []) => {
     const menuTree = getContextualMenuTree(currentView);
     const isOpen = radialMenuStack.length > 0;
     const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
@@ -4593,7 +4595,9 @@ export default function Pattrn() {
 
     // Panel sizing
     const fabSize = 56;
-    const panelWidth = 200;
+    const hasPillButtons = pillButtons.length > 0;
+    const closedWidth = hasPillButtons ? (pillButtons.length + 1) * fabSize : fabSize;
+    const panelWidth = Math.max(200, closedWidth);
     const itemHeight = 44;
     const panelPad = 8;
     const dividerHeight = 13;
@@ -4657,6 +4661,9 @@ export default function Pattrn() {
       );
     };
 
+    const defaultShadow = `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`;
+    const hoverShadow = `0 8px 32px rgba(0,0,0,0.5), 0 0 16px ${C.accent}22, inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.1)`;
+
     return (
       <>
         {/* Click-away layer — transparent, page stays usable */}
@@ -4667,13 +4674,13 @@ export default function Pattrn() {
           />
         )}
 
-        {/* Expanding Liquid Glass panel */}
+        {/* Expanding Liquid Glass panel / pill */}
         <div
           style={{
             position: "fixed",
             bottom: `calc(80px + env(safe-area-inset-bottom, 0px))`,
             right: 20,
-            width: isOpen ? panelWidth : fabSize,
+            width: isOpen ? panelWidth : closedWidth,
             height: isOpen ? openHeight : fabSize,
             borderRadius: isOpen ? 22 : fabSize / 2,
             background: `linear-gradient(135deg, rgba(255,255,255,0.12) 0%, rgba(255,255,255,0.03) 50%, rgba(255,255,255,0.08) 100%)`,
@@ -4682,19 +4689,15 @@ export default function Pattrn() {
             border: isOpen
               ? `1px solid rgba(255,255,255,0.18)`
               : "1px solid rgba(255,255,255,0.16)",
-            boxShadow: `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`,
+            boxShadow: defaultShadow,
             zIndex: 85,
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
-            cursor: isOpen ? "default" : "pointer",
             transition: isOpen
-              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, transform 0.15s ease, box-shadow 0.15s ease`
-              : `width 0.22s ${springClose}, height 0.22s ${springClose}, border-radius 0.22s ${springClose}, transform 0.15s ease, box-shadow 0.15s ease`,
+              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease`
+              : `width 0.22s ${springClose}, height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease`,
           }}
-          onClick={isOpen ? undefined : handleToggle}
-          onMouseEnter={e => { if (!isOpen) { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.5), 0 0 16px ${C.accent}22, inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.1)`; } }}
-          onMouseLeave={e => { if (!isOpen) { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.12), inset 0 -1px 0 rgba(0,0,0,0.1)`; } }}
           aria-label="Quick actions"
         >
           {/* Liquid Glass sheen highlight */}
@@ -4730,23 +4733,56 @@ export default function Pattrn() {
             {contextualItems.map((item, i) => renderItem(item, filteredNav.length + (showDivider ? 1 : 0) + i, item.isBack))}
           </div>
 
-          {/* Toggle button — sits at the bottom of the panel */}
-          <div
-            onClick={isOpen ? handleToggle : undefined}
-            style={{
-              width: "100%", height: fabSize, flexShrink: 0,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              borderTop: isOpen ? "1px solid rgba(255,255,255,0.06)" : "none",
-              cursor: "pointer",
-            }}
-          >
-            {isOpen ? (
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={activeStroke} strokeWidth="2.5" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
-              </svg>
-            ) : (
-              renderIcon(fabIconKey, strokeColor)
+          {/* Bottom bar: pill action buttons + menu toggle */}
+          <div style={{
+            display: "flex", alignItems: "center",
+            height: fabSize, flexShrink: 0,
+            borderTop: isOpen ? "1px solid rgba(255,255,255,0.06)" : "none",
+          }}>
+            {/* Action buttons in the pill */}
+            {pillButtons.map((btn) => (
+              <div
+                key={btn.id}
+                onClick={btn.disabled ? undefined : (e) => { e.stopPropagation(); btn.onClick?.(); }}
+                style={{
+                  width: fabSize, height: fabSize,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: btn.disabled ? "default" : "pointer",
+                  opacity: btn.disabled ? 0.35 : 1,
+                  transition: "opacity 0.15s, transform 0.15s",
+                  flexShrink: 0,
+                }}
+                onMouseEnter={e => { if (!btn.disabled) e.currentTarget.style.transform = "scale(1.15)"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+              >
+                {renderIcon(btn.icon, btn.color || strokeColor)}
+              </div>
+            ))}
+
+            {/* Separator between action buttons and menu toggle */}
+            {hasPillButtons && (
+              <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
             )}
+
+            {/* Menu toggle button */}
+            <div
+              onClick={(e) => { e.stopPropagation(); handleToggle(); }}
+              style={{
+                flex: 1, height: fabSize,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer",
+              }}
+              onMouseEnter={e => { if (!isOpen && !hasPillButtons) { e.currentTarget.parentElement.parentElement.style.transform = "scale(1.08)"; e.currentTarget.parentElement.parentElement.style.boxShadow = hoverShadow; } }}
+              onMouseLeave={e => { if (!isOpen && !hasPillButtons) { e.currentTarget.parentElement.parentElement.style.transform = "scale(1)"; e.currentTarget.parentElement.parentElement.style.boxShadow = defaultShadow; } }}
+            >
+              {isOpen ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={activeStroke} strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              ) : (
+                renderIcon(fabIconKey, strokeColor)
+              )}
+            </div>
           </div>
         </div>
       </>
@@ -12982,6 +13018,26 @@ export default function Pattrn() {
   const lockedCount = lockedCells.size;
   const totalBlanks = puzzle ? puzzle.blanks.size : 0;
 
+  // Pill action buttons for the bottom glass bar
+  const playPillButtons = [];
+  if (gameState === "playing") {
+    if (isCoop && coopMyLockedIn) {
+      playPillButtons.push({ id: "locked", icon: "check", color: C.correct });
+    } else {
+      const checkColor = allFilled
+        ? (isCoop ? "#54A0FF" : isBlind ? "#e06040" : C.accent)
+        : "rgba(255,255,255,0.3)";
+      playPillButtons.push({
+        id: "check", icon: "check", color: checkColor,
+        onClick: allFilled ? (isCoop ? coopLockIn : checkSolution) : undefined,
+        disabled: !allFilled,
+      });
+    }
+    if (!isCoop && (Object.keys(fills).length > 0 || attempts > 0)) {
+      playPillButtons.push({ id: "reset", icon: "refresh", color: "rgba(255,255,255,0.5)", onClick: resetBoard });
+    }
+  }
+
   return (
     <div
       ref={playViewScrollRef}
@@ -13693,57 +13749,6 @@ export default function Pattrn() {
             }}>Reject</button>
           </div>
         )}
-        {gameState === "playing" && (
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            {/* Coop: show Lock In or waiting state; Normal: show Check */}
-            {isCoop && coopMyLockedIn ? (
-              <div style={{
-                padding: "14px 32px", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-                textTransform: "uppercase", color: C.correct,
-                border: `2px solid ${C.correct}44`, backgroundColor: `${C.correct}11`,
-              }}>
-                {"\u2713"} Locked In {!coopPartnerLockedIn ? "- Waiting..." : ""}
-              </div>
-            ) : (
-              <button
-                onClick={allFilled ? (isCoop ? coopLockIn : checkSolution) : undefined}
-                disabled={!allFilled}
-                style={{
-                  backgroundColor: allFilled ? (isCoop ? "#54A0FF" : isBlind ? "#e06040" : C.accent) : C.surfaceLight,
-                  color: allFilled ? (isCoop ? "#fff" : isBlind ? "#fff" : C.bg) : C.textDim,
-                  border: "none",
-                  padding: "14px 48px", borderRadius: 12, fontSize: 15, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-                  cursor: allFilled ? "pointer" : "not-allowed",
-                  textTransform: "uppercase", transition: "all 0.2s",
-                  boxShadow: allFilled ? (isCoop ? "0 4px 20px #54A0FF44" : isBlind ? "0 4px 20px #e0604044" : `0 4px 20px ${C.accent}44`) : "none",
-                  opacity: allFilled ? 1 : 0.7,
-                }}
-                onMouseEnter={e => { if (allFilled) e.target.style.transform = "translateY(-2px)"; }}
-                onMouseLeave={e => { e.target.style.transform = "translateY(0)"; }}
-              >
-                {isCoop ? "Lock In" : isBlind ? "Guess" : "Check"}
-              </button>
-            )}
-            {!isCoop && (Object.keys(fills).length > 0 || attempts > 0) && (
-              <button
-                onClick={resetBoard}
-                style={{
-                  backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                  padding: "14px 20px", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase", transition: "all 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-              >
-                Reset
-              </button>
-            )}
-          </div>
-        )}
-
         {gameState === "won" && (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: isCoop ? 4 : 12, animation: "fadeUp 0.4s ease" }}>
@@ -14060,7 +14065,7 @@ export default function Pattrn() {
         )}
       </div>
 
-      {renderContextButton("play")}
+      {renderContextButton("play", playPillButtons)}
       {globalModalsEl}
     </div>
   );
