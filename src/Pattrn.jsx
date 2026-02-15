@@ -4574,24 +4574,7 @@ export default function Pattrn() {
     if (isCoop) {
       playRoot.push({ id: "coop-invite", icon: "user-plus", label: "Invite", action: () => { setShowCoopInvite(true); } });
     }
-    playRoot.push({ id: "back", icon: "back", label: customMosaicPuzzlesRef.current && isMosaic ? "Mosaic" : "Puzzles", action: () => {
-      if (isCoop) { setShowLeaveConfirm(true); return; }
-      if (difficulty === "cascade") {
-        const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
-        const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
-        setProgress(nextProgress); saveProgress(nextProgress);
-      }
-      stopTimer(); setShowMosaicPreviewOverlay(false);
-      if (customMosaicPuzzlesRef.current && isMosaic) {
-        if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
-          coopMosaicCurrentTileRef.current = -1;
-          updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
-          setCoopMosaicOtherFills({});
-          coopMosaicWriteThrottleRef.current = {};
-        }
-        setView("custom-mosaic");
-      } else { setView("menu"); }
-    }});
+    // Back action defined as pill button at call site
 
     // Menu view items
     const menuRoot = [];
@@ -4602,42 +4585,29 @@ export default function Pattrn() {
 
     // Creator view items
     const creatorRoot = [];
-    creatorRoot.push({ id: "back", icon: "back", label: creatorReturnView === "gallery" ? "Gallery" : "Home", action: () => {
-      const returnTo = creatorReturnView || "menu";
-      resetCreator(); setCreatorReturnView("menu");
-      if (returnTo === "gallery") { setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine"); } else { setView("menu"); }
-    }});
     if (firebaseConfigured && firebaseUser) {
       creatorRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
     }
 
     // Custom mosaic view items
     const customMosaicRoot = [];
-    customMosaicRoot.push({ id: "back", icon: "back", label: "Back", action: () => {
-      if (isCoopMosaic) { setShowMosaicLeaveConfirm(true); return; }
-      const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
-    }});
     if (firebaseConfigured && firebaseUser && !isCoopMosaic) {
       customMosaicRoot.push({ id: "coop-mosaic", icon: "user-plus", label: "Co-op", action: () => { setShowCoopFriendPicker(true); } });
       customMosaicRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
     }
 
     // Admin view items
+    // Admin back buttons defined as pill buttons at call sites
     const adminReviewRoot = [
-      { id: "back", icon: "back", label: "Home", action: () => { setView("menu"); } },
       { id: "refresh", icon: "refresh", label: "Refresh", action: () => { loadMosaicData("admin"); } },
     ];
     const adminManageRoot = [
-      { id: "back", icon: "back", label: "Home", action: () => { setView("menu"); } },
       { id: "refresh", icon: "refresh", label: "Refresh", action: () => { loadMosaicData("manage"); } },
     ];
     const adminMetricsRoot = [
-      { id: "back", icon: "back", label: "Home", action: () => { setView("menu"); } },
       { id: "refresh", icon: "refresh", label: "Refresh", action: () => { loadAdminMetricsData(); } },
     ];
-    const adminUsersRoot = [
-      { id: "back", icon: "back", label: "Home", action: () => { setView("menu"); } },
-    ];
+    const adminUsersRoot = [];
 
     const trees = {
       menu: { root: menuRoot },
@@ -9584,7 +9554,10 @@ export default function Pattrn() {
           );
         })()}
 
-        {renderContextButton("custom-mosaic")}
+        {renderContextButton("custom-mosaic", [{ id: "back", icon: "back", color: "#fff", onClick: () => {
+          if (isCoopMosaic) { setShowMosaicLeaveConfirm(true); return; }
+          const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
+        }}])}
         {globalModalsEl}
       </div>
     );
@@ -9793,7 +9766,11 @@ export default function Pattrn() {
           )}
         </div>
 
-      {renderContextButton("creator")}
+      {renderContextButton("creator", [{ id: "back", icon: "back", color: "#fff", onClick: () => {
+        const returnTo = creatorReturnView || "menu";
+        resetCreator(); setCreatorReturnView("menu");
+        if (returnTo === "gallery") { setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine"); } else { setView("menu"); }
+      }}])}
       {globalModalsEl}
       </div>
     );
@@ -10246,7 +10223,7 @@ export default function Pattrn() {
             ))}
           </div>
         )}
-        {renderContextButton("admin-review")}
+        {renderContextButton("admin-review", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
         {globalModalsEl}
       </div>
     );
@@ -10391,7 +10368,7 @@ export default function Pattrn() {
             })}
           </div>
         )}
-        {renderContextButton("admin-manage")}
+        {renderContextButton("admin-manage", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
         {globalModalsEl}
       </div>
     );
@@ -10663,7 +10640,7 @@ export default function Pattrn() {
             )}
           </div>
         )}
-        {renderContextButton("admin-metrics")}
+        {renderContextButton("admin-metrics", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
         {globalModalsEl}
       </div>
     );
@@ -10897,7 +10874,7 @@ export default function Pattrn() {
             })}
           </div>
         )}
-        {renderContextButton("admin-users")}
+        {renderContextButton("admin-users", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
         {globalModalsEl}
       </div>
     );
@@ -12986,7 +12963,25 @@ export default function Pattrn() {
   const totalBlanks = puzzle ? puzzle.blanks.size : 0;
 
   // Pill action buttons for the bottom glass bar
-  const playPillButtons = [];
+  const playBackAction = () => {
+    if (isCoop) { setShowLeaveConfirm(true); return; }
+    if (difficulty === "cascade") {
+      const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
+      const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
+      setProgress(nextProgress); saveProgress(nextProgress);
+    }
+    stopTimer(); setShowMosaicPreviewOverlay(false);
+    if (customMosaicPuzzlesRef.current && isMosaic) {
+      if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
+        coopMosaicCurrentTileRef.current = -1;
+        updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
+        setCoopMosaicOtherFills({});
+        coopMosaicWriteThrottleRef.current = {};
+      }
+      setView("custom-mosaic");
+    } else { setView("menu"); }
+  };
+  const playPillButtons = [{ id: "back", icon: "back", color: "#fff", onClick: playBackAction }];
   if (gameState === "playing") {
     if (isCoop && coopMyLockedIn) {
       playPillButtons.push({ id: "locked", icon: "check", color: C.correct });
