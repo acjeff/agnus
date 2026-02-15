@@ -2139,7 +2139,7 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
                   position: "absolute", top: -6, right: -6,
                   backgroundColor: exhausted ? C.textDim : (isEnigma ? "rgba(201,168,76,0.9)" : C.text),
                   color: C.bg, fontSize: 10, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace",
+                  fontFamily: "'Inter', sans-serif",
                   width: 18, height: 18, borderRadius: 9,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   lineHeight: 1,
@@ -3766,7 +3766,7 @@ export default function Pattrn() {
         }}>
           <div style={{
             fontSize: Math.max(size * 0.35, 16), fontWeight: 700,
-            color: C.textDim, fontFamily: "'Space Mono', monospace",
+            color: C.textDim, fontFamily: "'Inter', sans-serif",
             opacity: 0.5, userSelect: "none",
           }}>?</div>
         </div>
@@ -4832,7 +4832,7 @@ export default function Pattrn() {
             background: "none", border: "none",
             cursor: dimmed && !item.isBack ? "default" : "pointer",
             color: dimmed ? C.textDim : C.text,
-            fontFamily: "'Space Mono', monospace",
+            fontFamily: "'Inter', sans-serif",
             fontSize: 11, fontWeight: 600,
             letterSpacing: 0.5, textTransform: "uppercase",
             opacity: isOpen ? 1 : 0,
@@ -4942,7 +4942,7 @@ export default function Pattrn() {
               {/* Player picker (multi-partner) */}
               {showPassPlayerPicker && (
                 <>
-                  <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, marginRight: 2, whiteSpace: "nowrap" }}>
+                  <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, marginRight: 2, whiteSpace: "nowrap" }}>
                     Pass to:
                   </span>
                   {Object.entries(coopPlayers).map(([uid, p]) => {
@@ -4956,7 +4956,7 @@ export default function Pattrn() {
                         display: "flex", alignItems: "center", gap: 5, padding: "5px 10px",
                         borderRadius: 8, border: `1px solid ${playerColor}44`, background: "none",
                         cursor: "pointer", color: C.text, fontSize: 11, fontWeight: 600,
-                        fontFamily: "'Space Mono', monospace",
+                        fontFamily: "'Inter', sans-serif",
                       }}
                         onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${playerColor}22`; }}
                         onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
@@ -4983,19 +4983,19 @@ export default function Pattrn() {
                     width: 10, height: 10, borderRadius: "50%", backgroundColor: coopPassMode.targetColor,
                     display: "inline-block", flexShrink: 0,
                   }} />
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, whiteSpace: "nowrap" }}>
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 600, color: C.text, whiteSpace: "nowrap" }}>
                     Tap cell to pass to {coopPassMode.targetName}
                   </span>
                   <button onClick={(e) => { e.stopPropagation(); setCoopPassMode(null); setCoopPassPlayerPicker(false); }} style={{
                     background: "none", border: "none", color: C.textDim, cursor: "pointer",
-                    fontSize: 14, padding: "2px 6px", lineHeight: 1, fontFamily: "'Space Mono', monospace",
+                    fontSize: 14, padding: "2px 6px", lineHeight: 1, fontFamily: "'Inter', sans-serif",
                   }}>Cancel</button>
                 </>
               )}
               {/* Pending pass — waiting for response */}
               {showPassPending && (
                 <>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.textDim }}>
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 600, color: C.textDim }}>
                     Waiting for response...
                   </span>
                   <button onClick={(e) => {
@@ -5006,14 +5006,14 @@ export default function Pattrn() {
                   }} style={{
                     background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
                     color: C.textDim, cursor: "pointer", fontSize: 10, padding: "3px 8px",
-                    fontFamily: "'Space Mono', monospace", fontWeight: 600,
+                    fontFamily: "'Inter', sans-serif", fontWeight: 600,
                   }}>Cancel</button>
                 </>
               )}
               {/* Incoming pass — accept / reject */}
               {showPassIncoming && (
                 <>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.text, fontWeight: 600 }}>
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.text, fontWeight: 600 }}>
                     <span style={{ color: coopIncomingPass.fromColor, fontWeight: 700 }}>{coopIncomingPass.fromName}</span> wants to pass
                   </span>
                   <button onClick={(e) => {
@@ -5023,7 +5023,7 @@ export default function Pattrn() {
                   }} style={{
                     backgroundColor: C.correct, color: "#fff", border: "none",
                     padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer",
                     textTransform: "uppercase",
                   }}>Accept</button>
                   <button onClick={(e) => {
@@ -5033,7 +5033,7 @@ export default function Pattrn() {
                   }} style={{
                     backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
                     padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer",
                     textTransform: "uppercase",
                   }}>Reject</button>
                 </>
@@ -7234,7 +7234,7 @@ export default function Pattrn() {
     return (
       <DraggableDrawer isOpen={true} onClose={() => setShowThemePicker(false)} maxHeight="75vh">
           <div style={{ padding: "4px 24px 0", flexShrink: 0 }}>
-            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, margin: "0 0 4px", letterSpacing: 1 }}>
+            <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, margin: "0 0 4px", letterSpacing: 1 }}>
               Themes
             </h2>
             <p style={{ fontSize: 11, color: C.textDim, margin: "0 0 16px", lineHeight: 1.5 }}>
@@ -7312,7 +7312,7 @@ export default function Pattrn() {
 
                   <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
                     <div style={{
-                      fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
+                      fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700,
                       color: isActive ? C.accent : C.text, letterSpacing: 0.5,
                       display: "flex", alignItems: "center", gap: 6,
                     }}>
@@ -7325,7 +7325,7 @@ export default function Pattrn() {
                   </div>
 
                   {unlocked && !isActive && (
-                    <span style={{ color: C.textDim, fontSize: 11, fontFamily: "'Space Mono', monospace", flexShrink: 0 }}>Select</span>
+                    <span style={{ color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif", flexShrink: 0 }}>Select</span>
                   )}
                   {isActive && (
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
@@ -7345,7 +7345,7 @@ export default function Pattrn() {
               style={{
                 width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
                 padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer",
                 textTransform: "uppercase", transition: "all 0.15s",
               }}
             >
@@ -7384,20 +7384,20 @@ export default function Pattrn() {
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
+            fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700,
             color: C.text, lineHeight: 1.3,
           }}>
             {coopInviteToast.fromUsername || "Someone"} invited you to {isMosaicInvite ? "co-op mosaic!" : "co-op!"}
           </div>
           {isMosaicInvite ? (
             coopInviteToast.data?.mosaicTitle && (
-              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, fontFamily: "'Space Mono', monospace" }}>
+              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, fontFamily: "'Inter', sans-serif" }}>
                 {coopInviteToast.data.mosaicTitle}
               </div>
             )
           ) : (
             coopInviteToast.data?.mode && (
-              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, fontFamily: "'Space Mono', monospace" }}>
+              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, fontFamily: "'Inter', sans-serif" }}>
                 {coopInviteToast.data.mode} #{(coopInviteToast.data.level ?? 0) + 1}
               </div>
             )
@@ -7439,7 +7439,7 @@ export default function Pattrn() {
               style={{
                 background: C.coop, border: "none", borderRadius: 8,
                 padding: "6px 14px", color: "#fff", cursor: "pointer", fontSize: 11,
-                fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
+                fontFamily: "'Inter', sans-serif", fontWeight: 700, letterSpacing: 0.5,
               }}
             >
               Join
@@ -7672,7 +7672,7 @@ export default function Pattrn() {
                 )}
               </div>
               <h3 id="account-modal-title" style={{
-                fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
+                fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
               }}>
                 {username || "Signed In"}
               </h3>
@@ -7686,7 +7686,7 @@ export default function Pattrn() {
               border: `1px solid ${C.border}`, marginBottom: 12, textAlign: "center",
             }}>
               <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
-              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct }}>
+              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.correct }}>
                 {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
               </div>
             </div>
@@ -7695,7 +7695,7 @@ export default function Pattrn() {
               onClick={() => { setShowAccountModal(false); setShowProfilePage(true); }}
               style={{
                 width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                 background: C.accent, color: C.bg, border: "none", cursor: "pointer",
                 textTransform: "uppercase", transition: "all 0.15s", marginBottom: 8,
               }}
@@ -7707,7 +7707,7 @@ export default function Pattrn() {
               onClick={handleSignOut}
               style={{
                 width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                 background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
                 textTransform: "uppercase", transition: "all 0.15s",
               }}
@@ -7730,7 +7730,7 @@ export default function Pattrn() {
                 </svg>
               </div>
               <h3 id="account-modal-title" style={{
-                fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
+                fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
               }}>
                 {accountTab === "login" ? "Sign In" : "Create Account"}
               </h3>
@@ -7754,7 +7754,7 @@ export default function Pattrn() {
                   onClick={() => { setAccountTab(tab); setAccountError(""); }}
                   style={{
                     flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                    fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
                     background: accountTab === tab ? C.accent : "transparent",
                     color: accountTab === tab ? C.bg : C.textDim,
                     border: "none", cursor: "pointer", textTransform: "uppercase",
@@ -7772,7 +7772,7 @@ export default function Pattrn() {
               disabled={accountLoading}
               style={{
                 width: "100%", padding: "11px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
                 background: C.surface, border: `1px solid ${C.border}`, color: C.text,
                 cursor: accountLoading ? "not-allowed" : "pointer",
                 opacity: accountLoading ? 0.5 : 1, textTransform: "uppercase",
@@ -7812,7 +7812,7 @@ export default function Pattrn() {
                 autoComplete="email"
                 style={{
                   width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
-                  fontFamily: "'DM Sans', sans-serif",
+                  fontFamily: "'Inter', sans-serif",
                   background: C.surface, border: `1px solid ${C.border}`, color: C.text,
                   outline: "none", marginBottom: 8, boxSizing: "border-box",
                   transition: "border-color 0.15s",
@@ -7830,7 +7830,7 @@ export default function Pattrn() {
                 autoComplete={accountTab === "login" ? "current-password" : "new-password"}
                 style={{
                   width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
-                  fontFamily: "'DM Sans', sans-serif",
+                  fontFamily: "'Inter', sans-serif",
                   background: C.surface, border: `1px solid ${C.border}`, color: C.text,
                   outline: "none", marginBottom: 12, boxSizing: "border-box",
                   transition: "border-color 0.15s",
@@ -7857,7 +7857,7 @@ export default function Pattrn() {
                 aria-busy={accountLoading}
                 style={{
                   width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+                  fontFamily: "'Inter', sans-serif", letterSpacing: 2,
                   background: C.accent, color: C.bg, border: "none",
                   cursor: (accountLoading || !accountEmail || !accountPassword) ? "not-allowed" : "pointer",
                   opacity: (accountLoading || !accountEmail || !accountPassword) ? 0.5 : 1,
@@ -7876,7 +7876,7 @@ export default function Pattrn() {
             onClick={dismissAutoLoginPermanently}
             style={{
               width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 600,
-              fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.3,
+              fontFamily: "'Inter', sans-serif", letterSpacing: 0.3,
               background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
               transition: "all 0.15s", marginTop: 12,
             }}
@@ -7891,7 +7891,7 @@ export default function Pattrn() {
           aria-label="Close account dialog"
           style={{
             width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
             background: "none", border: "none", color: C.textDim, cursor: "pointer",
             textTransform: "uppercase", transition: "all 0.15s", marginTop: autoLoginModal && !firebaseUser ? 6 : 12,
           }}
@@ -7918,7 +7918,7 @@ export default function Pattrn() {
             </svg>
           </div>
           <h3 style={{
-            fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
+            fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
           }}>
             Choose a Username
           </h3>
@@ -7940,7 +7940,7 @@ export default function Pattrn() {
             autoComplete="username"
             style={{
               width: "100%", padding: "11px 14px", paddingRight: 40, borderRadius: 10, fontSize: 16,
-              fontFamily: "'Space Mono', monospace",
+              fontFamily: "'Inter', sans-serif",
               background: C.surface, border: `1px solid ${usernameError ? C.incorrect : usernameAvailable === true ? C.correct : C.border}`,
               color: C.text, outline: "none", boxSizing: "border-box",
               transition: "border-color 0.15s",
@@ -7979,7 +7979,7 @@ export default function Pattrn() {
           disabled={usernameLoading || !usernameInput.trim() || usernameInput.trim().length < 3 || usernameAvailable !== true}
           style={{
             width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+            fontFamily: "'Inter', sans-serif", letterSpacing: 2,
             background: (usernameAvailable === true && usernameInput.trim().length >= 3) ? C.accent : C.surfaceLight,
             color: (usernameAvailable === true && usernameInput.trim().length >= 3) ? C.bg : C.textDim,
             border: "none",
@@ -7997,7 +7997,7 @@ export default function Pattrn() {
             onClick={() => { setShowUsernameModal(false); setUsernameError(""); }}
             style={{
               width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
-              fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+              fontFamily: "'Inter', sans-serif", letterSpacing: 1,
               background: "none", border: "none", color: C.textDim, cursor: "pointer",
               textTransform: "uppercase", transition: "all 0.15s", marginTop: 8,
             }}
@@ -8092,7 +8092,7 @@ export default function Pattrn() {
           )}
 
           <h3 style={{
-            fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent,
+            fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent,
             margin: profilePicture ? "8px 0 4px" : "0 0 4px",
           }}>
             Profile
@@ -8110,7 +8110,7 @@ export default function Pattrn() {
           <div style={{ fontSize: 11, color: C.textDim, marginBottom: 6 }}>Username</div>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{
-              flex: 1, fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700,
+              flex: 1, fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700,
               color: username ? C.text : C.textDim,
             }}>
               {username || "Not set"}
@@ -8125,7 +8125,7 @@ export default function Pattrn() {
               }}
               style={{
                 padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "'Inter', sans-serif",
                 background: "none", border: `1px solid ${C.border}`, color: C.textDim,
                 cursor: "pointer", textTransform: "uppercase", letterSpacing: 0.5,
               }}
@@ -8141,7 +8141,7 @@ export default function Pattrn() {
           border: `1px solid ${C.border}`, marginBottom: 16, textAlign: "center",
         }}>
           <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
-          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct }}>
+          <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.correct }}>
             {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
           </div>
         </div>
@@ -8151,7 +8151,7 @@ export default function Pattrn() {
           onClick={handleSignOut}
           style={{
             width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
             background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
             textTransform: "uppercase", transition: "all 0.15s", marginBottom: 8,
           }}
@@ -8163,7 +8163,7 @@ export default function Pattrn() {
           onClick={() => setShowProfilePage(false)}
           style={{
             width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
             background: "none", border: "none", color: C.textDim, cursor: "pointer",
             textTransform: "uppercase", transition: "all 0.15s",
           }}
@@ -8180,13 +8180,13 @@ export default function Pattrn() {
       <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <h2 style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, margin: 0 }}>
+          <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, margin: 0 }}>
             {friendsModalTab === "compare" && compareFriend ? `vs ${compareFriend.username}` : "Friends"}
           </h2>
           <div style={{ display: "flex", gap: 6 }}>
             {friendsModalTab === "compare" && (
               <button onClick={() => { setFriendsModalTab("list"); setCompareFriend(null); setCompareFriendStats(null); }}
-                style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "4px 10px", color: C.textDim, cursor: "pointer", fontSize: 10, fontFamily: "'Space Mono', monospace", transition: "all 0.15s" }}
+                style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "4px 10px", color: C.textDim, cursor: "pointer", fontSize: 10, fontFamily: "'Inter', sans-serif", transition: "all 0.15s" }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
               >Back</button>
@@ -8210,7 +8210,7 @@ export default function Pattrn() {
                   style={{
                     flex: 1, padding: "10px 14px", borderRadius: 10,
                     backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                    color: C.text, fontSize: 13, fontFamily: "'Space Mono', monospace", outline: "none",
+                    color: C.text, fontSize: 13, fontFamily: "'Inter', sans-serif", outline: "none",
                   }}
                   onFocus={e => { e.target.style.borderColor = C.accent; }}
                   onBlur={e => { e.target.style.borderColor = C.border; }}
@@ -8220,7 +8220,7 @@ export default function Pattrn() {
                   disabled={!addFriendInput.trim() || addFriendLoading}
                   style={{
                     padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                     background: addFriendInput.trim() ? C.accent : C.surfaceLight,
                     color: addFriendInput.trim() ? C.bg : C.textDim,
                     border: "none", cursor: addFriendInput.trim() ? "pointer" : "not-allowed",
@@ -8229,7 +8229,7 @@ export default function Pattrn() {
                 >{addFriendLoading ? "..." : "Add"}</button>
               </div>
               {addFriendMsg && (
-                <div style={{ fontSize: 11, color: C.accent, marginTop: 6, fontFamily: "'Space Mono', monospace" }}>
+                <div style={{ fontSize: 11, color: C.accent, marginTop: 6, fontFamily: "'Inter', sans-serif" }}>
                   {addFriendMsg}
                 </div>
               )}
@@ -8242,7 +8242,7 @@ export default function Pattrn() {
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
                   Friends ({friendsList.length})
                 </div>
                 {/* Sort: online first, then by lastSeen */}
@@ -8287,14 +8287,14 @@ export default function Pattrn() {
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                              <span style={{ fontSize: 14, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              <span style={{ fontSize: 14, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                 {friend.username}
                               </span>
-                              <span style={{ fontSize: 10, color: online ? C.correct : C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>
+                              <span style={{ fontSize: 10, color: online ? C.correct : C.textDim, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>
                                 {online ? "ONLINE" : "OFFLINE"}
                               </span>
                             </div>
-                            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 2 }}>
+                            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 2 }}>
                               {online ? (
                                 currentLabel ? `Playing ${currentLabel}` : "In menus"
                               ) : (
@@ -8317,7 +8317,7 @@ export default function Pattrn() {
                               style={{
                                 background: "none", border: `1px solid ${C.accent}55`, borderRadius: 6,
                                 padding: "4px 10px", color: C.accent, cursor: "pointer", fontSize: 10,
-                                fontFamily: "'Space Mono', monospace", transition: "all 0.15s", fontWeight: 700,
+                                fontFamily: "'Inter', sans-serif", transition: "all 0.15s", fontWeight: 700,
                               }}
                               onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.backgroundColor = C.accent + "11"; }}
                               onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "55"; e.currentTarget.style.backgroundColor = "transparent"; }}
@@ -8339,17 +8339,17 @@ export default function Pattrn() {
                           <div style={{ display: "flex", gap: 8, marginLeft: 48, marginTop: 8 }}>
                             {lastSolvedLabel && (
                               <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.surfaceLight, border: `1px solid ${C.border}` }}>
-                                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Last Solved</div>
-                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{lastSolvedLabel}</div>
+                                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Inter', sans-serif", marginBottom: 2 }}>Last Solved</div>
+                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>{lastSolvedLabel}</div>
                                 {presence?.lastSolvedAt && (
-                                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 1 }}>{formatTimeAgo(presence.lastSolvedAt)}</div>
+                                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>{formatTimeAgo(presence.lastSolvedAt)}</div>
                                 )}
                               </div>
                             )}
                             {currentLabel && (
                               <div style={{ padding: "4px 10px", borderRadius: 6, backgroundColor: C.correct + "0a", border: `1px solid ${C.correct}22` }}>
-                                <div style={{ fontSize: 9, color: C.correct, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>Now Playing</div>
-                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 700 }}>{currentLabel}</div>
+                                <div style={{ fontSize: 9, color: C.correct, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Inter', sans-serif", marginBottom: 2 }}>Now Playing</div>
+                                <div style={{ fontSize: 11, color: C.text, fontFamily: "'Inter', sans-serif", fontWeight: 700 }}>{currentLabel}</div>
                               </div>
                             )}
                           </div>
@@ -8407,13 +8407,13 @@ export default function Pattrn() {
                 backgroundColor: tie ? C.surface : myWins ? C.correct + "0a" : theyWin ? C.incorrect + "0a" : C.surface,
                 border: `1px solid ${tie ? C.border : myWins ? C.correct + "22" : theyWin ? C.incorrect + "22" : C.border}`,
               }}>
-                <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: myWins ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
+                <div style={{ fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: myWins ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
                   {isBetter ? (myVal ? formatTime(myVal) : "--") : myVal}
                 </div>
-                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
+                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
                   {label}
                 </div>
-                <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: theyWin ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
+                <div style={{ fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: theyWin ? C.correct : tie ? C.accent : C.text, minWidth: 40, textAlign: "center" }}>
                   {isBetter ? (theirVal ? formatTime(theirVal) : "--") : theirVal}
                 </div>
               </div>
@@ -8431,10 +8431,10 @@ export default function Pattrn() {
             <div style={{ animation: "fadeUp 0.25s ease" }}>
               {/* Header row */}
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 12, padding: "0 12px" }}>
-                <div style={{ fontSize: 11, color: C.accent, fontFamily: "'Space Mono', monospace", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+                <div style={{ fontSize: 11, color: C.accent, fontFamily: "'Inter', sans-serif", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
                   You
                 </div>
-                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
+                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", fontWeight: 700, textTransform: "uppercase", letterSpacing: 1 }}>
                   {compareFriend.username}
                 </div>
               </div>
@@ -8446,7 +8446,7 @@ export default function Pattrn() {
               </div>
 
               {/* Per-mode solved */}
-              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
                 Puzzles Solved by Mode
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 16 }}>
@@ -8456,7 +8456,7 @@ export default function Pattrn() {
               </div>
 
               {/* Best times */}
-              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
                 Best Times (lower is better)
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -8472,13 +8472,13 @@ export default function Pattrn() {
                       backgroundColor: myWins ? C.correct + "0a" : theyWin ? C.incorrect + "0a" : C.surface,
                       border: `1px solid ${myWins ? C.correct + "22" : theyWin ? C.incorrect + "22" : C.border}`,
                     }}>
-                      <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: myWins ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
+                      <div style={{ fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: myWins ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
                         {myBest ? formatTime(myBest) : "--"}
                       </div>
-                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
+                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
                         {mode.charAt(0).toUpperCase() + mode.slice(1)}
                       </div>
-                      <div style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: theyWin ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
+                      <div style={{ fontSize: 13, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: theyWin ? C.correct : C.text, minWidth: 50, textAlign: "center" }}>
                         {theirBest ? formatTime(theirBest) : "--"}
                       </div>
                     </div>
@@ -8507,7 +8507,7 @@ export default function Pattrn() {
               <path d="M12 9v4m0 4h.01M12 3L2 21h20L12 3z" stroke={C.incorrect} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.incorrect, margin: "0 0 8px" }}>
+          <h3 style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.incorrect, margin: "0 0 8px" }}>
             Clear All Data?
           </h3>
           <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
@@ -8534,7 +8534,7 @@ export default function Pattrn() {
             setView("menu");
           }} style={{
             width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+            fontFamily: "'Inter', sans-serif", letterSpacing: 2,
             background: C.incorrect, color: "#fff", border: "none", cursor: "pointer",
             textTransform: "uppercase", transition: "all 0.15s",
           }}>
@@ -8542,7 +8542,7 @@ export default function Pattrn() {
           </button>
           <button onClick={() => setShowClearConfirm(false)} style={{
             width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
             background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
             textTransform: "uppercase", transition: "all 0.15s",
           }}>
@@ -8566,7 +8566,7 @@ export default function Pattrn() {
               <path d="M12 9v4m0 4h.01M12 3L2 21h20L12 3z" stroke="#dc2626" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#dc2626", margin: "0 0 8px" }}>
+          <h3 style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: "#dc2626", margin: "0 0 8px" }}>
             Delete Account?
           </h3>
           <p style={{ color: C.textDim, fontSize: 12, lineHeight: 1.6, margin: 0 }}>
@@ -8579,7 +8579,7 @@ export default function Pattrn() {
               onChange={e => setDeleteAccountPassword(e.target.value)}
               style={{
                 width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 12,
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "'Inter', sans-serif",
                 background: C.surface, border: `1px solid ${C.border}`, color: C.text,
                 outline: "none", boxSizing: "border-box",
               }}
@@ -8592,7 +8592,7 @@ export default function Pattrn() {
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
           <button onClick={handleDeleteAccount} disabled={deleteAccountLoading} style={{
             width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+            fontFamily: "'Inter', sans-serif", letterSpacing: 2,
             background: deleteAccountLoading ? "#dc262688" : "#dc2626", color: "#fff", border: "none",
             cursor: deleteAccountLoading ? "not-allowed" : "pointer",
             textTransform: "uppercase", transition: "all 0.15s",
@@ -8602,7 +8602,7 @@ export default function Pattrn() {
           <button onClick={() => { setShowDeleteAccountConfirm(false); setDeleteAccountError(""); setDeleteAccountPassword(""); }}
             disabled={deleteAccountLoading} style={{
             width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
             background: "none", border: `1px solid ${C.border}`, color: C.textDim,
             cursor: deleteAccountLoading ? "not-allowed" : "pointer",
             textTransform: "uppercase", transition: "all 0.15s",
@@ -8624,7 +8624,7 @@ export default function Pattrn() {
       <DraggableDrawer isOpen={true} onClose={() => setShowAchievements(false)}>
         <div data-drawer-scroll style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
           <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Achievements</h2>
+            <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Achievements</h2>
             <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>{unlocked}/{total} unlocked</p>
           </div>
           <div style={{ height: 6, borderRadius: 3, backgroundColor: C.surfaceLight, marginBottom: 20, overflow: "hidden" }}>
@@ -8641,12 +8641,12 @@ export default function Pattrn() {
                   border: `1px solid ${a.unlocked ? tc + "44" : C.border}`,
                   opacity: a.unlocked ? 1 : 0.5,
                 }}>
-                  <span style={{ fontSize: 14, color: tc, fontFamily: "'Space Mono', monospace" }}>{ts}</span>
+                  <span style={{ fontSize: 14, color: tc, fontFamily: "'Inter', sans-serif" }}>{ts}</span>
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: a.unlocked ? C.text : C.textDim }}>{a.label}</div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, color: a.unlocked ? C.text : C.textDim }}>{a.label}</div>
                     <div style={{ fontSize: 10, color: C.textDim, marginTop: 1 }}>{a.desc}</div>
                   </div>
-                  {a.unlocked && <span style={{ fontSize: 10, color: tc, fontFamily: "'Space Mono', monospace" }}>{"\u2713"}</span>}
+                  {a.unlocked && <span style={{ fontSize: 10, color: tc, fontFamily: "'Inter', sans-serif" }}>{"\u2713"}</span>}
                 </div>
               );
             })}
@@ -8656,7 +8656,7 @@ export default function Pattrn() {
           <button onClick={() => setShowAchievements(false)} style={{
             width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
             padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+            fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
           }}>Close</button>
         </div>
       </DraggableDrawer>
@@ -8670,24 +8670,24 @@ export default function Pattrn() {
       <DraggableDrawer isOpen={true} onClose={() => setShowShareModal(false)}>
         <div data-drawer-scroll style={{ overflowY: "auto", padding: "8px 24px 0", flex: 1 }}>
           <div style={{ textAlign: "center", marginBottom: 20 }}>
-            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Agnus</h2>
+            <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 24, fontWeight: 700, letterSpacing: 3, margin: 0, color: C.accent }}>Agnus</h2>
             <p style={{ color: C.textDim, fontSize: 11, marginTop: 4, letterSpacing: 1 }}>my stats</p>
           </div>
           <div style={{ display: "flex", justifyContent: "center", flexWrap: "wrap", gap: 16, marginBottom: 20, padding: "10px 16px", borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}` }}>
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.accent }}>{totalSolved}</div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, color: C.accent }}>{totalSolved}</div>
               <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>solved</div>
             </div>
             <div style={{ width: 1, backgroundColor: C.border }} />
             <div style={{ textAlign: "center" }}>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700 }}>300</div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700 }}>300</div>
               <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>total</div>
             </div>
             {getDailyStreak(progress) > 0 && (
               <>
                 <div style={{ width: 1, backgroundColor: C.border }} />
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.gold }}>{"\uD83D\uDD25"} {getDailyStreak(progress)}</div>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, color: C.gold }}>{"\uD83D\uDD25"} {getDailyStreak(progress)}</div>
                   <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>day streak</div>
                 </div>
               </>
@@ -8696,7 +8696,7 @@ export default function Pattrn() {
               <>
                 <div style={{ width: 1, backgroundColor: C.border }} />
                 <div style={{ textAlign: "center" }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 22, fontWeight: 700, color: C.correct }}>{formatTime(bestTimeAll)}</div>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, color: C.correct }}>{formatTime(bestTimeAll)}</div>
                   <div style={{ fontSize: 9, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>fastest</div>
                 </div>
               </>
@@ -8705,10 +8705,10 @@ export default function Pattrn() {
           {sections.map(s => (
             <div key={s.key} style={{ marginBottom: 16 }}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 6 }}>
-                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: s.key === "blind" ? "#e06040" : C.text, letterSpacing: 1, textTransform: "uppercase" }}>
+                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: s.key === "blind" ? "#e06040" : C.text, letterSpacing: 1, textTransform: "uppercase" }}>
                   {s.label}
                 </span>
-                <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>{s.solved}/{s.total}</span>
+                <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>{s.solved}/{s.total}</span>
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 3 }}>
                 {s.grid.map((g, gi) => (
@@ -8720,10 +8720,10 @@ export default function Pattrn() {
         </div>
         <div style={{ padding: "12px 24px", paddingBottom: "max(12px, env(safe-area-inset-bottom))", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 8, flexShrink: 0 }}>
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={copyShareText} style={{ flex: 1, backgroundColor: C.accent, color: C.bg, border: "none", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>{shareMsg || "Share all"}</button>
-            <button onClick={copyDailyShareText} style={{ flex: 1, backgroundColor: "transparent", color: C.accent, border: `1.5px solid ${C.accent}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>Share Daily</button>
+            <button onClick={copyShareText} style={{ flex: 1, backgroundColor: C.accent, color: C.bg, border: "none", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>{shareMsg || "Share all"}</button>
+            <button onClick={copyDailyShareText} style={{ flex: 1, backgroundColor: "transparent", color: C.accent, border: `1.5px solid ${C.accent}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 2, cursor: "pointer", textTransform: "uppercase" }}>Share Daily</button>
           </div>
-          <button onClick={() => setShowShareModal(false)} style={{ width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Close</button>
+          <button onClick={() => setShowShareModal(false)} style={{ width: "100%", backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Close</button>
         </div>
       </DraggableDrawer>
     );
@@ -8734,7 +8734,7 @@ export default function Pattrn() {
       <div style={{ padding: "0 24px 0", overflow: "hidden" }}>
         <div style={{ textAlign: "center", marginBottom: 16 }}>
           <span style={{ fontSize: 32 }}>{"\uD83C\uDF82"}</span>
-          <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: "#F472B6", margin: "8px 0 4px" }}>
+          <h3 style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: "#F472B6", margin: "8px 0 4px" }}>
             Set your birthday
           </h3>
           <p style={{ color: C.textDim, fontSize: 11, margin: 0 }}>
@@ -8745,7 +8745,7 @@ export default function Pattrn() {
           max={(() => { const n = new Date(); return `${n.getUTCFullYear()}-${String(n.getUTCMonth()+1).padStart(2,"0")}-${String(n.getUTCDate()).padStart(2,"0")}`; })()}
           style={{
             width: "100%", padding: "10px 12px", borderRadius: 10, border: `1px solid ${C.border}`,
-            backgroundColor: C.surface, color: C.text, fontFamily: "'Space Mono', monospace", fontSize: 16,
+            backgroundColor: C.surface, color: C.text, fontFamily: "'Inter', sans-serif", fontSize: 16,
             outline: "none", boxSizing: "border-box", minWidth: 0, colorScheme: "dark",
           }}
         />
@@ -8775,7 +8775,7 @@ export default function Pattrn() {
           setCalendarMonth(m - 1);
         }} disabled={!birthdayInput} style={{
           width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-          fontFamily: "'Space Mono', monospace", letterSpacing: 2,
+          fontFamily: "'Inter', sans-serif", letterSpacing: 2,
           background: birthdayInput ? "#F472B6" : C.surfaceLight, color: birthdayInput ? "#fff" : C.textDim,
           border: "none", cursor: birthdayInput ? "pointer" : "not-allowed", textTransform: "uppercase",
         }}>
@@ -8784,7 +8784,7 @@ export default function Pattrn() {
         {birthday && (
           <button onClick={() => { setBirthday(null); try { localStorage.removeItem(BIRTHDAY_KEY); } catch { /* ignore */ } setShowBirthdayPrompt(false); setBirthdayInput(""); }} style={{
             width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
             background: "none", border: `1px solid ${C.incorrect}`, color: C.incorrect,
             cursor: "pointer", textTransform: "uppercase",
           }}>
@@ -8793,7 +8793,7 @@ export default function Pattrn() {
         )}
         <button onClick={() => { setShowBirthdayPrompt(false); setBirthdayInput(""); }} style={{
           width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-          fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+          fontFamily: "'Inter', sans-serif", letterSpacing: 1,
           background: "none", border: `1px solid ${C.border}`, color: C.textDim,
           cursor: "pointer", textTransform: "uppercase",
         }}>
@@ -8815,12 +8815,12 @@ export default function Pattrn() {
         cursor: "pointer", transition: "all 0.15s", marginBottom: 8, position: "relative",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-          <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text }}>{label}</span>
+          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.text }}>{label}</span>
           {tag && (
-            <span style={{ fontSize: 9, fontWeight: 700, fontFamily: "'Space Mono', monospace", padding: "2px 6px", borderRadius: 4, backgroundColor: C.correct + "22", color: C.correct, textTransform: "uppercase", letterSpacing: 0.5 }}>{tag}</span>
+            <span style={{ fontSize: 9, fontWeight: 700, fontFamily: "'Inter', sans-serif", padding: "2px 6px", borderRadius: 4, backgroundColor: C.correct + "22", color: C.correct, textTransform: "uppercase", letterSpacing: 0.5 }}>{tag}</span>
           )}
         </div>
-        <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'DM Sans', sans-serif", lineHeight: 1.5 }}>
+        <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", lineHeight: 1.5 }}>
           {summary.totalSolved} puzzle{summary.totalSolved !== 1 ? "s" : ""} solved
           {summary.achievements > 0 && (<span> &middot; {summary.achievements} achievement{summary.achievements !== 1 ? "s" : ""}</span>)}
         </div>
@@ -8840,7 +8840,7 @@ export default function Pattrn() {
                 <path d="M9 21v-6h6v6" stroke="#F59E0B" strokeWidth="2" fill="none" strokeLinejoin="round"/>
               </svg>
             </div>
-            <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, margin: "0 0 6px" }}>
+            <h3 style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, margin: "0 0 6px" }}>
               Existing Save Found
             </h3>
             <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5, maxWidth: 300, marginInline: "auto" }}>
@@ -8851,13 +8851,13 @@ export default function Pattrn() {
           <SyncOption label="Use Cloud Save" tag={cloudMore ? "More progress" : null} summary={cloudSummary} highlight={cloudMore} onClick={() => handleSyncChoice("cloud")} />
           <button onClick={() => handleSyncChoice("merge")} style={{
             width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-            fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
             background: C.accent, color: C.bg, border: "none",
             cursor: "pointer", textTransform: "uppercase", transition: "all 0.15s", marginTop: 4,
           }}>
             Merge Both
           </button>
-          <p style={{ fontSize: 10, color: C.textDim, textAlign: "center", margin: "10px 0 0", lineHeight: 1.5, fontFamily: "'DM Sans', sans-serif" }}>
+          <p style={{ fontSize: 10, color: C.textDim, textAlign: "center", margin: "10px 0 0", lineHeight: 1.5, fontFamily: "'Inter', sans-serif" }}>
             Merge keeps the best results from both saves
           </p>
         </div>
@@ -8868,7 +8868,7 @@ export default function Pattrn() {
   const coopInviteEl = showCoopInvite && coopSessionId && (
     <DraggableDrawer isOpen={true} onClose={() => { setShowCoopInvite(false); setCoopSelectedFriends(new Set()); }} zIndex={1200}>
       <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
-        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>
           Co-op Invite
         </div>
         <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
@@ -8876,7 +8876,7 @@ export default function Pattrn() {
         </div>
         {friendsList.length > 0 && (
           <div style={{ marginBottom: 14, maxHeight: 140, overflowY: "auto" }}>
-            <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+            <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 6 }}>
               Invite Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -8906,9 +8906,9 @@ export default function Pattrn() {
                     ) : (
                       <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: "#54A0FF33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#54A0FF", fontWeight: 700, flexShrink: 0 }}>{(friend.username || "?")[0].toUpperCase()}</div>
                     )}
-                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
-                    {isActive && <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.correct, letterSpacing: 1, textTransform: "uppercase" }}>Active</span>}
-                    {isInvited && !isActive && <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.coop, letterSpacing: 1, textTransform: "uppercase" }}>Invited</span>}
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                    {isActive && <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 700, color: C.correct, letterSpacing: 1, textTransform: "uppercase" }}>Active</span>}
+                    {isInvited && !isActive && <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 700, color: C.coop, letterSpacing: 1, textTransform: "uppercase" }}>Invited</span>}
                   </button>
                 );
               })}
@@ -8922,12 +8922,12 @@ export default function Pattrn() {
               Promise.all([ sendNotification(uid, { type: "coop_invite", fromUid: firebaseUser.uid, fromUsername: username || firebaseUser.email, data: { sessionId: coopSessionId, mode: difficulty, level: currentPuzzle, url: coopUrl } }).catch(() => {}), addCoopInvitedUid(coopSessionId, uid).catch(() => {}) ])
             ));
             setCoopSelectedFriends(new Set());
-          }} style={{ marginBottom: 14, width: "100%", padding: "8px 12px", borderRadius: 8, backgroundColor: "#54A0FF", color: "#fff", border: "none", fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
+          }} style={{ marginBottom: 14, width: "100%", padding: "8px 12px", borderRadius: 8, backgroundColor: "#54A0FF", color: "#fff", border: "none", fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
             {`Send ${coopSelectedFriends.size} Invite${coopSelectedFriends.size > 1 ? "s" : ""}`}
           </button>
         )}
-        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>Or share link</div>
-        <div style={{ backgroundColor: C.bg, borderRadius: 8, padding: "10px 12px", marginBottom: 12, fontFamily: "'Space Mono', monospace", fontSize: 10, color: C.text, wordBreak: "break-all", border: `1px solid ${C.border}` }}>
+        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 6 }}>Or share link</div>
+        <div style={{ backgroundColor: C.bg, borderRadius: 8, padding: "10px 12px", marginBottom: 12, fontFamily: "'Inter', sans-serif", fontSize: 10, color: C.text, wordBreak: "break-all", border: `1px solid ${C.border}` }}>
           {typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=${difficulty}&level=${currentPuzzle}&coop=${coopSessionId}` : ""}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -8938,15 +8938,15 @@ export default function Pattrn() {
             if (result === "cancelled") return;
             try { await navigator.clipboard.writeText(url); } catch {}
             setShowCoopInvite(false);
-          }} style={{ flex: 1, backgroundColor: "#54A0FF", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
+          }} style={{ flex: 1, backgroundColor: "#54A0FF", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
             Copy Link
           </button>
-          <button onClick={() => { setShowCoopInvite(false); setCoopSelectedFriends(new Set()); }} style={{ backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
+          <button onClick={() => { setShowCoopInvite(false); setCoopSelectedFriends(new Set()); }} style={{ backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
             Close
           </button>
         </div>
         {!coopPartnerConnected && (
-          <div style={{ marginTop: 12, textAlign: "center", fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", animation: "pulse 2s infinite" }}>Waiting for partner to join...</div>
+          <div style={{ marginTop: 12, textAlign: "center", fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", animation: "pulse 2s infinite" }}>Waiting for partner to join...</div>
         )}
       </div>
     </DraggableDrawer>
@@ -8955,13 +8955,13 @@ export default function Pattrn() {
   const leaveConfirmEl = showLeaveConfirm && (
     <DraggableDrawer isOpen={true} onClose={() => setShowLeaveConfirm(false)} zIndex={1200}>
       <div style={{ padding: "0 24px 24px" }}>
-        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>Leave Co-op?</div>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>Leave Co-op?</div>
         <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
           {coopRole === "host" ? "The session will stay active. You can rejoin from the main menu." : "You will leave this session and your partner will need to invite you again to rejoin."}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { leaveCoopSession(); if (customMosaicPuzzlesRef.current && isMosaic) { setView("custom-mosaic"); } else { setView("menu"); } }} style={{ flex: 1, backgroundColor: "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Leave</button>
-          <button onClick={() => setShowLeaveConfirm(false)} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
+          <button onClick={() => { leaveCoopSession(); if (customMosaicPuzzlesRef.current && isMosaic) { setView("custom-mosaic"); } else { setView("menu"); } }} style={{ flex: 1, backgroundColor: "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Leave</button>
+          <button onClick={() => setShowLeaveConfirm(false)} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
         </div>
       </div>
     </DraggableDrawer>
@@ -8972,7 +8972,7 @@ export default function Pattrn() {
     return playersOnTiles.length > 0 ? (
       <DraggableDrawer isOpen={true} onClose={() => setShowCoopMosaicNavigate(false)} zIndex={1200}>
         <div style={{ padding: "0 24px 24px", textAlign: "center" }}>
-          <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>Go to player</div>
+          <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", letterSpacing: 1, textTransform: "uppercase", marginBottom: 12 }}>Go to player</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
             {playersOnTiles.map(([uid, p]) => (
               <button key={uid} onClick={() => {
@@ -8983,12 +8983,12 @@ export default function Pattrn() {
                 coopMosaicWriteThrottleRef.current = {};
                 startPuzzle(targetTile, "mosaic", true);
               }} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, background: C.coop + "11", border: `1px solid ${C.coop}44`, borderRadius: 8, padding: "10px 16px", cursor: "pointer", transition: "all 0.15s" }}>
-                <span style={{ color: C.coop, fontWeight: 700, fontFamily: "'Space Mono', monospace", fontSize: 12 }}>{p.username || "Player"}</span>
-                <span style={{ color: C.textDim, fontFamily: "'Space Mono', monospace", fontSize: 11 }}>tile {p.currentTile + 1}</span>
+                <span style={{ color: C.coop, fontWeight: 700, fontFamily: "'Inter', sans-serif", fontSize: 12 }}>{p.username || "Player"}</span>
+                <span style={{ color: C.textDim, fontFamily: "'Inter', sans-serif", fontSize: 11 }}>tile {p.currentTile + 1}</span>
               </button>
             ))}
           </div>
-          <button onClick={() => setShowCoopMosaicNavigate(false)} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 18px", color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1 }}>Stay</button>
+          <button onClick={() => setShowCoopMosaicNavigate(false)} style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 18px", color: C.textDim, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 11, letterSpacing: 1 }}>Stay</button>
         </div>
       </DraggableDrawer>
     ) : null;
@@ -8997,7 +8997,7 @@ export default function Pattrn() {
   const mosaicPreviewOverlayEl = showMosaicPreviewOverlay && customMosaicPlay && customMosaicPuzzlesRef.current && (
     <DraggableDrawer isOpen={true} onClose={() => setShowMosaicPreviewOverlay(false)} zIndex={1200}>
       <div style={{ padding: "0 24px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: "uppercase" }}>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: "uppercase" }}>
           Mosaic Preview — Tile {currentPuzzle + 1}
         </div>
         <canvas ref={el => {
@@ -9040,7 +9040,7 @@ export default function Pattrn() {
         }} style={{ borderRadius: 8, border: `1px solid ${C.border}` }} />
         <button onClick={() => setShowMosaicPreviewOverlay(false)} style={{
           background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px",
-          color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1,
+          color: C.textDim, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 11, letterSpacing: 1,
         }}>Close</button>
       </div>
     </DraggableDrawer>
@@ -9049,17 +9049,17 @@ export default function Pattrn() {
   const mosaicLeaveConfirmEl = showMosaicLeaveConfirm && (
     <DraggableDrawer isOpen={true} onClose={() => setShowMosaicLeaveConfirm(false)} zIndex={1200}>
       <div style={{ padding: "0 24px 24px" }}>
-        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>
           {coopMosaicRole === "host" ? "Go to Menu?" : "Leave Co-op?"}
         </div>
         <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
           {coopMosaicRole === "host" ? "Your session will stay active. You can rejoin anytime from the Active Co-op Sessions panel on the main menu." : "You will leave this session and your partner will need to invite you again to rejoin."}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => { setShowMosaicLeaveConfirm(false); leaveCoopMosaicSession(); loadActiveCoopSessions(); setView("menu"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; }} style={{ flex: 1, backgroundColor: coopMosaicRole === "host" ? C.coop : "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
+          <button onClick={() => { setShowMosaicLeaveConfirm(false); leaveCoopMosaicSession(); loadActiveCoopSessions(); setView("menu"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; }} style={{ flex: 1, backgroundColor: coopMosaicRole === "host" ? C.coop : "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
             {coopMosaicRole === "host" ? "Go to Menu" : "Leave"}
           </button>
-          <button onClick={() => setShowMosaicLeaveConfirm(false)} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
+          <button onClick={() => setShowMosaicLeaveConfirm(false)} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
         </div>
       </div>
     </DraggableDrawer>
@@ -9070,11 +9070,11 @@ export default function Pattrn() {
   const coopMosaicInviteEl = showCoopMosaicInvite && (
     <DraggableDrawer isOpen={true} onClose={() => { setShowCoopMosaicInvite(false); setCoopSelectedFriends(new Set()); }}>
       <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
-        <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.coop, margin: "0 0 8px 0", letterSpacing: 1 }}>Co-op Mosaic</h3>
-        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace" }}>Select friends to invite or share a link — anyone with the link can join!</div>
+        <h3 style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.coop, margin: "0 0 8px 0", letterSpacing: 1 }}>Co-op Mosaic</h3>
+        <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16, fontFamily: "'Inter', sans-serif" }}>Select friends to invite or share a link — anyone with the link can join!</div>
         {friendsList.length > 0 && (
           <div style={{ marginBottom: 14, maxHeight: 140, overflowY: "auto" }}>
-            <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>Invite Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}</div>
+            <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 6 }}>Invite Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}</div>
             <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
               {friendsList.map(friend => {
                 const isMosaicActive = !!coopMosaicPlayers[friend.uid];
@@ -9094,9 +9094,9 @@ export default function Pattrn() {
                       </div>
                     )}
                     {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} /> : <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: C.coop + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: C.coop, fontWeight: 700, flexShrink: 0 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
-                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
-                    {isMosaicActive && <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.correct, letterSpacing: 1, textTransform: "uppercase" }}>Active</span>}
-                    {isMosaicInvited && !isMosaicActive && <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700, color: C.coop, letterSpacing: 1, textTransform: "uppercase" }}>Invited</span>}
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                    {isMosaicActive && <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 700, color: C.correct, letterSpacing: 1, textTransform: "uppercase" }}>Active</span>}
+                    {isMosaicInvited && !isMosaicActive && <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 700, color: C.coop, letterSpacing: 1, textTransform: "uppercase" }}>Invited</span>}
                   </button>
                 );
               })}
@@ -9106,14 +9106,14 @@ export default function Pattrn() {
                 const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?coopMosaic=${coopMosaicSessionId}` : "";
                 await Promise.all([...coopSelectedFriends].map(uid => Promise.all([ sendNotification(uid, { type: "coop_mosaic_invite", fromUid: firebaseUser.uid, fromUsername: username || firebaseUser.email, data: { sessionId: coopMosaicSessionId, mosaicTitle: customMosaicPlay?.title || "Untitled", url: coopUrl } }).catch(() => {}), addCoopMosaicInvitedUid(coopMosaicSessionId, uid).catch(() => {}) ])));
                 setCoopSelectedFriends(new Set()); setShowCoopMosaicInvite(false);
-              }} style={{ marginTop: 8, width: "100%", padding: "8px 12px", borderRadius: 8, backgroundColor: C.coop, color: "#fff", border: "none", fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
+              }} style={{ marginTop: 8, width: "100%", padding: "8px 12px", borderRadius: 8, backgroundColor: C.coop, color: "#fff", border: "none", fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
                 {`Send ${coopSelectedFriends.size} Invite${coopSelectedFriends.size > 1 ? "s" : ""}`}
               </button>
             )}
           </div>
         )}
-        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>Or share link</div>
-        <div style={{ padding: "10px 12px", borderRadius: 8, backgroundColor: C.bg, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: "'Space Mono', monospace", color: C.text, wordBreak: "break-all", marginBottom: 12, userSelect: "all" }}>
+        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 6 }}>Or share link</div>
+        <div style={{ padding: "10px 12px", borderRadius: 8, backgroundColor: C.bg, border: `1px solid ${C.border}`, fontSize: 11, fontFamily: "'Inter', sans-serif", color: C.text, wordBreak: "break-all", marginBottom: 12, userSelect: "all" }}>
           {coopMosaicInviteUrl}
         </div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -9123,8 +9123,8 @@ export default function Pattrn() {
             if (result === "cancelled") return;
             try { await navigator.clipboard.writeText(coopMosaicInviteUrl); } catch {}
             setShowCoopMosaicInvite(false);
-          }} style={{ flex: 1, padding: "10px 16px", borderRadius: 10, backgroundColor: C.coop, color: "#fff", border: "none", fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Copy Link</button>
-          <button onClick={() => { setShowCoopMosaicInvite(false); setCoopSelectedFriends(new Set()); }} style={{ padding: "10px 16px", borderRadius: 10, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Close</button>
+          }} style={{ flex: 1, padding: "10px 16px", borderRadius: 10, backgroundColor: C.coop, color: "#fff", border: "none", fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Copy Link</button>
+          <button onClick={() => { setShowCoopMosaicInvite(false); setCoopSelectedFriends(new Set()); }} style={{ padding: "10px 16px", borderRadius: 10, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Close</button>
         </div>
       </div>
     </DraggableDrawer>
@@ -9136,19 +9136,19 @@ export default function Pattrn() {
     return (
       <DraggableDrawer isOpen={true} onClose={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); }} zIndex={1200}>
         <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
-          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>Start Co-op</div>
+          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>Start Co-op</div>
           <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>{isFromMosaic ? "Play this mosaic together" : "Select friends to invite or share a link"}</div>
           {/* Show current mosaic info when opened from mosaic view */}
           {isFromMosaic && (
             <div style={{ marginBottom: 14, padding: "8px 12px", borderRadius: 10, backgroundColor: C.coop + "12", border: `1px solid ${C.coop}33` }}>
-              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>Mosaic</div>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text }}>{customMosaicPlay.title || "Untitled"}</div>
+              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>Mosaic</div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.text }}>{customMosaicPlay.title || "Untitled"}</div>
               {customMosaicPlay.authorUsername && <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorUsername}</div>}
             </div>
           )}
           {friendsList.length > 0 && (
             <div style={{ marginBottom: 16, maxHeight: 200, overflowY: "auto" }}>
-              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
                 Your Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -9164,7 +9164,7 @@ export default function Pattrn() {
                         {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                       </div>
                       {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} /> : <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: pickerColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: pickerColor, fontWeight: 700, flexShrink: 0 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
-                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                      <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
                     </button>
                   );
                 })}
@@ -9172,7 +9172,7 @@ export default function Pattrn() {
             </div>
           )}
           {friendsList.length === 0 && (
-            <div style={{ marginBottom: 16, textAlign: "center", padding: "12px 0", color: C.textDim, fontSize: 11, fontFamily: "'Space Mono', monospace" }}>No friends added yet. You can add friends in the Mosaic gallery.</div>
+            <div style={{ marginBottom: 16, textAlign: "center", padding: "12px 0", color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif" }}>No friends added yet. You can add friends in the Mosaic gallery.</div>
           )}
           <div style={{ display: "flex", gap: 8 }}>
             {coopSelectedFriends.size > 0 ? (
@@ -9182,7 +9182,7 @@ export default function Pattrn() {
                 else { await startCoopSession({ inviteFriendUids: [...coopSelectedFriends] }); }
               }} style={{
                 flex: 1, backgroundColor: pickerColor, color: "#fff", border: "none",
-                padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                 cursor: "pointer", textTransform: "uppercase",
               }}>{`Invite ${coopSelectedFriends.size} Friend${coopSelectedFriends.size > 1 ? "s" : ""}`}</button>
             ) : (
@@ -9192,13 +9192,13 @@ export default function Pattrn() {
                 else { startCoopSession(); }
               }} style={{
                 flex: 1, backgroundColor: pickerColor, color: "#fff", border: "none",
-                padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                 cursor: "pointer", textTransform: "uppercase",
               }}>Share Link</button>
             )}
             <button onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); }} style={{
               backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-              padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
+              padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
             }}>Cancel</button>
           </div>
         </div>
@@ -9237,15 +9237,15 @@ export default function Pattrn() {
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
         paddingTop: "calc(32px + env(safe-area-inset-top, 0px))", paddingBottom: 32,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }`}</style>
         <div style={{ textAlign: "center", animation: "fadeUp 0.4s ease" }}>
           <div style={{ fontSize: 28, marginBottom: 16 }}>{"\u25A6"}</div>
           <div style={{
-            fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700,
+            fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700,
             color: C.coop, letterSpacing: 2, textTransform: "uppercase", marginBottom: 8,
           }}>
             Joining Co-op Mosaic
@@ -9253,7 +9253,7 @@ export default function Pattrn() {
           {firebaseAuthReady && !firebaseUser ? (
             <>
               <div style={{
-                fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.textDim,
+                fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.textDim,
                 marginBottom: 16,
               }}>
                 Sign in to join this session
@@ -9262,7 +9262,7 @@ export default function Pattrn() {
                 style={{
                   marginBottom: 8, background: C.coop, border: "none", borderRadius: 8,
                   padding: "10px 24px", color: "#fff", cursor: "pointer",
-                  fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, letterSpacing: 1,
+                  fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, letterSpacing: 1,
                   textTransform: "uppercase",
                 }}
               >
@@ -9271,7 +9271,7 @@ export default function Pattrn() {
             </>
           ) : (
             <div style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.textDim,
+              fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.textDim,
               animation: "coopPulse 1.5s ease-in-out infinite",
             }}>
               {!firebaseUser ? "Signing in..." : "Loading mosaic..."}
@@ -9285,7 +9285,7 @@ export default function Pattrn() {
             style={{
               marginTop: 24, background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
               padding: "8px 20px", color: C.textDim, cursor: "pointer",
-              fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 1,
+              fontFamily: "'Inter', sans-serif", fontSize: 11, letterSpacing: 1,
             }}
           >
             Cancel
@@ -9318,16 +9318,16 @@ export default function Pattrn() {
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes coopPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes coopPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }`}</style>
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
           <div style={{ flex: 1 }}>
-            <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, margin: 0, color: isCoopMosaic ? C.coop : C.accent }}>
+            <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, margin: 0, color: isCoopMosaic ? C.coop : C.accent }}>
               {customMosaicPlay.title || "Untitled"}
             </h2>
             {customMosaicPlay.authorUsername && (
@@ -9343,7 +9343,7 @@ export default function Pattrn() {
             padding: "8px 14px", borderRadius: 10,
             backgroundColor: C.coop + "11", border: `1px solid ${C.coop}33`,
             animation: "fadeUp 0.3s 0.01s ease both",
-            fontFamily: "'Space Mono', monospace", fontSize: 11,
+            fontFamily: "'Inter', sans-serif", fontSize: 11,
           }}>
             {coopMosaicStatus === "waiting" ? (
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -9352,7 +9352,7 @@ export default function Pattrn() {
                 <button onClick={() => setShowCoopMosaicInvite(true)}
                   style={{
                     marginLeft: "auto", background: "none", border: `1px solid ${C.coop}55`, borderRadius: 6, padding: "3px 8px",
-                    color: C.coop, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                    color: C.coop, cursor: "pointer", fontFamily: "'Inter', sans-serif",
                     fontSize: 9, letterSpacing: 1, textTransform: "uppercase",
                   }}
                 >
@@ -9375,7 +9375,7 @@ export default function Pattrn() {
                     <button onClick={() => setShowCoopMosaicInvite(true)}
                       style={{
                         marginLeft: "auto", background: "none", border: `1px solid ${C.coop}55`, borderRadius: 6, padding: "3px 8px",
-                        color: C.coop, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                        color: C.coop, cursor: "pointer", fontFamily: "'Inter', sans-serif",
                         fontSize: 9, letterSpacing: 1, textTransform: "uppercase", flexShrink: 0,
                       }}
                     >
@@ -9421,7 +9421,7 @@ export default function Pattrn() {
           </div>
         )}
 
-        <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Space Mono', monospace", marginBottom: 10, animation: "fadeUp 0.3s 0.02s ease both" }}>
+        <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: "'Inter', sans-serif", marginBottom: 10, animation: "fadeUp 0.3s 0.02s ease both" }}>
           {isCoopMosaic ? "Solve tiles together to reveal the picture" : "Solve all 25 tiles to reveal the picture"}
         </div>
 
@@ -9473,7 +9473,7 @@ export default function Pattrn() {
                   </div>
                 ) : (
                   <span style={{
-                    fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                    fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700,
                     color: anyPlayerHere ? C.coop : C.textDim, lineHeight: 1,
                   }}>
                     {i + 1}
@@ -9514,14 +9514,14 @@ export default function Pattrn() {
         </div>
 
         {/* Progress */}
-        <div style={{ marginTop: 16, fontSize: 12, color: C.textDim, fontFamily: "'Space Mono', monospace", animation: "fadeUp 0.3s 0.06s ease both" }}>
+        <div style={{ marginTop: 16, fontSize: 12, color: C.textDim, fontFamily: "'Inter', sans-serif", animation: "fadeUp 0.3s 0.06s ease both" }}>
           {solvedCount}/25 tiles solved
         </div>
 
         {/* Progressive picture preview — reveals completed tile areas */}
         {solvedCount > 0 && (
           <div style={{ marginTop: 20, animation: "fadeUp 0.4s ease both", textAlign: "center" }}>
-            <div style={{ fontSize: solvedCount === 25 ? 18 : 11, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: solvedCount === 25 ? C.correct : C.textDim, marginBottom: 12, letterSpacing: solvedCount === 25 ? 0 : 1, textTransform: solvedCount === 25 ? "none" : "uppercase" }}>
+            <div style={{ fontSize: solvedCount === 25 ? 18 : 11, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: solvedCount === 25 ? C.correct : C.textDim, marginBottom: 12, letterSpacing: solvedCount === 25 ? 0 : 1, textTransform: solvedCount === 25 ? "none" : "uppercase" }}>
               {solvedCount === 25 ? (isCoopMosaic ? "Picture revealed together!" : "Picture revealed!") : "Preview"}
             </div>
             <MosaicThumbnail grid={customMosaicPlay.grid} size={Math.min(280, typeof window !== "undefined" ? window.innerWidth - 80 : 280)} completedTiles={solvedCount === 25 ? null : effectiveMosaicProgress} />
@@ -9546,7 +9546,7 @@ export default function Pattrn() {
                 style={{
                   marginTop: 12, padding: "10px 20px", borderRadius: 10,
                   backgroundColor: C.correct, color: "#fff", border: "none",
-                  fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700,
+                  fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700,
                   letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
                 }}
               >
@@ -9577,7 +9577,7 @@ export default function Pattrn() {
             }}>
               <div style={{
                 fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5,
-                fontFamily: "'Space Mono', monospace", marginBottom: 14, textAlign: "center",
+                fontFamily: "'Inter', sans-serif", marginBottom: 14, textAlign: "center",
               }}>
                 Mosaic Stats
               </div>
@@ -9589,10 +9589,10 @@ export default function Pattrn() {
                   padding: "10px 8px", borderRadius: 10, backgroundColor: C.bg,
                   border: `1px solid ${C.border}`, textAlign: "center",
                 }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: solvedCount === 25 ? C.accent : C.text }}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: solvedCount === 25 ? C.accent : C.text }}>
                     {timedTiles.length > 0 ? formatTime(totalTime) : "—"}
                   </div>
-                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 4, letterSpacing: 0.5 }}>
+                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 4, letterSpacing: 0.5 }}>
                     {solvedCount === 25 ? "Total Time" : "Time So Far"}
                   </div>
                 </div>
@@ -9601,10 +9601,10 @@ export default function Pattrn() {
                   padding: "10px 8px", borderRadius: 10, backgroundColor: C.bg,
                   border: `1px solid ${C.border}`, textAlign: "center",
                 }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: solvedCount === 25 ? C.correct : C.text }}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: solvedCount === 25 ? C.correct : C.text }}>
                     {solvedCount}/25
                   </div>
-                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 4, letterSpacing: 0.5 }}>
+                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 4, letterSpacing: 0.5 }}>
                     Tiles Solved
                   </div>
                 </div>
@@ -9613,10 +9613,10 @@ export default function Pattrn() {
                   padding: "10px 8px", borderRadius: 10, backgroundColor: C.bg,
                   border: `1px solid ${C.border}`, textAlign: "center",
                 }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.text }}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text }}>
                     {avgAttempts}
                   </div>
-                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 4, letterSpacing: 0.5 }}>
+                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 4, letterSpacing: 0.5 }}>
                     Avg Attempts
                   </div>
                 </div>
@@ -9625,10 +9625,10 @@ export default function Pattrn() {
                   padding: "10px 8px", borderRadius: 10, backgroundColor: C.bg,
                   border: `1px solid ${C.border}`, textAlign: "center",
                 }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: perfectCount > 0 ? C.gold : C.text }}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: perfectCount > 0 ? C.gold : C.text }}>
                     {perfectCount}
                   </div>
-                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 4, letterSpacing: 0.5 }}>
+                  <div style={{ fontSize: 9, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 4, letterSpacing: 0.5 }}>
                     Perfect (1st try)
                   </div>
                 </div>
@@ -9640,10 +9640,10 @@ export default function Pattrn() {
                     flex: 1, padding: "8px 6px", borderRadius: 8, backgroundColor: C.bg,
                     border: `1px solid ${C.border}`, textAlign: "center",
                   }}>
-                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.correct }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.correct }}>
                       {formatTime(bestTime)}
                     </div>
-                    <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 3, letterSpacing: 0.5 }}>
+                    <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 3, letterSpacing: 0.5 }}>
                       Best Tile
                     </div>
                   </div>
@@ -9651,10 +9651,10 @@ export default function Pattrn() {
                     flex: 1, padding: "8px 6px", borderRadius: 8, backgroundColor: C.bg,
                     border: `1px solid ${C.border}`, textAlign: "center",
                   }}>
-                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.incorrect }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.incorrect }}>
                       {formatTime(worstTime)}
                     </div>
-                    <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Space Mono', monospace", marginTop: 3, letterSpacing: 0.5 }}>
+                    <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 3, letterSpacing: 0.5 }}>
                       Slowest Tile
                     </div>
                   </div>
@@ -9680,11 +9680,11 @@ export default function Pattrn() {
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -9695,14 +9695,14 @@ export default function Pattrn() {
           backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
           animation: "fadeUp 0.3s ease",
         }}>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+          <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             {creatorEditingId ? "Edit Mosaic" : "Create Mosaic"}
           </h2>
         </div>
 
         {/* 25x25 info */}
         <div style={{ width: "100%", maxWidth: 400, marginBottom: 6, animation: "fadeUp 0.3s 0.05s ease both" }}>
-          <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, fontFamily: "'Space Mono', monospace", textAlign: "center" }}>
+          <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, fontFamily: "'Inter', sans-serif", textAlign: "center" }}>
             25x25 grid &middot; becomes 25 playable puzzle tiles
           </div>
         </div>
@@ -9747,7 +9747,7 @@ export default function Pattrn() {
           <div style={{
             width: "100%", maxWidth: 400, textAlign: "center", padding: "8px 12px", borderRadius: 8,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-            fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, letterSpacing: 0.5,
+            fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent, letterSpacing: 0.5,
             animation: "fadeUp 0.3s 0.08s ease both",
           }}>
             {mosaicMsg}
@@ -9872,7 +9872,7 @@ export default function Pattrn() {
       {/* Save mosaic drawer — name prompt */}
       <DraggableDrawer isOpen={showSaveDrawer} onClose={() => setShowSaveDrawer(false)} maxHeight="50vh">
         <div style={{ padding: "8px 20px 24px" }}>
-          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, letterSpacing: 1, marginBottom: 16 }}>
+          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, letterSpacing: 1, marginBottom: 16 }}>
             {creatorEditingId ? "Update Mosaic" : "Name Your Mosaic"}
           </div>
           <input
@@ -9885,7 +9885,7 @@ export default function Pattrn() {
             style={{
               width: "100%", padding: "12px 14px", borderRadius: 10,
               backgroundColor: C.surface, border: `1px solid ${C.border}`,
-              color: C.text, fontSize: 16, fontFamily: "'Space Mono', monospace",
+              color: C.text, fontSize: 16, fontFamily: "'Inter', sans-serif",
               outline: "none", boxSizing: "border-box", letterSpacing: 0.5,
             }}
             onFocus={e => { e.target.style.borderColor = C.accent; }}
@@ -9905,7 +9905,7 @@ export default function Pattrn() {
             style={{
               width: "100%", marginTop: 12, padding: "12px 0", borderRadius: 10,
               backgroundColor: C.accent, color: "#fff", border: "none",
-              fontSize: 14, fontWeight: 700, fontFamily: "'Space Mono', monospace",
+              fontSize: 14, fontWeight: 700, fontFamily: "'Inter', sans-serif",
               letterSpacing: 1, textTransform: "uppercase", cursor: mosaicLoading ? "default" : "pointer",
               opacity: mosaicLoading ? 0.5 : 1, transition: "opacity 0.15s",
             }}
@@ -9929,11 +9929,11 @@ export default function Pattrn() {
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -9944,7 +9944,7 @@ export default function Pattrn() {
           backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
           animation: "fadeUp 0.3s ease",
         }}>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+          <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             Mosaic
           </h2>
         </div>
@@ -9962,7 +9962,7 @@ export default function Pattrn() {
               onClick={() => { setMosaicGalleryTab(tab.key); loadMosaicData(tab.key); }}
               style={{
                 flex: 1, padding: "10px 0", fontSize: 11, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
                 background: mosaicGalleryTab === tab.key ? C.accent : "transparent",
                 color: mosaicGalleryTab === tab.key ? C.bg : C.textDim,
                 border: "none", cursor: "pointer", textTransform: "uppercase",
@@ -9978,7 +9978,7 @@ export default function Pattrn() {
           <div style={{
             width: "100%", maxWidth: 400, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-            fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent,
+            fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent,
           }}>
             {mosaicMsg}
           </div>
@@ -9995,7 +9995,7 @@ export default function Pattrn() {
               padding: 24, maxWidth: 340, width: "100%", animation: "fadeUp 0.25s ease",
               maxHeight: "80vh", overflowY: "auto",
             }}>
-              <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, margin: "0 0 12px", textAlign: "center" }}>
+              <h3 style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, margin: "0 0 12px", textAlign: "center" }}>
                 Share Mosaic
               </h3>
               <p style={{ fontSize: 11, color: C.textDim, textAlign: "center", marginBottom: 16 }}>
@@ -10004,7 +10004,7 @@ export default function Pattrn() {
               {/* Friends list */}
               {friendsList.length > 0 && (
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
                     Friends
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -10029,7 +10029,7 @@ export default function Pattrn() {
                             {(friend.username || "?")[0].toUpperCase()}
                           </div>
                         )}
-                        <span style={{ fontSize: 13, fontFamily: "'Space Mono', monospace", color: C.text, fontWeight: 600 }}>
+                        <span style={{ fontSize: 13, fontFamily: "'Inter', sans-serif", color: C.text, fontWeight: 600 }}>
                           {friend.username}
                         </span>
                       </button>
@@ -10039,7 +10039,7 @@ export default function Pattrn() {
                 </div>
               )}
               {/* Manual username entry */}
-              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
                 {friendsList.length > 0 ? "Or enter a username" : "Enter a username"}
               </div>
               <input
@@ -10050,7 +10050,7 @@ export default function Pattrn() {
                 style={{
                   width: "100%", padding: "10px 14px", borderRadius: 10,
                   backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                  color: C.text, fontSize: 16, fontFamily: "'Space Mono', monospace",
+                  color: C.text, fontSize: 16, fontFamily: "'Inter', sans-serif",
                   outline: "none", boxSizing: "border-box", marginBottom: 12,
                 }}
                 onFocus={e => { e.target.style.borderColor = C.accent; }}
@@ -10062,7 +10062,7 @@ export default function Pattrn() {
                   disabled={!shareEmailInput.trim() || mosaicLoading}
                   style={{
                     flex: 1, padding: "10px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                     background: shareEmailInput.trim() ? C.accent : C.surfaceLight,
                     color: shareEmailInput.trim() ? C.bg : C.textDim,
                     border: "none", cursor: shareEmailInput.trim() ? "pointer" : "not-allowed",
@@ -10075,7 +10075,7 @@ export default function Pattrn() {
                   onClick={() => { setShareTargetMosaic(null); setShareEmailInput(""); }}
                   style={{
                     padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                     background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
                     textTransform: "uppercase",
                   }}
@@ -10094,14 +10094,14 @@ export default function Pattrn() {
             <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
               Sign in to manage friends<br/>
               <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
-                style={{ marginTop: 8, padding: "8px 20px", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", background: C.accent, color: C.bg, border: "none", cursor: "pointer" }}
+                style={{ marginTop: 8, padding: "8px 20px", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", background: C.accent, color: C.bg, border: "none", cursor: "pointer" }}
               >Sign In</button>
             </div>
           ) : (
             <div style={{ width: "100%", maxWidth: 400, animation: "fadeUp 0.3s ease" }}>
               {/* Add friend input */}
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
                   Add Friend by Username
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -10113,7 +10113,7 @@ export default function Pattrn() {
                     style={{
                       flex: 1, padding: "10px 14px", borderRadius: 10,
                       backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                      color: C.text, fontSize: 14, fontFamily: "'Space Mono', monospace",
+                      color: C.text, fontSize: 14, fontFamily: "'Inter', sans-serif",
                       outline: "none", boxSizing: "border-box",
                     }}
                     onFocus={e => { e.target.style.borderColor = C.accent; }}
@@ -10125,7 +10125,7 @@ export default function Pattrn() {
                     disabled={!addFriendInput.trim() || addFriendLoading}
                     style={{
                       padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                       background: addFriendInput.trim() ? C.accent : C.surfaceLight,
                       color: addFriendInput.trim() ? C.bg : C.textDim,
                       border: "none", cursor: addFriendInput.trim() ? "pointer" : "not-allowed",
@@ -10136,7 +10136,7 @@ export default function Pattrn() {
                   </button>
                 </div>
                 {addFriendMsg && (
-                  <div style={{ fontSize: 11, color: C.accent, marginTop: 6, fontFamily: "'Space Mono', monospace" }}>
+                  <div style={{ fontSize: 11, color: C.accent, marginTop: 6, fontFamily: "'Inter', sans-serif" }}>
                     {addFriendMsg}
                   </div>
                 )}
@@ -10148,7 +10148,7 @@ export default function Pattrn() {
                 </div>
               ) : (
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
                     Your Friends ({friendsList.length})
                   </div>
                   {friendsList.map(friend => (
@@ -10164,7 +10164,7 @@ export default function Pattrn() {
                         </div>
                       )}
                       <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 14, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div style={{ fontSize: 14, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {friend.username}
                         </div>
                       </div>
@@ -10174,7 +10174,7 @@ export default function Pattrn() {
                         style={{
                           background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
                           padding: "4px 10px", color: C.textDim, cursor: "pointer", fontSize: 10,
-                          fontFamily: "'Space Mono', monospace", transition: "all 0.15s", flexShrink: 0,
+                          fontFamily: "'Inter', sans-serif", transition: "all 0.15s", flexShrink: 0,
                         }}
                         onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
                         onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
@@ -10193,7 +10193,7 @@ export default function Pattrn() {
           <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
             Sign in to see your mosaics<br/>
             <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
-              style={{ marginTop: 8, padding: "8px 20px", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", background: C.accent, color: C.bg, border: "none", cursor: "pointer" }}
+              style={{ marginTop: 8, padding: "8px 20px", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", background: C.accent, color: C.bg, border: "none", cursor: "pointer" }}
             >Sign In</button>
           </div>
         ) : currentList.length === 0 ? (
@@ -10213,7 +10213,7 @@ export default function Pattrn() {
                   <MosaicThumbnail grid={mosaic.grid} size={64} hidden={true} completedTiles={mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null} />
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {mosaic.title || "Untitled"}
                   </div>
                   <div style={{ fontSize: 10, color: C.textDim }}>
@@ -10229,7 +10229,7 @@ export default function Pattrn() {
                     const solved = Object.values(mc).filter(v => v > 0).length;
                     if (solved === 0) return null;
                     return (
-                      <div style={{ fontSize: 9, color: solved === 25 ? C.correct : C.accent, marginTop: 2, fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                      <div style={{ fontSize: 9, color: solved === 25 ? C.correct : C.accent, marginTop: 2, fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                         {solved === 25 ? "Complete!" : `${solved}/25 tiles`}
                       </div>
                     );
@@ -10237,7 +10237,7 @@ export default function Pattrn() {
                 </div>
                 {mosaic.grid && (
                   <button onClick={() => startCustomMosaicPlay(mosaic)} title="Play as puzzle"
-                    style={{ background: C.accent, border: "none", borderRadius: 6, padding: "4px 10px", color: C.bg, cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "'Space Mono', monospace", flexShrink: 0, transition: "all 0.15s" }}
+                    style={{ background: C.accent, border: "none", borderRadius: 6, padding: "4px 10px", color: C.bg, cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif", flexShrink: 0, transition: "all 0.15s" }}
                     onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; }}
                     onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
                   >Play</button>
@@ -10284,15 +10284,15 @@ export default function Pattrn() {
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 480, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+          <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             Review Mosaics
           </h2>
         </div>
@@ -10301,7 +10301,7 @@ export default function Pattrn() {
           <div style={{
             width: "100%", maxWidth: 480, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-            fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent,
+            fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent,
           }}>
             {mosaicMsg}
           </div>
@@ -10315,7 +10315,7 @@ export default function Pattrn() {
           </div>
         ) : (
           <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 12, animation: "fadeUp 0.3s 0.02s ease both" }}>
-            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
               {pendingMosaicsList.length} pending
             </div>
             {pendingMosaicsList.map(mosaic => (
@@ -10326,7 +10326,7 @@ export default function Pattrn() {
                 <div style={{ display: "flex", gap: 16, alignItems: "flex-start", marginBottom: 12 }}>
                   <MosaicThumbnail grid={mosaic.grid} size={100} />
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 4 }}>
                       {mosaic.title || "Untitled"}
                     </div>
                     <div style={{ fontSize: 11, color: C.textDim, marginBottom: 2 }}>
@@ -10343,7 +10343,7 @@ export default function Pattrn() {
                     disabled={mosaicLoading}
                     style={{
                       flex: 1, padding: "10px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                       background: C.correct, color: C.bg, border: "none", cursor: "pointer",
                       textTransform: "uppercase", transition: "all 0.15s", opacity: mosaicLoading ? 0.6 : 1,
                     }}
@@ -10355,7 +10355,7 @@ export default function Pattrn() {
                     disabled={mosaicLoading}
                     style={{
                       flex: 1, padding: "10px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                       background: C.incorrect, color: "#fff", border: "none", cursor: "pointer",
                       textTransform: "uppercase", transition: "all 0.15s", opacity: mosaicLoading ? 0.6 : 1,
                     }}
@@ -10378,15 +10378,15 @@ export default function Pattrn() {
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 480, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+          <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             Manage Public
           </h2>
         </div>
@@ -10395,7 +10395,7 @@ export default function Pattrn() {
           <div style={{
             width: "100%", maxWidth: 480, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-            fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent,
+            fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent,
           }}>
             {mosaicMsg}
           </div>
@@ -10409,7 +10409,7 @@ export default function Pattrn() {
           </div>
         ) : (
           <div style={{ width: "100%", maxWidth: 480, display: "flex", flexDirection: "column", gap: 10, animation: "fadeUp 0.3s 0.02s ease both" }}>
-            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
               {publicMosaicsList.length} published
               {staffPickMosaic && <span> &middot; Staff pick: <span style={{ color: C.accent }}>{staffPickMosaic.title || "Untitled"}</span></span>}
             </div>
@@ -10427,7 +10427,7 @@ export default function Pattrn() {
                     <MosaicThumbnail grid={mosaic.grid} size={80} />
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {mosaic.title || "Untitled"}
                         </div>
                         {isStaffPick && (
@@ -10480,7 +10480,7 @@ export default function Pattrn() {
                           style={{
                             background: "none", border: `1px solid ${isStaffPick ? C.accent : C.border}`, borderRadius: 6,
                             padding: "4px 10px", color: isStaffPick ? C.accent : C.textDim,
-                            cursor: "pointer", fontSize: 11, fontFamily: "'Space Mono', monospace",
+                            cursor: "pointer", fontSize: 11, fontFamily: "'Inter', sans-serif",
                             transition: "all 0.15s",
                           }}
                           onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
@@ -10497,7 +10497,7 @@ export default function Pattrn() {
                           style={{
                             background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 10px",
                             color: C.textDim, cursor: "pointer", fontSize: 11,
-                            fontFamily: "'Space Mono', monospace", transition: "all 0.15s",
+                            fontFamily: "'Inter', sans-serif", transition: "all 0.15s",
                           }}
                           onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
                           onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
@@ -10523,15 +10523,15 @@ export default function Pattrn() {
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 520, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+          <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             Game Metrics
           </h2>
         </div>
@@ -10543,7 +10543,7 @@ export default function Pattrn() {
               onClick={() => setAdminMetricsTab(tab.key)}
               style={{
                 flex: 1, padding: "8px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                 textTransform: "uppercase", cursor: "pointer", transition: "all 0.15s",
                 background: adminMetricsTab === tab.key ? C.accent : "transparent",
                 color: adminMetricsTab === tab.key ? C.bg : C.textDim,
@@ -10578,10 +10578,10 @@ export default function Pattrn() {
                       backgroundColor: C.surface, border: `1px solid ${C.border}`,
                       textAlign: "center",
                     }}>
-                      <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+                      <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 6 }}>
                         {stat.label}
                       </div>
-                      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: stat.color }}>
+                      <div style={{ fontSize: 22, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: stat.color }}>
                         {stat.value}
                       </div>
                     </div>
@@ -10589,7 +10589,7 @@ export default function Pattrn() {
                 </div>
 
                 {/* Per-mode breakdown */}
-                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginTop: 8 }}>
+                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginTop: 8 }}>
                   Puzzles Solved by Mode
                 </div>
                 <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -10603,10 +10603,10 @@ export default function Pattrn() {
                         backgroundColor: C.surface, border: `1px solid ${C.border}`,
                       }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                          <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.text, textTransform: "capitalize" }}>
+                          <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.text, textTransform: "capitalize" }}>
                             {mode}
                           </span>
-                          <span style={{ fontSize: 11, fontFamily: "'Space Mono', monospace", color: C.textDim }}>
+                          <span style={{ fontSize: 11, fontFamily: "'Inter', sans-serif", color: C.textDim }}>
                             {ms.totalSolved || 0} solved &middot; {ms.players || 0} players &middot; {ms.completionRate || 0}% played
                           </span>
                         </div>
@@ -10615,10 +10615,10 @@ export default function Pattrn() {
                           <div style={{ height: "100%", borderRadius: 2, backgroundColor: C.accent, width: `${barWidth}%`, transition: "width 0.4s ease" }} />
                         </div>
                         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                          <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                          <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
                             Avg: {ms.avgSolved || 0}/user
                           </span>
-                          <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                          <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
                             Avg active: {ms.avgSolvedActive || 0}/player
                           </span>
                         </div>
@@ -10632,14 +10632,14 @@ export default function Pattrn() {
             {/* DIFFICULTY TAB */}
             {adminMetricsTab === "difficulty" && (
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", lineHeight: 1.6 }}>
+                <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", lineHeight: 1.6 }}>
                   Per-puzzle stats showing average attempts and gold rate. High avg attempts + low gold rate = harder puzzles. Look for outliers that may be too hard or too easy.
                 </div>
                 {["easy", "medium", "hard"].map(mode => {
                   const puzzles = adminMetrics.difficultyAnalysis[mode] || [];
                   if (puzzles.length === 0) return (
                     <div key={mode} style={{ padding: 16, borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}` }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.text, textTransform: "capitalize", marginBottom: 6 }}>{mode}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.text, textTransform: "capitalize", marginBottom: 6 }}>{mode}</div>
                       <div style={{ fontSize: 11, color: C.textDim }}>No completion data yet</div>
                     </div>
                   );
@@ -10649,15 +10649,15 @@ export default function Pattrn() {
                   return (
                     <div key={mode}>
                       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.text, textTransform: "capitalize" }}>{mode}</span>
-                        <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                        <span style={{ fontSize: 14, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.text, textTransform: "capitalize" }}>{mode}</span>
+                        <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
                           Avg attempts across all: {overallAvg.toFixed(1)}
                         </span>
                       </div>
                       {/* Table header */}
                       <div style={{
                         display: "grid", gridTemplateColumns: "50px 1fr 70px 70px 60px", gap: 4, padding: "6px 10px",
-                        fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Space Mono', monospace",
+                        fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 0.5, fontFamily: "'Inter', sans-serif",
                       }}>
                         <span>#</span><span>Status</span><span style={{ textAlign: "right" }}>Avg Att.</span><span style={{ textAlign: "right" }}>Avg Time</span><span style={{ textAlign: "right" }}>Gold %</span>
                       </div>
@@ -10676,19 +10676,19 @@ export default function Pattrn() {
                               border: `1px solid ${isTooHard ? C.incorrect + "22" : isTooEasy ? C.coop + "22" : C.border}`,
                               alignItems: "center",
                             }}>
-                              <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text }}>
+                              <span style={{ fontSize: 12, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: C.text }}>
                                 {parseInt(p.puzzleKey) + 1}
                               </span>
-                              <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: statusColor }}>
+                              <span style={{ fontSize: 10, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: statusColor }}>
                                 {statusLabel} <span style={{ fontWeight: 400, color: C.textDim }}>({p.players} plays)</span>
                               </span>
-                              <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: C.text, textAlign: "right" }}>
+                              <span style={{ fontSize: 12, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: C.text, textAlign: "right" }}>
                                 {p.avgAttempts}
                               </span>
-                              <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", color: C.textDim, textAlign: "right" }}>
+                              <span style={{ fontSize: 12, fontFamily: "'Inter', sans-serif", color: C.textDim, textAlign: "right" }}>
                                 {formatTime(parseInt(p.avgTime))}
                               </span>
-                              <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", fontWeight: 700, color: parseFloat(p.goldRate) > 60 ? C.gold : parseFloat(p.goldRate) < 20 ? C.incorrect : C.text, textAlign: "right" }}>
+                              <span style={{ fontSize: 12, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: parseFloat(p.goldRate) > 60 ? C.gold : parseFloat(p.goldRate) < 20 ? C.incorrect : C.text, textAlign: "right" }}>
                                 {p.goldRate}%
                               </span>
                             </div>
@@ -10696,7 +10696,7 @@ export default function Pattrn() {
                         })}
                       </div>
                       {puzzles.length > 20 && (
-                        <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", textAlign: "center", marginTop: 6 }}>
+                        <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", textAlign: "center", marginTop: 6 }}>
                           Showing top 20 hardest of {puzzles.length} puzzles
                         </div>
                       )}
@@ -10711,7 +10711,7 @@ export default function Pattrn() {
               <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
                 {/* User distribution by puzzles solved */}
                 <div>
-                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 10 }}>
                     Users by Total Puzzles Solved
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -10725,10 +10725,10 @@ export default function Pattrn() {
                           backgroundColor: C.surface, border: `1px solid ${C.border}`,
                         }}>
                           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.text }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.text }}>
                               {bucket.label}
                             </span>
-                            <span style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", color: C.accent, fontWeight: 700 }}>
+                            <span style={{ fontSize: 12, fontFamily: "'Inter', sans-serif", color: C.accent, fontWeight: 700 }}>
                               {bucket.count} <span style={{ color: C.textDim, fontWeight: 400 }}>({pct}%)</span>
                             </span>
                           </div>
@@ -10747,7 +10747,7 @@ export default function Pattrn() {
 
                 {/* Retention signals */}
                 <div>
-                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 10 }}>
+                  <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 10 }}>
                     Key Signals
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -10769,10 +10769,10 @@ export default function Pattrn() {
                           display: "flex", alignItems: "center", justifyContent: "space-between",
                         }}>
                           <div style={{ flex: 1 }}>
-                            <div style={{ fontSize: 12, fontFamily: "'Space Mono', monospace", color: C.text, marginBottom: 2 }}>{s.label}</div>
-                            <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>{s.note}</div>
+                            <div style={{ fontSize: 12, fontFamily: "'Inter', sans-serif", color: C.text, marginBottom: 2 }}>{s.label}</div>
+                            <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>{s.note}</div>
                           </div>
-                          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: s.color, minWidth: 50, textAlign: "right" }}>
+                          <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: s.color, minWidth: 50, textAlign: "right" }}>
                             {s.value}
                           </div>
                         </div>
@@ -10839,19 +10839,19 @@ export default function Pattrn() {
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 520, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
+          <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             User Activity
           </h2>
           <span style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 11, letterSpacing: 0.5,
+              fontFamily: "'Inter', sans-serif", fontSize: 11, letterSpacing: 0.5,
               color: "#06B6D4", display: "flex", alignItems: "center", gap: 6,
             }}>
             <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#06B6D4", display: "inline-block" }} />
@@ -10872,10 +10872,10 @@ export default function Pattrn() {
                 backgroundColor: C.surface, border: `1px solid ${C.border}`,
                 textAlign: "center",
               }}>
-                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
                   {stat.label}
                 </div>
-                <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: stat.color }}>
+                <div style={{ fontSize: 20, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: stat.color }}>
                   {stat.value}
                 </div>
               </div>
@@ -10893,7 +10893,7 @@ export default function Pattrn() {
             style={{
               width: "100%", padding: "10px 14px", borderRadius: 10,
               backgroundColor: C.surface, border: `1px solid ${C.border}`,
-              color: C.text, fontSize: 12, fontFamily: "'Space Mono', monospace",
+              color: C.text, fontSize: 12, fontFamily: "'Inter', sans-serif",
               outline: "none", boxSizing: "border-box",
             }}
             onFocus={e => { e.currentTarget.style.borderColor = C.accent; }}
@@ -10912,7 +10912,7 @@ export default function Pattrn() {
               onClick={() => setAdminUserActivitySort(s.key)}
               style={{
                 flex: 1, padding: "7px 0", borderRadius: 8, fontSize: 10, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
                 textTransform: "uppercase", cursor: "pointer", transition: "all 0.15s",
                 background: adminUserActivitySort === s.key ? "#06B6D4" : "transparent",
                 color: adminUserActivitySort === s.key ? C.bg : C.textDim,
@@ -10931,7 +10931,7 @@ export default function Pattrn() {
           </div>
         ) : (
           <div style={{ width: "100%", maxWidth: 520, display: "flex", flexDirection: "column", gap: 8, animation: "fadeUp 0.3s 0.08s ease both" }}>
-            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 2 }}>
+            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginBottom: 2 }}>
               {sortedUsers.length} user{sortedUsers.length !== 1 ? "s" : ""}{searchLower ? " matching" : ""}
             </div>
             {sortedUsers.map(user => {
@@ -10953,14 +10953,14 @@ export default function Pattrn() {
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
                         <span style={{
-                          fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text,
+                          fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.text,
                           overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                         }}>
                           {user.username || "No username"}
                         </span>
                         {online && user.status === "playing" && (
                           <span style={{
-                            fontSize: 9, fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                            fontSize: 9, fontFamily: "'Inter', sans-serif", fontWeight: 700,
                             color: C.bg, backgroundColor: C.correct, padding: "1px 6px", borderRadius: 4,
                             textTransform: "uppercase", letterSpacing: 0.5,
                           }}>
@@ -10969,7 +10969,7 @@ export default function Pattrn() {
                         )}
                         {online && user.status !== "playing" && (
                           <span style={{
-                            fontSize: 9, fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                            fontSize: 9, fontFamily: "'Inter', sans-serif", fontWeight: 700,
                             color: C.bg, backgroundColor: "#06B6D4", padding: "1px 6px", borderRadius: 4,
                             textTransform: "uppercase", letterSpacing: 0.5,
                           }}>
@@ -10977,19 +10977,19 @@ export default function Pattrn() {
                           </span>
                         )}
                       </div>
-                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
                         {describeActivity(user)}
                       </div>
                       {/* Stats row */}
                       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                        <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: C.accent }}>
+                        <span style={{ fontSize: 10, fontFamily: "'Inter', sans-serif", color: C.accent }}>
                           {user.totalSolved} solved
                         </span>
-                        <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: C.gold }}>
+                        <span style={{ fontSize: 10, fontFamily: "'Inter', sans-serif", color: C.gold }}>
                           {user.achievements} achievements
                         </span>
                         {user.updatedAt > 0 && (
-                          <span style={{ fontSize: 10, fontFamily: "'Space Mono', monospace", color: C.textDim }}>
+                          <span style={{ fontSize: 10, fontFamily: "'Inter', sans-serif", color: C.textDim }}>
                             Synced {fmtTimeAgo(user.updatedAt)}
                           </span>
                         )}
@@ -11001,7 +11001,7 @@ export default function Pattrn() {
                             .filter(mode => (user.progress[mode] || 0) > 0)
                             .map(mode => (
                               <span key={mode} style={{
-                                fontSize: 9, fontFamily: "'Space Mono', monospace",
+                                fontSize: 9, fontFamily: "'Inter', sans-serif",
                                 color: C.textDim, backgroundColor: C.surfaceLight,
                                 padding: "2px 6px", borderRadius: 4,
                               }}>
@@ -11031,11 +11031,11 @@ export default function Pattrn() {
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -11045,11 +11045,11 @@ export default function Pattrn() {
           position: "sticky", top: 0, zIndex: 50,
           backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
         }}>
-          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.coop, lineHeight: 1 }}>
+          <h1 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.coop, lineHeight: 1 }}>
             Co-op
           </h1>
           {firebaseConfigured && firebaseUser && onlineFriendsCount > 0 && (
-            <span style={{ fontSize: 10, color: C.correct, fontFamily: "'Space Mono', monospace" }}>
+            <span style={{ fontSize: 10, color: C.correct, fontFamily: "'Inter', sans-serif" }}>
               {onlineFriendsCount} friend{onlineFriendsCount !== 1 ? "s" : ""} online
             </span>
           )}
@@ -11067,7 +11067,7 @@ export default function Pattrn() {
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
                 <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
               </svg>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 6 }}>
                 Sign in to play co-op
               </div>
               <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
@@ -11076,7 +11076,7 @@ export default function Pattrn() {
               <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
                 style={{
                   padding: "10px 24px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                  fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                   background: C.coop, color: "#fff", border: "none", cursor: "pointer",
                 }}>
                 Sign In
@@ -11091,7 +11091,7 @@ export default function Pattrn() {
               background: `linear-gradient(135deg, ${C.surface} 0%, ${C.coop}11 100%)`,
               border: `1px solid ${C.coop}33`, padding: 20,
             }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 4 }}>
                 Start Co-op Puzzle
               </div>
               <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16 }}>
@@ -11100,7 +11100,7 @@ export default function Pattrn() {
 
               {/* Mode selection */}
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
+                <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Inter', sans-serif" }}>
                   Game Mode
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
@@ -11111,7 +11111,7 @@ export default function Pattrn() {
                         background: coopSetupMode === d.key ? C.coop : C.bg,
                         color: coopSetupMode === d.key ? "#fff" : C.textDim,
                         border: `1px solid ${coopSetupMode === d.key ? C.coop : C.border}`,
-                        cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600,
+                        cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 600,
                         transition: "all 0.15s",
                       }}>
                       {d.label}
@@ -11123,22 +11123,22 @@ export default function Pattrn() {
               {/* Puzzle selection - for non-mosaic, non-cascade modes */}
               {coopSetupMode && coopSetupMode !== "cascade" && coopSetupMode !== "mosaic" && (
                 <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Inter', sans-serif" }}>
                     Puzzle #{coopSetupLevel + 1}
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <button onClick={() => setCoopSetupLevel(Math.max(0, coopSetupLevel - 1))}
-                      style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 14 }}>
+                      style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", color: C.textDim, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 14 }}>
                       &minus;
                     </button>
                     <input type="range" min={0} max={49} value={coopSetupLevel}
                       onChange={e => setCoopSetupLevel(Number(e.target.value))}
                       style={{ flex: 1, accentColor: C.coop }} />
                     <button onClick={() => setCoopSetupLevel(Math.min(49, coopSetupLevel + 1))}
-                      style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 14 }}>
+                      style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px", color: C.textDim, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 14 }}>
                       +
                     </button>
-                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 14, fontWeight: 700, color: C.text, minWidth: 28, textAlign: "center" }}>
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, minWidth: 28, textAlign: "center" }}>
                       {coopSetupLevel + 1}
                     </span>
                   </div>
@@ -11150,7 +11150,7 @@ export default function Pattrn() {
                 const availableMosaics = [...(myMosaics || []), ...(staffPickMosaic ? [staffPickMosaic] : [])].filter((m, i, arr) => arr.findIndex(x => x.id === m.id) === i);
                 return (
                   <div style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
+                    <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Inter', sans-serif" }}>
                       Choose Mosaic
                     </div>
                     {availableMosaics.length > 0 ? (
@@ -11166,14 +11166,14 @@ export default function Pattrn() {
                               <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${sel ? C.coop : C.border}`, backgroundColor: sel ? C.coop : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
                                 {sel && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
                               </div>
-                              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{m.title || "Untitled"}</span>
+                              <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{m.title || "Untitled"}</span>
                               {m.authorUsername && <span style={{ fontSize: 9, color: C.textDim }}>by {m.authorUsername}</span>}
                             </button>
                           );
                         })}
                       </div>
                     ) : (
-                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", padding: "8px 0" }}>No mosaics available. Create one in the Mosaic gallery first.</div>
+                      <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", padding: "8px 0" }}>No mosaics available. Create one in the Mosaic gallery first.</div>
                     )}
                   </div>
                 );
@@ -11204,7 +11204,7 @@ export default function Pattrn() {
                 }}
                 style={{
                   width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                  fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                   background: (coopSetupMode && !(coopSetupMode === "mosaic" && !coopSetupMosaic)) ? C.coop : C.border,
                   color: (coopSetupMode && !(coopSetupMode === "mosaic" && !coopSetupMosaic)) ? "#fff" : C.textDim,
                   border: "none", cursor: (coopSetupMode && !(coopSetupMode === "mosaic" && !coopSetupMosaic)) ? "pointer" : "default",
@@ -11242,20 +11242,20 @@ export default function Pattrn() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
                       {isMosaicSession && (
-                        <span style={{ fontSize: 9, color: isCompleted ? C.correct : C.coop, fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
+                        <span style={{ fontSize: 9, color: isCompleted ? C.correct : C.coop, fontFamily: "'Inter', sans-serif", fontWeight: 700, letterSpacing: 0.5, textTransform: "uppercase" }}>
                           {isCompleted ? "Mosaic" : "Co-op Mosaic"}
                         </span>
                       )}
-                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>
+                      <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 140 }}>
                         {titleLabel}
                       </span>
                       {!isCompleted && (
-                        <span style={{ fontSize: 9, color: isHost ? C.coop : "#FF9FF3", fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                        <span style={{ fontSize: 9, color: isHost ? C.coop : "#FF9FF3", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                           {isHost ? "Host" : "Guest"}
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 10, color: statusColor, fontFamily: "'Space Mono', monospace" }}>
+                    <div style={{ fontSize: 10, color: statusColor, fontFamily: "'Inter', sans-serif" }}>
                       {isCompleted ? (
                         <>
                           {"\u2713"} Complete
@@ -11278,7 +11278,7 @@ export default function Pattrn() {
                         style={{
                           background: C.correct, border: "none", borderRadius: 8,
                           padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 10,
-                          fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
+                          fontFamily: "'Inter', sans-serif", fontWeight: 700, letterSpacing: 0.5,
                         }}>
                         View
                       </button>
@@ -11289,7 +11289,7 @@ export default function Pattrn() {
                         style={{
                           background: C.coop, border: "none", borderRadius: 8,
                           padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 10,
-                          fontFamily: "'Space Mono', monospace", fontWeight: 700, letterSpacing: 0.5,
+                          fontFamily: "'Inter', sans-serif", fontWeight: 700, letterSpacing: 0.5,
                         }}>
                         Rejoin
                       </button>
@@ -11300,7 +11300,7 @@ export default function Pattrn() {
                         style={{
                           background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
                           padding: "8px 10px", color: C.textDim, cursor: "pointer", fontSize: 10,
-                          fontFamily: "'Space Mono', monospace",
+                          fontFamily: "'Inter', sans-serif",
                         }}
                         title="Close session"
                         onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.color = "#f87171"; }}
@@ -11317,7 +11317,7 @@ export default function Pattrn() {
                   <div style={{
                     fontSize: 9, color: C.coop, textTransform: "uppercase",
                     letterSpacing: 1.5, marginBottom: 10,
-                    fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                    fontFamily: "'Inter', sans-serif", fontWeight: 700,
                   }}>Active Sessions {activeSessions.length > 0 && `(${activeSessions.length})`}</div>
 
                   {activeSessions.length === 0 ? (
@@ -11345,7 +11345,7 @@ export default function Pattrn() {
                     <div style={{
                       fontSize: 9, color: C.correct, textTransform: "uppercase",
                       letterSpacing: 1.5, marginBottom: 10,
-                      fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                      fontFamily: "'Inter', sans-serif", fontWeight: 700,
                     }}>Completed Sessions ({completedSessions.length})</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {completedSessions.map(session => renderSessionCard(session, true))}
@@ -11368,10 +11368,10 @@ export default function Pattrn() {
                   return (
                     <DraggableDrawer isOpen={true} onClose={() => setCoopCompletedBreakdown(null)} zIndex={1200}>
                       <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
-                        <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 16, fontWeight: 700, color: C.correct, marginBottom: 4 }}>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.correct, marginBottom: 4 }}>
                           {"\u2713"} {bs.mosaicTitle || "Untitled"}
                         </div>
-                        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, fontFamily: "'Space Mono', monospace" }}>
+                        <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, fontFamily: "'Inter', sans-serif" }}>
                           Co-op mosaic completed{playerNames.length > 0 ? ` with ${playerNames.join(", ")}` : ""}
                         </div>
 
@@ -11388,10 +11388,10 @@ export default function Pattrn() {
                               backgroundColor: C.bg, border: `1px solid ${C.border}`,
                               textAlign: "center",
                             }}>
-                              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.text }}>
+                              <div style={{ fontSize: 16, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.text }}>
                                 {stat.value}
                               </div>
-                              <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>
+                              <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1, marginTop: 2 }}>
                                 {stat.label}
                               </div>
                             </div>
@@ -11399,7 +11399,7 @@ export default function Pattrn() {
                         </div>
 
                         {/* Per-tile breakdown */}
-                        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 8 }}>
+                        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
                           Tile Breakdown
                         </div>
                         <div style={{
@@ -11416,13 +11416,13 @@ export default function Pattrn() {
                                 backgroundColor: isPerfect ? C.correct + "15" : C.surface,
                                 border: `1px solid ${isPerfect ? C.correct + "44" : C.border}`,
                               }}>
-                                <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: isPerfect ? C.correct : C.text }}>
+                                <div style={{ fontSize: 10, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: isPerfect ? C.correct : C.text }}>
                                   {i + 1}
                                 </div>
-                                <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                                <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
                                   {tileAttempts === 1 ? "\u2713" : `${tileAttempts}x`}
                                 </div>
-                                <div style={{ fontSize: 7, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                                <div style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
                                   {formatTime(tileTime)}
                                 </div>
                               </div>
@@ -11434,7 +11434,7 @@ export default function Pattrn() {
                           style={{
                             width: "100%", marginTop: 16, padding: "10px 0", borderRadius: 10,
                             backgroundColor: C.correct, color: "#fff", border: "none",
-                            fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
+                            fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700,
                             letterSpacing: 1, cursor: "pointer",
                           }}
                         >
@@ -11464,11 +11464,11 @@ export default function Pattrn() {
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -11478,7 +11478,7 @@ export default function Pattrn() {
           position: "sticky", top: 0, zIndex: 50,
           backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
         }}>
-          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
+          <h1 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
             Profile
           </h1>
         </div>
@@ -11503,7 +11503,7 @@ export default function Pattrn() {
               )}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
                 {firebaseUser ? (username || "Player") : "Guest"}
               </div>
               <div style={{ fontSize: 11, color: C.textDim, marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
@@ -11515,11 +11515,11 @@ export default function Pattrn() {
                     width: 6, height: 6, borderRadius: "50%",
                     backgroundColor: syncStatus === "syncing" ? C.inProgress : syncStatus === "error" ? C.incorrect : C.correct,
                   }} />
-                  <span style={{ fontSize: 9, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                  <span style={{ fontSize: 9, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
                     {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Synced"}
                   </span>
                   <span style={{ color: C.textDim, fontSize: 9 }}>&middot;</span>
-                  <span style={{ fontSize: 9, color: C.accent, fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                  <span style={{ fontSize: 9, color: C.accent, fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                     {totalSolvedAll} solved
                   </span>
                 </div>
@@ -11557,7 +11557,7 @@ export default function Pattrn() {
                   </svg>
                 </div>
                 <div style={{ flex: 1, textAlign: "left" }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
                     {firebaseUser ? "Edit Profile" : "Sign In"}
                   </div>
                   <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
@@ -11586,7 +11586,7 @@ export default function Pattrn() {
                 <span style={{ fontSize: 16, color: C.accent, lineHeight: 1 }}>{"\u2605"}</span>
               </div>
               <div style={{ flex: 1, textAlign: "left" }}>
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
                   Achievements
                 </div>
                 <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
@@ -11618,7 +11618,7 @@ export default function Pattrn() {
                 </svg>
               </div>
               <div style={{ flex: 1, textAlign: "left" }}>
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
                   Statistics
                 </div>
                 <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
@@ -11646,7 +11646,7 @@ export default function Pattrn() {
                 <span style={{ fontSize: 16, lineHeight: 1 }}>{"\uD83C\uDF82"}</span>
               </div>
               <div style={{ flex: 1, textAlign: "left" }}>
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
                   Birthday Puzzle
                 </div>
                 <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
@@ -11678,7 +11678,7 @@ export default function Pattrn() {
                 </svg>
               </div>
               <div style={{ flex: 1, textAlign: "left" }}>
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
                   Themes
                 </div>
                 <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
@@ -11710,7 +11710,7 @@ export default function Pattrn() {
                   </svg>
                 </div>
                 <div style={{ flex: 1, textAlign: "left" }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
                     Friends
                   </div>
                   <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
@@ -11734,7 +11734,7 @@ export default function Pattrn() {
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.5 3 3.5.5-2.5 2.5.5 3.5L8 9.5 4.5 11.5 5 8 2.5 5.5 6 5z" stroke="#EF4444" strokeWidth="1.5" fill="none" strokeLinejoin="round"/></svg>
                   </div>
                   <div style={{ flex: 1, textAlign: "left" }}>
-                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Review</div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Review</div>
                   </div>
                   <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
                 </button>
@@ -11747,7 +11747,7 @@ export default function Pattrn() {
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 8h12M2 12h12" stroke="#F59E0B" strokeWidth="1.5" strokeLinecap="round"/></svg>
                   </div>
                   <div style={{ flex: 1, textAlign: "left" }}>
-                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Manage</div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Manage</div>
                   </div>
                   <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
                 </button>
@@ -11760,7 +11760,7 @@ export default function Pattrn() {
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="2" y="9" width="3" height="5" rx="0.5" fill="#8B5CF6"/><rect x="6.5" y="5" width="3" height="9" rx="0.5" fill="#8B5CF6"/><rect x="11" y="2" width="3" height="12" rx="0.5" fill="#8B5CF6"/></svg>
                   </div>
                   <div style={{ flex: 1, textAlign: "left" }}>
-                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Metrics</div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Metrics</div>
                   </div>
                   <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
                 </button>
@@ -11773,7 +11773,7 @@ export default function Pattrn() {
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="3" stroke="#06B6D4" strokeWidth="1.5" fill="none"/><path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5" stroke="#06B6D4" strokeWidth="1.5" fill="none" strokeLinecap="round"/></svg>
                   </div>
                   <div style={{ flex: 1, textAlign: "left" }}>
-                    <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Users</div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Admin: Users</div>
                   </div>
                   <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
                 </button>
@@ -11801,7 +11801,7 @@ export default function Pattrn() {
                   </svg>
                 </div>
                 <div style={{ flex: 1, textAlign: "left" }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Sign Out</div>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>Sign Out</div>
                 </div>
               </button>
             )}
@@ -11826,7 +11826,7 @@ export default function Pattrn() {
                 </svg>
               </div>
               <div style={{ flex: 1, textAlign: "left" }}>
-                <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.incorrect, letterSpacing: 0.5 }}>
+                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.incorrect, letterSpacing: 0.5 }}>
                   Clear All Data
                 </div>
                 <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
@@ -11856,7 +11856,7 @@ export default function Pattrn() {
                   </svg>
                 </div>
                 <div style={{ flex: 1, textAlign: "left" }}>
-                  <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: "#dc2626", letterSpacing: 0.5 }}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: "#dc2626", letterSpacing: 0.5 }}>
                     Delete Account
                   </div>
                   <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
@@ -11881,11 +11881,11 @@ export default function Pattrn() {
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
-        fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+        fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 0, paddingRight: 0,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } `}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } `}</style>
 
         {/* ── Compact top app bar ── */}
         <div style={{
@@ -11897,7 +11897,7 @@ export default function Pattrn() {
           backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
         }}>
           {/* Left: logo */}
-          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
+          <h1 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
             Agnus
           </h1>
         </div>
@@ -11923,10 +11923,10 @@ export default function Pattrn() {
             }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
                 <div>
-                  <div style={{ fontSize: 11, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Space Mono', monospace", marginBottom: 4 }}>
+                  <div style={{ fontSize: 11, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
                     Daily Puzzle
                   </div>
-                  <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
                     {todayLabel}
                   </div>
                 </div>
@@ -11937,7 +11937,7 @@ export default function Pattrn() {
                     backgroundColor: C.gold + "18", border: `1px solid ${C.gold}33`,
                   }}>
                     <span style={{ fontSize: 13 }}>🔥</span>
-                    <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: C.gold }}>{streak}</span>
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.gold }}>{streak}</span>
                   </div>
                 )}
               </div>
@@ -11947,11 +11947,11 @@ export default function Pattrn() {
                   padding: "8px 12px", borderRadius: 10, backgroundColor: C.bg + "88",
                 }}>
                   <ScoreBadge attempts={todayResult} />
-                  <span style={{ fontSize: 12, color: C.text, fontFamily: "'Space Mono', monospace", fontWeight: 600 }}>
+                  <span style={{ fontSize: 12, color: C.text, fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                     Solved in {todayResult} attempt{todayResult !== 1 ? "s" : ""}
                   </span>
                   {todayTime != null && (
-                    <span style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                    <span style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
                       {formatTime(todayTime)}
                     </span>
                   )}
@@ -11962,7 +11962,7 @@ export default function Pattrn() {
                   onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, todayLabel); }}
                   style={{
                     flex: 1, padding: "12px 0", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                    fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                     background: C.accent, color: C.bg, border: "none", cursor: "pointer",
                     transition: "transform 0.15s",
                   }}
@@ -11990,7 +11990,7 @@ export default function Pattrn() {
                   }}
                   style={{
                     padding: "12px 16px", borderRadius: 12, fontSize: 12, fontWeight: 600,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                    fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
                     background: "none", border: `1px solid ${C.accent}55`, color: C.accent, cursor: "pointer",
                   }}
                 >
@@ -12011,7 +12011,7 @@ export default function Pattrn() {
             <div style={{
               display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10,
             }}>
-              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: "#54A0FF", letterSpacing: 1, textTransform: "uppercase" }}>
+              <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, color: "#54A0FF", letterSpacing: 1, textTransform: "uppercase" }}>
                 Notifications
               </span>
               <button
@@ -12036,7 +12036,7 @@ export default function Pattrn() {
                     </span>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontFamily: "'Space Mono', monospace", fontWeight: 600, color: C.text, lineHeight: 1.3 }}>
+                    <div style={{ fontSize: 11, fontFamily: "'Inter', sans-serif", fontWeight: 600, color: C.text, lineHeight: 1.3 }}>
                       {notif.type === "coop_invite"
                         ? `${notif.fromUsername || "Someone"} invited you to co-op`
                         : notif.type === "coop_mosaic_invite"
@@ -12091,7 +12091,7 @@ export default function Pattrn() {
                         style={{
                           background: C.coop, border: "none", borderRadius: 6,
                           padding: "4px 8px", color: "#fff", cursor: "pointer", fontSize: 9,
-                          fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                          fontFamily: "'Inter', sans-serif", fontWeight: 700,
                         }}
                       >
                         Join
@@ -12109,7 +12109,7 @@ export default function Pattrn() {
                         style={{
                           background: C.coop, border: "none", borderRadius: 6,
                           padding: "4px 8px", color: "#fff", cursor: "pointer", fontSize: 9,
-                          fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                          fontFamily: "'Inter', sans-serif", fontWeight: 700,
                         }}
                       >
                         Join
@@ -12127,7 +12127,7 @@ export default function Pattrn() {
                         style={{
                           background: C.accent, border: "none", borderRadius: 6,
                           padding: "4px 8px", color: C.bg, cursor: "pointer", fontSize: 9,
-                          fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                          fontFamily: "'Inter', sans-serif", fontWeight: 700,
                         }}
                       >
                         View
@@ -12144,7 +12144,7 @@ export default function Pattrn() {
                         style={{
                           background: "#FFE66D", border: "none", borderRadius: 6,
                           padding: "4px 8px", color: C.bg, cursor: "pointer", fontSize: 9,
-                          fontFamily: "'Space Mono', monospace", fontWeight: 700,
+                          fontFamily: "'Inter', sans-serif", fontWeight: 700,
                         }}
                       >
                         Review
@@ -12176,7 +12176,7 @@ export default function Pattrn() {
               <div style={{
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
                 letterSpacing: 1.5, marginBottom: 6,
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "'Inter', sans-serif",
               }}>{cat}</div>
               <div style={{
                 display: "grid",
@@ -12202,7 +12202,7 @@ export default function Pattrn() {
                         border: active ? "1px solid transparent" : isCleared ? `1.5px solid ${C.gold}88` : `1px solid ${C.border}`,
                         borderRadius: 10,
                         cursor: "pointer",
-                        fontFamily: "'Space Mono', monospace",
+                        fontFamily: "'Inter', sans-serif",
                         fontSize: 11,
                         fontWeight: active ? 700 : isCleared ? 600 : 400,
                         letterSpacing: 0.5,
@@ -12239,18 +12239,18 @@ export default function Pattrn() {
           }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
             </div>
             <div style={{ width: 1, alignSelf: "stretch", backgroundColor: C.border }} />
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Streak</div>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.gold }}>{getDailyStreak(progress)}</div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.gold }}>{getDailyStreak(progress)}</div>
             </div>
             <div style={{ flex: 1 }} />
             <button onClick={() => setShowShareModal(true)}
               style={{
                 padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 600,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
                 background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
                 transition: "all 0.15s",
               }}
@@ -12269,18 +12269,18 @@ export default function Pattrn() {
           }}>
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
             </div>
             <div style={{ width: 1, alignSelf: "stretch", backgroundColor: C.border }} />
             <div style={{ textAlign: "center" }}>
               <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Attempted</div>
-              <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 20, fontWeight: 700 }}>{totalAttempted}</div>
+              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700 }}>{totalAttempted}</div>
             </div>
             <div style={{ flex: 1 }} />
             <button onClick={() => setShowShareModal(true)}
               style={{
                 padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 600,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
                 background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
                 transition: "all 0.15s",
               }}
@@ -12318,12 +12318,12 @@ export default function Pattrn() {
                   <span style={{ fontSize: 14, color: C.accent, lineHeight: 1 }}>{"\u2605"}</span>
                 </div>
                 <div style={{ flex: 1, textAlign: "left" }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
                     Achievements
                   </span>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, fontWeight: 700 }}>
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent, fontWeight: 700 }}>
                     {unlocked}/{total}
                   </span>
                   <div style={{
@@ -12351,14 +12351,14 @@ export default function Pattrn() {
                 backgroundColor: C.surface, padding: "12px 16px", boxSizing: "border-box",
               }}>
                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F472B6" }}>
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: "#F472B6" }}>
                     {"\uD83C\uDF82"} Birthday puzzle
                   </span>
                   <button
                     onClick={() => setShowBirthdayPrompt(true)}
                     style={{
                       padding: "8px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                      fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                       background: "#F472B6", color: "#fff", border: "none", cursor: "pointer",
                     }}
                   >
@@ -12386,7 +12386,7 @@ export default function Pattrn() {
             }}>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700, color: "#F472B6" }}>
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: "#F472B6" }}>
                     {"\uD83C\uDF82"} {bdLabel}
                   </span>
                   {bdSolved && (
@@ -12413,7 +12413,7 @@ export default function Pattrn() {
                       }}
                       style={{
                         padding: "6px 12px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
                         background: "none", border: `1px solid #F472B644`, color: "#F472B6", cursor: "pointer",
                       }}
                     >
@@ -12425,14 +12425,14 @@ export default function Pattrn() {
                       onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, bdDateStr); }}
                       style={{
                         padding: "8px 16px", borderRadius: 8, fontSize: 12, fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                         background: "#F472B6", color: "#fff", border: "none", cursor: "pointer",
                       }}
                     >
                       {bdSolved ? "View" : "Play"}
                     </button>
                   ) : bdIsFuture ? (
-                    <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace" }}>
+                    <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
                       Not yet available
                     </span>
                   ) : null}
@@ -12440,7 +12440,7 @@ export default function Pattrn() {
                     onClick={() => setShowBirthdayPrompt(true)}
                     style={{
                       padding: "6px 10px", borderRadius: 8, fontSize: 11, fontWeight: 600,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                      fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
                       background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
                     }}
                   >
@@ -12504,12 +12504,12 @@ export default function Pattrn() {
                   onClick={() => { if (calendarMonth === 0) { setCalendarMonth(11); setCalendarYear(y => y - 1); } else setCalendarMonth(m => m - 1); }}
                   style={{
                     background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 12px",
-                    color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 14, transition: "all 0.15s",
+                    color: C.textDim, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 14, transition: "all 0.15s",
                   }}
                   onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
                 >&larr;</button>
-                <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.text, letterSpacing: 1 }}>
+                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.text, letterSpacing: 1 }}>
                   {MONTH_NAMES[calendarMonth]} {calendarYear}
                 </span>
                 <button
@@ -12518,7 +12518,7 @@ export default function Pattrn() {
                   style={{
                     background: "none", border: `1px solid ${canGoForward ? C.border : C.border + "44"}`, borderRadius: 8, padding: "6px 12px",
                     color: canGoForward ? C.textDim : C.textDim + "44", cursor: canGoForward ? "pointer" : "default",
-                    fontFamily: "'Space Mono', monospace", fontSize: 14, transition: "all 0.15s",
+                    fontFamily: "'Inter', sans-serif", fontSize: 14, transition: "all 0.15s",
                   }}
                   onMouseEnter={e => { if (canGoForward) { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; } }}
                   onMouseLeave={e => { if (canGoForward) { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; } }}
@@ -12531,7 +12531,7 @@ export default function Pattrn() {
                     onClick={() => { setCalendarYear(todayUTCYear); setCalendarMonth(todayUTCMonth); }}
                     style={{
                       background: "none", border: `1px solid ${C.accent}`, borderRadius: 8, padding: "5px 12px",
-                      color: C.accent, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 10,
+                      color: C.accent, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 10,
                       fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", transition: "all 0.15s",
                       whiteSpace: "nowrap",
                     }}
@@ -12545,7 +12545,7 @@ export default function Pattrn() {
                   style={{
                     position: "relative", display: "inline-block",
                     background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "5px 12px",
-                    color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace", fontSize: 10,
+                    color: C.textDim, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 10,
                     fontWeight: 700, letterSpacing: 1, textTransform: "uppercase", transition: "all 0.15s",
                     whiteSpace: "nowrap",
                   }}
@@ -12569,7 +12569,7 @@ export default function Pattrn() {
               <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
                 {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
                   <div key={d} style={{
-                    textAlign: "center", fontFamily: "'Space Mono', monospace", fontSize: 9,
+                    textAlign: "center", fontFamily: "'Inter', sans-serif", fontSize: 9,
                     color: C.textDim, letterSpacing: 0.5, padding: "4px 0",
                   }}>{d}</div>
                 ))}
@@ -12616,12 +12616,12 @@ export default function Pattrn() {
                         }} />
                       )}
                       <span style={{
-                        fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: cell.isToday ? 800 : isBd ? 800 : 600,
+                        fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: cell.isToday ? 800 : isBd ? 800 : 600,
                         color: numColor, lineHeight: 1,
                       }}>{cell.day}</span>
                       {solved && <ScoreBadge attempts={cell.result} />}
                       {solved && cell.time != null && (
-                        <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 7, color: C.textDim, lineHeight: 1 }}>
+                        <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 7, color: C.textDim, lineHeight: 1 }}>
                           {formatTime(cell.time)}
                         </span>
                       )}
@@ -12633,7 +12633,7 @@ export default function Pattrn() {
               {/* Legend */}
               <div style={{
                 marginTop: 16, display: "flex", gap: 16, fontSize: 11, color: C.textDim,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5,
+                fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
                 flexWrap: "wrap", justifyContent: "center",
               }}>
                 <span><span style={{ color: C.gold }}>{"\u2605"}</span> 1-2 tries</span>
@@ -12661,7 +12661,7 @@ export default function Pattrn() {
               width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
               display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
             }}>
-              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Space Mono', monospace" }}>
+              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Inter', sans-serif" }}>
                 <span style={{ color: C.accent }}>&#9733; Staff Pick</span>
               </div>
               <button
@@ -12683,7 +12683,7 @@ export default function Pattrn() {
                 />
                 <div style={{ textAlign: "center" }}>
                   <div style={{
-                    fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700,
+                    fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700,
                     color: C.text, letterSpacing: 1, marginBottom: 4,
                   }}>
                     {staffPickMosaic.title || "Untitled"}
@@ -12692,7 +12692,7 @@ export default function Pattrn() {
                     <div style={{ fontSize: 10, color: C.textDim, marginBottom: 6 }}>by {staffPickMosaic.authorUsername}</div>
                   )}
                   <div style={{
-                    fontSize: 10, fontFamily: "'Space Mono', monospace",
+                    fontSize: 10, fontFamily: "'Inter', sans-serif",
                     color: spSolved === 25 ? C.correct : C.textDim, letterSpacing: 0.5,
                   }}>
                     {spSolved === 25 ? "Completed!" : `${spSolved}/25 tiles solved`}
@@ -12714,7 +12714,7 @@ export default function Pattrn() {
               <div style={{
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
                 letterSpacing: 1.5, marginBottom: 8,
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "'Inter', sans-serif",
               }}>Shared With You</div>
               <div className="mosaic-carousel" style={{
                 display: "flex", gap: 10, overflowX: "auto", paddingBottom: 8,
@@ -12737,7 +12737,7 @@ export default function Pattrn() {
                   >
                     <MosaicThumbnail grid={mosaic.grid} size={72} hidden={true} completedTiles={mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null} />
                     <div style={{
-                      fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 600,
+                      fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 600,
                       color: C.text, textAlign: "center", lineHeight: 1.2,
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       width: "100%",
@@ -12770,7 +12770,7 @@ export default function Pattrn() {
               <div style={{
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
                 letterSpacing: 1.5, marginBottom: 8,
-                fontFamily: "'Space Mono', monospace",
+                fontFamily: "'Inter', sans-serif",
               }}>Community Mosaics</div>
               <div className="mosaic-carousel" style={{
                 display: "flex", gap: 10, overflowX: "auto", paddingBottom: 8,
@@ -12793,7 +12793,7 @@ export default function Pattrn() {
                   >
                     <MosaicThumbnail grid={mosaic.grid} size={72} hidden={true} completedTiles={mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null} />
                     <div style={{
-                      fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 600,
+                      fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 600,
                       color: C.text, textAlign: "center", lineHeight: 1.2,
                       overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                       width: "100%",
@@ -12865,14 +12865,14 @@ export default function Pattrn() {
                   }} />
                 )}
                 <span style={{
-                  fontFamily: "'Space Mono', monospace", fontSize: 15, fontWeight: 700,
+                  fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 700,
                   color: numColor, lineHeight: 1,
                 }}>
                   {i + 1}
                 </span>
                 {isCascade ? (
                   cascadeSizeLabel ? <span style={{
-                    fontFamily: "'Space Mono', monospace", fontSize: 9, color: cascadeInProgress ? C.inProgress : C.textDim,
+                    fontFamily: "'Inter', sans-serif", fontSize: 9, color: cascadeInProgress ? C.inProgress : C.textDim,
                     lineHeight: 1.2,
                   }}>
                     {cascadeSizeLabel}
@@ -12881,7 +12881,7 @@ export default function Pattrn() {
                   <>
                     {result !== undefined && <ScoreBadge attempts={result} />}
                     {solved && time != null && (
-                      <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 8, color: C.textDim, lineHeight: 1 }}>
+                      <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 8, color: C.textDim, lineHeight: 1 }}>
                         {formatTime(time)}
                       </span>
                     )}
@@ -12895,7 +12895,7 @@ export default function Pattrn() {
         {/* Legend */}
         <div style={{
           marginTop: 24, display: "flex", gap: 16, fontSize: 11, color: C.textDim,
-          fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, animation: "fadeUp 0.5s 0.25s ease both",
+          fontFamily: "'Inter', sans-serif", letterSpacing: 0.5, animation: "fadeUp 0.5s 0.25s ease both",
           flexWrap: "wrap", justifyContent: "center",
         }}>
           <span><span style={{ color: C.gold }}>{"\u2605"}</span> 1-2 tries</span>
@@ -12969,16 +12969,16 @@ export default function Pattrn() {
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{
-                  fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700,
+                  fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 700,
                   color: tc, letterSpacing: 1.5, textTransform: "uppercase",
                   marginBottom: 3,
                 }}>Achievement unlocked</div>
                 <div style={{
-                  fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700,
                   color: C.text, letterSpacing: 0.5,
                 }}>{achievementToast.label}</div>
                 <div style={{
-                  fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: C.textDim,
+                  fontFamily: "'Inter', sans-serif", fontSize: 10, color: C.textDim,
                   marginTop: 2, lineHeight: 1.3,
                 }}>{achievementToast.desc}</div>
               </div>
@@ -13017,11 +13017,11 @@ export default function Pattrn() {
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{
-                fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700,
+                fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 700,
                 color: C.accent, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2,
               }}>Theme unlocked</div>
               <div style={{
-                fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700,
                 color: C.text, letterSpacing: 0.5,
               }}>{themeToast.name}</div>
             </div>
@@ -13035,7 +13035,7 @@ export default function Pattrn() {
               }}
               style={{
                 background: C.accent, border: "none", borderRadius: 8, padding: "6px 12px",
-                color: C.bg, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                color: C.bg, cursor: "pointer", fontFamily: "'Inter', sans-serif",
                 fontSize: 11, fontWeight: 700, letterSpacing: 0.5, whiteSpace: "nowrap",
                 transition: "opacity 0.15s", flexShrink: 0,
               }}
@@ -13070,7 +13070,7 @@ export default function Pattrn() {
               <path d="M12 7v6M12 16v1" stroke={C.accent} strokeWidth="2" strokeLinecap="round"/>
             </svg>
             <span style={{
-              fontFamily: "'DM Sans', sans-serif", fontSize: 12, color: C.text, lineHeight: 1.4,
+              fontFamily: "'Inter', sans-serif", fontSize: 12, color: C.text, lineHeight: 1.4,
             }}>
               Sign in from the <strong style={{ color: C.accent }}>Profile</strong> tab to sync progress
             </span>
@@ -13241,13 +13241,13 @@ export default function Pattrn() {
       ref={playViewScrollRef}
       style={{
       height: "100dvh", minHeight: "100dvh", backgroundColor: C.bg, color: C.text,
-      fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
+      fontFamily: "'Inter', sans-serif",
       display: "flex", flexDirection: "column",
       position: "relative", width: "100%",
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; touch-action: manipulation; } @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} } @keyframes enigmaRotor { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} } @keyframes enigmaBgDrift { 0%{transform:translate(0%,0%) rotate(0deg)} 33%{transform:translate(5%,-3%) rotate(1deg)} 66%{transform:translate(-3%,5%) rotate(-1deg)} 100%{transform:translate(2%,2%) rotate(0.5deg)} } @keyframes enigmaWireDrift { 0%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(3%,-2%) scale(1.02)} 100%{transform:translate(-2%,3%) scale(0.98)} } @keyframes enigmaGlow { 0%,100%{box-shadow:inset 0 0 20px rgba(201,168,76,0.04),inset 0 0 60px rgba(140,107,30,0.02)} 50%{box-shadow:inset 0 0 30px rgba(201,168,76,0.08),inset 0 0 80px rgba(140,107,30,0.04)} } @keyframes enigmaDecrypt { 0%{transform:rotateY(0deg) scale(1);opacity:0.4;filter:brightness(0.5)} 25%{transform:rotateY(90deg) scale(0.9);opacity:0.6;filter:brightness(0.7)} 50%{transform:rotateY(180deg) scale(0.95);opacity:0.8;filter:brightness(1.3)} 75%{transform:rotateY(270deg) scale(1.02);filter:brightness(1.1)} 100%{transform:rotateY(360deg) scale(1);opacity:1;filter:brightness(1)} } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; touch-action: manipulation; } @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} } @keyframes enigmaRotor { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} } @keyframes enigmaBgDrift { 0%{transform:translate(0%,0%) rotate(0deg)} 33%{transform:translate(5%,-3%) rotate(1deg)} 66%{transform:translate(-3%,5%) rotate(-1deg)} 100%{transform:translate(2%,2%) rotate(0.5deg)} } @keyframes enigmaWireDrift { 0%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(3%,-2%) scale(1.02)} 100%{transform:translate(-2%,3%) scale(0.98)} } @keyframes enigmaGlow { 0%,100%{box-shadow:inset 0 0 20px rgba(201,168,76,0.04),inset 0 0 60px rgba(140,107,30,0.02)} 50%{box-shadow:inset 0 0 30px rgba(201,168,76,0.08),inset 0 0 80px rgba(140,107,30,0.04)} } @keyframes enigmaDecrypt { 0%{transform:rotateY(0deg) scale(1);opacity:0.4;filter:brightness(0.5)} 25%{transform:rotateY(90deg) scale(0.9);opacity:0.6;filter:brightness(0.7)} 50%{transform:rotateY(180deg) scale(0.95);opacity:0.8;filter:brightness(1.3)} 75%{transform:rotateY(270deg) scale(1.02);filter:brightness(1.1)} 100%{transform:rotateY(360deg) scale(1);opacity:1;filter:brightness(1)} } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }`}</style>
 
       <Particles show={showParticles} />
 
@@ -13305,16 +13305,16 @@ export default function Pattrn() {
               </div>
               <div style={{ minWidth: 0 }}>
                 <div style={{
-                  fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700,
+                  fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 700,
                   color: tc, letterSpacing: 1.5, textTransform: "uppercase",
                   marginBottom: 3,
                 }}>Achievement unlocked</div>
                 <div style={{
-                  fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700,
                   color: C.text, letterSpacing: 0.5,
                 }}>{achievementToast.label}</div>
                 <div style={{
-                  fontFamily: "'DM Sans', sans-serif", fontSize: 10, color: C.textDim,
+                  fontFamily: "'Inter', sans-serif", fontSize: 10, color: C.textDim,
                   marginTop: 2, lineHeight: 1.3,
                 }}>{achievementToast.desc}</div>
               </div>
@@ -13353,11 +13353,11 @@ export default function Pattrn() {
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{
-                fontFamily: "'Space Mono', monospace", fontSize: 9, fontWeight: 700,
+                fontFamily: "'Inter', sans-serif", fontSize: 9, fontWeight: 700,
                 color: C.accent, letterSpacing: 1.5, textTransform: "uppercase", marginBottom: 2,
               }}>Theme unlocked</div>
               <div style={{
-                fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700,
+                fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700,
                 color: C.text, letterSpacing: 0.5,
               }}>{themeToast.name}</div>
             </div>
@@ -13371,7 +13371,7 @@ export default function Pattrn() {
               }}
               style={{
                 background: C.accent, border: "none", borderRadius: 8, padding: "6px 12px",
-                color: C.bg, cursor: "pointer", fontFamily: "'Space Mono', monospace",
+                color: C.bg, cursor: "pointer", fontFamily: "'Inter', sans-serif",
                 fontSize: 11, fontWeight: 700, letterSpacing: 0.5, whiteSpace: "nowrap",
                 transition: "opacity 0.15s", flexShrink: 0,
               }}
@@ -13393,7 +13393,7 @@ export default function Pattrn() {
           left: "50%", transform: "translateX(-50%)", zIndex: 25,
           backgroundColor: "#54A0FF", borderRadius: 10,
           padding: "8px 16px", boxShadow: "0 4px 16px rgba(84,160,255,0.4)",
-          fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
+          fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700,
           color: "#fff", textAlign: "center",
           animation: "fadeUp 0.3s ease both",
           pointerEvents: "none",
@@ -13410,15 +13410,15 @@ export default function Pattrn() {
         paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: gridTotalWidth }}>
-          <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 18, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, letterSpacing: 2 }}>
+          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, letterSpacing: 2 }}>
             {formatTime(elapsedTime)}
           </div>
           <div style={{ textAlign: "center" }}>
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 10, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
+            <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 10, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
               {isCoop ? "Co-op " : isCoopMosaic ? "Co-op " : ""}{diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
             </span>
             {!isDaily && !isCascade && (
-              <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 13, fontWeight: 700, color: C.accent, letterSpacing: 2 }}>
+              <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.accent, letterSpacing: 2 }}>
                 #{currentPuzzle + 1}
               </span>
             )}
@@ -13436,7 +13436,7 @@ export default function Pattrn() {
                 {/* You indicator */}
                 <div style={{
                   display: "flex", alignItems: "center", gap: 4,
-                  fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: 0.5,
+                  fontFamily: "'Inter', sans-serif", fontSize: 10, letterSpacing: 0.5,
                   color: coopMyLockedIn ? C.correct : COOP_MY_COLOR,
                 }}>
                   <span style={{
@@ -13456,7 +13456,7 @@ export default function Pattrn() {
                   return (
                     <div style={{
                       display: "flex", alignItems: "center", gap: 4,
-                      fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: 0.5,
+                      fontFamily: "'Inter', sans-serif", fontSize: 10, letterSpacing: 0.5,
                       color: !coopPartnerConnected ? C.textDim : isLocked ? (isCorrect ? C.correct : C.incorrect) : color,
                     }}>
                       <span style={{
@@ -13475,7 +13475,7 @@ export default function Pattrn() {
                     onClick={() => setCoopPlayersExpanded(!coopPlayersExpanded)}
                     style={{
                       display: "flex", alignItems: "center", gap: 4,
-                      fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: 0.5,
+                      fontFamily: "'Inter', sans-serif", fontSize: 10, letterSpacing: 0.5,
                       color: coopPartnerLockedIn ? (coopPartnerCorrect ? C.correct : C.incorrect) : C.text,
                       background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
                       padding: "2px 8px", cursor: "pointer",
@@ -13503,7 +13503,7 @@ export default function Pattrn() {
                 {otherEntries.length === 0 && (
                   <div style={{
                     display: "flex", alignItems: "center", gap: 4,
-                    fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: 0.5,
+                    fontFamily: "'Inter', sans-serif", fontSize: 10, letterSpacing: 0.5,
                     color: C.textDim,
                   }}>
                     <span style={{
@@ -13532,7 +13532,7 @@ export default function Pattrn() {
                     return (
                       <div key={uid} style={{
                         display: "flex", alignItems: "center", gap: 6,
-                        fontFamily: "'Space Mono', monospace", fontSize: 10, letterSpacing: 0.5,
+                        fontFamily: "'Inter', sans-serif", fontSize: 10, letterSpacing: 0.5,
                       }}>
                         <span style={{
                           width: 8, height: 8, borderRadius: "50%",
@@ -13564,7 +13564,7 @@ export default function Pattrn() {
           transform: "translateX(-50%)", zIndex: 20,
           backgroundColor: C.surface, border: `1px solid #54A0FF44`, borderRadius: 12,
           padding: "12px 20px", boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
-          fontFamily: "'Space Mono', monospace", fontSize: 12, color: C.text,
+          fontFamily: "'Inter', sans-serif", fontSize: 12, color: C.text,
           textAlign: "center", animation: "fadeUp 0.3s ease both",
         }}>
           <div style={{ marginBottom: 4, fontWeight: 700, color: "#54A0FF" }}>Waiting for partner</div>
@@ -13574,7 +13574,7 @@ export default function Pattrn() {
             style={{
               marginTop: 8, backgroundColor: "#54A0FF", color: "#fff", border: "none",
               padding: "8px 16px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-              fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+              fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer",
               textTransform: "uppercase",
             }}
           >
@@ -13598,7 +13598,7 @@ export default function Pattrn() {
               display: "flex", flexDirection: "column", gap: 3,
               padding: "4px 10px", borderRadius: 8,
               backgroundColor: C.coop + "18", border: `1px solid ${C.coop}44`,
-              fontSize: 10, fontFamily: "'Space Mono', monospace",
+              fontSize: 10, fontFamily: "'Inter', sans-serif",
               cursor: "pointer", transition: "all 0.15s", maxWidth: 160,
             }}
           >
@@ -13793,11 +13793,11 @@ export default function Pattrn() {
       <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: activeTheme.gridBg || C.surface, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
         {gameState === "won" && (
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: isCoop ? 4 : 12, animation: "fadeUp 0.4s ease" }}>
+            <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.correct, marginBottom: isCoop ? 4 : 12, animation: "fadeUp 0.4s ease" }}>
               &#x2713; {isCoop ? "Co-op complete!" : isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : isSpin ? "Nailed it!" : isMosaic ? "Tile complete!" : "Perfect"}
             </div>
             {isCoop && (
-              <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 12, animation: "fadeUp 0.5s 0.1s ease both" }}>
+              <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginBottom: 12, animation: "fadeUp 0.5s 0.1s ease both" }}>
                 Session complete — well played!
               </div>
             )}
@@ -13812,18 +13812,18 @@ export default function Pattrn() {
                   <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
                 </svg>
                 <span style={{
-                  fontSize: 16, fontWeight: 700, fontFamily: "'Space Mono', monospace",
+                  fontSize: 16, fontWeight: 700, fontFamily: "'Inter', sans-serif",
                   color: puzzleRanking.rank <= 3 ? C.gold : C.text,
                 }}>
                   {puzzleRanking.rank}/{puzzleRanking.total}
                 </span>
-                <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", textTransform: "uppercase", letterSpacing: 1 }}>
+                <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
                   {puzzleRanking.rank === 1 ? "1st place!" : puzzleRanking.rank === 2 ? "2nd place" : puzzleRanking.rank === 3 ? "3rd place" : "rank"}
                 </span>
               </div>
             )}
             {puzzleRankingLoading && !isCoop && !isCascade && !isMosaic && (
-              <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", marginBottom: 10, animation: "fadeUp 0.3s ease" }}>
+              <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", marginBottom: 10, animation: "fadeUp 0.3s ease" }}>
                 Loading ranking...
               </div>
             )}
@@ -13832,7 +13832,7 @@ export default function Pattrn() {
               <div style={{
                 marginBottom: 12, animation: "fadeUp 0.5s 0.15s ease both",
               }}>
-                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
+                <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 6 }}>
                   Friends on this puzzle
                 </div>
                 <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
@@ -13846,7 +13846,7 @@ export default function Pattrn() {
                         display: "flex", alignItems: "center", gap: 6, padding: "5px 10px",
                         borderRadius: 8, backgroundColor: C.surface,
                         border: `1px solid ${theyWereFaster ? C.incorrect + "33" : iWasFaster ? C.correct + "33" : C.border}`,
-                        fontSize: 11, fontFamily: "'Space Mono', monospace",
+                        fontSize: 11, fontFamily: "'Inter', sans-serif",
                       }}>
                         {friend.profilePicture ? (
                           <img src={friend.profilePicture} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} />
@@ -13870,7 +13870,7 @@ export default function Pattrn() {
 
         {gameState === "lost" && (
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.incorrect, marginBottom: 4, animation: "fadeUp 0.4s ease" }}>
+            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.incorrect, marginBottom: 4, animation: "fadeUp 0.4s ease" }}>
               {isCoop ? "Co-op failed" : isCascade ? "Run over" : "Not this time"}
             </div>
             <div style={{ fontSize: 12, color: C.textDim }}>
