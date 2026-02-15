@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell, PaintBucket, Eraser, Settings, Cake, Trash2, Edit3, Award, X, Copy } from "lucide-react";
+import { GuidedTourInteractive } from "./GuidedTourInteractive";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -5295,6 +5296,7 @@ export default function Pattrn() {
         <button
           key={item.id}
           onClick={handleClick}
+          data-tour-id={item.id}
           style={{
             width: "100%", height: itemHeight,
             display: "flex", alignItems: "center", gap: 12,
@@ -6776,6 +6778,7 @@ export default function Pattrn() {
             {/* Menu toggle button */}
             <div
               onClick={(e) => { e.stopPropagation(); handleToggle(); }}
+              data-tour-id="menu-button"
               style={{
                 flex: 1, height: fabSize,
                 display: "flex", alignItems: "center", justifyContent: isOpen ? "flex-end" : "center",
@@ -12911,267 +12914,66 @@ export default function Pattrn() {
 
       {renderContextButton("menu")}
 
-      {/* Guided Tour Overlay */}
-      {showGuidedTour && view === "menu" && (() => {
-        const isBasicTour = tourPhase === "basic";
-        const isCoopTour = tourPhase === "coop";
-        const maxBasicSteps = 4;
-        const maxCoopSteps = 3;
-        const maxSteps = isCoopTour ? maxCoopSteps : maxBasicSteps;
-        const isLastStep = guidedTourStep === maxSteps - 1;
+      {/* Guided Tour - Interactive */}
+      {showGuidedTour && (
+        <GuidedTourInteractive
+          step={guidedTourStep}
+          onAdvance={() => {
+            const isBasicTour = tourPhase === "basic";
+            const isCoopTour = tourPhase === "coop";
+            const maxBasicSteps = 9;
+            const maxCoopSteps = 3;
+            const maxSteps = isCoopTour ? maxCoopSteps : maxBasicSteps;
+            const isLastStep = guidedTourStep === maxSteps - 1;
 
-        const handleSkip = () => {
-          const tourType = isCoopTour ? "coop" : "basic";
-          if (firebaseUser) {
-            saveGuidedTourStatus(firebaseUser.uid, true, tourType).catch(() => {});
-          } else if (isBasicTour) {
-            try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
-          }
-          setShowGuidedTour(false);
-          setRadialMenuStack([]);
-          if (isCoopTour) setHasSeenCoopTour(true);
-          else setHasSeenGuidedTour(true);
-        };
-
-        const handleNext = () => {
-          if (!isLastStep) {
-            setGuidedTourStep(prev => prev + 1);
-          } else {
-            // Last step logic
-            if (isBasicTour && !firebaseUser) {
-              // Prompt to create account at end of basic tour for logged-out users
-              try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
-              setShowGuidedTour(false);
-              setHasSeenGuidedTour(true);
-              setRadialMenuStack(["root", "sign-in"]);
-              setAccountTab("signup");
-              setAccountError("");
-            } else if (isBasicTour && firebaseUser) {
-              // Logged-in user finishing basic tour - start co-op tour
-              saveGuidedTourStatus(firebaseUser.uid, true, "basic").catch(() => {});
-              setHasSeenGuidedTour(true);
-              setTourPhase("coop");
-              setGuidedTourStep(0);
-            } else if (isCoopTour) {
-              // Finished co-op tour
-              saveGuidedTourStatus(firebaseUser.uid, true, "coop").catch(() => {});
-              setShowGuidedTour(false);
-              setRadialMenuStack([]);
-              setHasSeenCoopTour(true);
+            if (!isLastStep) {
+              setGuidedTourStep(prev => prev + 1);
+            } else {
+              // Last step logic
+              if (isBasicTour && !firebaseUser) {
+                try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
+                setShowGuidedTour(false);
+                setHasSeenGuidedTour(true);
+              } else if (isBasicTour && firebaseUser) {
+                saveGuidedTourStatus(firebaseUser.uid, true, "basic").catch(() => {});
+                setHasSeenGuidedTour(true);
+                setTourPhase("coop");
+                setGuidedTourStep(0);
+              } else if (isCoopTour) {
+                saveGuidedTourStatus(firebaseUser.uid, true, "coop").catch(() => {});
+                setShowGuidedTour(false);
+                setRadialMenuStack([]);
+                setHasSeenCoopTour(true);
+              }
             }
-          }
-        };
-
-        return (
-          <div style={{
-            position: "fixed", inset: 0, zIndex: 90,
-            backgroundColor: "rgba(0, 0, 0, 0.7)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            padding: 20, boxSizing: "border-box",
-          }}>
-            <div style={{
-              backgroundColor: C.surface, borderRadius: 16,
-              border: `1px solid ${C.accent}33`,
-              padding: 24, maxWidth: 400, width: "100%",
-              boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-              animation: "fadeUp 0.3s ease both",
-            }}>
-              {/* Tour Header */}
-              <div style={{
-                display: "flex", alignItems: "center", gap: 12, marginBottom: 16,
-              }}>
-                <div style={{
-                  width: 40, height: 40, borderRadius: "50%",
-                  background: `linear-gradient(135deg, ${isCoopTour ? C.coop + "22" : C.accent + "22"} 0%, ${isCoopTour ? C.coop + "44" : C.accent + "44"} 100%)`,
-                  border: `2px solid ${isCoopTour ? C.coop + "66" : C.accent + "66"}`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 20,
-                }}>{isCoopTour ? "🤝" : "👋"}</div>
-                <div>
-                  <div style={{
-                    fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700,
-                    color: C.text, lineHeight: 1.2,
-                  }}>{isCoopTour ? "Co-op Mode" : "Welcome to Pattrn!"}</div>
-                  <div style={{
-                    fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.textDim,
-                    letterSpacing: 0.5, textTransform: "uppercase",
-                  }}>{isCoopTour ? "Co-op Tour" : "Quick Tour"} • Step {guidedTourStep + 1} of {maxSteps}</div>
-                </div>
-              </div>
-
-              {/* Tour Content */}
-              <div style={{
-                marginBottom: 20, minHeight: 120,
-              }}>
-                {/* Basic Tour Steps */}
-                {isBasicTour && guidedTourStep === 0 && (
-                  <>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600,
-                      color: C.accent, marginBottom: 8,
-                    }}>🏠 Home & Daily Puzzle</div>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.text,
-                      lineHeight: 1.6,
-                    }}>
-                      Your home base! Here you'll find the daily puzzle, your streak, and quick access to all game modes. Play today's puzzle to keep your streak alive!
-                    </div>
-                  </>
-                )}
-                {isBasicTour && guidedTourStep === 1 && (
-                  <>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600,
-                      color: C.accent, marginBottom: 8,
-                    }}>📱 Menu Button (Bottom Right)</div>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.text,
-                      lineHeight: 1.6,
-                    }}>
-                      Tap the menu button in the bottom right corner to access all features: Quick Play, Home, Mosaic Gallery, Profile, Themes, and more!
-                    </div>
-                  </>
-                )}
-                {isBasicTour && guidedTourStep === 2 && (
-                  <>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600,
-                      color: C.accent, marginBottom: 8,
-                    }}>🎮 Quick Play & Modes</div>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.text,
-                      lineHeight: 1.6,
-                    }}>
-                      Use Quick Play to jump into different difficulty levels (Easy, Medium, Hard), or try special modes like Daily, Cascade, and Blind puzzles for extra challenges!
-                    </div>
-                  </>
-                )}
-                {isBasicTour && guidedTourStep === 3 && (
-                  <>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600,
-                      color: C.accent, marginBottom: 8,
-                    }}>🎨 Profile & Customization</div>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.text,
-                      lineHeight: 1.6, marginBottom: !firebaseUser ? 12 : 0,
-                    }}>
-                      Access your profile from the menu to view achievements, customize your username, change themes, and track your progress.
-                    </div>
-                    {!firebaseUser && (
-                      <div style={{
-                        padding: 12, borderRadius: 8,
-                        background: `linear-gradient(135deg, ${C.coop}11 0%, ${C.coop}22 100%)`,
-                        border: `1px solid ${C.coop}33`,
-                        marginTop: 12,
-                      }}>
-                        <div style={{
-                          fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600,
-                          color: C.coop, marginBottom: 4,
-                        }}>🤝 Want to play with friends?</div>
-                        <div style={{
-                          fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.text,
-                          lineHeight: 1.5,
-                        }}>
-                          Create an account to unlock Co-op mode and play puzzles together!
-                        </div>
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {/* Co-op Tour Steps */}
-                {isCoopTour && guidedTourStep === 0 && (
-                  <>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600,
-                      color: C.coop, marginBottom: 8,
-                    }}>🤝 Co-op Mode</div>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.text,
-                      lineHeight: 1.6,
-                    }}>
-                      Play puzzles together with friends in real-time! Each player gets assigned specific cells to fill, and you can pass cells to teammates if you need help.
-                    </div>
-                  </>
-                )}
-                {isCoopTour && guidedTourStep === 1 && (
-                  <>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600,
-                      color: C.coop, marginBottom: 8,
-                    }}>🎮 Starting a Session</div>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.text,
-                      lineHeight: 1.6,
-                    }}>
-                      Open the menu and select Co-op to create a new session. Choose a puzzle difficulty, then invite friends by sharing the link or sending invites directly to your friends list!
-                    </div>
-                  </>
-                )}
-                {isCoopTour && guidedTourStep === 2 && (
-                  <>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 600,
-                      color: C.coop, marginBottom: 8,
-                    }}>⚡ Playing Together</div>
-                    <div style={{
-                      fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.text,
-                      lineHeight: 1.6,
-                    }}>
-                      Work together to solve the puzzle! You'll see your teammates' moves in real-time. Lock in your answers when you're confident, and celebrate together when the puzzle is complete!
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Tour Actions */}
-              <div style={{
-                display: "flex", gap: 8, justifyContent: "space-between",
-              }}>
-                <button
-                  onClick={handleSkip}
-                  style={{
-                    padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 600,
-                    fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                    background: "none", border: `1px solid ${C.textDim}44`,
-                    color: C.textDim, cursor: "pointer",
-                  }}
-                >
-                  Skip Tour
-                </button>
-                <div style={{ display: "flex", gap: 8 }}>
-                  {guidedTourStep > 0 && (
-                    <button
-                      onClick={() => setGuidedTourStep(prev => prev - 1)}
-                      style={{
-                        padding: "10px 16px", borderRadius: 10, fontSize: 12, fontWeight: 600,
-                        fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                        background: "none", border: `1px solid ${isCoopTour ? C.coop + "55" : C.accent + "55"}`,
-                        color: isCoopTour ? C.coop : C.accent, cursor: "pointer",
-                      }}
-                    >
-                      Back
-                    </button>
-                  )}
-                  <button
-                    onClick={handleNext}
-                    style={{
-                      padding: "10px 20px", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                      fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-                      background: isCoopTour ? C.coop : C.accent,
-                      color: isCoopTour ? "#fff" : C.bg,
-                      border: "none", cursor: "pointer",
-                    }}
-                  >
-                    {isLastStep ? (isBasicTour && !firebaseUser ? "Create Account" : "Got It!") : "Next"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+          }}
+          onSkip={() => {
+            const tourType = tourPhase === "coop" ? "coop" : "basic";
+            if (firebaseUser) {
+              saveGuidedTourStatus(firebaseUser.uid, true, tourType).catch(() => {});
+            } else if (tourPhase === "basic") {
+              try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
+            }
+            setShowGuidedTour(false);
+            setRadialMenuStack([]);
+            if (tourPhase === "coop") setHasSeenCoopTour(true);
+            else setHasSeenGuidedTour(true);
+          }}
+          tourPhase={tourPhase}
+          colors={C}
+          view={view}
+          radialMenuStack={radialMenuStack}
+          setRadialMenuStack={setRadialMenuStack}
+          setView={setView}
+          setDifficulty={setDifficulty}
+          puzzleIndex={currentPuzzle}
+          setPuzzleIndex={(idx) => {/* handled by tour advancement */}}
+          selectedCell={selectedCell}
+          fills={fills}
+          puzzle={puzzle}
+          firebaseUser={firebaseUser}
+        />
+      )}
 
       {globalModalsEl}
       </div>
