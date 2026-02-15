@@ -2979,6 +2979,8 @@ export default function Pattrn() {
   const customMosaicPuzzlesRef = useRef(null); // array of 25 puzzle objects when playing custom mosaic
   const [creatorReturnView, setCreatorReturnView] = useState("menu"); // where to go when leaving creator
   const [showSaveDrawer, setShowSaveDrawer] = useState(false); // drawer for naming mosaic on save
+  const creatorColorScrollRef = useRef(null); // color picker carousel scroll container
+  const creatorColorDragRef = useRef({ active: false, startX: 0, scrollStart: 0, moved: false, lastX: 0, lastT: 0, velX: 0, rafId: 0 });
   const [friendsList, setFriendsList] = useState([]); // array of { uid, username, profilePicture }
   const [addFriendInput, setAddFriendInput] = useState("");
   const [addFriendMsg, setAddFriendMsg] = useState("");
@@ -3258,6 +3260,51 @@ export default function Pattrn() {
     setCreatorTitle("");
     setCreatorEditingId(null);
     setCreatorTool("draw");
+  }, []);
+
+  // Color picker carousel — momentum drag (mirrors TokenPicker)
+  useEffect(() => {
+    const el = creatorColorScrollRef.current;
+    if (!el) return;
+    const d = creatorColorDragRef.current;
+    const getX = (e) => e.touches ? e.touches[0].clientX : e.clientX;
+    const down = (e) => {
+      cancelAnimationFrame(d.rafId);
+      d.active = true; d.moved = false;
+      d.startX = getX(e); d.scrollStart = el.scrollLeft;
+      d.lastX = d.startX; d.lastT = Date.now(); d.velX = 0;
+    };
+    const move = (e) => {
+      if (!d.active) return;
+      const x = getX(e);
+      const dx = d.startX - x;
+      if (Math.abs(dx) > 3) d.moved = true;
+      const now = Date.now();
+      const dt = now - d.lastT;
+      if (dt > 0) d.velX = (d.lastX - x) / dt;
+      d.lastX = x; d.lastT = now;
+      el.scrollLeft = d.scrollStart + dx;
+    };
+    const up = () => {
+      if (!d.active) return;
+      d.active = false;
+      let v = d.velX * 16;
+      if (Math.abs(v) < 0.5) return;
+      const coast = () => {
+        v *= 0.95;
+        if (Math.abs(v) < 0.5) return;
+        el.scrollLeft += v;
+        d.rafId = requestAnimationFrame(coast);
+      };
+      d.rafId = requestAnimationFrame(coast);
+    };
+    el.addEventListener("touchstart", down, { passive: true });
+    el.addEventListener("touchmove", move, { passive: true });
+    el.addEventListener("touchend", up);
+    el.addEventListener("mousedown", down);
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => { cancelAnimationFrame(d.rafId); el.removeEventListener("touchstart", down); el.removeEventListener("touchmove", move); el.removeEventListener("touchend", up); el.removeEventListener("mousedown", down); window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
   }, []);
 
   // Pointer-move based painting: uses element coordinates for smooth drag across tiny cells
@@ -9708,50 +9755,61 @@ export default function Pattrn() {
         </div>
       </div>
 
-      {/* Color picker — Liquid Glass row above main menu */}
+      {/* Color picker — Liquid Glass pill carousel above main menu */}
       <div style={{
         position: "fixed",
-        bottom: `calc(${16 + 56 + 8}px + env(safe-area-inset-bottom, 0px))`,
+        bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
         right: 20,
-        display: "flex", alignItems: "center", gap: 4,
-        padding: "6px 8px",
-        borderRadius: 18,
+        borderRadius: 9999,
         background: activeTheme.gridBg || C.surface,
         backdropFilter: "blur(28px) saturate(200%)",
         WebkitBackdropFilter: "blur(28px) saturate(200%)",
         border: "1px solid rgba(255,255,255,0.16)",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15)",
         zIndex: 85,
-        flexWrap: "wrap",
+        padding: "6px 4px",
         maxWidth: "calc(100vw - 40px)",
+        overflow: "hidden",
       }}>
         {/* Liquid Glass sheen */}
         <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none" }}>
           <div style={{ position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%", background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)", borderRadius: "inherit" }} />
         </div>
-        {CREATOR_COLORS.map(color => (
+        <div ref={creatorColorScrollRef} className="token-picker-scroll" style={{
+          display: "flex", gap: 10, justifyContent: "flex-start", padding: "8px 16px",
+          flexWrap: "nowrap", overflowX: "auto", flex: "1 1 auto", minWidth: 0, maxWidth: "100%",
+          WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none",
+          touchAction: "pan-x", willChange: "scroll-position",
+        }}>
+          {CREATOR_COLORS.map(color => (
+            <div
+              key={color}
+              onClick={() => { if (!creatorColorDragRef.current.moved) setCreatorColor(color); }}
+              style={{
+                width: 48, height: 48, borderRadius: 12, backgroundColor: color, flexShrink: 0,
+                border: creatorColor === color ? `3px solid ${C.text}` : "3px solid transparent",
+                cursor: "pointer",
+                transition: "transform 0.2s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s cubic-bezier(0.4,0,0.2,1), border-color 0.2s cubic-bezier(0.4,0,0.2,1)",
+                transform: creatorColor === color ? "scale(1.15)" : "scale(1)",
+                boxShadow: creatorColor === color ? `0 0 12px ${color}88` : `0 2px 8px rgba(0,0,0,0.25)`,
+              }}
+            />
+          ))}
+          {/* Eraser */}
           <div
-            key={color}
-            onClick={() => setCreatorColor(color)}
+            onClick={() => { if (!creatorColorDragRef.current.moved) setCreatorColor(null); }}
             style={{
-              width: 22, height: 22, borderRadius: 6, backgroundColor: color,
-              border: creatorColor === color ? `2px solid ${C.accent}` : `1.5px solid rgba(255,255,255,0.15)`,
-              cursor: "pointer", transition: "all 0.15s", flexShrink: 0,
-              boxShadow: creatorColor === color ? `0 0 8px ${C.accent}66` : "none",
+              width: 48, height: 48, borderRadius: 12, flexShrink: 0,
+              backgroundColor: C.surface,
+              border: creatorColor === null ? `3px solid ${C.text}` : "3px solid transparent",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "transform 0.2s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s cubic-bezier(0.4,0,0.2,1), border-color 0.2s cubic-bezier(0.4,0,0.2,1)",
+              transform: creatorColor === null ? "scale(1.15)" : "scale(1)",
+              boxShadow: creatorColor === null ? `0 0 12px ${C.accent}88` : `0 2px 8px rgba(0,0,0,0.25)`,
             }}
-          />
-        ))}
-        {/* Eraser */}
-        <div
-          onClick={() => setCreatorColor(null)}
-          style={{
-            width: 22, height: 22, borderRadius: 6,
-            backgroundColor: creatorColor === null ? "rgba(255,255,255,0.15)" : "transparent",
-            border: creatorColor === null ? `2px solid ${C.accent}` : `1.5px solid rgba(255,255,255,0.15)`,
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "all 0.15s", flexShrink: 0,
-          }}
-        >
-          <Eraser size={12} color={creatorColor === null ? C.accent : "rgba(255,255,255,0.5)"} strokeWidth={2} />
+          >
+            <Eraser size={20} color={creatorColor === null ? C.accent : "rgba(255,255,255,0.5)"} strokeWidth={2} />
+          </div>
         </div>
       </div>
 
