@@ -6151,7 +6151,14 @@ export default function Pattrn() {
                             const level = coopSetupMode === "cascade" ? 0 : coopSetupLevel;
                             startPuzzle(level, coopSetupMode);
                             setView("play");
-                            setTimeout(() => { startCoopSession(); }, 300);
+                            setTimeout(() => {
+                              startCoopSession();
+                              // Close menu and open coop-start invite panel after starting session
+                              setTimeout(() => {
+                                setCoopSelectedFriends(new Set());
+                                setRadialMenuStack(["root", "coop-start"]);
+                              }, 300);
+                            }, 300);
                           }
                         } catch { /* ignore */ }
                         setCoopSetupStarting(false);
