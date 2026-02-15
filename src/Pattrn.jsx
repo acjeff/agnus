@@ -4569,8 +4569,9 @@ export default function Pattrn() {
     const visibleItemCount = contextualItems.length + (showNav ? navItems.length : 0);
     const openHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize;
 
-    // Elastic spring curve
-    const elastic = "cubic-bezier(0.34, 1.56, 0.64, 1)";
+    // Liquid Glass spring curves — fast initial movement, subtle overshoot, quick settle
+    const springOpen = "cubic-bezier(0.175, 0.885, 0.32, 1.175)";
+    const springClose = "cubic-bezier(0.4, 0, 0.7, 1)";
 
     const handleToggle = () => {
       if (isOpen) setRadialMenuStack([]);
@@ -4584,7 +4585,7 @@ export default function Pattrn() {
         else if (item.sub) setRadialMenuStack(prev => [...prev, item.sub]);
         else if (item.action) { item.action(); setRadialMenuStack([]); }
       };
-      const staggerIn = 0.08 + animIndex * 0.04;
+      const staggerIn = 0.04 + animIndex * 0.03;
       return (
         <button
           key={item.id}
@@ -4600,10 +4601,10 @@ export default function Pattrn() {
             fontSize: 11, fontWeight: 600,
             letterSpacing: 0.5, textTransform: "uppercase",
             opacity: isOpen ? 1 : 0,
-            transform: isOpen ? "translateY(0) scale(1)" : "translateY(12px) scale(0.9)",
+            transform: isOpen ? "translateY(0)" : "translateY(8px)",
             transition: isOpen
-              ? `opacity 0.35s ${elastic} ${staggerIn}s, transform 0.35s ${elastic} ${staggerIn}s, background 0.15s`
-              : `opacity 0.18s ease ${animIndex * 0.015}s, transform 0.18s ease ${animIndex * 0.015}s, background 0.15s`,
+              ? `opacity 0.2s ${springOpen} ${staggerIn}s, transform 0.25s ${springOpen} ${staggerIn}s, background 0.15s`
+              : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s, background 0.15s`,
             pointerEvents: isOpen ? "auto" : "none",
           }}
           onMouseEnter={e => { if (isOpen) e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
@@ -4654,8 +4655,8 @@ export default function Pattrn() {
             flexDirection: "column",
             cursor: isOpen ? "default" : "pointer",
             transition: isOpen
-              ? `width 0.5s ${elastic}, height 0.5s ${elastic}, border-radius 0.5s ${elastic}, transform 0.15s ease, box-shadow 0.15s ease`
-              : `width 0.4s ${elastic}, height 0.4s ${elastic}, border-radius 0.4s ${elastic}, transform 0.15s ease, box-shadow 0.15s ease`,
+              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, transform 0.15s ease, box-shadow 0.15s ease`
+              : `width 0.22s ${springClose}, height 0.22s ${springClose}, border-radius 0.22s ${springClose}, transform 0.15s ease, box-shadow 0.15s ease`,
           }}
           onClick={isOpen ? undefined : handleToggle}
           onMouseEnter={e => { if (!isOpen) { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.boxShadow = `0 8px 32px rgba(0,0,0,0.5), 0 0 16px ${C.accent}22, inset 0 1px 0 rgba(255,255,255,0.15), inset 0 -1px 0 rgba(0,0,0,0.1)`; } }}
@@ -4674,7 +4675,7 @@ export default function Pattrn() {
           </div>
 
           {/* Menu content — always rendered, animated via transitions */}
-          <div style={{ padding: `${panelPad}px 0 0 0`, flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
             {/* Contextual items — page-specific actions */}
             {contextualItems.map((item, i) => renderItem(item, i, item.isBack))}
 
@@ -4684,8 +4685,8 @@ export default function Pattrn() {
                 padding: "6px 16px",
                 opacity: isOpen ? 1 : 0,
                 transition: isOpen
-                  ? `opacity 0.3s ease ${0.08 + contextualItems.length * 0.04}s`
-                  : "opacity 0.12s ease 0s",
+                  ? `opacity 0.2s ease ${0.04 + contextualItems.length * 0.03}s`
+                  : "opacity 0.08s ease 0s",
               }}>
                 <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
               </div>
