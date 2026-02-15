@@ -4592,7 +4592,36 @@ export default function Pattrn() {
     globe: (c) => <Globe size={18} color={c} strokeWidth={2} />,
     folder: (c) => <FolderOpen size={18} color={c} strokeWidth={2} />,
     plus: (c) => <Plus size={18} color={c} strokeWidth={2} />,
-    users: (c) => <Users size={18} color={c} strokeWidth={2} />,
+    users: (c) => {
+      const hasActiveSessions = activeCoopSessions.filter(s => s.status !== "complete").length > 0;
+      return (
+        <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+          <Users size={18} color={c} strokeWidth={2} />
+          {hasActiveSessions && (
+            <span style={{
+              position: "absolute",
+              top: -6,
+              right: -8,
+              minWidth: 16,
+              height: 16,
+              borderRadius: 8,
+              backgroundColor: "#A855F7",
+              color: "#fff",
+              fontSize: 9,
+              fontWeight: 700,
+              fontFamily: "'Inter', sans-serif",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 4px",
+              boxShadow: "0 0 8px rgba(168, 85, 247, 0.6)",
+            }}>
+              {activeCoopSessions.filter(s => s.status !== "complete").length > 99 ? "99+" : activeCoopSessions.filter(s => s.status !== "complete").length}
+            </span>
+          )}
+        </span>
+      );
+    },
     back: (c) => <ChevronLeft size={18} color={c} strokeWidth={2} />,
     grid: (c) => <Grid3X3 size={18} color={c} strokeWidth={2} />,
     eye: (c) => <Eye size={18} color={c} strokeWidth={2} />,
@@ -5237,15 +5266,35 @@ export default function Pattrn() {
 
       // Define glow configurations for special menu items
       const getItemGlow = () => {
+        const hasActiveSessions = activeCoopSessions.filter(s => s.status !== "complete").length > 0;
+
+        // Blue glow for notifications
         if (item.id === "notifications" && notifications.length > 0) {
           return {
-            background: "radial-gradient(ellipse at center, rgba(84, 160, 255, 0.15) 0%, rgba(84, 160, 255, 0.08) 40%, transparent 70%)",
-            hoverBackground: "radial-gradient(ellipse at center, rgba(84, 160, 255, 0.22) 0%, rgba(84, 160, 255, 0.12) 40%, transparent 70%)",
+            background: "radial-gradient(ellipse at center, rgba(84, 160, 255, 0.25) 0%, rgba(84, 160, 255, 0.15) 40%, transparent 70%)",
+            hoverBackground: "radial-gradient(ellipse at center, rgba(84, 160, 255, 0.35) 0%, rgba(84, 160, 255, 0.22) 40%, transparent 70%)",
             animation: "subtleGlowPulse 2.5s ease-in-out infinite",
           };
         }
-        // Future: Add rainbow glow for quick play here
-        // if (item.id === "quick-play") { return { background: "radial-gradient(...rainbow...)", ... }; }
+
+        // Purple glow for coop items when there are active sessions
+        if ((item.id === "nav-coop-menu" || item.id === "coop-active") && hasActiveSessions) {
+          return {
+            background: "radial-gradient(ellipse at center, rgba(168, 85, 247, 0.25) 0%, rgba(168, 85, 247, 0.15) 40%, transparent 70%)",
+            hoverBackground: "radial-gradient(ellipse at center, rgba(168, 85, 247, 0.35) 0%, rgba(168, 85, 247, 0.22) 40%, transparent 70%)",
+            animation: "subtleGlowPulse 2.5s ease-in-out infinite",
+          };
+        }
+
+        // Rainbow glow for Quick Play
+        if (item.id === "nav-play") {
+          return {
+            background: "radial-gradient(ellipse at center, rgba(255,0,0,0.18) 0%, rgba(255,127,0,0.16) 12%, rgba(255,255,0,0.14) 24%, rgba(0,255,0,0.14) 36%, rgba(0,127,255,0.14) 48%, rgba(148,0,211,0.12) 60%, transparent 70%)",
+            hoverBackground: "radial-gradient(ellipse at center, rgba(255,0,0,0.25) 0%, rgba(255,127,0,0.22) 12%, rgba(255,255,0,0.20) 24%, rgba(0,255,0,0.20) 36%, rgba(0,127,255,0.20) 48%, rgba(148,0,211,0.18) 60%, transparent 70%)",
+            animation: "subtleGlowPulse 2.5s ease-in-out infinite",
+          };
+        }
+
         return null;
       };
 
