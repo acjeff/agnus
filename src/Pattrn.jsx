@@ -11695,18 +11695,17 @@ export default function Pattrn() {
               ...(logoExpanded ? { paddingRight: 16, gap: 8 } : {}),
             }}
           >
-            <img src="/app-icon.png" alt="Agnus" style={{ width: 34, height: 34, borderRadius: 17, flexShrink: 0 }} />
-            <span style={{
+            <img src="/app-icon.png" alt="Agnus" style={{ width: 34, height: 34, borderRadius: 17, flexShrink: 0, display: "block" }} />
+            <div style={{
               fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700, letterSpacing: 1.5, color: C.accent, lineHeight: 1,
               whiteSpace: "nowrap",
-              display: "inline-block",
               maxWidth: logoExpanded ? 80 : 0,
               opacity: logoExpanded ? 1 : 0,
               overflow: "hidden",
               transition: "max-width 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease",
             }}>
               Agnus
-            </span>
+            </div>
           </div>
           {/* Right: action buttons pill */}
           {firebaseConfigured && firebaseUser && (
