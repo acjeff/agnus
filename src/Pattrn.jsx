@@ -2855,6 +2855,18 @@ export default function Pattrn() {
 
   // Radial context button state — stack for nested menus (empty = closed, ["root"] = top level, ["root","play"] = sub-menu)
   const [radialMenuStack, setRadialMenuStack] = useState([]);
+  // Lock body scroll when context menu is open
+  useEffect(() => {
+    const menuOpen = radialMenuStack.length > 0;
+    if (menuOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    }
+    return () => { document.body.style.overflow = ""; document.body.style.touchAction = ""; };
+  }, [radialMenuStack.length]);
 
   // Theme state
   const [activeThemeId, setActiveThemeId] = useState(() => loadTheme());
@@ -4605,7 +4617,12 @@ export default function Pattrn() {
     const hasContextual = contextualItems.length > 0;
     const showDivider = showNav && hasContextual;
     const visibleItemCount = (showNav ? filteredNav.length : 0) + contextualItems.length;
-    const openHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize;
+    const contentHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize;
+    // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
+    const bottomOffset = 80; // matches the bottom: calc(80px + ...) positioning
+    const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
+    const openHeight = Math.min(contentHeight, maxPanelHeight);
+    const needsScroll = contentHeight > maxPanelHeight;
 
     // Liquid Glass spring curves — fast initial movement, subtle overshoot, quick settle
     const springOpen = "cubic-bezier(0.175, 0.885, 0.32, 1.175)";
@@ -4666,11 +4683,12 @@ export default function Pattrn() {
 
     return (
       <>
-        {/* Click-away layer — transparent, page stays usable */}
+        {/* Click-away layer — blocks scrolling underneath */}
         {isOpen && (
           <div
             onClick={() => setRadialMenuStack([])}
-            style={{ position: "fixed", inset: 0, zIndex: 84 }}
+            onTouchMove={e => e.preventDefault()}
+            style={{ position: "fixed", inset: 0, zIndex: 84, touchAction: "none", overscrollBehavior: "none" }}
           />
         )}
 
@@ -4712,7 +4730,7 @@ export default function Pattrn() {
           </div>
 
           {/* Menu content — always rendered, animated via transitions */}
-          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden" }}>
+          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen && needsScroll ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}>
             {/* Persistent nav items — always first */}
             {showNav && filteredNav.map((item, i) => renderItem(item, i, false))}
 
