@@ -9686,7 +9686,7 @@ export default function Pattrn() {
         <div
           onClick={() => setCreatorTool("draw")}
           style={{
-            width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center",
+            width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", position: "relative",
             backgroundColor: creatorTool === "draw" ? "rgba(255,255,255,0.12)" : "transparent",
             transition: "background-color 0.15s",
@@ -9698,7 +9698,7 @@ export default function Pattrn() {
         <div
           onClick={() => setCreatorTool("fill")}
           style={{
-            width: 48, height: 48, display: "flex", alignItems: "center", justifyContent: "center",
+            width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center",
             cursor: "pointer", position: "relative",
             backgroundColor: creatorTool === "fill" ? "rgba(255,255,255,0.12)" : "transparent",
             transition: "background-color 0.15s",
