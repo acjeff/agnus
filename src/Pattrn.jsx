@@ -13401,10 +13401,36 @@ export default function Pattrn() {
               Session complete — well played!
             </div>
           )}
+          {/* Global ranking display */}
+          {puzzleRanking && !isCoop && !isCascade && !isMosaic && (
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px",
+              borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              marginTop: 16, animation: "fadeUp 0.5s 0.15s ease both", pointerEvents: "auto",
+            }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={puzzleRanking.rank <= 3 ? C.gold : C.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
+              </svg>
+              <span style={{
+                fontSize: 16, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                color: puzzleRanking.rank <= 3 ? C.gold : C.text,
+              }}>
+                {puzzleRanking.rank}/{puzzleRanking.total}
+              </span>
+              <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
+                {puzzleRanking.rank === 1 ? "1st place!" : puzzleRanking.rank === 2 ? "2nd place" : puzzleRanking.rank === 3 ? "3rd place" : "rank"}
+              </span>
+            </div>
+          )}
+          {puzzleRankingLoading && !isCoop && !isCascade && !isMosaic && (
+            <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 16, animation: "fadeUp 0.5s 0.15s ease both" }}>
+              Loading ranking...
+            </div>
+          )}
           {/* Friends who completed this puzzle */}
           {Object.keys(friendsPuzzleData).length > 0 && !isCoop && !isCascade && !isMosaic && (
             <div style={{
-              marginTop: 16, animation: "fadeUp 0.5s 0.2s ease both", pointerEvents: "auto",
+              marginTop: 12, animation: "fadeUp 0.5s 0.2s ease both", pointerEvents: "auto",
             }}>
               <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
                 Friends on this puzzle
@@ -13445,36 +13471,6 @@ export default function Pattrn() {
 
       {/* Fixed bottom bar: coop UI + game state info */}
       <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: activeTheme.gridBg || C.surface, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-        {gameState === "won" && (
-          <div style={{ textAlign: "center" }}>
-            {/* Global ranking display */}
-            {puzzleRanking && !isCoop && !isCascade && !isMosaic && (
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: 8, padding: "8px 16px",
-                borderRadius: 10, backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                marginBottom: 10, animation: "fadeUp 0.5s 0.1s ease both",
-              }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={puzzleRanking.rank <= 3 ? C.gold : C.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/>
-                </svg>
-                <span style={{
-                  fontSize: 16, fontWeight: 700, fontFamily: "'Inter', sans-serif",
-                  color: puzzleRanking.rank <= 3 ? C.gold : C.text,
-                }}>
-                  {puzzleRanking.rank}/{puzzleRanking.total}
-                </span>
-                <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
-                  {puzzleRanking.rank === 1 ? "1st place!" : puzzleRanking.rank === 2 ? "2nd place" : puzzleRanking.rank === 3 ? "3rd place" : "rank"}
-                </span>
-              </div>
-            )}
-            {puzzleRankingLoading && !isCoop && !isCascade && !isMosaic && (
-              <div style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", marginBottom: 10, animation: "fadeUp 0.3s ease" }}>
-                Loading ranking...
-              </div>
-            )}
-          </div>
-        )}
 
         {gameState === "lost" && (
           <div style={{ textAlign: "center" }}>
