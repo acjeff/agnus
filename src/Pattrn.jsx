@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogOut, Check, RotateCcw, ChevronRight, HandHelping } from "lucide-react";
+import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock } from "lucide-react";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -2950,6 +2950,7 @@ export default function Pattrn() {
   const [coopIncomingPass, setCoopIncomingPass] = useState(null); // { fromUid, fromName, fromColor, cellKey } — incoming pass request
   const [coopPendingPassCell, setCoopPendingPassCell] = useState(null); // cellKey of outgoing pending pass
   const [coopPassPlayerPicker, setCoopPassPlayerPicker] = useState(false); // show player picker for pass
+  const [pendingPassOpen, setPendingPassOpen] = useState(false); // toggle pending pass UI in pill
   const COOP_NEON_COLORS = ["#FF6B6B", "#00E676", "#FF9100", "#E040FB", "#FFEA00", "#00E5FF", "#FF4081", "#76FF03"];
   const COOP_MY_COLOR = "#54A0FF";
 
@@ -4507,6 +4508,12 @@ export default function Pattrn() {
     refresh: (c) => <RotateCcw size={18} color={c} strokeWidth={2} />,
     forward: (c) => <ChevronRight size={18} color={c} strokeWidth={2} />,
     pass: (c) => <HandHelping size={18} color={c} strokeWidth={2} />,
+    "pass-pending": (c) => (
+      <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+        <HandHelping size={18} color={c} strokeWidth={2} />
+        <Clock size={10} color="#f59e0b" strokeWidth={2.5} style={{ position: "absolute", bottom: -2, right: -4 }} />
+      </span>
+    ),
   };
 
   // Quick Play sub-menu — shared across all views (accessed from nav)
@@ -4652,7 +4659,7 @@ export default function Pattrn() {
     // Pass UI state — rendered inside the Liquid Glass panel
     const showPassPlayerPicker = coopPassPlayerPicker && !coopPassMode;
     const showPassBanner = !!coopPassMode;
-    const showPassPending = !!coopPendingPassCell;
+    const showPassPending = pendingPassOpen && !!coopPendingPassCell;
     const showPassIncoming = gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey;
     const hasPassUI = showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming;
     const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : 0;
@@ -4741,7 +4748,7 @@ export default function Pattrn() {
             bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
             right: 20,
             width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
-            height: isOpen ? openHeight : (hasPassUI ? "auto" : fabSize),
+            height: isOpen ? openHeight : undefined,
             borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
             background: activeTheme.gridBg || C.surface,
             backdropFilter: "blur(28px) saturate(200%)",
@@ -4749,7 +4756,7 @@ export default function Pattrn() {
             border: isOpen ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(255,255,255,0.16)",
             boxShadow: defaultShadow,
             zIndex: 85,
-            overflow: isOpen ? "hidden" : "visible",
+            overflow: "hidden",
             display: "flex",
             flexDirection: "column",
             transition: isOpen
@@ -4770,7 +4777,7 @@ export default function Pattrn() {
           </div>
 
           {/* Menu content — always rendered, animated via transitions */}
-          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen && needsScroll ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", overflowY: isOpen && needsScroll ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}>
             {/* Persistent nav items — always first */}
             {showNav && filteredNav.map((item, i) => renderItem(item, i, false))}
 
@@ -4863,6 +4870,7 @@ export default function Pattrn() {
                     e.stopPropagation();
                     cancelCoopPassRequest(coopSessionId, coopPendingPassCell).catch(() => {});
                     setCoopPendingPassCell(null);
+                    setPendingPassOpen(false);
                   }} style={{
                     background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
                     color: C.textDim, cursor: "pointer", fontSize: 10, padding: "3px 8px",
@@ -5689,6 +5697,7 @@ export default function Pattrn() {
     setCoopIncomingPass(null);
     setCoopPendingPassCell(null);
     setCoopPassPlayerPicker(false);
+    setPendingPassOpen(false);
     coopPlayerUidsRef.current = "";
     setShowLeaveConfirm(false);
     coopWriteThrottleRef.current = {};
@@ -5859,6 +5868,7 @@ export default function Pattrn() {
       const myOutgoing = Object.entries(passRequests).find(([, req]) => req.fromUid === myUid && req.status === "pending");
       if (!myOutgoing) {
         setCoopPendingPassCell(null);
+        setPendingPassOpen(false);
       }
 
       // Sync invited UIDs
@@ -5895,6 +5905,7 @@ export default function Pattrn() {
           setCoopIncomingPass(null);
           setCoopPendingPassCell(null);
           setCoopPassPlayerPicker(false);
+          setPendingPassOpen(false);
         }
       }
 
@@ -13205,15 +13216,22 @@ export default function Pattrn() {
       playPillButtons.push({ id: "reset", icon: "refresh", color: "#fff", onClick: resetBoard });
     }
     if (isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0) {
-      playPillButtons.push({ id: "pass-cell", icon: "pass", color: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF" : "#fff", onClick: () => {
-        if (coopPassMode) { setCoopPassMode(null); setSelectedToken(null); return; }
-        setSelectedToken(null); setSelectedCell(null);
-        const entries = Object.entries(coopPlayers);
-        if (entries.length === 1) {
-          const [uid, p] = entries[0];
-          setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
-        } else { setCoopPassPlayerPicker(prev => !prev); }
-      }});
+      if (coopPendingPassCell) {
+        // Pending pass — show clock badge icon, tap toggles waiting UI
+        playPillButtons.push({ id: "pass-cell", icon: "pass-pending", color: "#f59e0b", onClick: () => {
+          setPendingPassOpen(prev => !prev);
+        }});
+      } else {
+        playPillButtons.push({ id: "pass-cell", icon: "pass", color: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF" : "#fff", onClick: () => {
+          if (coopPassMode) { setCoopPassMode(null); setSelectedToken(null); return; }
+          setSelectedToken(null); setSelectedCell(null);
+          const entries = Object.entries(coopPlayers);
+          if (entries.length === 1) {
+            const [uid, p] = entries[0];
+            setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
+          } else { setCoopPassPlayerPicker(prev => !prev); }
+        }});
+      }
     }
     if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
       playPillButtons.push({ id: "preview", icon: "search", color: C.accent, onClick: () => setShowMosaicPreviewOverlay(true) });
