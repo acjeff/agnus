@@ -4597,7 +4597,7 @@ export default function Pattrn() {
   // FAB icon — always the burger menu
   const getFabIcon = () => "burger";
 
-  const renderContextButton = (currentView, pillButtons = [], bottomPx = 80) => {
+  const renderContextButton = (currentView, pillButtons = [], bottomPx = 16) => {
     const menuTree = getContextualMenuTree(currentView);
     const isOpen = radialMenuStack.length > 0;
     const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
@@ -13691,7 +13691,7 @@ export default function Pattrn() {
       </div>
 
       {/* Fixed bottom bar: coop UI + game state info */}
-      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(140px + env(safe-area-inset-bottom, 0px))` : `calc(100px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
         {/* Pass player picker dropdown (multi-partner) */}
         {coopPassPlayerPicker && !coopPassMode && (
           <div style={{
@@ -13935,11 +13935,11 @@ export default function Pattrn() {
         )}
       </div>
 
-      {/* Token picker — Liquid Glass pill below the action pill */}
+      {/* Token picker — Liquid Glass pill above the menu pill */}
       {gameState === "playing" && puzzle && (
         <div style={{
           position: "fixed",
-          bottom: `calc(16px + env(safe-area-inset-bottom, 0px))`,
+          bottom: `calc(80px + env(safe-area-inset-bottom, 0px))`,
           right: 20,
           borderRadius: 28,
           background: `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.55) 100%)`,
@@ -13956,7 +13956,7 @@ export default function Pattrn() {
           />
         </div>
       )}
-      {renderContextButton("play", playPillButtons, gameState === "playing" && puzzle ? 88 : 80)}
+      {renderContextButton("play", playPillButtons)}
       {globalModalsEl}
     </div>
   );
