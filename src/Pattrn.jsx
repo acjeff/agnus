@@ -4655,7 +4655,8 @@ export default function Pattrn() {
     const showPassPending = !!coopPendingPassCell;
     const showPassIncoming = gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey;
     const hasPassUI = showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming;
-    const passRowHeight = 44;
+    const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : 0;
+    const passRowHeight = showPassPlayerPicker ? (passPlayerCount > 2 ? 88 : 56) : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 1 : 0; // +1 for top divider
 
     const contentHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight;
@@ -4794,8 +4795,9 @@ export default function Pattrn() {
           {hasPassUI && (
             <div style={{
               borderTop: "1px solid rgba(255,255,255,0.06)",
-              padding: "6px 12px",
+              padding: "8px 12px",
               display: "flex", alignItems: "center", justifyContent: "center",
+              flexWrap: "wrap",
               gap: 6, flexShrink: 0, minHeight: passRowHeight,
             }}>
               {/* Player picker (multi-partner) */}
