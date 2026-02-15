@@ -4631,7 +4631,7 @@ export default function Pattrn() {
     const filteredNav = navItems.filter(item => item.id !== viewToNavId[currentView]);
 
     const fabIconKey = isOpen ? null : getFabIcon();
-    const strokeColor = "rgba(255,255,255,0.85)";
+    const strokeColor = "#fff";
     const activeStroke = C.accent;
     const renderIcon = (key, color) => radialIcons[key] ? radialIcons[key](color) : null;
 
@@ -13080,7 +13080,7 @@ export default function Pattrn() {
       });
     }
     if (!isCoop && (Object.keys(fills).length > 0 || attempts > 0)) {
-      playPillButtons.push({ id: "reset", icon: "refresh", color: "rgba(255,255,255,0.5)", onClick: resetBoard });
+      playPillButtons.push({ id: "reset", icon: "refresh", color: "#fff", onClick: resetBoard });
     }
     if (isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0) {
       playPillButtons.push({ id: "pass-cell", icon: "pass", color: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF" : "rgba(255,255,255,0.5)", onClick: () => {
@@ -13098,7 +13098,7 @@ export default function Pattrn() {
     }
   } else if (gameState === "won") {
     // Share
-    playPillButtons.push({ id: "share", icon: "share", color: "rgba(255,255,255,0.7)", onClick: async () => {
+    playPillButtons.push({ id: "share", icon: "share", color: "#fff", onClick: async () => {
       let text;
       if (isCoop) {
         text = `Agnus Co-op \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\nSolved together \u2022 ${formatTime(elapsedTime)}`;
@@ -13119,7 +13119,7 @@ export default function Pattrn() {
       setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
     }});
     // Retry
-    playPillButtons.push({ id: "retry", icon: "refresh", color: "rgba(255,255,255,0.7)", onClick: () => {
+    playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => {
       if (isCoop) leaveCoopSession();
       startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true, isDaily ? currentDailyDate : null);
     }});
@@ -13144,7 +13144,7 @@ export default function Pattrn() {
   } else if (gameState === "lost") {
     // Share (cascade only)
     if (isCascade && !isCoop) {
-      playPillButtons.push({ id: "share", icon: "share", color: "rgba(255,255,255,0.7)", onClick: async () => {
+      playPillButtons.push({ id: "share", icon: "share", color: "#fff", onClick: async () => {
         const sz = puzzle?.gridSize ?? 0;
         const text = `Agnus Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`;
         const result = await tryNativeShare({ text });
@@ -13156,13 +13156,13 @@ export default function Pattrn() {
     }
     // Retry
     if (isCoop) {
-      playPillButtons.push({ id: "retry", icon: "refresh", color: "rgba(255,255,255,0.7)", onClick: retryCoop });
+      playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: retryCoop });
       playPillButtons.push({ id: "done", icon: "home", color: "#54A0FF", onClick: () => { leaveCoopSession(); setView("menu"); } });
     } else if (isCascade) {
-      playPillButtons.push({ id: "retry", icon: "refresh", color: "rgba(255,255,255,0.7)", onClick: () => startPuzzle(cascadeRunIndex, "cascade", true) });
+      playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => startPuzzle(cascadeRunIndex, "cascade", true) });
       playPillButtons.push({ id: "back-done", icon: "home", color: C.accent, onClick: () => setView("menu") });
     } else {
-      playPillButtons.push({ id: "retry", icon: "refresh", color: "rgba(255,255,255,0.7)", onClick: () => startPuzzle(currentPuzzle) });
+      playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => startPuzzle(currentPuzzle) });
       if (currentPuzzle < totalPuzzles - 1) {
         playPillButtons.push({ id: "next", icon: "forward", color: C.accent, onClick: () => startPuzzle(currentPuzzle + 1) });
       }
