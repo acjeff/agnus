@@ -171,18 +171,24 @@ function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
     if (!isOpen) return;
     const scrollY = window.scrollY;
     const body = document.body;
+    const html = document.documentElement;
     body.style.position = "fixed";
     body.style.top = `-${scrollY}px`;
     body.style.left = "0";
     body.style.right = "0";
+    body.style.width = "100%";
     body.style.overflow = "hidden";
+    html.style.overflow = "hidden";
     return () => {
+      const savedY = parseInt(body.style.top || "0", 10) * -1;
       body.style.position = "";
       body.style.top = "";
       body.style.left = "";
       body.style.right = "";
+      body.style.width = "";
       body.style.overflow = "";
-      window.scrollTo(0, scrollY);
+      html.style.overflow = "";
+      window.scrollTo(0, savedY);
     };
   }, [isOpen]);
 
@@ -4838,6 +4844,7 @@ export default function Pattrn() {
             right: 20,
             width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
             height: isOpen ? openHeight : fabSize + passUIHeight,
+            maxHeight: isOpen ? `calc(100vh - ${bottomPx}px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 20px)` : undefined,
             borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
             background: activeTheme.gridBg || C.surface,
             backdropFilter: "blur(28px) saturate(200%)",
@@ -4849,8 +4856,8 @@ export default function Pattrn() {
             display: "flex",
             flexDirection: "column",
             transition: isOpen
-              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease`
-              : `width 0.22s ${springClose}, height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease`,
+              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, max-height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease`
+              : `width 0.22s ${springClose}, height 0.22s ${springClose}, max-height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease`,
           }}
           aria-label="Quick actions"
         >
@@ -4866,7 +4873,7 @@ export default function Pattrn() {
           </div>
 
           {/* Menu content — always rendered, animated via transitions */}
-          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", overflowY: isOpen && needsScroll ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}>
             {/* Persistent nav items — always first */}
             {showNav && filteredNav.map((item, i) => renderItem(item, i, false))}
 
