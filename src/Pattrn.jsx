@@ -4770,7 +4770,7 @@ export default function Pattrn() {
     const filteredNav = navItems.filter(item => item.id !== viewToNavId[currentView]);
 
     const fabIconKey = isOpen ? null : getFabIcon();
-    const strokeColor = "#fff";
+    const strokeColor = C.text;
     const activeStroke = C.accent;
     const renderIcon = (key, color) => radialIcons[key] ? radialIcons[key](color) : null;
 
@@ -4858,8 +4858,8 @@ export default function Pattrn() {
       );
     };
 
-    const defaultShadow = "none";
-    const hoverShadow = "none";
+    const defaultShadow = "0 4px 24px rgba(0,0,0,0.08), 0 1px 6px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.6)";
+    const hoverShadow = "0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.7)";
 
     return (
       <>
@@ -4882,10 +4882,10 @@ export default function Pattrn() {
             height: isOpen ? openHeight : fabSize + passUIHeight,
             maxHeight: isOpen ? `calc(100vh - ${bottomPx}px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 20px)` : undefined,
             borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
-            background: activeTheme.gridBg || C.surface,
-            backdropFilter: "blur(28px) saturate(200%)",
-            WebkitBackdropFilter: "blur(28px) saturate(200%)",
-            border: isOpen ? "1px solid rgba(0,0,0,0.06)" : "1px solid rgba(0,0,0,0.05)",
+            background: "rgba(255,255,255,0.55)",
+            backdropFilter: "blur(24px) saturate(180%)",
+            WebkitBackdropFilter: "blur(24px) saturate(180%)",
+            border: "1px solid rgba(255,255,255,0.7)",
             boxShadow: defaultShadow,
             zIndex: 85,
             overflow: "hidden",
@@ -4903,7 +4903,7 @@ export default function Pattrn() {
           }}>
             <div style={{
               position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%",
-              background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)",
+              background: "linear-gradient(180deg, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0) 100%)",
               borderRadius: "inherit",
             }} />
           </div>
@@ -5069,7 +5069,7 @@ export default function Pattrn() {
 
             {/* Separator between action buttons and menu toggle */}
             {hasPillButtons && (
-              <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
+              <div style={{ width: 1, height: 24, background: "rgba(0,0,0,0.1)", flexShrink: 0 }} />
             )}
 
             {/* Menu toggle button */}
