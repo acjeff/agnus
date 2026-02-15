@@ -10004,26 +10004,6 @@ export default function Pattrn() {
           </div>
         )}
 
-      {/* FAB: Create Mosaic */}
-      {firebaseUser && (
-        <button onClick={() => { resetCreator(); setCreatorReturnView("gallery"); setView("creator"); }}
-          style={{
-            position: "fixed", bottom: "calc(80px + env(safe-area-inset-bottom, 0px))", right: 20,
-            width: 56, height: 56, borderRadius: 16, zIndex: 80,
-            backgroundColor: C.accent, border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: `0 4px 16px ${C.accent}55, 0 2px 8px rgba(0,0,0,0.3)`,
-            transition: "transform 0.15s, box-shadow 0.15s",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
-          aria-label="Create Mosaic"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.bg} strokeWidth="2.5" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
-        </button>
-      )}
       {renderContextButton("gallery")}
       {globalModalsEl}
       </div>
