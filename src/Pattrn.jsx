@@ -4664,7 +4664,7 @@ export default function Pattrn() {
     const hasPassUI = showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming;
     const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : 0;
     const passRowHeight = showPassPlayerPicker ? (passPlayerCount > 2 ? 88 : 56) : showPassIncoming ? 56 : 48;
-    const passUIHeight = hasPassUI ? passRowHeight + 1 : 0; // +1 for top divider
+    const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
 
     const contentHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight;
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
@@ -4748,7 +4748,7 @@ export default function Pattrn() {
             bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
             right: 20,
             width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
-            height: isOpen ? openHeight : undefined,
+            height: isOpen ? openHeight : fabSize + passUIHeight,
             borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
             background: activeTheme.gridBg || C.surface,
             backdropFilter: "blur(28px) saturate(200%)",
