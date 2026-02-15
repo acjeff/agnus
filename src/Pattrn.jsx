@@ -4713,7 +4713,7 @@ export default function Pattrn() {
     // Custom mosaic view items
     const customMosaicRoot = [];
     if (firebaseConfigured && firebaseUser && !isCoopMosaic) {
-      customMosaicRoot.push({ id: "coop-mosaic", icon: "user-plus", label: "Co-op", sub: "coop-start", beforeSub: () => {
+      customMosaicRoot.push({ id: "coop-mosaic", icon: "user-plus", label: "Play w/ Friends", sub: "coop-start", beforeSub: () => {
         setCoopSelectedFriends(new Set());
         return true;
       } });
@@ -10192,67 +10192,71 @@ export default function Pattrn() {
             {currentList.map(mosaic => (
               <div key={mosaic.id} style={{
                 display: "flex", gap: 12, padding: "12px", borderRadius: 12,
-                backgroundColor: C.surface, border: `1px solid ${C.border}`, alignItems: "center",
+                backgroundColor: C.surface, border: `1px solid ${C.border}`,
               }}>
-                <div style={{ cursor: "pointer" }} onClick={() => mosaic.grid && startCustomMosaicPlay(mosaic)}>
+                <div style={{ cursor: "pointer", flexShrink: 0 }} onClick={() => mosaic.grid && startCustomMosaicPlay(mosaic)}>
                   <MosaicThumbnail grid={mosaic.grid} size={64} hidden={true} completedTiles={mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null} />
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {mosaic.title || "Untitled"}
+                <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+                  <div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.text, marginBottom: 2 }}>
+                      {mosaic.title || "Untitled"}
+                    </div>
+                    <div style={{ fontSize: 10, color: C.textDim }}>
+                      {mosaicGalleryTab === "shared" && mosaic.sharedByUsername ? `From ${mosaic.sharedByUsername}` :
+                       mosaicGalleryTab === "public" && mosaic.authorUsername ? `By ${mosaic.authorUsername}` :
+                       mosaic.publicStatus === "approved" ? "Published" :
+                       mosaic.publicStatus === "pending" ? "Pending review" :
+                       mosaic.publicStatus === "rejected" ? "Not approved" : ""}
+                    </div>
+                    {(() => {
+                      const mc = mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null;
+                      if (!mc) return null;
+                      const solved = Object.values(mc).filter(v => v > 0).length;
+                      if (solved === 0) return null;
+                      return (
+                        <div style={{ fontSize: 9, color: solved === 25 ? C.correct : C.accent, marginTop: 2, fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                          {solved === 25 ? "Complete!" : `${solved}/25 tiles`}
+                        </div>
+                      );
+                    })()}
                   </div>
-                  <div style={{ fontSize: 10, color: C.textDim }}>
-                    {mosaicGalleryTab === "shared" && mosaic.sharedByUsername ? `From ${mosaic.sharedByUsername}` :
-                     mosaicGalleryTab === "public" && mosaic.authorUsername ? `By ${mosaic.authorUsername}` :
-                     mosaic.publicStatus === "approved" ? "Published" :
-                     mosaic.publicStatus === "pending" ? "Pending review" :
-                     mosaic.publicStatus === "rejected" ? "Not approved" : ""}
-                  </div>
-                  {(() => {
-                    const mc = mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null;
-                    if (!mc) return null;
-                    const solved = Object.values(mc).filter(v => v > 0).length;
-                    if (solved === 0) return null;
-                    return (
-                      <div style={{ fontSize: 9, color: solved === 25 ? C.correct : C.accent, marginTop: 2, fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
-                        {solved === 25 ? "Complete!" : `${solved}/25 tiles`}
-                      </div>
-                    );
-                  })()}
-                </div>
-                {mosaic.grid && (
-                  <button onClick={() => startCustomMosaicPlay(mosaic)} title="Play as puzzle"
-                    style={{ background: C.accent, border: "none", borderRadius: 6, padding: "4px 10px", color: C.bg, cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif", flexShrink: 0, transition: "all 0.15s" }}
-                    onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; }}
-                    onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
-                  >Play</button>
-                )}
-                {mosaicGalleryTab === "mine" && (
-                  <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
-                    <button onClick={() => editMosaic(mosaic)} title="Edit"
-                      style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-                    >Edit</button>
-                    <button onClick={() => setShareTargetMosaic(mosaic)} title="Share"
-                      style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = "#4ECDC4"; e.currentTarget.style.color = "#4ECDC4"; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-                    >Share</button>
-                    {!mosaic.publicStatus && (
-                      <button onClick={() => handleSubmitForReview(mosaic)} title="Submit to public gallery"
-                        style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
-                        onMouseEnter={e => { e.currentTarget.style.borderColor = "#FFE66D"; e.currentTarget.style.color = "#FFE66D"; }}
-                        onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-                      >Publish</button>
+                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                    {mosaic.grid && (
+                      <button onClick={() => startCustomMosaicPlay(mosaic)} title="Play as puzzle"
+                        style={{ background: C.accent, border: "none", borderRadius: 6, padding: "4px 10px", color: C.bg, cursor: "pointer", fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif", transition: "all 0.15s" }}
+                        onMouseEnter={e => { e.currentTarget.style.opacity = "0.85"; }}
+                        onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
+                      >Play</button>
                     )}
-                    <button onClick={() => handleDeleteMosaic(mosaic.id)} title="Delete"
-                      style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
-                      onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
-                      onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-                    >Del</button>
+                    {mosaicGalleryTab === "mine" && (
+                      <>
+                        <button onClick={() => editMosaic(mosaic)} title="Edit"
+                          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                        >Edit</button>
+                        <button onClick={() => setShareTargetMosaic(mosaic)} title="Share"
+                          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = "#4ECDC4"; e.currentTarget.style.color = "#4ECDC4"; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                        >Share</button>
+                        {!mosaic.publicStatus && (
+                          <button onClick={() => handleSubmitForReview(mosaic)} title="Submit to public gallery"
+                            style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
+                            onMouseEnter={e => { e.currentTarget.style.borderColor = "#FFE66D"; e.currentTarget.style.color = "#FFE66D"; }}
+                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                          >Publish</button>
+                        )}
+                        <button onClick={() => handleDeleteMosaic(mosaic.id)} title="Delete"
+                          style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 6, padding: "4px 8px", color: C.textDim, cursor: "pointer", fontSize: 11, transition: "all 0.15s" }}
+                          onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; }}
+                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+                        >Del</button>
+                      </>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             ))}
           </div>
