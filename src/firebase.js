@@ -964,6 +964,11 @@ export async function respondCoopPassRequest(sessionId, cellKey, accepted) {
     if (!req) return;
     await set(ref(db, `coopSessions/${sessionId}/cellOverrides/${cellKey}`), req.toUid);
     await remove(ref(db, `coopSessions/${sessionId}/fills/${cellKey}`)).catch(() => {});
+    // Unlock the player who accepted the tile so they can place it
+    await update(ref(db, `coopSessions/${sessionId}/players/${req.toUid}`), {
+      lockedIn: false,
+      correct: false,
+    });
   }
   // Remove the request regardless
   await remove(ref(db, `coopSessions/${sessionId}/passRequests/${cellKey}`));
