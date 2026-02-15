@@ -55,7 +55,7 @@ export function GuidedTourInteractive({
       {
         id: "in-puzzle",
         title: "Study the Pattern",
-        description: "Look at the filled cells. Can you see the pattern? Each row and column follows a rule!",
+        description: "Look at the filled tiles. Can you see the pattern? Each row and column follows a rule!",
         position: "center",
         showArrow: false,
         autoAdvance: false,
@@ -64,7 +64,7 @@ export function GuidedTourInteractive({
       {
         id: "tap-cell",
         title: "Tap This Cell",
-        description: "Tap this empty cell to select it and fill it in!",
+        description: "Tap this empty cell to select where you want to place a tile!",
         targetSelector: "[data-tour-id='first-blank-cell']",
         position: "top",
         showArrow: true,
@@ -72,9 +72,9 @@ export function GuidedTourInteractive({
         condition: () => selectedCell !== null,
       },
       {
-        id: "enter-value",
-        title: "Enter a Number",
-        description: "Use the keypad below to enter your answer. Pick any number!",
+        id: "select-tile",
+        title: "Pick a Tile",
+        description: "Choose a tile from the selection below. Tap one to place it in the cell!",
         targetSelector: "[data-tour-id='keypad']",
         position: "top",
         showArrow: true,
@@ -84,7 +84,7 @@ export function GuidedTourInteractive({
       {
         id: "fill-more",
         title: "Great! Keep Going",
-        description: "Now fill in the rest of the empty cells. Look for the pattern!",
+        description: "Now place tiles in the rest of the empty cells. Look for the pattern!",
         targetSelector: "[data-tour-id='grid']",
         position: "top",
         showArrow: true,
@@ -101,7 +101,7 @@ export function GuidedTourInteractive({
       {
         id: "check-answer",
         title: "Check Your Solution!",
-        description: "All cells filled! Tap the checkmark ✓ to see if you got it right!",
+        description: "All tiles placed! Tap the checkmark ✓ to see if you got it right!",
         targetSelector: "[data-tour-id='check-button']",
         position: "left",
         showArrow: true,
