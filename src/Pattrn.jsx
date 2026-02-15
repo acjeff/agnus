@@ -6400,12 +6400,12 @@ export default function Pattrn() {
                         }}>
                           <div style={{
                             width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-                            backgroundColor: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "22" : "#54A0FF22",
+                            backgroundColor: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "22" : notif.type === "mosaic_pending_review" ? "#FFE66D22" : "#54A0FF22",
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            border: `1.5px solid ${(notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "44" : "#54A0FF44"}`,
+                            border: `1.5px solid ${(notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "44" : notif.type === "mosaic_pending_review" ? "#FFE66D44" : "#54A0FF44"}`,
                           }}>
-                            <span style={{ fontSize: 12, color: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop : "#54A0FF" }}>
-                              {notif.type === "coop_invite" ? "⚔" : notif.type === "coop_mosaic_invite" ? "◦" : "◦"}
+                            <span style={{ fontSize: 12, color: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop : notif.type === "mosaic_pending_review" ? "#FFE66D" : "#54A0FF" }}>
+                              {notif.type === "coop_invite" ? "⚔" : notif.type === "coop_mosaic_invite" ? "◦" : notif.type === "mosaic_pending_review" ? "🚩" : "◦"}
                             </span>
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -6414,14 +6414,123 @@ export default function Pattrn() {
                                 ? `${notif.fromUsername || "Someone"} invited you to co-op`
                                 : notif.type === "coop_mosaic_invite"
                                 ? `${notif.fromUsername || "Someone"} invited you to mosaic`
+                                : notif.type === "mosaic_pending_review"
+                                ? `${notif.fromUsername || "Someone"} submitted a mosaic for review`
                                 : `${notif.fromUsername || "Someone"} shared`
                               }
                             </div>
-                            {notif.data?.mosaicTitle && (
+                            {notif.type === "coop_invite" && notif.data?.mode && (
+                              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
+                                {notif.data.mode} #{(notif.data.level ?? 0) + 1}
+                              </div>
+                            )}
+                            {notif.type === "coop_mosaic_invite" && notif.data?.mosaicTitle && (
                               <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
                                 "{notif.data.mosaicTitle}"
                               </div>
                             )}
+                            {(notif.type === "mosaic_shared" || notif.type === "mosaic_pending_review") && notif.data?.title && (
+                              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
+                                "{notif.data.title}"
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                            {notif.type === "coop_invite" && notif.data?.sessionId && (
+                              <button
+                                onClick={async () => {
+                                  // Join the coop session
+                                  const session = await loadCoopSession(notif.data.sessionId);
+                                  if (session && session.status !== "complete") {
+                                    setDifficulty(session.mode);
+                                    setCurrentPuzzle(session.level ?? 0);
+                                    if (session.dailyDate) setCurrentDailyDate(session.dailyDate);
+                                    setCoopSessionId(session.id);
+                                    setCoopRole("guest");
+                                    setCoopStatus("joining");
+                                    setFills({});
+                                    setAttempts(0);
+                                    setGameState("playing");
+                                    setWrongCells(new Set());
+                                    setLockedCells(new Set());
+                                    setShowParticles(false);
+                                    setSelectedCell(null);
+                                    setSelectedToken(null);
+                                    setView("play");
+                                  }
+                                  dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
+                                  setMenuOpen(false);
+                                }}
+                                style={{
+                                  background: C.coop, border: "none", borderRadius: 6,
+                                  padding: "4px 8px", color: "#fff", cursor: "pointer", fontSize: 9,
+                                  fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                                }}
+                              >
+                                Join
+                              </button>
+                            )}
+                            {notif.type === "coop_mosaic_invite" && notif.data?.sessionId && (
+                              <button
+                                onClick={() => {
+                                  setCoopMosaicSessionId(notif.data.sessionId);
+                                  setCoopMosaicRole("guest");
+                                  setCoopMosaicStatus("joining");
+                                  dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
+                                  setMenuOpen(false);
+                                }}
+                                style={{
+                                  background: C.coop, border: "none", borderRadius: 6,
+                                  padding: "4px 8px", color: "#fff", cursor: "pointer", fontSize: 9,
+                                  fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                                }}
+                              >
+                                Join
+                              </button>
+                            )}
+                            {notif.type === "mosaic_shared" && (
+                              <button
+                                onClick={() => {
+                                  dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
+                                  setMosaicGalleryTab("shared");
+                                  loadMosaicData("shared");
+                                  setView("gallery");
+                                  setMenuOpen(false);
+                                }}
+                                style={{
+                                  background: C.accent, border: "none", borderRadius: 6,
+                                  padding: "4px 8px", color: C.bg, cursor: "pointer", fontSize: 9,
+                                  fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                                }}
+                              >
+                                View
+                              </button>
+                            )}
+                            {notif.type === "mosaic_pending_review" && (
+                              <button
+                                onClick={() => {
+                                  dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
+                                  loadMosaicData("admin");
+                                  setView("admin-review");
+                                  setMenuOpen(false);
+                                }}
+                                style={{
+                                  background: "#FFE66D", border: "none", borderRadius: 6,
+                                  padding: "4px 8px", color: C.bg, cursor: "pointer", fontSize: 9,
+                                  fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                                }}
+                              >
+                                Review
+                              </button>
+                            )}
+                            <button
+                              onClick={() => { dismissNotification(firebaseUser.uid, notif.id).catch(() => {}); }}
+                              style={{
+                                background: "none", border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 6,
+                                padding: "4px 6px", color: C.textDim, cursor: "pointer", fontSize: 9,
+                              }}
+                              title="Dismiss"
+                            >{"\u2715"}</button>
                           </div>
                         </div>
                       ))}
