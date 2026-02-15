@@ -4148,7 +4148,7 @@ export default function Pattrn() {
 
   // Viewport size tracking for dynamic grid sizing
   const [viewportSize, setViewportSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
-  const [headerHeight, setHeaderHeight] = useState(88);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(140);
   const [infoRowHeight, setInfoRowHeight] = useState(40);
   const headerRef = useRef(null);
@@ -4484,6 +4484,12 @@ export default function Pattrn() {
     star: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>,
     compass: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>,
     burger: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
+    palette: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>,
+    share: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>,
+    search: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+    "user-plus": (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>,
+    upload: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>,
+    logout: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
   };
 
   // Quick Play sub-menu — shared across all views (accessed from nav)
@@ -4498,6 +4504,52 @@ export default function Pattrn() {
 
   // Contextual menu items per view — page-specific actions
   const getContextualMenuTree = (currentView) => {
+    // Build play contextual items dynamically (some are conditional)
+    const playRoot = [];
+    playRoot.push({ id: "theme", icon: "palette", label: "Theme", action: () => { setShowThemePicker(true); } });
+    if (firebaseConfigured && firebaseUser) {
+      playRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
+    }
+    playRoot.push({ id: "share", icon: "share", label: "Share", action: async () => {
+      const url = typeof window !== "undefined" ? window.location.href : "";
+      const result = await tryNativeShare({ title: "Agnus", text: "Check out this puzzle", url: url || undefined });
+      if (result === "shared") { setShareMsg("Shared!"); setTimeout(() => setShareMsg(""), 2000); return; }
+      if (result === "cancelled") return;
+      try { await navigator.clipboard.writeText(url); } catch { /* fallback */ }
+      setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
+    }});
+    if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
+      playRoot.push({ id: "preview", icon: "search", label: "Preview", action: () => { setShowMosaicPreviewOverlay(true); } });
+    }
+    if (!isCoop && gameState === "playing" && !isCascade && !isMosaic) {
+      playRoot.push({ id: "coop-start", icon: "user-plus", label: "Co-op", action: () => {
+        if (!firebaseUser) { coopPendingLoginRef.current = true; setShowAccountModal(true); return; }
+        setShowCoopFriendPicker(true);
+      }});
+    }
+    if (isCoop) {
+      playRoot.push({ id: "coop-invite", icon: "upload", label: "Invite", action: () => { setShowCoopInvite(true); } });
+      playRoot.push({ id: "coop-leave", icon: "logout", label: "Leave", action: () => { setShowLeaveConfirm(true); } });
+    }
+    playRoot.push({ id: "back", icon: "back", label: customMosaicPuzzlesRef.current && isMosaic ? "Mosaic" : "Puzzles", action: () => {
+      if (isCoop) { setShowLeaveConfirm(true); return; }
+      if (difficulty === "cascade") {
+        const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
+        const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
+        setProgress(nextProgress); saveProgress(nextProgress);
+      }
+      stopTimer(); setShowMosaicPreviewOverlay(false);
+      if (customMosaicPuzzlesRef.current && isMosaic) {
+        if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
+          coopMosaicCurrentTileRef.current = -1;
+          updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
+          setCoopMosaicOtherFills({});
+          coopMosaicWriteThrottleRef.current = {};
+        }
+        setView("custom-mosaic");
+      } else { setView("menu"); }
+    }});
+
     const trees = {
       menu: {
         root: [
@@ -4510,6 +4562,9 @@ export default function Pattrn() {
           { id: "public", icon: "globe", label: "Public", action: () => { setMosaicGalleryTab("public"); loadMosaicData("public"); } },
           { id: "mine", icon: "folder", label: "My Mosaics", action: () => { setMosaicGalleryTab("mine"); loadMosaicData("mine"); } },
         ],
+      },
+      play: {
+        root: playRoot,
       },
       profile: {
         root: [
@@ -13107,214 +13162,12 @@ export default function Pattrn() {
         </div>
       )}
 
-      {/* Top bar - fixed at top so it always stays visible */}
-      <div ref={headerRef} style={{
-        flexShrink: 0, zIndex: 10, backgroundColor: C.bg,
-        paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
-        display: "flex", justifyContent: "center", boxSizing: "border-box",
-        touchAction: "manipulation",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridTotalWidth, animation: "fadeUp 0.3s ease" }}>
-        <button onClick={() => {
-          if (isCoop) { setShowLeaveConfirm(true); return; }
-          if (difficulty === "cascade") {
-            const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
-            const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
-            setProgress(nextProgress);
-            saveProgress(nextProgress);
-          }
-          stopTimer();
-          setShowMosaicPreviewOverlay(false);
-          if (customMosaicPuzzlesRef.current && isMosaic) {
-            // In coop mosaic mode, update current tile to -1 (overview)
-            if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
-              coopMosaicCurrentTileRef.current = -1;
-              updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
-              setCoopMosaicOtherFills({});
-              coopMosaicWriteThrottleRef.current = {};
-            }
-            setView("custom-mosaic");
-          } else {
-            setView("menu");
-          }
-        }}
-          style={{
-            background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-            color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-            fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-        >
-          &larr; {customMosaicPuzzlesRef.current && isMosaic ? "MOSAIC" : "PUZZLES"}
-        </button>
-        <div style={{ flex: 1 }} />
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          <button
-            onClick={() => setShowThemePicker(true)}
-            style={{
-              background: "none", border: `1px solid ${activeThemeId !== "classic" ? (activeTheme.gridBorder || C.border).replace(/44$/, "88") : C.border}`,
-              borderRadius: 8, padding: "5px 8px", cursor: "pointer", fontSize: 14, lineHeight: 1,
-              transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
-              color: activeThemeId !== "classic" ? C.text : C.textDim,
-              minWidth: 32, height: 30,
-            }}
-            title="Change theme"
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = activeThemeId !== "classic" ? (activeTheme.gridBorder || C.border).replace(/44$/, "88") : C.border; e.currentTarget.style.color = activeThemeId !== "classic" ? C.text : C.textDim; }}
-          >
-            {activeTheme.icon || <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>}
-          </button>
-          {/* Friends button */}
-          {firebaseConfigured && firebaseUser && (
-            <button
-              onClick={() => {
-                setShowFriendsModal(true);
-                setFriendsModalTab("list");
-              }}
-              style={{
-                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
-                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
-                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
-                position: "relative", minWidth: 32, height: 30,
-              }}
-              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
-              aria-label="Friends"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              {onlineFriendsCount > 0 && (
-                <span style={{
-                  position: "absolute", top: -4, right: -4,
-                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
-                  backgroundColor: C.correct, color: "#fff",
-                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: "'Space Mono', monospace",
-                }}>
-                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
-                </span>
-              )}
-            </button>
-          )}
-          <button
-            onClick={async () => {
-              const url = typeof window !== "undefined" ? window.location.href : "";
-              const result = await tryNativeShare({ title: "Agnus", text: "Check out this puzzle", url: url || undefined });
-              if (result === "shared") {
-                setShareMsg("Shared!");
-                setTimeout(() => setShareMsg(""), 2000);
-                return;
-              }
-              if (result === "cancelled") return;
-              try { await navigator.clipboard.writeText(url); } catch { /* fallback */ }
-              setShareMsg("Copied!");
-              setTimeout(() => setShareMsg(""), 2000);
-            }}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px",
-              color: C.textDim, cursor: "pointer", fontSize: 12, transition: "all 0.15s",
-            }}
-            title="Share link to this level"
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            {shareMsg || "Share"}
-          </button>
-          {/* Magnifying glass button - visible when playing a custom mosaic puzzle */}
-          {customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay && (
-            <button
-              onClick={() => setShowMosaicPreviewOverlay(true)}
-              style={{
-                background: "none", border: `1px solid ${C.accent}44`, borderRadius: 8,
-                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s", minWidth: 32, height: 30,
-              }}
-              title="Preview full mosaic"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.backgroundColor = C.accent + "11"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "44"; e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"/>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-            </button>
-          )}
-          {/* Coop share button - visible when playing supported modes, prompts login if needed */}
-          {!isCoop && gameState === "playing" && !isCascade && !isMosaic && (
-            <button
-              onClick={() => {
-                if (!firebaseUser) {
-                  coopPendingLoginRef.current = true;
-                  setShowAccountModal(true);
-                  return;
-                }
-                setShowCoopFriendPicker(true);
-              }}
-              style={{
-                background: "none", border: `1px solid #54A0FF55`, borderRadius: 8,
-                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s", minWidth: 32, height: 30,
-              }}
-              title="Start co-op"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#54A0FF55"; e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#54A0FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
-              </svg>
-            </button>
-          )}
-          {/* Coop invite button when in coop */}
-          {isCoop && (
-            <button
-              onClick={() => setShowCoopInvite(true)}
-              style={{
-                background: "none", border: `1px solid #54A0FF55`, borderRadius: 8,
-                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s", minWidth: 32, height: 30,
-              }}
-              title="Invite a friend"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#54A0FF55"; e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#54A0FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
-              </svg>
-            </button>
-          )}
-          {/* Coop leave button when in coop */}
-          {isCoop && (
-            <button
-              onClick={() => { setShowLeaveConfirm(true); }}
-              style={{
-                background: "none", border: `1px solid #f8717188`, borderRadius: 8,
-                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s", minWidth: 32, height: 30,
-              }}
-              title="Leave co-op session"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.backgroundColor = "#f8717111"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#f8717188"; e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-            </button>
-          )}
-        </div>
-        </div>
-      </div>
 
       {/* Partner lock-in toast notification */}
       {coopPartnerLockToast && (
         <div style={{
           position: "fixed",
-          top: "calc(130px + env(safe-area-inset-top, 0px))",
+          top: "calc(60px + env(safe-area-inset-top, 0px))",
           left: "50%", transform: "translateX(-50%)", zIndex: 25,
           backgroundColor: "#54A0FF", borderRadius: 10,
           padding: "8px 16px", boxShadow: "0 4px 16px rgba(84,160,255,0.4)",
@@ -13327,11 +13180,11 @@ export default function Pattrn() {
         </div>
       )}
 
-      {/* Info row: flex child below header */}
+      {/* Info row: now the top element of the play view */}
       <div ref={infoRowRef} style={{
         flexShrink: 0, zIndex: 10,
         backgroundColor: C.bg, display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: 4, paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
+        paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: gridTotalWidth }}>
           <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 18, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, letterSpacing: 2 }}>
