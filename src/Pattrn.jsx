@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell, PaintBucket, Eraser } from "lucide-react";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -2853,6 +2854,21 @@ export default function Pattrn() {
   const [birthdayInput, setBirthdayInput] = useState("");
   const goToDateRef = useRef(null);
 
+  // Radial context button state — stack for nested menus (empty = closed, ["root"] = top level, ["root","play"] = sub-menu)
+  const [radialMenuStack, setRadialMenuStack] = useState([]);
+  // Lock body scroll when context menu is open
+  useEffect(() => {
+    const menuOpen = radialMenuStack.length > 0;
+    if (menuOpen) {
+      document.body.style.overflow = "hidden";
+      document.body.style.touchAction = "none";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.touchAction = "";
+    }
+    return () => { document.body.style.overflow = ""; document.body.style.touchAction = ""; };
+  }, [radialMenuStack.length]);
+
   // Theme state
   const [activeThemeId, setActiveThemeId] = useState(() => loadTheme());
   const [showThemePicker, setShowThemePicker] = useState(false);
@@ -2934,6 +2950,7 @@ export default function Pattrn() {
   const [coopIncomingPass, setCoopIncomingPass] = useState(null); // { fromUid, fromName, fromColor, cellKey } — incoming pass request
   const [coopPendingPassCell, setCoopPendingPassCell] = useState(null); // cellKey of outgoing pending pass
   const [coopPassPlayerPicker, setCoopPassPlayerPicker] = useState(false); // show player picker for pass
+  const [pendingPassOpen, setPendingPassOpen] = useState(false); // toggle pending pass UI in pill
   const COOP_NEON_COLORS = ["#FF6B6B", "#00E676", "#FF9100", "#E040FB", "#FFEA00", "#00E5FF", "#FF4081", "#76FF03"];
   const COOP_MY_COLOR = "#54A0FF";
 
@@ -2961,6 +2978,9 @@ export default function Pattrn() {
   const [customMosaicProgress, setCustomMosaicProgress] = useState({}); // { tileIndex: attempts }
   const customMosaicPuzzlesRef = useRef(null); // array of 25 puzzle objects when playing custom mosaic
   const [creatorReturnView, setCreatorReturnView] = useState("menu"); // where to go when leaving creator
+  const [showSaveDrawer, setShowSaveDrawer] = useState(false); // drawer for naming mosaic on save
+  const creatorColorScrollRef = useRef(null); // color picker carousel scroll container
+  const creatorColorDragRef = useRef({ active: false, startX: 0, scrollStart: 0, moved: false, lastX: 0, lastT: 0, velX: 0, rafId: 0 });
   const [friendsList, setFriendsList] = useState([]); // array of { uid, username, profilePicture }
   const [addFriendInput, setAddFriendInput] = useState("");
   const [addFriendMsg, setAddFriendMsg] = useState("");
@@ -3242,6 +3262,51 @@ export default function Pattrn() {
     setCreatorTool("draw");
   }, []);
 
+  // Color picker carousel — momentum drag (mirrors TokenPicker)
+  useEffect(() => {
+    const el = creatorColorScrollRef.current;
+    if (!el) return;
+    const d = creatorColorDragRef.current;
+    const getX = (e) => e.touches ? e.touches[0].clientX : e.clientX;
+    const down = (e) => {
+      cancelAnimationFrame(d.rafId);
+      d.active = true; d.moved = false;
+      d.startX = getX(e); d.scrollStart = el.scrollLeft;
+      d.lastX = d.startX; d.lastT = Date.now(); d.velX = 0;
+    };
+    const move = (e) => {
+      if (!d.active) return;
+      const x = getX(e);
+      const dx = d.startX - x;
+      if (Math.abs(dx) > 3) d.moved = true;
+      const now = Date.now();
+      const dt = now - d.lastT;
+      if (dt > 0) d.velX = (d.lastX - x) / dt;
+      d.lastX = x; d.lastT = now;
+      el.scrollLeft = d.scrollStart + dx;
+    };
+    const up = () => {
+      if (!d.active) return;
+      d.active = false;
+      let v = d.velX * 16;
+      if (Math.abs(v) < 0.5) return;
+      const coast = () => {
+        v *= 0.95;
+        if (Math.abs(v) < 0.5) return;
+        el.scrollLeft += v;
+        d.rafId = requestAnimationFrame(coast);
+      };
+      d.rafId = requestAnimationFrame(coast);
+    };
+    el.addEventListener("touchstart", down, { passive: true });
+    el.addEventListener("touchmove", move, { passive: true });
+    el.addEventListener("touchend", up);
+    el.addEventListener("mousedown", down);
+    window.addEventListener("mousemove", move);
+    window.addEventListener("mouseup", up);
+    return () => { cancelAnimationFrame(d.rafId); el.removeEventListener("touchstart", down); el.removeEventListener("touchmove", move); el.removeEventListener("touchend", up); el.removeEventListener("mousedown", down); window.removeEventListener("mousemove", move); window.removeEventListener("mouseup", up); };
+  }, []);
+
   // Pointer-move based painting: uses element coordinates for smooth drag across tiny cells
   const creatorColorRef = useRef("#FF6B6B");
   useEffect(() => { creatorColorRef.current = creatorColor; }, [creatorColor]);
@@ -3356,15 +3421,27 @@ export default function Pattrn() {
     setView("custom-mosaic");
   }, [buildCustomMosaicPuzzles, progress.mosaicCompletions]);
 
-  const handleSaveMosaic = useCallback(async () => {
+  // Pre-save validation — opens the naming drawer if valid
+  const handleSaveClick = useCallback(() => {
     if (!firebaseUser) { setMosaicMsg("Sign in to save mosaics"); setTimeout(() => setMosaicMsg(""), 2500); return; }
-    if (!creatorTitle.trim()) { setMosaicMsg("Give your mosaic a name first!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    const allFilled = creatorGrid.every(row => row.every(c => c !== null));
+    if (!allFilled) { setMosaicMsg("Fill in all cells before saving!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    // Pre-fill title for edits
+    if (creatorEditingId && !creatorTitle.trim()) setCreatorTitle("");
+    setShowSaveDrawer(true);
+  }, [firebaseUser, creatorGrid, creatorEditingId, creatorTitle]);
+
+  const handleSaveMosaic = useCallback(async (titleFromDrawer) => {
+    const title = (titleFromDrawer || "").trim();
+    if (!firebaseUser) { setMosaicMsg("Sign in to save mosaics"); setTimeout(() => setMosaicMsg(""), 2500); return; }
+    if (!title) { setMosaicMsg("Give your mosaic a name first!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
     const allFilled = creatorGrid.every(row => row.every(c => c !== null));
     if (!allFilled) { setMosaicMsg("Fill in all cells before saving!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
     setMosaicLoading(true);
+    setShowSaveDrawer(false);
     try {
       const mosaicData = {
-        title: creatorTitle.trim(),
+        title,
         grid: creatorGrid,
         gridSize: 25,
         authorUsername: username || "",
@@ -3377,6 +3454,7 @@ export default function Pattrn() {
         setCreatorEditingId(id);
         setMosaicMsg("Mosaic saved!");
       }
+      setCreatorTitle(title);
     } catch (e) {
       console.error("Save mosaic failed:", e);
       const isPermErr = e?.message?.includes("PERMISSION_DENIED");
@@ -3385,7 +3463,7 @@ export default function Pattrn() {
       setMosaicLoading(false);
       setTimeout(() => setMosaicMsg(""), 4000);
     }
-  }, [firebaseUser, creatorGrid, creatorTitle, creatorEditingId]);
+  }, [firebaseUser, creatorGrid, creatorEditingId]);
 
   const handleDeleteMosaic = useCallback(async (mosaicId) => {
     if (!firebaseUser) return;
@@ -4145,7 +4223,7 @@ export default function Pattrn() {
 
   // Viewport size tracking for dynamic grid sizing
   const [viewportSize, setViewportSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
-  const [headerHeight, setHeaderHeight] = useState(88);
+  const [headerHeight, setHeaderHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(140);
   const [infoRowHeight, setInfoRowHeight] = useState(40);
   const headerRef = useRef(null);
@@ -4451,73 +4529,530 @@ export default function Pattrn() {
     cascadeRunIndexRef.current = cascadeRunIndex;
   }
   // --- Bottom Tab Bar helper ---
-  const BottomTabBar = ({ active }) => (
-    <nav className="bottom-tab-bar" style={{
-      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
-      backgroundColor: C.bg + "f0",
-      borderTop: `1px solid ${C.border}`,
-      paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      display: "flex", justifyContent: "center",
-    }}>
-      <div style={{
-        display: "flex", width: "100%", maxWidth: 480,
-        justifyContent: "space-around", alignItems: "center",
-        padding: "6px 0 4px",
-      }}>
-        {/* Home */}
-        <button onClick={() => setView("menu")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "home" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-          <span style={{ fontSize: 10, fontWeight: active === "home" ? 700 : 500, color: active === "home" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Home</span>
-        </button>
-        {/* Mosaic (Gallery) */}
-        <button onClick={() => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); }}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "mosaic" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-          </svg>
-          <span style={{ fontSize: 10, fontWeight: active === "mosaic" ? 700 : 500, color: active === "mosaic" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Mosaic</span>
-        </button>
-        {/* Co-op */}
-        <button onClick={() => setView("coop")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative" }}>
-          <div style={{ position: "relative", display: "inline-flex" }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "coop" ? C.coop : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            {activeCoopSessions.filter(s => s.status !== "complete").length > 0 && (
-              <div style={{
-                position: "absolute", top: -4, right: -8,
-                minWidth: 16, height: 16, borderRadius: 8,
-                backgroundColor: C.coop, display: "flex", alignItems: "center", justifyContent: "center",
-                padding: "0 4px", boxSizing: "border-box",
-              }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "'Space Mono', monospace", lineHeight: 1, paddingTop: 1 }}>
-                  {activeCoopSessions.filter(s => s.status !== "complete").length}
-                </span>
-              </div>
-            )}
-          </div>
-          <span style={{ fontSize: 10, fontWeight: active === "coop" ? 700 : 500, color: active === "coop" ? C.coop : C.textDim, fontFamily: "'Space Mono', monospace" }}>Co-op</span>
-        </button>
-        {/* Profile */}
-        <button onClick={() => setView("profile")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative" }}>
-          {firebaseUser && profilePicture ? (
-            <img src={profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: 11, objectFit: "cover", border: `1.5px solid ${active === "profile" ? C.accent : C.border}` }} />
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "profile" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+  // --- Context Button (Liquid Glass FAB) ---
+  // Close radial menu when view changes
+  const prevViewRef = useRef(view);
+  if (prevViewRef.current !== view) {
+    prevViewRef.current = view;
+    if (radialMenuStack.length > 0) setRadialMenuStack([]);
+  }
+
+  // SVG icon components for radial menu (minimal, monochrome stroke icons)
+  const radialIcons = {
+    play: (c) => <Play size={18} color={c} strokeWidth={2} />,
+    create: (c) => <Pencil size={18} color={c} strokeWidth={2} />,
+    profile: (c) => <User size={18} color={c} strokeWidth={2} />,
+    home: (c) => <Home size={18} color={c} strokeWidth={2} />,
+    gallery: (c) => <LayoutGrid size={18} color={c} strokeWidth={2} />,
+    trophy: (c) => <Trophy size={18} color={c} strokeWidth={2} />,
+    globe: (c) => <Globe size={18} color={c} strokeWidth={2} />,
+    folder: (c) => <FolderOpen size={18} color={c} strokeWidth={2} />,
+    plus: (c) => <Plus size={18} color={c} strokeWidth={2} />,
+    users: (c) => <Users size={18} color={c} strokeWidth={2} />,
+    back: (c) => <ChevronLeft size={18} color={c} strokeWidth={2} />,
+    grid: (c) => <Grid3X3 size={18} color={c} strokeWidth={2} />,
+    eye: (c) => <Eye size={18} color={c} strokeWidth={2} />,
+    zap: (c) => <Zap size={18} color={c} strokeWidth={2} />,
+    shuffle: (c) => <Shuffle size={18} color={c} strokeWidth={2} />,
+    calendar: (c) => <Calendar size={18} color={c} strokeWidth={2} />,
+    layers: (c) => <Layers size={18} color={c} strokeWidth={2} />,
+    star: (c) => <Star size={18} color={c} strokeWidth={2} />,
+    compass: (c) => <Compass size={18} color={c} strokeWidth={2} />,
+    burger: (c) => <Menu size={18} color={c} strokeWidth={2} />,
+    palette: (c) => <Palette size={18} color={c} strokeWidth={2} />,
+    share: (c) => <Share2 size={18} color={c} strokeWidth={2} />,
+    search: (c) => <Search size={18} color={c} strokeWidth={2} />,
+    "user-plus": (c) => <UserPlus size={18} color={c} strokeWidth={2} />,
+    upload: (c) => <Upload size={18} color={c} strokeWidth={2} />,
+    login: (c) => <LogIn size={18} color={c} strokeWidth={2} />,
+    logout: (c) => <LogOut size={18} color={c} strokeWidth={2} />,
+    check: (c) => <Check size={20} color={c} strokeWidth={2.5} />,
+    refresh: (c) => <RotateCcw size={18} color={c} strokeWidth={2} />,
+    forward: (c) => <ChevronRight size={18} color={c} strokeWidth={2} />,
+    pass: (c) => <HandHelping size={18} color={c} strokeWidth={2} />,
+    bell: (c) => <Bell size={18} color={c} strokeWidth={2} />,
+    pencil: (c) => <Pencil size={18} color={c} strokeWidth={2} />,
+    "paint-bucket": (c) => <PaintBucket size={18} color={c} strokeWidth={2} />,
+    eraser: (c) => <Eraser size={18} color={c} strokeWidth={2} />,
+    "pass-pending": (c) => (
+      <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+        <HandHelping size={18} color={c} strokeWidth={2} />
+        <Clock size={10} color="#f59e0b" strokeWidth={2.5} style={{ position: "absolute", bottom: -2, right: -4 }} />
+      </span>
+    ),
+  };
+
+  // Quick Play sub-menu — shared across all views (accessed from nav)
+  // Pick a random uncompleted puzzle index for a given difficulty, fallback to 0
+  const getRandomUncompletedPuzzle = (diff) => {
+    const puzzles = PUZZLE_SETS[diff] || [];
+    const diffProg = progress[diff] || {};
+    const uncompleted = [];
+    for (let i = 0; i < puzzles.length; i++) {
+      if (!diffProg[i] || diffProg[i] <= 0) uncompleted.push(i);
+    }
+    if (uncompleted.length === 0) return Math.floor(Math.random() * puzzles.length); // all done, pick random
+    return uncompleted[Math.floor(Math.random() * uncompleted.length)];
+  };
+
+  const quickPlayStart = (diff, idx, dailyDate) => {
+    if (coopSessionId) leaveCoopSession();
+    startPuzzle(idx, diff, true, dailyDate);
+  };
+  const playSubMenu = [
+    { id: "back", icon: "back", label: "Back", isBack: true },
+    { id: "easy", icon: "grid", label: "Easy", action: () => { quickPlayStart("easy", getRandomUncompletedPuzzle("easy")); } },
+    { id: "medium", icon: "layers", label: "Medium", action: () => { quickPlayStart("medium", getRandomUncompletedPuzzle("medium")); } },
+    { id: "hard", icon: "zap", label: "Hard", action: () => { quickPlayStart("hard", getRandomUncompletedPuzzle("hard")); } },
+    { id: "daily", icon: "calendar", label: "Daily", action: () => { quickPlayStart("daily", null, getTodayDailyDateStr()); } },
+    { id: "cascade", icon: "layers", label: "Cascade", action: () => { quickPlayStart("cascade", cascadeRunIndex); } },
+  ];
+
+  // Theme sub-menu — select a theme inline
+  const themeAchList = computeAchievements(progress, times, savedAchievementIds);
+  const themeSubMenu = [
+    { id: "back", icon: "back", label: "Back", isBack: true },
+    ...PUZZLE_THEMES.map(theme => {
+      const unlocked = isThemeUnlocked(theme, themeAchList);
+      const isActive = activeThemeId === theme.id;
+      return {
+        id: `theme-${theme.id}`,
+        icon: "palette",
+        label: theme.name + (isActive ? " \u2713" : ""),
+        dimmed: !unlocked,
+        action: unlocked ? () => { setActiveThemeId(theme.id); saveTheme(theme.id); } : null,
+      };
+    }),
+  ];
+
+  // Contextual menu items per view — page-specific actions
+  const getContextualMenuTree = (currentView) => {
+    // Build play contextual items dynamically (some are conditional)
+    const playRoot = [];
+    playRoot.push({ id: "theme", icon: "palette", label: "Theme", sub: "theme" });
+    if (!isCoop && gameState === "playing" && !isCascade && !isMosaic) {
+      playRoot.push({ id: "coop-start", icon: "user-plus", label: "Play w/ Friends", action: () => {
+        if (!firebaseUser) { coopPendingLoginRef.current = true; setShowAccountModal(true); return; }
+        setShowCoopFriendPicker(true);
+      }});
+    }
+    if (isCoop) {
+      playRoot.push({ id: "coop-invite", icon: "user-plus", label: "Invite", action: () => { setShowCoopInvite(true); } });
+    }
+    // Back action defined as pill button at call site
+
+    // Menu view items
+    const menuRoot = [];
+    if (firebaseConfigured && !firebaseUser) {
+      menuRoot.push({ id: "sign-in", icon: "login", label: "Sign In", action: () => { setShowAccountModal(true); } });
+    }
+    if (firebaseConfigured && firebaseUser) {
+      menuRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
+      menuRoot.push({ id: "notifications", icon: "bell", label: "Notifications", action: () => { setShowNotifications(!showNotifications); } });
+    }
+
+    // Creator view items
+    const creatorRoot = [];
+    if (firebaseConfigured && firebaseUser) {
+      creatorRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
+    }
+
+    // Custom mosaic view items
+    const customMosaicRoot = [];
+    if (firebaseConfigured && firebaseUser && !isCoopMosaic) {
+      customMosaicRoot.push({ id: "coop-mosaic", icon: "user-plus", label: "Co-op", action: () => { setShowCoopFriendPicker(true); } });
+      customMosaicRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
+    }
+
+    // Admin view items
+    // Admin back buttons defined as pill buttons at call sites
+    const adminReviewRoot = [
+      { id: "refresh", icon: "refresh", label: "Refresh", action: () => { loadMosaicData("admin"); } },
+    ];
+    const adminManageRoot = [
+      { id: "refresh", icon: "refresh", label: "Refresh", action: () => { loadMosaicData("manage"); } },
+    ];
+    const adminMetricsRoot = [
+      { id: "refresh", icon: "refresh", label: "Refresh", action: () => { loadAdminMetricsData(); } },
+    ];
+    const adminUsersRoot = [];
+
+    const trees = {
+      menu: { root: menuRoot },
+      gallery: {
+        root: [
+          { id: "public", icon: "globe", label: "Public", action: () => { setMosaicGalleryTab("public"); loadMosaicData("public"); } },
+          { id: "mine", icon: "folder", label: "My Mosaics", action: () => { setMosaicGalleryTab("mine"); loadMosaicData("mine"); } },
+        ],
+      },
+      play: { root: playRoot },
+      profile: {
+        root: [
+          { id: "achievements", icon: "trophy", label: "Achievements", action: () => { setShowAchievements(true); } },
+        ],
+      },
+      creator: { root: creatorRoot },
+      "custom-mosaic": { root: customMosaicRoot },
+      coop: { root: firebaseConfigured && firebaseUser ? [
+        { id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } },
+      ] : [] },
+      "admin-review": { root: adminReviewRoot },
+      "admin-manage": { root: adminManageRoot },
+      "admin-metrics": { root: adminMetricsRoot },
+      "admin-users": { root: adminUsersRoot },
+    };
+    return trees[currentView] || { root: [] };
+  };
+
+  // Persistent nav items — always show all core page links
+  const navItems = [
+    { id: "nav-play", icon: "play", label: "Quick Play", sub: "play" },
+    { id: "nav-home", icon: "home", label: "Home", action: () => { setView("menu"); } },
+    { id: "nav-gallery", icon: "gallery", label: "Mosaic", action: () => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); } },
+    { id: "nav-coop", icon: "users", label: "Co-op", action: () => { setView("coop"); } },
+    { id: "nav-profile", icon: "profile", label: "Profile", action: () => { setView("profile"); } },
+  ];
+
+  // FAB icon — always the burger menu
+  const getFabIcon = () => "burger";
+
+  const renderContextButton = (currentView, pillButtons = [], bottomPx = 16) => {
+    const menuTree = getContextualMenuTree(currentView);
+    const isOpen = radialMenuStack.length > 0;
+    const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
+    const isSubMenu = currentMenuKey !== "root";
+    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : (menuTree[currentMenuKey] || []);
+
+    // Filter out the current page from nav
+    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-home", "custom-mosaic": "nav-gallery" };
+    const filteredNav = navItems.filter(item => item.id !== viewToNavId[currentView]);
+
+    const fabIconKey = isOpen ? null : getFabIcon();
+    const strokeColor = "#fff";
+    const activeStroke = C.accent;
+    const renderIcon = (key, color) => radialIcons[key] ? radialIcons[key](color) : null;
+
+    // Panel sizing
+    const fabSize = 56;
+    const hasPillButtons = pillButtons.length > 0;
+    const closedWidth = hasPillButtons ? (pillButtons.length + 1) * fabSize : fabSize;
+    const panelWidth = Math.max(200, closedWidth);
+    const itemHeight = 44;
+    const panelPad = 8;
+    const dividerHeight = 13;
+    const showNav = !isSubMenu;
+    const hasContextual = contextualItems.length > 0;
+    const showDivider = showNav && hasContextual;
+    const visibleItemCount = (showNav ? filteredNav.length : 0) + contextualItems.length;
+
+    // Pass UI state — rendered inside the Liquid Glass panel
+    const showPassPlayerPicker = coopPassPlayerPicker && !coopPassMode;
+    const showPassBanner = !!coopPassMode;
+    const showPassPending = pendingPassOpen && !!coopPendingPassCell;
+    const showPassIncoming = gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey;
+    const hasPassUI = showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming;
+    const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : 0;
+    const passRowHeight = showPassPlayerPicker ? (passPlayerCount > 2 ? 88 : 56) : showPassIncoming ? 56 : 48;
+    const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
+
+    const contentHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight;
+    // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
+    const bottomOffset = bottomPx; // matches the bottom positioning
+    const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
+    const openHeight = Math.min(contentHeight, maxPanelHeight);
+    const needsScroll = contentHeight > maxPanelHeight;
+
+    // Liquid Glass spring curves — fast initial movement, subtle overshoot, quick settle
+    const springOpen = "cubic-bezier(0.175, 0.885, 0.32, 1.175)";
+    const springClose = "cubic-bezier(0.4, 0, 0.7, 1)";
+
+    const handleToggle = () => {
+      if (isOpen) setRadialMenuStack([]);
+      else setRadialMenuStack(["root"]);
+    };
+
+    // Shared item renderer — uses CSS transitions (not animations) so items animate in AND out
+    const renderItem = (item, animIndex, dimmed) => {
+      const handleClick = () => {
+        if (item.isBack) setRadialMenuStack(prev => prev.slice(0, -1));
+        else if (item.sub) setRadialMenuStack(prev => [...prev, item.sub]);
+        else if (item.action) { item.action(); setRadialMenuStack([]); }
+      };
+      const staggerIn = 0.04 + animIndex * 0.03;
+      return (
+        <button
+          key={item.id}
+          onClick={handleClick}
+          style={{
+            width: "100%", height: itemHeight,
+            display: "flex", alignItems: "center", gap: 12,
+            padding: "0 16px",
+            background: "none", border: "none",
+            cursor: dimmed && !item.isBack ? "default" : "pointer",
+            color: dimmed ? C.textDim : C.text,
+            fontFamily: "'Space Mono', monospace",
+            fontSize: 11, fontWeight: 600,
+            letterSpacing: 0.5, textTransform: "uppercase",
+            opacity: isOpen ? 1 : 0,
+            transform: isOpen ? "translateY(0)" : "translateY(8px)",
+            transition: isOpen
+              ? `opacity 0.2s ${springOpen} ${staggerIn}s, transform 0.25s ${springOpen} ${staggerIn}s, background 0.15s`
+              : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s, background 0.15s`,
+            pointerEvents: isOpen ? "auto" : "none",
+          }}
+          onMouseEnter={e => { if (isOpen) e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
+        >
+          <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 28, height: 28, flexShrink: 0 }}>
+            {renderIcon(item.icon, dimmed ? C.textDim : strokeColor)}
+          </span>
+          <span style={{ flex: 1, textAlign: "left" }}>{item.label}</span>
+          {item.sub && (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+              <polyline points="9 18 15 12 9 6"/>
             </svg>
           )}
-          <span style={{ fontSize: 10, fontWeight: active === "profile" ? 700 : 500, color: active === "profile" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Profile</span>
         </button>
-      </div>
-    </nav>
-  );
+      );
+    };
+
+    const defaultShadow = "none";
+    const hoverShadow = "none";
+
+    return (
+      <>
+        {/* Click-away layer — blocks scrolling underneath */}
+        {isOpen && (
+          <div
+            onClick={() => setRadialMenuStack([])}
+            onTouchMove={e => e.preventDefault()}
+            style={{ position: "fixed", inset: 0, zIndex: 84, touchAction: "none", overscrollBehavior: "none" }}
+          />
+        )}
+
+        {/* Expanding Liquid Glass panel / pill */}
+        <div
+          style={{
+            position: "fixed",
+            bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
+            right: 20,
+            width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
+            height: isOpen ? openHeight : fabSize + passUIHeight,
+            borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
+            background: activeTheme.gridBg || C.surface,
+            backdropFilter: "blur(28px) saturate(200%)",
+            WebkitBackdropFilter: "blur(28px) saturate(200%)",
+            border: isOpen ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(255,255,255,0.16)",
+            boxShadow: defaultShadow,
+            zIndex: 85,
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            transition: isOpen
+              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease`
+              : `width 0.22s ${springClose}, height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease`,
+          }}
+          aria-label="Quick actions"
+        >
+          {/* Liquid Glass sheen highlight */}
+          <div style={{
+            position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none",
+          }}>
+            <div style={{
+              position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%",
+              background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)",
+              borderRadius: "inherit",
+            }} />
+          </div>
+
+          {/* Menu content — always rendered, animated via transitions */}
+          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflow: "hidden", overflowY: isOpen && needsScroll ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}>
+            {/* Persistent nav items — always first */}
+            {showNav && filteredNav.map((item, i) => renderItem(item, i, false))}
+
+            {/* Divider between nav and contextual */}
+            {showDivider && (
+              <div style={{
+                padding: "6px 16px",
+                opacity: isOpen ? 1 : 0,
+                transition: isOpen
+                  ? `opacity 0.2s ease ${0.04 + filteredNav.length * 0.03}s`
+                  : "opacity 0.08s ease 0s",
+              }}>
+                <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
+              </div>
+            )}
+
+            {/* Contextual items — page-specific actions */}
+            {contextualItems.map((item, i) => renderItem(item, filteredNav.length + (showDivider ? 1 : 0) + i, item.isBack || item.dimmed))}
+          </div>
+
+          {/* Pass UI — player picker / banner / pending / incoming */}
+          {hasPassUI && (
+            <div style={{
+              borderTop: "1px solid rgba(255,255,255,0.06)",
+              padding: "8px 12px",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              flexWrap: "wrap",
+              gap: 6, flexShrink: 0, minHeight: passRowHeight,
+            }}>
+              {/* Player picker (multi-partner) */}
+              {showPassPlayerPicker && (
+                <>
+                  <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, marginRight: 2, whiteSpace: "nowrap" }}>
+                    Pass to:
+                  </span>
+                  {Object.entries(coopPlayers).map(([uid, p]) => {
+                    const playerColor = coopPlayerColorMap[uid] || "#FF9FF3";
+                    return (
+                      <button key={uid} onClick={(e) => {
+                        e.stopPropagation();
+                        setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: playerColor });
+                        setCoopPassPlayerPicker(false);
+                      }} style={{
+                        display: "flex", alignItems: "center", gap: 5, padding: "5px 10px",
+                        borderRadius: 8, border: `1px solid ${playerColor}44`, background: "none",
+                        cursor: "pointer", color: C.text, fontSize: 11, fontWeight: 600,
+                        fontFamily: "'Space Mono', monospace",
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${playerColor}22`; }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                      >
+                        <span style={{
+                          width: 14, height: 14, borderRadius: "50%", backgroundColor: playerColor,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 8, fontWeight: 700, color: "#fff", flexShrink: 0,
+                        }}>{(p.username || "P")[0].toUpperCase()}</span>
+                        {p.username || "Player"}
+                      </button>
+                    );
+                  })}
+                  <button onClick={(e) => { e.stopPropagation(); setCoopPassPlayerPicker(false); }} style={{
+                    background: "none", border: "none", color: C.textDim, cursor: "pointer",
+                    fontSize: 16, padding: "2px 6px", lineHeight: 1,
+                  }}>{"\u2715"}</button>
+                </>
+              )}
+              {/* Pass mode banner — tap a cell */}
+              {showPassBanner && (
+                <>
+                  <span style={{
+                    width: 10, height: 10, borderRadius: "50%", backgroundColor: coopPassMode.targetColor,
+                    display: "inline-block", flexShrink: 0,
+                  }} />
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, whiteSpace: "nowrap" }}>
+                    Tap cell to pass to {coopPassMode.targetName}
+                  </span>
+                  <button onClick={(e) => { e.stopPropagation(); setCoopPassMode(null); setCoopPassPlayerPicker(false); }} style={{
+                    background: "none", border: "none", color: C.textDim, cursor: "pointer",
+                    fontSize: 14, padding: "2px 6px", lineHeight: 1, fontFamily: "'Space Mono', monospace",
+                  }}>Cancel</button>
+                </>
+              )}
+              {/* Pending pass — waiting for response */}
+              {showPassPending && (
+                <>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.textDim }}>
+                    Waiting for response...
+                  </span>
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    cancelCoopPassRequest(coopSessionId, coopPendingPassCell).catch(() => {});
+                    setCoopPendingPassCell(null);
+                    setPendingPassOpen(false);
+                  }} style={{
+                    background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
+                    color: C.textDim, cursor: "pointer", fontSize: 10, padding: "3px 8px",
+                    fontFamily: "'Space Mono', monospace", fontWeight: 600,
+                  }}>Cancel</button>
+                </>
+              )}
+              {/* Incoming pass — accept / reject */}
+              {showPassIncoming && (
+                <>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.text, fontWeight: 600 }}>
+                    <span style={{ color: coopIncomingPass.fromColor, fontWeight: 700 }}>{coopIncomingPass.fromName}</span> wants to pass
+                  </span>
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, true).catch(() => {});
+                    setSelectedCell(null);
+                  }} style={{
+                    backgroundColor: C.correct, color: "#fff", border: "none",
+                    padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    textTransform: "uppercase",
+                  }}>Accept</button>
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, false).catch(() => {});
+                    setSelectedCell(null);
+                  }} style={{
+                    backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                    padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    textTransform: "uppercase",
+                  }}>Reject</button>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Bottom bar: pill action buttons + menu toggle */}
+          <div style={{
+            display: "flex", alignItems: "center",
+            height: fabSize, flexShrink: 0,
+            borderTop: (isOpen || hasPassUI) ? "1px solid rgba(255,255,255,0.06)" : "none",
+          }}>
+            {/* Action buttons in the pill */}
+            {pillButtons.map((btn) => (
+              <div
+                key={btn.id}
+                onClick={btn.disabled ? undefined : (e) => { e.stopPropagation(); btn.onClick?.(); }}
+                style={{
+                  width: fabSize, height: fabSize,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  cursor: btn.disabled ? "default" : "pointer",
+                  opacity: btn.disabled ? 0.35 : 1,
+                  transition: "opacity 0.15s, transform 0.15s",
+                  flexShrink: 0,
+                }}
+                onMouseEnter={e => { if (!btn.disabled) e.currentTarget.style.transform = "scale(1.15)"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+              >
+                {renderIcon(btn.icon, btn.color || strokeColor)}
+              </div>
+            ))}
+
+            {/* Separator between action buttons and menu toggle */}
+            {hasPillButtons && (
+              <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.12)", flexShrink: 0 }} />
+            )}
+
+            {/* Menu toggle button */}
+            <div
+              onClick={(e) => { e.stopPropagation(); handleToggle(); }}
+              style={{
+                flex: 1, height: fabSize,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer",
+              }}
+              onMouseEnter={e => { if (!isOpen && !hasPillButtons) { e.currentTarget.parentElement.parentElement.style.transform = "scale(1.08)"; e.currentTarget.parentElement.parentElement.style.boxShadow = hoverShadow; } }}
+              onMouseLeave={e => { if (!isOpen && !hasPillButtons) { e.currentTarget.parentElement.parentElement.style.transform = "scale(1)"; e.currentTarget.parentElement.parentElement.style.boxShadow = defaultShadow; } }}
+            >
+              {isOpen ? (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={activeStroke} strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              ) : (
+                renderIcon(fabIconKey, strokeColor)
+              )}
+            </div>
+          </div>
+        </div>
+      </>
+    );
+  };
 
   const isMosaic = difficulty === "mosaic";
   const mosaicMainPuzzles = isMosaic ? (staffPickPuzzlesRef.current || PUZZLE_SETS.mosaic) : null;
@@ -5251,6 +5786,7 @@ export default function Pattrn() {
     setCoopIncomingPass(null);
     setCoopPendingPassCell(null);
     setCoopPassPlayerPicker(false);
+    setPendingPassOpen(false);
     coopPlayerUidsRef.current = "";
     setShowLeaveConfirm(false);
     coopWriteThrottleRef.current = {};
@@ -5421,6 +5957,7 @@ export default function Pattrn() {
       const myOutgoing = Object.entries(passRequests).find(([, req]) => req.fromUid === myUid && req.status === "pending");
       if (!myOutgoing) {
         setCoopPendingPassCell(null);
+        setPendingPassOpen(false);
       }
 
       // Sync invited UIDs
@@ -5457,6 +5994,7 @@ export default function Pattrn() {
           setCoopIncomingPass(null);
           setCoopPendingPassCell(null);
           setCoopPassPlayerPicker(false);
+          setPendingPassOpen(false);
         }
       }
 
@@ -8745,20 +9283,6 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => {
-            if (isCoopMosaic) { setShowMosaicLeaveConfirm(true); return; }
-            const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
-          }}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <div style={{ flex: 1 }}>
             <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 20, fontWeight: 700, letterSpacing: 2, margin: 0, color: isCoopMosaic ? C.coop : C.accent }}>
               {customMosaicPlay.title || "Untitled"}
@@ -8767,59 +9291,6 @@ export default function Pattrn() {
               <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorUsername}</div>
             )}
           </div>
-          {/* Co-op button */}
-          {firebaseConfigured && firebaseUser && !isCoopMosaic && (
-            <button
-              onClick={() => setShowCoopFriendPicker(true)}
-              style={{
-                background: "none", border: `1px solid ${C.coop}55`,
-                borderRadius: 8, padding: "5px 10px", cursor: "pointer",
-                transition: "all 0.15s", display: "flex", alignItems: "center", gap: 4, height: 30,
-                fontFamily: "'Space Mono', monospace", fontSize: 10, fontWeight: 700,
-                color: C.coop, letterSpacing: 1, textTransform: "uppercase",
-              }}
-              title="Start co-op mosaic session"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.coop; e.currentTarget.style.backgroundColor = C.coop + "11"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.coop + "55"; e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.coop} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              Co-op
-            </button>
-          )}
-          {firebaseConfigured && firebaseUser && !isCoopMosaic && (
-            <button
-              onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }}
-              style={{
-                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
-                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
-                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
-                position: "relative", minWidth: 32, height: 30,
-              }}
-              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
-              aria-label="Friends"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              {onlineFriendsCount > 0 && (
-                <span style={{
-                  position: "absolute", top: -4, right: -4,
-                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
-                  backgroundColor: C.correct, color: "#fff",
-                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: "'Space Mono', monospace",
-                }}>
-                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
-                </span>
-              )}
-            </button>
-          )}
         </div>
 
         {/* Coop mosaic status bar — n-player */}
@@ -9150,6 +9621,10 @@ export default function Pattrn() {
           );
         })()}
 
+        {renderContextButton("custom-mosaic", [{ id: "back", icon: "back", color: "#fff", onClick: () => {
+          if (isCoopMosaic) { setShowMosaicLeaveConfirm(true); return; }
+          const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
+        }}])}
         {globalModalsEl}
       </div>
     );
@@ -9164,9 +9639,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -9177,150 +9652,9 @@ export default function Pattrn() {
           backgroundColor: C.bg + "ee", backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
           animation: "fadeUp 0.3s ease",
         }}>
-          <button onClick={() => {
-            const returnTo = creatorReturnView || "menu";
-            resetCreator();
-            setCreatorReturnView("menu");
-            if (returnTo === "gallery") {
-              setView("gallery");
-              loadMosaicData(mosaicGalleryTab || "mine");
-            } else {
-              setView("menu");
-            }
-          }}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             {creatorEditingId ? "Edit Mosaic" : "Create Mosaic"}
           </h2>
-          {firebaseConfigured && firebaseUser && (
-            <button
-              onClick={() => { setShowFriendsModal(true); setFriendsModalTab("list"); }}
-              style={{
-                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
-                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
-                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
-                position: "relative", minWidth: 32, height: 30,
-              }}
-              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
-              aria-label="Friends"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              {onlineFriendsCount > 0 && (
-                <span style={{
-                  position: "absolute", top: -4, right: -4,
-                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
-                  backgroundColor: C.correct, color: "#fff",
-                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: "'Space Mono', monospace",
-                }}>
-                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
-                </span>
-              )}
-            </button>
-          )}
-        </div>
-
-        {/* Title input */}
-        <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, animation: "fadeUp 0.3s 0.02s ease both" }}>
-          <input
-            type="text"
-            value={creatorTitle}
-            onChange={e => setCreatorTitle(e.target.value)}
-            placeholder="Mosaic title..."
-            maxLength={40}
-            style={{
-              width: "100%", padding: "10px 14px", borderRadius: 10,
-              backgroundColor: C.surface, border: `1px solid ${C.border}`,
-              color: C.text, fontSize: 16, fontFamily: "'Space Mono', monospace",
-              outline: "none", boxSizing: "border-box", letterSpacing: 0.5,
-            }}
-            onFocus={e => { e.target.style.borderColor = C.accent; }}
-            onBlur={e => { e.target.style.borderColor = C.border; }}
-          />
-        </div>
-
-        {/* Color palette */}
-        <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, animation: "fadeUp 0.3s 0.04s ease both" }}>
-          <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
-            Colors
-          </div>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {CREATOR_COLORS.map(color => (
-              <button
-                key={color}
-                onClick={() => setCreatorColor(color)}
-                style={{
-                  width: 28, height: 28, borderRadius: 6, backgroundColor: color, border: creatorColor === color ? `2.5px solid ${C.accent}` : `1.5px solid ${C.border}`,
-                  cursor: "pointer", transition: "all 0.15s",
-                  boxShadow: creatorColor === color ? `0 0 8px ${C.accent}66` : "none",
-                }}
-              />
-            ))}
-            {/* Eraser */}
-            <button
-              onClick={() => setCreatorColor(null)}
-              style={{
-                width: 28, height: 28, borderRadius: 6, backgroundColor: C.surface,
-                border: creatorColor === null ? `2.5px solid ${C.accent}` : `1.5px solid ${C.border}`,
-                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 14, color: C.textDim, transition: "all 0.15s",
-              }}
-              title="Eraser"
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M11.5 2.5l2 2-8 8-3 1 1-3z" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            </button>
-          </div>
-        </div>
-
-        {/* Tools */}
-        <div style={{ width: "100%", maxWidth: 400, marginBottom: 12, animation: "fadeUp 0.3s 0.045s ease both" }}>
-          <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Space Mono', monospace" }}>
-            Tools
-          </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {/* Draw tool */}
-            <button
-              onClick={() => setCreatorTool("draw")}
-              style={{
-                display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 6,
-                backgroundColor: creatorTool === "draw" ? C.accent + "22" : C.surface,
-                border: creatorTool === "draw" ? `2px solid ${C.accent}` : `1.5px solid ${C.border}`,
-                cursor: "pointer", fontSize: 11, color: creatorTool === "draw" ? C.accent : C.textDim,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, transition: "all 0.15s",
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2.5 13.5l1-3 8-8 2 2-8 8z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Draw
-            </button>
-            {/* Fill tool */}
-            <button
-              onClick={() => setCreatorTool("fill")}
-              style={{
-                display: "flex", alignItems: "center", gap: 5, padding: "5px 12px", borderRadius: 6,
-                backgroundColor: creatorTool === "fill" ? C.accent + "22" : C.surface,
-                border: creatorTool === "fill" ? `2px solid ${C.accent}` : `1.5px solid ${C.border}`,
-                cursor: "pointer", fontSize: 11, color: creatorTool === "fill" ? C.accent : C.textDim,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 0.5, transition: "all 0.15s",
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M13 9c0 2-1.5 4-3 4s-3-2-3-4 3-7 3-7 3 5 3 7z" stroke="currentColor" strokeWidth="1.3" fill="currentColor" fillOpacity="0.2" strokeLinecap="round" strokeLinejoin="round"/><path d="M1.5 11l4-4 3 3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
-              Fill
-            </button>
-          </div>
         </div>
 
         {/* 25x25 info */}
@@ -9365,52 +9699,179 @@ export default function Pattrn() {
           </div>
         </div>
 
-        {/* Actions */}
-        <div style={{ width: "100%", maxWidth: 400, display: "flex", flexDirection: "column", gap: 8, animation: "fadeUp 0.3s 0.08s ease both" }}>
-          {mosaicMsg && (
-            <div style={{
-              textAlign: "center", padding: "8px 12px", borderRadius: 8,
-              backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, letterSpacing: 0.5,
-            }}>
-              {mosaicMsg}
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handleSaveMosaic}
-              disabled={mosaicLoading}
-              style={{
-                flex: 1, padding: "12px 0", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1.5,
-                background: C.accent, color: C.bg, border: "none", cursor: mosaicLoading ? "not-allowed" : "pointer",
-                textTransform: "uppercase", transition: "all 0.15s", opacity: mosaicLoading ? 0.6 : 1,
-              }}
-            >
-              {mosaicLoading ? "Saving..." : creatorEditingId ? "Update" : "Save"}
-            </button>
-            <button
-              onClick={() => { resetCreator(); }}
-              style={{
-                padding: "12px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                textTransform: "uppercase", transition: "all 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-            >
-              Clear
-            </button>
+        {/* Status messages */}
+        {mosaicMsg && (
+          <div style={{
+            width: "100%", maxWidth: 400, textAlign: "center", padding: "8px 12px", borderRadius: 8,
+            backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
+            fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, letterSpacing: 0.5,
+            animation: "fadeUp 0.3s 0.08s ease both",
+          }}>
+            {mosaicMsg}
           </div>
-          {!firebaseUser && firebaseConfigured && (
-            <div style={{ textAlign: "center", fontSize: 11, color: C.textDim, marginTop: 4 }}>
-              Sign in from the menu to save your creations
-            </div>
-          )}
-        </div>
+        )}
+        {!firebaseUser && firebaseConfigured && (
+          <div style={{ width: "100%", maxWidth: 400, textAlign: "center", fontSize: 11, color: C.textDim, marginTop: 8, animation: "fadeUp 0.3s 0.08s ease both" }}>
+            Sign in from the menu to save your creations
+          </div>
+        )}
 
-      <BottomTabBar active="mosaic" />
+      {/* Tool toggle — bottom left Liquid Glass pill */}
+      <div style={{
+        position: "fixed",
+        bottom: `calc(16px + env(safe-area-inset-bottom, 0px))`,
+        left: 20,
+        display: "flex",
+        borderRadius: 28,
+        background: activeTheme.gridBg || C.surface,
+        backdropFilter: "blur(28px) saturate(200%)",
+        WebkitBackdropFilter: "blur(28px) saturate(200%)",
+        border: "1px solid rgba(255,255,255,0.16)",
+        zIndex: 85,
+        overflow: "hidden",
+      }}>
+        {/* Liquid Glass sheen */}
+        <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none" }}>
+          <div style={{ position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%", background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)", borderRadius: "inherit" }} />
+        </div>
+        <div
+          onClick={() => setCreatorTool("draw")}
+          style={{
+            width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", position: "relative",
+            backgroundColor: creatorTool === "draw" ? "rgba(255,255,255,0.12)" : "transparent",
+            transition: "background-color 0.15s",
+          }}
+        >
+          <Pencil size={18} color={creatorTool === "draw" ? C.accent : "#fff"} strokeWidth={2} />
+        </div>
+        <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.12)", alignSelf: "center" }} />
+        <div
+          onClick={() => setCreatorTool("fill")}
+          style={{
+            width: 56, height: 56, display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "pointer", position: "relative",
+            backgroundColor: creatorTool === "fill" ? "rgba(255,255,255,0.12)" : "transparent",
+            transition: "background-color 0.15s",
+          }}
+        >
+          <PaintBucket size={18} color={creatorTool === "fill" ? C.accent : "#fff"} strokeWidth={2} />
+        </div>
+      </div>
+
+      {/* Color picker — Liquid Glass pill carousel above main menu */}
+      <div style={{
+        position: "fixed",
+        bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
+        right: 20,
+        borderRadius: 9999,
+        background: activeTheme.gridBg || C.surface,
+        backdropFilter: "blur(28px) saturate(200%)",
+        WebkitBackdropFilter: "blur(28px) saturate(200%)",
+        border: "1px solid rgba(255,255,255,0.16)",
+        boxShadow: "0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15)",
+        zIndex: 85,
+        padding: "6px 4px",
+        maxWidth: "calc(100vw - 40px)",
+        overflow: "hidden",
+      }}>
+        {/* Liquid Glass sheen */}
+        <div style={{ position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none" }}>
+          <div style={{ position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%", background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)", borderRadius: "inherit" }} />
+        </div>
+        <div ref={creatorColorScrollRef} className="token-picker-scroll" style={{
+          display: "flex", gap: 10, justifyContent: "flex-start", padding: "8px 16px",
+          flexWrap: "nowrap", overflowX: "auto", flex: "1 1 auto", minWidth: 0, maxWidth: "100%",
+          WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none",
+          touchAction: "pan-x", willChange: "scroll-position",
+        }}>
+          {CREATOR_COLORS.map(color => (
+            <div
+              key={color}
+              onClick={() => { if (!creatorColorDragRef.current.moved) setCreatorColor(color); }}
+              style={{
+                width: 48, height: 48, borderRadius: 12, backgroundColor: color, flexShrink: 0,
+                border: creatorColor === color ? `3px solid ${C.text}` : "3px solid transparent",
+                cursor: "pointer",
+                transition: "transform 0.2s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s cubic-bezier(0.4,0,0.2,1), border-color 0.2s cubic-bezier(0.4,0,0.2,1)",
+                transform: creatorColor === color ? "scale(1.15)" : "scale(1)",
+                boxShadow: creatorColor === color ? `0 0 12px ${color}88` : `0 2px 8px rgba(0,0,0,0.25)`,
+              }}
+            />
+          ))}
+          {/* Eraser */}
+          <div
+            onClick={() => { if (!creatorColorDragRef.current.moved) setCreatorColor(null); }}
+            style={{
+              width: 48, height: 48, borderRadius: 12, flexShrink: 0,
+              backgroundColor: C.surface,
+              border: creatorColor === null ? `3px solid ${C.text}` : "3px solid transparent",
+              cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "transform 0.2s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s cubic-bezier(0.4,0,0.2,1), border-color 0.2s cubic-bezier(0.4,0,0.2,1)",
+              transform: creatorColor === null ? "scale(1.15)" : "scale(1)",
+              boxShadow: creatorColor === null ? `0 0 12px ${C.accent}88` : `0 2px 8px rgba(0,0,0,0.25)`,
+            }}
+          >
+            <Eraser size={20} color={creatorColor === null ? C.accent : "rgba(255,255,255,0.5)"} strokeWidth={2} />
+          </div>
+        </div>
+      </div>
+
+      {renderContextButton("creator", [
+        { id: "back", icon: "back", color: "#fff", onClick: () => {
+          resetCreator(); setCreatorReturnView("menu");
+          setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine");
+        }},
+        { id: "clear", icon: "refresh", color: "#fff", onClick: () => resetCreator() },
+        { id: "save", icon: "upload", color: C.accent, onClick: handleSaveClick, disabled: mosaicLoading },
+      ])}
+
+      {/* Save mosaic drawer — name prompt */}
+      <DraggableDrawer isOpen={showSaveDrawer} onClose={() => setShowSaveDrawer(false)} maxHeight="50vh">
+        <div style={{ padding: "8px 20px 24px" }}>
+          <div style={{ fontFamily: "'Syne', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, letterSpacing: 1, marginBottom: 16 }}>
+            {creatorEditingId ? "Update Mosaic" : "Name Your Mosaic"}
+          </div>
+          <input
+            type="text"
+            defaultValue={creatorTitle}
+            placeholder="Mosaic title..."
+            maxLength={40}
+            autoFocus
+            id="save-drawer-title-input"
+            style={{
+              width: "100%", padding: "12px 14px", borderRadius: 10,
+              backgroundColor: C.surface, border: `1px solid ${C.border}`,
+              color: C.text, fontSize: 16, fontFamily: "'Space Mono', monospace",
+              outline: "none", boxSizing: "border-box", letterSpacing: 0.5,
+            }}
+            onFocus={e => { e.target.style.borderColor = C.accent; }}
+            onBlur={e => { e.target.style.borderColor = C.border; }}
+            onKeyDown={e => {
+              if (e.key === "Enter") {
+                handleSaveMosaic(e.target.value);
+              }
+            }}
+          />
+          <button
+            onClick={() => {
+              const input = document.getElementById("save-drawer-title-input");
+              handleSaveMosaic(input ? input.value : "");
+            }}
+            disabled={mosaicLoading}
+            style={{
+              width: "100%", marginTop: 12, padding: "12px 0", borderRadius: 10,
+              backgroundColor: C.accent, color: "#fff", border: "none",
+              fontSize: 14, fontWeight: 700, fontFamily: "'Space Mono', monospace",
+              letterSpacing: 1, textTransform: "uppercase", cursor: mosaicLoading ? "default" : "pointer",
+              opacity: mosaicLoading ? 0.5 : 1, transition: "opacity 0.15s",
+            }}
+          >
+            {mosaicLoading ? "Saving..." : (creatorEditingId ? "Update" : "Save")}
+          </button>
+        </div>
+      </DraggableDrawer>
+
       {globalModalsEl}
       </div>
     );
@@ -9427,9 +9888,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -9769,27 +10230,7 @@ export default function Pattrn() {
           </div>
         )}
 
-      {/* FAB: Create Mosaic */}
-      {firebaseUser && (
-        <button onClick={() => { resetCreator(); setCreatorReturnView("gallery"); setView("creator"); }}
-          style={{
-            position: "fixed", bottom: "calc(80px + env(safe-area-inset-bottom, 0px))", right: 20,
-            width: 56, height: 56, borderRadius: 16, zIndex: 80,
-            backgroundColor: C.accent, border: "none", cursor: "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: `0 4px 16px ${C.accent}55, 0 2px 8px rgba(0,0,0,0.3)`,
-            transition: "transform 0.15s, box-shadow 0.15s",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
-          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
-          aria-label="Create Mosaic"
-        >
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.bg} strokeWidth="2.5" strokeLinecap="round">
-            <path d="M12 5v14M5 12h14"/>
-          </svg>
-        </button>
-      )}
-      <BottomTabBar active="mosaic" />
+      {renderContextButton("gallery", [{ id: "create", icon: "plus", color: C.accent, onClick: () => setView("creator") }])}
       {globalModalsEl}
       </div>
     );
@@ -9808,31 +10249,9 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 480, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => setView("menu")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             Review Mosaics
           </h2>
-          <button onClick={() => loadMosaicData("admin")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            Refresh
-          </button>
         </div>
 
         {mosaicMsg && (
@@ -9905,6 +10324,7 @@ export default function Pattrn() {
             ))}
           </div>
         )}
+        {renderContextButton("admin-review", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
         {globalModalsEl}
       </div>
     );
@@ -9923,31 +10343,9 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 480, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => setView("menu")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             Manage Public
           </h2>
-          <button onClick={() => loadMosaicData("manage")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            Refresh
-          </button>
         </div>
 
         {mosaicMsg && (
@@ -10071,6 +10469,7 @@ export default function Pattrn() {
             })}
           </div>
         )}
+        {renderContextButton("admin-manage", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
         {globalModalsEl}
       </div>
     );
@@ -10089,31 +10488,9 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 520, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => setView("menu")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             Game Metrics
           </h2>
-          <button onClick={loadAdminMetricsData}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 11, letterSpacing: 0.5, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            Refresh
-          </button>
         </div>
 
         {/* Tab bar */}
@@ -10364,6 +10741,7 @@ export default function Pattrn() {
             )}
           </div>
         )}
+        {renderContextButton("admin-metrics", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
         {globalModalsEl}
       </div>
     );
@@ -10426,17 +10804,6 @@ export default function Pattrn() {
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 520, display: "flex", alignItems: "center", gap: 12, marginBottom: 20, animation: "fadeUp 0.3s ease" }}>
-          <button onClick={() => setView("menu")}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-              color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-              fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            &larr; Back
-          </button>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             User Activity
           </h2>
@@ -10608,6 +10975,7 @@ export default function Pattrn() {
             })}
           </div>
         )}
+        {renderContextButton("admin-users", [{ id: "back", icon: "back", color: "#fff", onClick: () => setView("menu") }])}
         {globalModalsEl}
       </div>
     );
@@ -10622,9 +10990,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -11037,7 +11405,7 @@ export default function Pattrn() {
             );
           })()}
         </div>
-        <BottomTabBar active="coop" />
+        {renderContextButton("coop")}
         {globalModalsEl}
       </div>
     );
@@ -11055,9 +11423,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
         {/* Header */}
         <div style={{
@@ -11459,7 +11827,7 @@ export default function Pattrn() {
 
         {/* Delete Account confirmation dialog */}
 
-        <BottomTabBar active="profile" />
+        {renderContextButton("profile")}
         {globalModalsEl}
       </div>
     );
@@ -11472,9 +11840,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 0, paddingRight: 0,
+        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 0, paddingRight: 0,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); } `}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } `}</style>
 
         {/* ── Compact top app bar ── */}
         <div style={{
@@ -11489,74 +11857,6 @@ export default function Pattrn() {
           <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
             Agnus
           </h1>
-          {/* Right: action buttons */}
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {/* Friends button */}
-            {firebaseConfigured && firebaseUser && (
-              <button
-                onClick={() => {
-                  setShowFriendsModal(true);
-                  setFriendsModalTab("list");
-                }}
-                style={{
-                  background: "none", border: "none", borderRadius: 10,
-                  width: 36, height: 36, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all 0.15s", position: "relative",
-                  backgroundColor: friendsList.length > 0 ? C.accent + "15" : "transparent",
-                }}
-                aria-label="Friends"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={friendsList.length > 0 ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                  <circle cx="9" cy="7" r="4"/>
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                </svg>
-                {onlineFriendsCount > 0 && (
-                  <span style={{
-                    position: "absolute", top: 2, right: 2,
-                    minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
-                    backgroundColor: C.correct, color: "#fff",
-                    fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                    fontFamily: "'Space Mono', monospace",
-                  }}>
-                    {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
-                  </span>
-                )}
-              </button>
-            )}
-            {/* Notification bell */}
-            {firebaseConfigured && firebaseUser && (
-              <button
-                onClick={() => setShowNotifications(!showNotifications)}
-                style={{
-                  background: "none", border: "none", borderRadius: 10,
-                  width: 36, height: 36, cursor: "pointer",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all 0.15s", position: "relative",
-                  backgroundColor: notifications.length > 0 ? "#54A0FF15" : "transparent",
-                }}
-                aria-label="Notifications"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={notifications.length > 0 ? "#54A0FF" : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
-                  <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                </svg>
-                {notifications.length > 0 && (
-                  <span style={{
-                    position: "absolute", top: 2, right: 2,
-                    width: 14, height: 14, borderRadius: "50%",
-                    backgroundColor: "#f87171", color: "#fff",
-                    fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                    fontFamily: "'Space Mono', monospace",
-                  }}>
-                    {notifications.length > 9 ? "9+" : notifications.length}
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
         </div>
 
         {/* ── Scrollable content area ── */}
@@ -12750,7 +13050,7 @@ export default function Pattrn() {
         </div>
       )}
 
-      <BottomTabBar active="home" />
+      {renderContextButton("menu")}
       {globalModalsEl}
       </div>
     );
@@ -12762,6 +13062,136 @@ export default function Pattrn() {
   const totalPuzzles = puzzles.length;
   const lockedCount = lockedCells.size;
   const totalBlanks = puzzle ? puzzle.blanks.size : 0;
+
+  // Pill action buttons for the bottom glass bar
+  const playBackAction = () => {
+    if (isCoop) { setShowLeaveConfirm(true); return; }
+    if (difficulty === "cascade") {
+      const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
+      const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
+      setProgress(nextProgress); saveProgress(nextProgress);
+    }
+    stopTimer(); setShowMosaicPreviewOverlay(false);
+    if (customMosaicPuzzlesRef.current && isMosaic) {
+      if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
+        coopMosaicCurrentTileRef.current = -1;
+        updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
+        setCoopMosaicOtherFills({});
+        coopMosaicWriteThrottleRef.current = {};
+      }
+      setView("custom-mosaic");
+    } else { setView("menu"); }
+  };
+  const playPillButtons = [{ id: "back", icon: "back", color: "#fff", onClick: playBackAction }];
+  if (gameState === "playing") {
+    if (isCoop && coopMyLockedIn) {
+      playPillButtons.push({ id: "locked", icon: "check", color: C.correct });
+    } else {
+      const checkColor = allFilled
+        ? (isCoop ? "#54A0FF" : isBlind ? "#e06040" : C.accent)
+        : "rgba(255,255,255,0.3)";
+      playPillButtons.push({
+        id: "check", icon: "check", color: checkColor,
+        onClick: allFilled ? (isCoop ? coopLockIn : checkSolution) : undefined,
+        disabled: !allFilled,
+      });
+    }
+    if (!isCoop && (Object.keys(fills).length > 0 || attempts > 0)) {
+      playPillButtons.push({ id: "reset", icon: "refresh", color: "#fff", onClick: resetBoard });
+    }
+    if (isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0) {
+      if (coopPendingPassCell) {
+        // Pending pass — show clock badge icon, tap toggles waiting UI
+        playPillButtons.push({ id: "pass-cell", icon: "pass-pending", color: "#f59e0b", onClick: () => {
+          setPendingPassOpen(prev => !prev);
+        }});
+      } else {
+        playPillButtons.push({ id: "pass-cell", icon: "pass", color: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF" : "#fff", onClick: () => {
+          if (coopPassMode) { setCoopPassMode(null); setSelectedToken(null); return; }
+          setSelectedToken(null); setSelectedCell(null);
+          const entries = Object.entries(coopPlayers);
+          if (entries.length === 1) {
+            const [uid, p] = entries[0];
+            setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
+          } else { setCoopPassPlayerPicker(prev => !prev); }
+        }});
+      }
+    }
+    if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
+      playPillButtons.push({ id: "preview", icon: "search", color: C.accent, onClick: () => setShowMosaicPreviewOverlay(true) });
+    }
+  } else if (gameState === "won") {
+    // Share
+    playPillButtons.push({ id: "share", icon: "share", color: "#fff", onClick: async () => {
+      let text;
+      if (isCoop) {
+        text = `Agnus Co-op \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\nSolved together \u2022 ${formatTime(elapsedTime)}`;
+      } else if (isCascade) {
+        text = `Agnus Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
+      } else if (isDaily) {
+        const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
+        const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${currentDailyDate}` : "";
+        text = `Agnus Daily ${currentDailyDate}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}\n${dailyUrl}`;
+      } else {
+        const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
+        text = `Agnus \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+      }
+      const result = await tryNativeShare({ text });
+      if (result === "shared") { setShareMsg("Shared!"); setTimeout(() => setShareMsg(""), 2000); return; }
+      if (result === "cancelled") return;
+      navigator.clipboard.writeText(text).catch(() => {});
+      setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
+    }});
+    // Retry
+    playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => {
+      if (isCoop) leaveCoopSession();
+      startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true, isDaily ? currentDailyDate : null);
+    }});
+    // Next / Done / Back — the primary action
+    if (isCoop) {
+      playPillButtons.push({ id: "done", icon: "home", color: "#54A0FF", onClick: () => { leaveCoopSession(); setView("menu"); } });
+    } else if (isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) {
+      playPillButtons.push({ id: "back-done", icon: "back", color: C.accent, onClick: () => {
+        if (customMosaicPuzzlesRef.current && isMosaic) {
+          if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
+            coopMosaicCurrentTileRef.current = -1;
+            updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
+            setCoopMosaicOtherFills({});
+            coopMosaicWriteThrottleRef.current = {};
+          }
+          setView("custom-mosaic");
+        } else { setView("menu"); }
+      }});
+    } else if (currentPuzzle < totalPuzzles - 1) {
+      playPillButtons.push({ id: "next", icon: "forward", color: C.accent, onClick: () => startPuzzle(currentPuzzle + 1) });
+    }
+  } else if (gameState === "lost") {
+    // Share (cascade only)
+    if (isCascade && !isCoop) {
+      playPillButtons.push({ id: "share", icon: "share", color: "#fff", onClick: async () => {
+        const sz = puzzle?.gridSize ?? 0;
+        const text = `Agnus Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`;
+        const result = await tryNativeShare({ text });
+        if (result === "shared") { setShareMsg("Shared!"); setTimeout(() => setShareMsg(""), 2000); return; }
+        if (result === "cancelled") return;
+        navigator.clipboard.writeText(text).catch(() => {});
+        setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
+      }});
+    }
+    // Retry
+    if (isCoop) {
+      playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: retryCoop });
+      playPillButtons.push({ id: "done", icon: "home", color: "#54A0FF", onClick: () => { leaveCoopSession(); setView("menu"); } });
+    } else if (isCascade) {
+      playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => startPuzzle(cascadeRunIndex, "cascade", true) });
+      playPillButtons.push({ id: "back-done", icon: "home", color: C.accent, onClick: () => setView("menu") });
+    } else {
+      playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => startPuzzle(currentPuzzle) });
+      if (currentPuzzle < totalPuzzles - 1) {
+        playPillButtons.push({ id: "next", icon: "forward", color: C.accent, onClick: () => startPuzzle(currentPuzzle + 1) });
+      }
+    }
+  }
 
   return (
     <div
@@ -12911,214 +13341,12 @@ export default function Pattrn() {
         </div>
       )}
 
-      {/* Top bar - fixed at top so it always stays visible */}
-      <div ref={headerRef} style={{
-        flexShrink: 0, zIndex: 10, backgroundColor: C.bg,
-        paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
-        display: "flex", justifyContent: "center", boxSizing: "border-box",
-        touchAction: "manipulation",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", width: "100%", maxWidth: gridTotalWidth, animation: "fadeUp 0.3s ease" }}>
-        <button onClick={() => {
-          if (isCoop) { setShowLeaveConfirm(true); return; }
-          if (difficulty === "cascade") {
-            const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
-            const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
-            setProgress(nextProgress);
-            saveProgress(nextProgress);
-          }
-          stopTimer();
-          setShowMosaicPreviewOverlay(false);
-          if (customMosaicPuzzlesRef.current && isMosaic) {
-            // In coop mosaic mode, update current tile to -1 (overview)
-            if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
-              coopMosaicCurrentTileRef.current = -1;
-              updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
-              setCoopMosaicOtherFills({});
-              coopMosaicWriteThrottleRef.current = {};
-            }
-            setView("custom-mosaic");
-          } else {
-            setView("menu");
-          }
-        }}
-          style={{
-            background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 14px",
-            color: C.textDim, cursor: "pointer", fontFamily: "'Space Mono', monospace",
-            fontSize: 12, letterSpacing: 1, transition: "all 0.15s",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-        >
-          &larr; {customMosaicPuzzlesRef.current && isMosaic ? "MOSAIC" : "PUZZLES"}
-        </button>
-        <div style={{ flex: 1 }} />
-        <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 4, flexShrink: 0 }}>
-          <button
-            onClick={() => setShowThemePicker(true)}
-            style={{
-              background: "none", border: `1px solid ${activeThemeId !== "classic" ? (activeTheme.gridBorder || C.border).replace(/44$/, "88") : C.border}`,
-              borderRadius: 8, padding: "5px 8px", cursor: "pointer", fontSize: 14, lineHeight: 1,
-              transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
-              color: activeThemeId !== "classic" ? C.text : C.textDim,
-              minWidth: 32, height: 30,
-            }}
-            title="Change theme"
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = activeThemeId !== "classic" ? (activeTheme.gridBorder || C.border).replace(/44$/, "88") : C.border; e.currentTarget.style.color = activeThemeId !== "classic" ? C.text : C.textDim; }}
-          >
-            {activeTheme.icon || <svg viewBox="0 0 24 24" width={14} height={14} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22"/><line x1="2" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22" y2="12"/></svg>}
-          </button>
-          {/* Friends button */}
-          {firebaseConfigured && firebaseUser && (
-            <button
-              onClick={() => {
-                setShowFriendsModal(true);
-                setFriendsModalTab("list");
-              }}
-              style={{
-                background: "none", border: `1px solid ${onlineFriendsCount > 0 ? C.correct + "55" : C.border}`,
-                borderRadius: 8, padding: "5px 8px", cursor: "pointer",
-                transition: "all 0.15s", display: "flex", alignItems: "center", justifyContent: "center",
-                position: "relative", minWidth: 32, height: 30,
-              }}
-              title={`Friends${onlineFriendsCount > 0 ? ` (${onlineFriendsCount} online)` : ""}`}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = onlineFriendsCount > 0 ? C.correct + "55" : C.border; }}
-              aria-label="Friends"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={onlineFriendsCount > 0 ? C.correct : C.textDim} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-              </svg>
-              {onlineFriendsCount > 0 && (
-                <span style={{
-                  position: "absolute", top: -4, right: -4,
-                  minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
-                  backgroundColor: C.correct, color: "#fff",
-                  fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
-                  fontFamily: "'Space Mono', monospace",
-                }}>
-                  {onlineFriendsCount > 9 ? "9+" : onlineFriendsCount}
-                </span>
-              )}
-            </button>
-          )}
-          <button
-            onClick={async () => {
-              const url = typeof window !== "undefined" ? window.location.href : "";
-              const result = await tryNativeShare({ title: "Agnus", text: "Check out this puzzle", url: url || undefined });
-              if (result === "shared") {
-                setShareMsg("Shared!");
-                setTimeout(() => setShareMsg(""), 2000);
-                return;
-              }
-              if (result === "cancelled") return;
-              try { await navigator.clipboard.writeText(url); } catch { /* fallback */ }
-              setShareMsg("Copied!");
-              setTimeout(() => setShareMsg(""), 2000);
-            }}
-            style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "6px 10px",
-              color: C.textDim, cursor: "pointer", fontSize: 12, transition: "all 0.15s",
-            }}
-            title="Share link to this level"
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-          >
-            {shareMsg || "Share"}
-          </button>
-          {/* Magnifying glass button - visible when playing a custom mosaic puzzle */}
-          {customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay && (
-            <button
-              onClick={() => setShowMosaicPreviewOverlay(true)}
-              style={{
-                background: "none", border: `1px solid ${C.accent}44`, borderRadius: 8,
-                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s", minWidth: 32, height: 30,
-              }}
-              title="Preview full mosaic"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.backgroundColor = C.accent + "11"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "44"; e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="8"/>
-                <line x1="21" y1="21" x2="16.65" y2="16.65"/>
-              </svg>
-            </button>
-          )}
-          {/* Coop share button - visible when playing supported modes, prompts login if needed */}
-          {!isCoop && gameState === "playing" && !isCascade && !isMosaic && (
-            <button
-              onClick={() => {
-                if (!firebaseUser) {
-                  coopPendingLoginRef.current = true;
-                  setShowAccountModal(true);
-                  return;
-                }
-                setShowCoopFriendPicker(true);
-              }}
-              style={{
-                background: "none", border: `1px solid #54A0FF55`, borderRadius: 8,
-                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s", minWidth: 32, height: 30,
-              }}
-              title="Start co-op"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#54A0FF55"; e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#54A0FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
-              </svg>
-            </button>
-          )}
-          {/* Coop invite button when in coop */}
-          {isCoop && (
-            <button
-              onClick={() => setShowCoopInvite(true)}
-              style={{
-                background: "none", border: `1px solid #54A0FF55`, borderRadius: 8,
-                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s", minWidth: 32, height: 30,
-              }}
-              title="Invite a friend"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#54A0FF"; e.currentTarget.style.backgroundColor = "#54A0FF11"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#54A0FF55"; e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#54A0FF" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
-              </svg>
-            </button>
-          )}
-          {/* Coop leave button when in coop */}
-          {isCoop && (
-            <button
-              onClick={() => { setShowLeaveConfirm(true); }}
-              style={{
-                background: "none", border: `1px solid #f8717188`, borderRadius: 8,
-                padding: "5px 8px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                transition: "all 0.15s", minWidth: 32, height: 30,
-              }}
-              title="Leave co-op session"
-              onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.backgroundColor = "#f8717111"; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = "#f8717188"; e.currentTarget.style.backgroundColor = "transparent"; }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f87171" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-              </svg>
-            </button>
-          )}
-        </div>
-        </div>
-      </div>
 
       {/* Partner lock-in toast notification */}
       {coopPartnerLockToast && (
         <div style={{
           position: "fixed",
-          top: "calc(130px + env(safe-area-inset-top, 0px))",
+          top: "calc(60px + env(safe-area-inset-top, 0px))",
           left: "50%", transform: "translateX(-50%)", zIndex: 25,
           backgroundColor: "#54A0FF", borderRadius: 10,
           padding: "8px 16px", boxShadow: "0 4px 16px rgba(84,160,255,0.4)",
@@ -13131,11 +13359,12 @@ export default function Pattrn() {
         </div>
       )}
 
-      {/* Info row: flex child below header */}
+      {/* Info row: now the top element of the play view */}
       <div ref={infoRowRef} style={{
         flexShrink: 0, zIndex: 10,
-        backgroundColor: C.bg, display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: 4, paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
+        backgroundColor: activeTheme.gridBg || C.surface,
+        display: "flex", flexDirection: "column", alignItems: "center",
+        paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: gridTotalWidth }}>
           <div style={{ fontFamily: "'Space Mono', monospace", fontSize: 18, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, letterSpacing: 2 }}>
@@ -13311,8 +13540,8 @@ export default function Pattrn() {
         </div>
       )}
 
-      {/* Grid area: flex child between header/info and footer, centers grid */}
-      <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, boxSizing: "border-box", padding: edgePad }}>
+      {/* Grid area: flex child between header/info and footer, top-aligned */}
+      <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", alignItems: "flex-start", justifyContent: "center", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, boxSizing: "border-box", padding: edgePad }}>
         <GridDecoration decoration={activeTheme.decoration} />
         {/* Coop mosaic players indicator — positioned top-left of puzzle panel */}
         {isCoopMosaic && coopMosaicAnyConnected && gameState === "playing" && (
@@ -13517,216 +13746,8 @@ export default function Pattrn() {
       </div>
       </div>
 
-      {/* Fixed bottom bar: token picker + actions */}
-      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: C.bg, paddingTop: 10, paddingBottom: "calc(12px + env(safe-area-inset-bottom, 0px))", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, borderTop: `1px solid ${C.border}` }}>
-        {/* Token picker row */}
-        {gameState === "playing" && (
-          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId}
-          />
-        )}
-        {/* Pass player picker dropdown (multi-partner) */}
-        {coopPassPlayerPicker && !coopPassMode && (
-          <div style={{
-            padding: "8px 12px", backgroundColor: C.surface,
-            border: `1px solid ${C.border}`, borderRadius: 12,
-            display: "flex", gap: 6, alignItems: "center", justifyContent: "center",
-            animation: "fadeUp 0.2s ease both",
-          }}>
-            <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, marginRight: 4 }}>
-              Pass to:
-            </span>
-            {Object.entries(coopPlayers).map(([uid, p]) => {
-              const playerColor = coopPlayerColorMap[uid] || "#FF9FF3";
-              return (
-                <button key={uid} onClick={() => {
-                  setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: playerColor });
-                  setCoopPassPlayerPicker(false);
-                }} style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "6px 12px",
-                  borderRadius: 8, border: `1px solid ${playerColor}44`, background: "none",
-                  cursor: "pointer", color: C.text, fontSize: 12, fontWeight: 600,
-                  fontFamily: "'Space Mono', monospace",
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${playerColor}22`; }}
-                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                >
-                  <span style={{
-                    width: 14, height: 14, borderRadius: "50%", backgroundColor: playerColor,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 8, fontWeight: 700, color: "#fff", flexShrink: 0,
-                  }}>{(p.username || "P")[0].toUpperCase()}</span>
-                  {p.username || "Player"}
-                </button>
-              );
-            })}
-            <button onClick={() => setCoopPassPlayerPicker(false)} style={{
-              background: "none", border: "none", color: C.textDim, cursor: "pointer",
-              fontSize: 16, padding: "2px 6px", lineHeight: 1,
-            }}>{"\u2715"}</button>
-          </div>
-        )}
-        {/* Pass mode banner — tap a cell to pass */}
-        {coopPassMode && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8, padding: "6px 16px",
-            backgroundColor: `${coopPassMode.targetColor}18`, border: `1px solid ${coopPassMode.targetColor}44`,
-            borderRadius: 10, animation: "fadeUp 0.2s ease both",
-          }}>
-            <span style={{
-              width: 10, height: 10, borderRadius: "50%", backgroundColor: coopPassMode.targetColor,
-              display: "inline-block", flexShrink: 0,
-            }} />
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text }}>
-              Tap your cell to pass to {coopPassMode.targetName}
-            </span>
-            <button onClick={() => { setCoopPassMode(null); setCoopPassPlayerPicker(false); }} style={{
-              background: "none", border: "none", color: C.textDim, cursor: "pointer",
-              fontSize: 14, padding: "2px 6px", lineHeight: 1, fontFamily: "'Space Mono', monospace",
-            }}>Cancel</button>
-          </div>
-        )}
-        {/* Pending pass indicator */}
-        {coopPendingPassCell && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 6, padding: "6px 16px",
-            backgroundColor: `${COOP_MY_COLOR}18`, border: `1px solid ${COOP_MY_COLOR}44`,
-            borderRadius: 10, animation: "fadeUp 0.2s ease both",
-          }}>
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.textDim }}>
-              Waiting for response...
-            </span>
-            <button onClick={() => {
-              cancelCoopPassRequest(coopSessionId, coopPendingPassCell).catch(() => {});
-              setCoopPendingPassCell(null);
-            }} style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
-              color: C.textDim, cursor: "pointer", fontSize: 10, padding: "3px 8px",
-              fontFamily: "'Space Mono', monospace", fontWeight: 600,
-            }}>Cancel</button>
-          </div>
-        )}
-        {/* Pass this cell — own row above lock in */}
-        {gameState === "playing" && isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0 && (
-          <button
-            onClick={() => {
-              if (coopPassMode) {
-                setCoopPassMode(null);
-                setSelectedToken(null);
-                return;
-              }
-              setSelectedToken(null);
-              setSelectedCell(null);
-              const entries = Object.entries(coopPlayers);
-              if (entries.length === 1) {
-                const [uid, p] = entries[0];
-                setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
-              } else {
-                setCoopPassPlayerPicker(prev => !prev);
-              }
-            }}
-            style={{
-              display: "flex", alignItems: "center", gap: 8, padding: "8px 20px",
-              borderRadius: 10, cursor: "pointer",
-              backgroundColor: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF18" : "transparent",
-              border: (coopPassMode || coopPassPlayerPicker) ? "1px solid #54A0FF44" : `1px solid ${C.border}`,
-              color: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF" : C.textDim,
-              fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600,
-              letterSpacing: 1, textTransform: "uppercase",
-              transition: "all 0.2s",
-            }}
-          >
-            <svg width={14} height={14} viewBox="0 0 24 24" fill="none"
-              stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M16 3h5v5"/><path d="M21 3l-7 7"/><path d="M11 13l-7 7"/><path d="M3 16v5h5"/>
-            </svg>
-            Pass Cell
-          </button>
-        )}
-        {/* Accept/reject incoming pass request — own row above lock in */}
-        {gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "6px 16px",
-            backgroundColor: `${coopIncomingPass.fromColor}18`, border: `1px solid ${coopIncomingPass.fromColor}44`,
-            borderRadius: 10, animation: "fadeUp 0.2s ease both",
-          }}>
-            <span style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.text,
-              fontWeight: 600,
-            }}>
-              <span style={{ color: coopIncomingPass.fromColor, fontWeight: 700 }}>{coopIncomingPass.fromName}</span> wants to pass this cell
-            </span>
-            <button onClick={() => {
-              respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, true).catch(() => {});
-              setSelectedCell(null);
-            }} style={{
-              backgroundColor: C.correct, color: "#fff", border: "none",
-              padding: "8px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-              fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-              textTransform: "uppercase",
-            }}>Accept</button>
-            <button onClick={() => {
-              respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, false).catch(() => {});
-              setSelectedCell(null);
-            }} style={{
-              backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-              padding: "8px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-              fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-              textTransform: "uppercase",
-            }}>Reject</button>
-          </div>
-        )}
-        {gameState === "playing" && (
-          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-            {/* Coop: show Lock In or waiting state; Normal: show Check */}
-            {isCoop && coopMyLockedIn ? (
-              <div style={{
-                padding: "14px 32px", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-                textTransform: "uppercase", color: C.correct,
-                border: `2px solid ${C.correct}44`, backgroundColor: `${C.correct}11`,
-              }}>
-                {"\u2713"} Locked In {!coopPartnerLockedIn ? "- Waiting..." : ""}
-              </div>
-            ) : (
-              <button
-                onClick={allFilled ? (isCoop ? coopLockIn : checkSolution) : undefined}
-                disabled={!allFilled}
-                style={{
-                  backgroundColor: allFilled ? (isCoop ? "#54A0FF" : isBlind ? "#e06040" : C.accent) : C.surfaceLight,
-                  color: allFilled ? (isCoop ? "#fff" : isBlind ? "#fff" : C.bg) : C.textDim,
-                  border: "none",
-                  padding: "14px 48px", borderRadius: 12, fontSize: 15, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 2,
-                  cursor: allFilled ? "pointer" : "not-allowed",
-                  textTransform: "uppercase", transition: "all 0.2s",
-                  boxShadow: allFilled ? (isCoop ? "0 4px 20px #54A0FF44" : isBlind ? "0 4px 20px #e0604044" : `0 4px 20px ${C.accent}44`) : "none",
-                  opacity: allFilled ? 1 : 0.7,
-                }}
-                onMouseEnter={e => { if (allFilled) e.target.style.transform = "translateY(-2px)"; }}
-                onMouseLeave={e => { e.target.style.transform = "translateY(0)"; }}
-              >
-                {isCoop ? "Lock In" : isBlind ? "Guess" : "Check"}
-              </button>
-            )}
-            {!isCoop && (Object.keys(fills).length > 0 || attempts > 0) && (
-              <button
-                onClick={resetBoard}
-                style={{
-                  backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                  padding: "14px 20px", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase", transition: "all 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-              >
-                Reset
-              </button>
-            )}
-          </div>
-        )}
-
+      {/* Fixed bottom bar: coop UI + game state info */}
+      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: activeTheme.gridBg || C.surface, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
         {gameState === "won" && (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: isCoop ? 4 : 12, animation: "fadeUp 0.4s ease" }}>
@@ -13801,115 +13822,6 @@ export default function Pattrn() {
                 </div>
               </div>
             )}
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              <button onClick={async () => {
-                let text;
-                if (isCoop) {
-                  text = `Agnus Co-op \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\nSolved together \u2022 ${formatTime(elapsedTime)}`;
-                } else if (isCascade) {
-                  text = `Agnus Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
-                } else if (isDaily) {
-                  const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-                  const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${currentDailyDate}` : "";
-                  text = `Agnus Daily ${currentDailyDate}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}\n${dailyUrl}`;
-                } else {
-                  const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-                  text = `Agnus \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
-                }
-                const result = await tryNativeShare({ text });
-                if (result === "shared") {
-                  setShareMsg("Shared!");
-                  setTimeout(() => setShareMsg(""), 2000);
-                  return;
-                }
-                if (result === "cancelled") return;
-                navigator.clipboard.writeText(text).catch(() => {});
-                setShareMsg("Copied!");
-                setTimeout(() => setShareMsg(""), 2000);
-              }}
-                style={{
-                  backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                  padding: "12px 24px", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase", transition: "all 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
-              >
-                {shareMsg || "Share"}
-              </button>
-              <button onClick={() => { if (isCoop) leaveCoopSession(); startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true, isDaily ? currentDailyDate : null); }}
-                style={{
-                  backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                  padding: "12px 24px", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase", transition: "all 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
-              >
-                Retry
-              </button>
-              {isCoop ? (
-                <button onClick={() => {
-                  // Clean up local coop state; session auto-closes from the completion effect
-                  leaveCoopSession();
-                  setView("menu");
-                }}
-                  style={{
-                    backgroundColor: "#54A0FF", color: "#fff", border: "none",
-                    padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.2s",
-                    boxShadow: "0 4px 20px #54A0FF44",
-                  }}
-                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                >
-                  Done
-                </button>
-              ) : (isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) ? (
-                <button onClick={() => {
-                  if (customMosaicPuzzlesRef.current && isMosaic) {
-                    if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
-                      coopMosaicCurrentTileRef.current = -1;
-                      updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
-                      setCoopMosaicOtherFills({});
-                      coopMosaicWriteThrottleRef.current = {};
-                    }
-                    setView("custom-mosaic");
-                  } else {
-                    setView("menu");
-                  }
-                }}
-                  style={{
-                    backgroundColor: isCoopMosaic ? C.coop : C.accent, color: isCoopMosaic ? "#fff" : C.bg, border: "none",
-                    padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.2s",
-                    boxShadow: `0 4px 20px ${isCoopMosaic ? C.coop : C.accent}44`,
-                  }}
-                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                >
-                  {customMosaicPuzzlesRef.current && isMosaic ? "Back to mosaic" : "Back to puzzles"}
-                </button>
-              ) : currentPuzzle < totalPuzzles - 1 ? (
-                <button onClick={() => startPuzzle(currentPuzzle + 1)}
-                  style={{
-                    backgroundColor: C.accent, color: C.bg, border: "none",
-                    padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.2s",
-                    boxShadow: `0 4px 20px ${C.accent}44`,
-                  }}
-                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                >
-                  Next &rarr;
-                </button>
-              ) : null}
-            </div>
           </div>
         )}
 
@@ -13918,131 +13830,37 @@ export default function Pattrn() {
             <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.incorrect, marginBottom: 4, animation: "fadeUp 0.4s ease" }}>
               {isCoop ? "Co-op failed" : isCascade ? "Run over" : "Not this time"}
             </div>
-            <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: C.textDim }}>
               {isCoop ? "Out of attempts" : isCascade ? (
                 <div>Reached {puzzle?.gridSize ?? 0}×{puzzle?.gridSize ?? 0}</div>
               ) : "Better luck next time"}
-            </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              {isCascade && !isCoop && (
-                <button onClick={async () => {
-                  const sz = puzzle?.gridSize ?? 0;
-                  const text = `Agnus Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`;
-                  const result = await tryNativeShare({ text });
-                  if (result === "shared") {
-                    setShareMsg("Shared!");
-                    setTimeout(() => setShareMsg(""), 2000);
-                    return;
-                  }
-                  if (result === "cancelled") return;
-                  navigator.clipboard.writeText(text).catch(() => {});
-                  setShareMsg("Copied!");
-                  setTimeout(() => setShareMsg(""), 2000);
-                }}
-                  style={{
-                    backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                    padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => { e.target.style.borderColor = C.accent; e.target.style.color = C.accent; }}
-                  onMouseLeave={e => { e.target.style.borderColor = C.border; e.target.style.color = C.text; }}
-                >
-                  {shareMsg || "Share"}
-                </button>
-              )}
-              {isCoop ? (
-                <>
-                  <button onClick={retryCoop}
-                    style={{
-                      backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
-                  >
-                    Retry
-                  </button>
-                  <button onClick={() => { leaveCoopSession(); setView("menu"); }}
-                    style={{
-                      backgroundColor: "#54A0FF", color: "#fff", border: "none",
-                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                      boxShadow: "0 4px 16px #54A0FF44",
-                    }}
-                    onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                    onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                  >
-                    Back to puzzles
-                  </button>
-                </>
-              ) : isCascade ? (
-                <>
-                  <button onClick={() => startPuzzle(cascadeRunIndex, "cascade", true)}
-                    style={{
-                      backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => { e.target.style.borderColor = C.accent; e.target.style.color = C.accent; }}
-                    onMouseLeave={e => { e.target.style.borderColor = C.border; e.target.style.color = C.text; }}
-                  >
-                    Retry
-                  </button>
-                  <button onClick={() => { setView("menu"); }}
-                    style={{
-                      backgroundColor: C.accent, color: C.bg, border: "none",
-                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                      boxShadow: `0 4px 16px ${C.accent}44`,
-                    }}
-                    onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                    onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                  >
-                    Back to puzzles
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button onClick={() => startPuzzle(currentPuzzle)}
-                    style={{
-                      backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => { e.target.style.borderColor = C.accent; e.target.style.color = C.accent; }}
-                    onMouseLeave={e => { e.target.style.borderColor = C.border; e.target.style.color = C.text; }}
-                  >
-                    Retry
-                  </button>
-                  {currentPuzzle < totalPuzzles - 1 && (
-                    <button onClick={() => startPuzzle(currentPuzzle + 1)}
-                      style={{
-                        backgroundColor: C.accent, color: C.bg, border: "none",
-                        padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                        textTransform: "uppercase", transition: "all 0.15s",
-                        boxShadow: `0 4px 16px ${C.accent}44`,
-                      }}
-                      onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                      onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                    >
-                      Next &rarr;
-                    </button>
-                  )}
-                </>
-              )}
             </div>
           </div>
         )}
       </div>
 
+      {/* Token picker — Liquid Glass pill above the menu pill */}
+      {gameState === "playing" && puzzle && (
+        <div style={{
+          position: "fixed",
+          bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
+          right: 20,
+          borderRadius: 9999,
+          background: activeTheme.gridBg || C.surface,
+          backdropFilter: "blur(28px) saturate(200%)",
+          WebkitBackdropFilter: "blur(28px) saturate(200%)",
+          border: "1px solid rgba(255,255,255,0.16)",
+          boxShadow: `0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15)`,
+          zIndex: 85,
+          padding: "6px 4px",
+          maxWidth: "calc(100vw - 40px)",
+          overflow: "hidden",
+        }}>
+          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId}
+          />
+        </div>
+      )}
+      {renderContextButton("play", playPillButtons)}
       {globalModalsEl}
     </div>
   );
