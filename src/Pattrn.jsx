@@ -9720,56 +9720,32 @@ export default function Pattrn() {
           </div>
         </div>
 
-        {/* Actions */}
-        <div style={{ width: "100%", maxWidth: 400, display: "flex", flexDirection: "column", gap: 8, animation: "fadeUp 0.3s 0.08s ease both" }}>
-          {mosaicMsg && (
-            <div style={{
-              textAlign: "center", padding: "8px 12px", borderRadius: 8,
-              backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, letterSpacing: 0.5,
-            }}>
-              {mosaicMsg}
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handleSaveMosaic}
-              disabled={mosaicLoading}
-              style={{
-                flex: 1, padding: "12px 0", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1.5,
-                background: C.accent, color: C.bg, border: "none", cursor: mosaicLoading ? "not-allowed" : "pointer",
-                textTransform: "uppercase", transition: "all 0.15s", opacity: mosaicLoading ? 0.6 : 1,
-              }}
-            >
-              {mosaicLoading ? "Saving..." : creatorEditingId ? "Update" : "Save"}
-            </button>
-            <button
-              onClick={() => { resetCreator(); }}
-              style={{
-                padding: "12px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                textTransform: "uppercase", transition: "all 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-            >
-              Clear
-            </button>
+        {/* Status messages */}
+        {mosaicMsg && (
+          <div style={{
+            width: "100%", maxWidth: 400, textAlign: "center", padding: "8px 12px", borderRadius: 8,
+            backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
+            fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, letterSpacing: 0.5,
+            animation: "fadeUp 0.3s 0.08s ease both",
+          }}>
+            {mosaicMsg}
           </div>
-          {!firebaseUser && firebaseConfigured && (
-            <div style={{ textAlign: "center", fontSize: 11, color: C.textDim, marginTop: 4 }}>
-              Sign in from the menu to save your creations
-            </div>
-          )}
-        </div>
+        )}
+        {!firebaseUser && firebaseConfigured && (
+          <div style={{ width: "100%", maxWidth: 400, textAlign: "center", fontSize: 11, color: C.textDim, marginTop: 8, animation: "fadeUp 0.3s 0.08s ease both" }}>
+            Sign in from the menu to save your creations
+          </div>
+        )}
 
-      {renderContextButton("creator", [{ id: "back", icon: "back", color: "#fff", onClick: () => {
-        const returnTo = creatorReturnView || "menu";
-        resetCreator(); setCreatorReturnView("menu");
-        if (returnTo === "gallery") { setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine"); } else { setView("menu"); }
-      }}])}
+      {renderContextButton("creator", [
+        { id: "back", icon: "back", color: "#fff", onClick: () => {
+          const returnTo = creatorReturnView || "menu";
+          resetCreator(); setCreatorReturnView("menu");
+          if (returnTo === "gallery") { setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine"); } else { setView("menu"); }
+        }},
+        { id: "clear", icon: "refresh", color: "#fff", onClick: () => resetCreator() },
+        { id: "save", icon: "upload", color: C.accent, onClick: handleSaveMosaic, disabled: mosaicLoading },
+      ])}
       {globalModalsEl}
       </div>
     );
