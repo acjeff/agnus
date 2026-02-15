@@ -4150,6 +4150,63 @@ export default function Pattrn() {
     }
   }, [firebaseUser]);
 
+  // Get max birthday date (today)
+  const getMaxBirthdayDate = () => {
+    const n = new Date();
+    return `${n.getUTCFullYear()}-${String(n.getUTCMonth()+1).padStart(2,"0")}-${String(n.getUTCDate()).padStart(2,"0")}`;
+  };
+
+  // Handle saving birthday
+  const handleSaveBirthday = useCallback((dateStr) => {
+    if (!dateStr) return;
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const bdStr = `${String(d).padStart(2, "0")}-${String(m).padStart(2, "0")}-${y}`;
+    setBirthday(bdStr);
+    try { localStorage.setItem(BIRTHDAY_KEY, bdStr); } catch { /* ignore */ }
+    if (bdStr === CHEAT_BIRTHDAY) {
+      const saved = loadSavedAchievements();
+      if (!saved.has("cheat_turing")) {
+        achievementQueueRef.current.push({ id: "cheat_turing", label: "Welcome Back, Alan", desc: "The enigma has been decoded", tier: 3 });
+        if (!achievementToastTimer.current) advanceAchievementQueue();
+        saved.add("cheat_turing");
+        saveSavedAchievements(saved);
+        setSavedAchievementIds(new Set(saved));
+        const enigmaTheme = PUZZLE_THEMES.find(t => t.id === "enigma");
+        if (enigmaTheme) { setTimeout(() => showThemeToast(enigmaTheme), 3800); }
+      }
+    }
+    setRadialMenuStack([]);
+    setCalendarYear(y);
+    setCalendarMonth(m - 1);
+  }, []);
+
+  // Handle removing birthday
+  const handleRemoveBirthday = useCallback(() => {
+    setBirthday(null);
+    try { localStorage.removeItem(BIRTHDAY_KEY); } catch { /* ignore */ }
+    setRadialMenuStack([]);
+  }, []);
+
+  // Handle clear all data
+  const handleClearData = useCallback(async () => {
+    try {
+      localStorage.removeItem(PROGRESS_KEY);
+      localStorage.removeItem(TIMES_KEY);
+      localStorage.removeItem(BIRTHDAY_KEY);
+      localStorage.removeItem(THEME_KEY);
+      localStorage.removeItem(ACHIEV_KEY);
+    } catch { /* ignore */ }
+    if (firebaseUser) { try { await logOut(); } catch { /* ignore */ } }
+    setProgress({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, mosaic: {}, cascadeRunState: {}, cascadeRunStateLastIndex: undefined });
+    setTimes({ easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {} });
+    setSavedAchievementIds(new Set());
+    setBirthday(null);
+    setActiveThemeId("classic");
+    setRadialMenuStack([]);
+    setShowGameMenu(false);
+    setView("menu");
+  }, [firebaseUser]);
+
   // Show a toast hint that login is available via the menu button
   // Auto-sync to cloud when data changes and user is logged in
   const cloudSyncTimer = useRef(null);
@@ -4921,7 +4978,7 @@ export default function Pattrn() {
       h += 20 + 8; // header + margin
       h += 44 + 16; // date input + margin
       h += 42 + 8; // save button + margin
-      if (userBirthday) h += 42 + 8; // remove button if exists
+      if (birthday) h += 42 + 8; // remove button if exists
       h += 12; // bottom padding
       return h;
     })();
@@ -5461,7 +5518,6 @@ export default function Pattrn() {
                                 {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
                                 <div style={{ flex: 1 }}>
                                   <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text }}>{friend.username}</div>
-                                  {friend.lastActiveAt && <div style={{ fontSize: 9, color: C.textDim }}>Active {formatRelativeTime(friend.lastActiveAt)}</div>}
                                 </div>
                                 <button onClick={() => handleRemoveFriend(friend.uid)} style={{
                                   padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
@@ -5522,13 +5578,13 @@ export default function Pattrn() {
                       ))}
                     </div>
                     <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-                      <button onClick={handleShareAll} style={{
+                      <button onClick={copyShareText} style={{
                         flex: 1, padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
                         fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                         background: C.accent, color: C.bg, border: "none",
                         cursor: "pointer", textTransform: "uppercase",
                       }}>Share All</button>
-                      <button onClick={handleShareDaily} style={{
+                      <button onClick={copyDailyShareText} style={{
                         flex: 1, padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
                         fontFamily: "'Inter', sans-serif", letterSpacing: 1,
                         background: "rgba(255,255,255,0.08)", color: C.text, border: "1px solid rgba(255,255,255,0.08)",
@@ -5600,7 +5656,10 @@ export default function Pattrn() {
                     <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 12, textAlign: "center" }}>Set Your Birthday</div>
                     <input
                       type="date"
-                      defaultValue={userBirthday || ""}
+                      defaultValue={birthday ? (() => {
+                        const [d, m, y] = birthday.split("-");
+                        return `${y}-${m}-${d}`;
+                      })() : ""}
                       max={getMaxBirthdayDate()}
                       id="birthday-date-input"
                       style={{
@@ -5608,6 +5667,7 @@ export default function Pattrn() {
                         backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
                         color: C.text, fontSize: 14, fontFamily: "'Inter', sans-serif",
                         outline: "none", boxSizing: "border-box", marginBottom: 12,
+                        colorScheme: "dark",
                       }}
                     />
                     <button
@@ -5622,7 +5682,7 @@ export default function Pattrn() {
                         cursor: "pointer", textTransform: "uppercase", marginBottom: 8,
                       }}
                     >Save Birthday</button>
-                    {userBirthday && (
+                    {birthday && (
                       <button
                         onClick={handleRemoveBirthday}
                         style={{
