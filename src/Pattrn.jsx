@@ -4525,7 +4525,7 @@ export default function Pattrn() {
     { id: "easy", icon: "grid", label: "Easy", action: () => { const idx = getRandomUncompletedPuzzle("easy"); setDifficulty("easy"); setCurrentPuzzle(idx); setView("play"); } },
     { id: "medium", icon: "layers", label: "Medium", action: () => { const idx = getRandomUncompletedPuzzle("medium"); setDifficulty("medium"); setCurrentPuzzle(idx); setView("play"); } },
     { id: "hard", icon: "zap", label: "Hard", action: () => { const idx = getRandomUncompletedPuzzle("hard"); setDifficulty("hard"); setCurrentPuzzle(idx); setView("play"); } },
-    { id: "daily", icon: "calendar", label: "Daily", action: () => { setDifficulty("daily"); setCurrentDailyDate(getDateString()); setView("play"); } },
+    { id: "daily", icon: "calendar", label: (() => { const n = new Date(); return `${String(n.getUTCDate()).padStart(2,"0")}-${String(n.getUTCMonth()+1).padStart(2,"0")}-${n.getUTCFullYear()}`; })(), action: () => { setDifficulty("daily"); setCurrentDailyDate(getDateString()); setView("play"); } },
     { id: "cascade", icon: "layers", label: "Cascade", action: () => { setDifficulty("cascade"); setView("play"); } },
   ];
 
