@@ -11887,8 +11887,8 @@ export default function Pattrn() {
       }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=DM+Serif+Display&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } `}</style>
 
-        {/* ── Safe-area top spacer ── */}
-        <div style={{ paddingTop: "env(safe-area-inset-top, 0px)" }} />
+        {/* ── Safe-area top spacer + breathing room ── */}
+        <div style={{ paddingTop: "calc(24px + env(safe-area-inset-top, 0px))" }} />
 
         {/* ── Scrollable content area ── */}
         <div style={{ width: "100%", maxWidth: 480, padding: "0 20px", boxSizing: "border-box" }}>
@@ -12217,116 +12217,6 @@ export default function Pattrn() {
           ))}
         </div>
 
-        {/* Stats summary with inline share */}
-        {isDaily ? (
-          <div style={{
-            width: "100%",
-            display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
-            padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
-            alignItems: "center", boxSizing: "border-box",
-          }}>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
-            </div>
-            <div style={{ width: 1, alignSelf: "stretch", backgroundColor: C.border }} />
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Streak</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 20, fontWeight: 700, color: C.gold }}>{getDailyStreak(progress)}</div>
-            </div>
-            <div style={{ flex: 1 }} />
-            <button onClick={() => setShowShareModal(true)}
-              style={{
-                padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 600,
-                fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.5,
-                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-            >
-              Stats
-            </button>
-          </div>
-        ) : (
-          <div style={{
-            width: "100%",
-            display: "flex", gap: 24, marginBottom: 24, animation: "fadeUp 0.5s 0.1s ease both",
-            padding: "12px 24px", borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
-            alignItems: "center", boxSizing: "border-box",
-          }}>
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Solved</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent }}>{completedCount}</div>
-            </div>
-            <div style={{ width: 1, alignSelf: "stretch", backgroundColor: C.border }} />
-            <div style={{ textAlign: "center" }}>
-              <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>Attempted</div>
-              <div style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 20, fontWeight: 700 }}>{totalAttempted}</div>
-            </div>
-            <div style={{ flex: 1 }} />
-            <button onClick={() => setShowShareModal(true)}
-              style={{
-                padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 600,
-                fontFamily: "'DM Sans', sans-serif", letterSpacing: 0.5,
-                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                transition: "all 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-            >
-              Stats
-            </button>
-          </div>
-        )}
-
-        {/* Achievements button — now also accessible from game menu */}
-        {(() => {
-          const achs = computeAchievements(progress, times, savedAchievementIds);
-          const unlocked = achs.filter(a => a.unlocked).length;
-          const total = achs.length;
-          return (
-            <div style={{
-              width: "100%", marginBottom: 16, animation: "fadeUp 0.5s 0.12s ease both",
-            }}>
-              <button onClick={() => setShowAchievements(true)} style={{
-                width: "100%", padding: "12px 16px", borderRadius: 12,
-                backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                transition: "all 0.15s",
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
-              >
-                <div style={{
-                  width: 28, height: 28, borderRadius: 7,
-                  backgroundColor: C.accent + "22", display: "flex", alignItems: "center", justifyContent: "center",
-                  border: `1.5px solid ${C.accent}44`,
-                }}>
-                  <span style={{ fontSize: 14, color: C.accent, lineHeight: 1 }}>{"\u2605"}</span>
-                </div>
-                <div style={{ flex: 1, textAlign: "left" }}>
-                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, fontWeight: 700, color: C.text, letterSpacing: 0.5 }}>
-                    Achievements
-                  </span>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: 11, color: C.accent, fontWeight: 700 }}>
-                    {unlocked}/{total}
-                  </span>
-                  <div style={{
-                    height: 4, width: 40, borderRadius: 2, backgroundColor: C.surfaceLight, overflow: "hidden",
-                  }}>
-                    <div style={{
-                      height: "100%", borderRadius: 2, backgroundColor: C.accent,
-                      width: `${(unlocked / total) * 100}%`,
-                    }} />
-                  </div>
-                </div>
-              </button>
-            </div>
-          );
-        })()}
 
         {/* Birthday panel — same layout as "play today" */}
         {isDaily && (() => {
