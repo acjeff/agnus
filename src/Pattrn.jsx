@@ -4504,6 +4504,7 @@ export default function Pattrn() {
     logout: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
     check: (c) => <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>,
     refresh: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
+    forward: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 6 15 12 9 18"/></svg>,
   };
 
   // Quick Play sub-menu — shared across all views (accessed from nav)
@@ -13054,6 +13055,77 @@ export default function Pattrn() {
     if (!isCoop && (Object.keys(fills).length > 0 || attempts > 0)) {
       playPillButtons.push({ id: "reset", icon: "refresh", color: "rgba(255,255,255,0.5)", onClick: resetBoard });
     }
+  } else if (gameState === "won") {
+    // Share
+    playPillButtons.push({ id: "share", icon: "share", color: "rgba(255,255,255,0.7)", onClick: async () => {
+      let text;
+      if (isCoop) {
+        text = `Agnus Co-op \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\nSolved together \u2022 ${formatTime(elapsedTime)}`;
+      } else if (isCascade) {
+        text = `Agnus Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
+      } else if (isDaily) {
+        const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
+        const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${currentDailyDate}` : "";
+        text = `Agnus Daily ${currentDailyDate}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}\n${dailyUrl}`;
+      } else {
+        const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
+        text = `Agnus \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+      }
+      const result = await tryNativeShare({ text });
+      if (result === "shared") { setShareMsg("Shared!"); setTimeout(() => setShareMsg(""), 2000); return; }
+      if (result === "cancelled") return;
+      navigator.clipboard.writeText(text).catch(() => {});
+      setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
+    }});
+    // Retry
+    playPillButtons.push({ id: "retry", icon: "refresh", color: "rgba(255,255,255,0.7)", onClick: () => {
+      if (isCoop) leaveCoopSession();
+      startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true, isDaily ? currentDailyDate : null);
+    }});
+    // Next / Done / Back — the primary action
+    if (isCoop) {
+      playPillButtons.push({ id: "done", icon: "home", color: "#54A0FF", onClick: () => { leaveCoopSession(); setView("menu"); } });
+    } else if (isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) {
+      playPillButtons.push({ id: "back-done", icon: "back", color: C.accent, onClick: () => {
+        if (customMosaicPuzzlesRef.current && isMosaic) {
+          if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
+            coopMosaicCurrentTileRef.current = -1;
+            updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
+            setCoopMosaicOtherFills({});
+            coopMosaicWriteThrottleRef.current = {};
+          }
+          setView("custom-mosaic");
+        } else { setView("menu"); }
+      }});
+    } else if (currentPuzzle < totalPuzzles - 1) {
+      playPillButtons.push({ id: "next", icon: "forward", color: C.accent, onClick: () => startPuzzle(currentPuzzle + 1) });
+    }
+  } else if (gameState === "lost") {
+    // Share (cascade only)
+    if (isCascade && !isCoop) {
+      playPillButtons.push({ id: "share", icon: "share", color: "rgba(255,255,255,0.7)", onClick: async () => {
+        const sz = puzzle?.gridSize ?? 0;
+        const text = `Agnus Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`;
+        const result = await tryNativeShare({ text });
+        if (result === "shared") { setShareMsg("Shared!"); setTimeout(() => setShareMsg(""), 2000); return; }
+        if (result === "cancelled") return;
+        navigator.clipboard.writeText(text).catch(() => {});
+        setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
+      }});
+    }
+    // Retry
+    if (isCoop) {
+      playPillButtons.push({ id: "retry", icon: "refresh", color: "rgba(255,255,255,0.7)", onClick: retryCoop });
+      playPillButtons.push({ id: "done", icon: "home", color: "#54A0FF", onClick: () => { leaveCoopSession(); setView("menu"); } });
+    } else if (isCascade) {
+      playPillButtons.push({ id: "retry", icon: "refresh", color: "rgba(255,255,255,0.7)", onClick: () => startPuzzle(cascadeRunIndex, "cascade", true) });
+      playPillButtons.push({ id: "back-done", icon: "home", color: C.accent, onClick: () => setView("menu") });
+    } else {
+      playPillButtons.push({ id: "retry", icon: "refresh", color: "rgba(255,255,255,0.7)", onClick: () => startPuzzle(currentPuzzle) });
+      if (currentPuzzle < totalPuzzles - 1) {
+        playPillButtons.push({ id: "next", icon: "forward", color: C.accent, onClick: () => startPuzzle(currentPuzzle + 1) });
+      }
+    }
   }
 
   return (
@@ -13841,115 +13913,6 @@ export default function Pattrn() {
                 </div>
               </div>
             )}
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              <button onClick={async () => {
-                let text;
-                if (isCoop) {
-                  text = `Agnus Co-op \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\nSolved together \u2022 ${formatTime(elapsedTime)}`;
-                } else if (isCascade) {
-                  text = `Agnus Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
-                } else if (isDaily) {
-                  const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-                  const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${currentDailyDate}` : "";
-                  text = `Agnus Daily ${currentDailyDate}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}\n${dailyUrl}`;
-                } else {
-                  const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-                  text = `Agnus \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
-                }
-                const result = await tryNativeShare({ text });
-                if (result === "shared") {
-                  setShareMsg("Shared!");
-                  setTimeout(() => setShareMsg(""), 2000);
-                  return;
-                }
-                if (result === "cancelled") return;
-                navigator.clipboard.writeText(text).catch(() => {});
-                setShareMsg("Copied!");
-                setTimeout(() => setShareMsg(""), 2000);
-              }}
-                style={{
-                  backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                  padding: "12px 24px", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase", transition: "all 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
-              >
-                {shareMsg || "Share"}
-              </button>
-              <button onClick={() => { if (isCoop) leaveCoopSession(); startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true, isDaily ? currentDailyDate : null); }}
-                style={{
-                  backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                  padding: "12px 24px", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                  fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                  textTransform: "uppercase", transition: "all 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
-              >
-                Retry
-              </button>
-              {isCoop ? (
-                <button onClick={() => {
-                  // Clean up local coop state; session auto-closes from the completion effect
-                  leaveCoopSession();
-                  setView("menu");
-                }}
-                  style={{
-                    backgroundColor: "#54A0FF", color: "#fff", border: "none",
-                    padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.2s",
-                    boxShadow: "0 4px 20px #54A0FF44",
-                  }}
-                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                >
-                  Done
-                </button>
-              ) : (isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) ? (
-                <button onClick={() => {
-                  if (customMosaicPuzzlesRef.current && isMosaic) {
-                    if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
-                      coopMosaicCurrentTileRef.current = -1;
-                      updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
-                      setCoopMosaicOtherFills({});
-                      coopMosaicWriteThrottleRef.current = {};
-                    }
-                    setView("custom-mosaic");
-                  } else {
-                    setView("menu");
-                  }
-                }}
-                  style={{
-                    backgroundColor: isCoopMosaic ? C.coop : C.accent, color: isCoopMosaic ? "#fff" : C.bg, border: "none",
-                    padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.2s",
-                    boxShadow: `0 4px 20px ${isCoopMosaic ? C.coop : C.accent}44`,
-                  }}
-                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                >
-                  {customMosaicPuzzlesRef.current && isMosaic ? "Back to mosaic" : "Back to puzzles"}
-                </button>
-              ) : currentPuzzle < totalPuzzles - 1 ? (
-                <button onClick={() => startPuzzle(currentPuzzle + 1)}
-                  style={{
-                    backgroundColor: C.accent, color: C.bg, border: "none",
-                    padding: "12px 40px", borderRadius: 12, fontSize: 14, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 2, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.2s",
-                    boxShadow: `0 4px 20px ${C.accent}44`,
-                  }}
-                  onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                  onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                >
-                  Next &rarr;
-                </button>
-              ) : null}
-            </div>
           </div>
         )}
 
@@ -13958,126 +13921,10 @@ export default function Pattrn() {
             <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.incorrect, marginBottom: 4, animation: "fadeUp 0.4s ease" }}>
               {isCoop ? "Co-op failed" : isCascade ? "Run over" : "Not this time"}
             </div>
-            <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: C.textDim }}>
               {isCoop ? "Out of attempts" : isCascade ? (
                 <div>Reached {puzzle?.gridSize ?? 0}×{puzzle?.gridSize ?? 0}</div>
               ) : "Better luck next time"}
-            </div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
-              {isCascade && !isCoop && (
-                <button onClick={async () => {
-                  const sz = puzzle?.gridSize ?? 0;
-                  const text = `Agnus Cascade \uD83E\uDDE9\nReached ${sz}×${sz}`;
-                  const result = await tryNativeShare({ text });
-                  if (result === "shared") {
-                    setShareMsg("Shared!");
-                    setTimeout(() => setShareMsg(""), 2000);
-                    return;
-                  }
-                  if (result === "cancelled") return;
-                  navigator.clipboard.writeText(text).catch(() => {});
-                  setShareMsg("Copied!");
-                  setTimeout(() => setShareMsg(""), 2000);
-                }}
-                  style={{
-                    backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                    padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                    textTransform: "uppercase", transition: "all 0.15s",
-                  }}
-                  onMouseEnter={e => { e.target.style.borderColor = C.accent; e.target.style.color = C.accent; }}
-                  onMouseLeave={e => { e.target.style.borderColor = C.border; e.target.style.color = C.text; }}
-                >
-                  {shareMsg || "Share"}
-                </button>
-              )}
-              {isCoop ? (
-                <>
-                  <button onClick={retryCoop}
-                    style={{
-                      backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-                    onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.text; }}
-                  >
-                    Retry
-                  </button>
-                  <button onClick={() => { leaveCoopSession(); setView("menu"); }}
-                    style={{
-                      backgroundColor: "#54A0FF", color: "#fff", border: "none",
-                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                      boxShadow: "0 4px 16px #54A0FF44",
-                    }}
-                    onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                    onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                  >
-                    Back to puzzles
-                  </button>
-                </>
-              ) : isCascade ? (
-                <>
-                  <button onClick={() => startPuzzle(cascadeRunIndex, "cascade", true)}
-                    style={{
-                      backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => { e.target.style.borderColor = C.accent; e.target.style.color = C.accent; }}
-                    onMouseLeave={e => { e.target.style.borderColor = C.border; e.target.style.color = C.text; }}
-                  >
-                    Retry
-                  </button>
-                  <button onClick={() => { setView("menu"); }}
-                    style={{
-                      backgroundColor: C.accent, color: C.bg, border: "none",
-                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                      boxShadow: `0 4px 16px ${C.accent}44`,
-                    }}
-                    onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                    onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                  >
-                    Back to puzzles
-                  </button>
-                </>
-              ) : (
-                <>
-                  <button onClick={() => startPuzzle(currentPuzzle)}
-                    style={{
-                      backgroundColor: "transparent", color: C.text, border: `1px solid ${C.border}`,
-                      padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                      fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase", transition: "all 0.15s",
-                    }}
-                    onMouseEnter={e => { e.target.style.borderColor = C.accent; e.target.style.color = C.accent; }}
-                    onMouseLeave={e => { e.target.style.borderColor = C.border; e.target.style.color = C.text; }}
-                  >
-                    Retry
-                  </button>
-                  {currentPuzzle < totalPuzzles - 1 && (
-                    <button onClick={() => startPuzzle(currentPuzzle + 1)}
-                      style={{
-                        backgroundColor: C.accent, color: C.bg, border: "none",
-                        padding: "10px 24px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                        fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-                        textTransform: "uppercase", transition: "all 0.15s",
-                        boxShadow: `0 4px 16px ${C.accent}44`,
-                      }}
-                      onMouseEnter={e => e.target.style.transform = "translateY(-2px)"}
-                      onMouseLeave={e => e.target.style.transform = "translateY(0)"}
-                    >
-                      Next &rarr;
-                    </button>
-                  )}
-                </>
-              )}
             </div>
           </div>
         )}
