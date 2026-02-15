@@ -4529,11 +4529,28 @@ export default function Pattrn() {
     { id: "cascade", icon: "layers", label: "Cascade", action: () => { setDifficulty("cascade"); setView("play"); } },
   ];
 
+  // Theme sub-menu — select a theme inline
+  const themeAchList = computeAchievements(progress, times, savedAchievementIds);
+  const themeSubMenu = [
+    { id: "back", icon: "back", label: "Back", isBack: true },
+    ...PUZZLE_THEMES.map(theme => {
+      const unlocked = isThemeUnlocked(theme, themeAchList);
+      const isActive = activeThemeId === theme.id;
+      return {
+        id: `theme-${theme.id}`,
+        icon: "palette",
+        label: theme.name + (isActive ? " \u2713" : ""),
+        dimmed: !unlocked,
+        action: unlocked ? () => { setActiveThemeId(theme.id); saveTheme(theme.id); } : null,
+      };
+    }),
+  ];
+
   // Contextual menu items per view — page-specific actions
   const getContextualMenuTree = (currentView) => {
     // Build play contextual items dynamically (some are conditional)
     const playRoot = [];
-    playRoot.push({ id: "theme", icon: "palette", label: "Theme", action: () => { setShowThemePicker(true); } });
+    playRoot.push({ id: "theme", icon: "palette", label: "Theme", sub: "theme" });
     if (!isCoop && gameState === "playing" && !isCascade && !isMosaic) {
       playRoot.push({ id: "coop-start", icon: "user-plus", label: "Play w/ Friends", action: () => {
         if (!firebaseUser) { coopPendingLoginRef.current = true; setShowAccountModal(true); return; }
@@ -4602,7 +4619,7 @@ export default function Pattrn() {
     const isOpen = radialMenuStack.length > 0;
     const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
     const isSubMenu = currentMenuKey !== "root";
-    const contextualItems = currentMenuKey === "play" ? playSubMenu : (menuTree[currentMenuKey] || []);
+    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
     const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-home", "custom-mosaic": "nav-gallery", play: "nav-play" };
@@ -4658,7 +4675,7 @@ export default function Pattrn() {
             display: "flex", alignItems: "center", gap: 12,
             padding: "0 16px",
             background: "none", border: "none",
-            cursor: "pointer",
+            cursor: dimmed && !item.isBack ? "default" : "pointer",
             color: dimmed ? C.textDim : C.text,
             fontFamily: "'Space Mono', monospace",
             fontSize: 11, fontWeight: 600,
@@ -4756,7 +4773,7 @@ export default function Pattrn() {
             )}
 
             {/* Contextual items — page-specific actions */}
-            {contextualItems.map((item, i) => renderItem(item, filteredNav.length + (showDivider ? 1 : 0) + i, item.isBack))}
+            {contextualItems.map((item, i) => renderItem(item, filteredNav.length + (showDivider ? 1 : 0) + i, item.isBack || item.dimmed))}
           </div>
 
           {/* Bottom bar: pill action buttons + menu toggle */}
@@ -13307,6 +13324,7 @@ export default function Pattrn() {
       {/* Info row: now the top element of the play view */}
       <div ref={infoRowRef} style={{
         flexShrink: 0, zIndex: 10,
+        backgroundColor: activeTheme.gridBg || C.surface,
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
       }}>
@@ -13691,7 +13709,7 @@ export default function Pattrn() {
       </div>
 
       {/* Fixed bottom bar: coop UI + game state info */}
-      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: activeTheme.gridBg || C.surface, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
         {/* Pass player picker dropdown (multi-partner) */}
         {coopPassPlayerPicker && !coopPassMode && (
           <div style={{
