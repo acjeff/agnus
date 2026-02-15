@@ -10152,7 +10152,7 @@ export default function Pattrn() {
           </div>
         )}
 
-      {renderContextButton("admin-review")}
+      {renderContextButton("gallery")}
       {globalModalsEl}
       </div>
     );
@@ -10246,7 +10246,7 @@ export default function Pattrn() {
             ))}
           </div>
         )}
-        {renderContextButton("admin-manage")}
+        {renderContextButton("admin-review")}
         {globalModalsEl}
       </div>
     );
