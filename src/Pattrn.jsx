@@ -13957,9 +13957,9 @@ export default function Pattrn() {
       {gameState === "playing" && puzzle && (
         <div style={{
           position: "fixed",
-          bottom: `calc(80px + env(safe-area-inset-bottom, 0px))`,
+          bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
           right: 20,
-          borderRadius: 28,
+          borderRadius: "50%",
           background: `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.55) 100%)`,
           backdropFilter: "blur(28px) saturate(200%)",
           WebkitBackdropFilter: "blur(28px) saturate(200%)",
