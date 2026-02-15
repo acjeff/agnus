@@ -8853,6 +8853,81 @@ export default function Pattrn() {
     );
   })() : null;
 
+  // --- Play view slide-in / swipe-back ---
+  const prevViewRef = useRef(view);
+  useEffect(() => {
+    if (view === "play" && prevViewRef.current !== "play") {
+      setPlayViewEntering(true);
+    }
+    prevViewRef.current = view;
+  }, [view]);
+
+  const playViewGoBack = useCallback(() => {
+    const el = playViewContainerRef.current;
+    if (!el) return;
+    el.style.transition = "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)";
+    el.style.transform = "translateX(100%)";
+    setTimeout(() => {
+      if (isCoop) { setShowLeaveConfirm(true); el.style.transition = "none"; el.style.transform = ""; return; }
+      if (difficulty === "cascade") {
+        const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
+        const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
+        setProgress(nextProgress);
+        saveProgress(nextProgress);
+      }
+      stopTimer();
+      setShowMosaicPreviewOverlay(false);
+      if (customMosaicPuzzlesRef.current && isMosaic) {
+        if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
+          coopMosaicCurrentTileRef.current = -1;
+          updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
+          setCoopMosaicOtherFills({});
+          coopMosaicWriteThrottleRef.current = {};
+        }
+        setView("custom-mosaic");
+      } else {
+        setView("menu");
+      }
+    }, 300);
+  }, [isCoop, difficulty, cascadeLevel, fills, attempts, progress, cascadeRunIndex, isMosaic, isCoopMosaic, coopMosaicSessionId, firebaseUser]);
+
+  const onPlaySwipeStart = useCallback((e) => {
+    if (e.clientX > 24) return;
+    swipeBackState.current = { active: true, startX: e.clientX, startY: e.clientY, confirmed: false, moved: false };
+  }, []);
+
+  const onPlaySwipeMove = useCallback((e) => {
+    const s = swipeBackState.current;
+    if (!s.active) return;
+    const dx = e.clientX - s.startX;
+    const dy = e.clientY - s.startY;
+    if (!s.confirmed && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) {
+      s.active = false; return;
+    }
+    if (!s.confirmed && dx > 10) s.confirmed = true;
+    if (!s.confirmed) return;
+    s.moved = true;
+    const el = playViewContainerRef.current;
+    if (el) {
+      el.style.transition = "none";
+      el.style.transform = `translateX(${Math.max(0, dx)}px)`;
+    }
+  }, []);
+
+  const onPlaySwipeEnd = useCallback((e) => {
+    const s = swipeBackState.current;
+    if (!s.active || !s.confirmed) { s.active = false; return; }
+    s.active = false;
+    const dx = (e.clientX || 0) - s.startX;
+    const el = playViewContainerRef.current;
+    if (dx > 100) {
+      playViewGoBack();
+    } else if (el) {
+      el.style.transition = "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)";
+      el.style.transform = "translateX(0)";
+    }
+  }, [playViewGoBack]);
+
   // --- Global modals element (included in every return) ---
   const globalModalsEl = (
     <>
@@ -12982,81 +13057,6 @@ export default function Pattrn() {
       </div>
     );
   }
-
-  // --- Play view slide-in / swipe-back ---
-  const prevViewRef = useRef(view);
-  useEffect(() => {
-    if (view === "play" && prevViewRef.current !== "play") {
-      setPlayViewEntering(true);
-    }
-    prevViewRef.current = view;
-  }, [view]);
-
-  const playViewGoBack = useCallback(() => {
-    const el = playViewContainerRef.current;
-    if (!el) return;
-    el.style.transition = "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)";
-    el.style.transform = "translateX(100%)";
-    setTimeout(() => {
-      if (isCoop) { setShowLeaveConfirm(true); el.style.transition = "none"; el.style.transform = ""; return; }
-      if (difficulty === "cascade") {
-        const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
-        const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
-        setProgress(nextProgress);
-        saveProgress(nextProgress);
-      }
-      stopTimer();
-      setShowMosaicPreviewOverlay(false);
-      if (customMosaicPuzzlesRef.current && isMosaic) {
-        if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
-          coopMosaicCurrentTileRef.current = -1;
-          updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
-          setCoopMosaicOtherFills({});
-          coopMosaicWriteThrottleRef.current = {};
-        }
-        setView("custom-mosaic");
-      } else {
-        setView("menu");
-      }
-    }, 300);
-  }, [isCoop, difficulty, cascadeLevel, fills, attempts, progress, cascadeRunIndex, isMosaic, isCoopMosaic, coopMosaicSessionId, firebaseUser]);
-
-  const onPlaySwipeStart = useCallback((e) => {
-    if (e.clientX > 24) return;
-    swipeBackState.current = { active: true, startX: e.clientX, startY: e.clientY, confirmed: false, moved: false };
-  }, []);
-
-  const onPlaySwipeMove = useCallback((e) => {
-    const s = swipeBackState.current;
-    if (!s.active) return;
-    const dx = e.clientX - s.startX;
-    const dy = e.clientY - s.startY;
-    if (!s.confirmed && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) {
-      s.active = false; return;
-    }
-    if (!s.confirmed && dx > 10) s.confirmed = true;
-    if (!s.confirmed) return;
-    s.moved = true;
-    const el = playViewContainerRef.current;
-    if (el) {
-      el.style.transition = "none";
-      el.style.transform = `translateX(${Math.max(0, dx)}px)`;
-    }
-  }, []);
-
-  const onPlaySwipeEnd = useCallback((e) => {
-    const s = swipeBackState.current;
-    if (!s.active || !s.confirmed) { s.active = false; return; }
-    s.active = false;
-    const dx = (e.clientX || 0) - s.startX;
-    const el = playViewContainerRef.current;
-    if (dx > 100) {
-      playViewGoBack();
-    } else if (el) {
-      el.style.transition = "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)";
-      el.style.transform = "translateX(0)";
-    }
-  }, [playViewGoBack]);
 
   // --- PLAY VIEW ---
   const diffLabel = isDaily ? "Daily" : isCascade ? "Cascade" : DIFFICULTIES.find(d => d.key === difficulty)?.label || "";
