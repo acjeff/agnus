@@ -4486,21 +4486,22 @@ export default function Pattrn() {
     burger: (c) => <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
   };
 
-  // Contextual menu items per view — page-specific actions + sub-menus
+  // Quick Play sub-menu — shared across all views (accessed from nav)
+  const playSubMenu = [
+    { id: "back", icon: "back", label: "Back", isBack: true },
+    { id: "easy", icon: "grid", label: "Easy", action: () => { setDifficulty("easy"); setCurrentPuzzle(0); setView("play"); } },
+    { id: "medium", icon: "layers", label: "Medium", action: () => { setDifficulty("medium"); setCurrentPuzzle(0); setView("play"); } },
+    { id: "hard", icon: "zap", label: "Hard", action: () => { setDifficulty("hard"); setCurrentPuzzle(0); setView("play"); } },
+    { id: "daily", icon: "calendar", label: "Daily", action: () => { setDifficulty("daily"); setView("play"); } },
+    { id: "cascade", icon: "layers", label: "Cascade", action: () => { setDifficulty("cascade"); setView("play"); } },
+  ];
+
+  // Contextual menu items per view — page-specific actions
   const getContextualMenuTree = (currentView) => {
     const trees = {
       menu: {
         root: [
-          { id: "play", icon: "play", label: "Play", sub: "play" },
           { id: "create", icon: "create", label: "Create", action: () => { setView("creator"); } },
-        ],
-        play: [
-          { id: "back", icon: "back", label: "Back", isBack: true },
-          { id: "easy", icon: "grid", label: "Easy", action: () => { setDifficulty("easy"); setCurrentPuzzle(0); setView("play"); } },
-          { id: "medium", icon: "layers", label: "Medium", action: () => { setDifficulty("medium"); setCurrentPuzzle(0); setView("play"); } },
-          { id: "hard", icon: "zap", label: "Hard", action: () => { setDifficulty("hard"); setCurrentPuzzle(0); setView("play"); } },
-          { id: "daily", icon: "calendar", label: "Daily", action: () => { setDifficulty("daily"); setView("play"); } },
-          { id: "cascade", icon: "layers", label: "Cascade", action: () => { setDifficulty("cascade"); setView("play"); } },
         ],
       },
       gallery: {
@@ -4521,6 +4522,7 @@ export default function Pattrn() {
 
   // Persistent nav items — always show all core page links
   const navItems = [
+    { id: "nav-play", icon: "play", label: "Quick Play", sub: "play" },
     { id: "nav-home", icon: "home", label: "Home", action: () => { setView("menu"); } },
     { id: "nav-gallery", icon: "gallery", label: "Mosaic", action: () => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); } },
     { id: "nav-coop", icon: "users", label: "Co-op", action: () => { setView("coop"); } },
@@ -4535,10 +4537,10 @@ export default function Pattrn() {
     const isOpen = radialMenuStack.length > 0;
     const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
     const isSubMenu = currentMenuKey !== "root";
-    const contextualItems = menuTree[currentMenuKey] || [];
+    const contextualItems = currentMenuKey === "play" ? playSubMenu : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
-    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-home", "custom-mosaic": "nav-gallery", play: "nav-home" };
+    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-home", "custom-mosaic": "nav-gallery", play: "nav-play" };
     const filteredNav = navItems.filter(item => item.id !== viewToNavId[currentView]);
 
     const fabIconKey = isOpen ? null : getFabIcon();
