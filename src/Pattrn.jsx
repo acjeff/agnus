@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogOut, Check, RotateCcw, ChevronRight, Hand } from "lucide-react";
+import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogOut, Check, RotateCcw, ChevronRight, HandHelping } from "lucide-react";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -4506,7 +4506,7 @@ export default function Pattrn() {
     check: (c) => <Check size={20} color={c} strokeWidth={2.5} />,
     refresh: (c) => <RotateCcw size={18} color={c} strokeWidth={2} />,
     forward: (c) => <ChevronRight size={18} color={c} strokeWidth={2} />,
-    pass: (c) => <Hand size={18} color={c} strokeWidth={2} />,
+    pass: (c) => <HandHelping size={18} color={c} strokeWidth={2} />,
   };
 
   // Quick Play sub-menu — shared across all views (accessed from nav)
