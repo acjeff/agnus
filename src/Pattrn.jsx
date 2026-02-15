@@ -4734,9 +4734,7 @@ export default function Pattrn() {
             background: `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.55) 100%)`,
             backdropFilter: "blur(28px) saturate(200%)",
             WebkitBackdropFilter: "blur(28px) saturate(200%)",
-            border: isOpen
-              ? `1px solid rgba(255,255,255,0.18)`
-              : "1px solid rgba(255,255,255,0.16)",
+            border: "none",
             boxShadow: defaultShadow,
             zIndex: 85,
             overflow: "hidden",
@@ -4785,7 +4783,7 @@ export default function Pattrn() {
           <div style={{
             display: "flex", alignItems: "center",
             height: fabSize, flexShrink: 0,
-            borderTop: isOpen ? "1px solid rgba(255,255,255,0.06)" : "none",
+            borderTop: "none",
           }}>
             {/* Action buttons in the pill */}
             {pillButtons.map((btn) => (
@@ -13942,7 +13940,7 @@ export default function Pattrn() {
           background: `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.55) 100%)`,
           backdropFilter: "blur(28px) saturate(200%)",
           WebkitBackdropFilter: "blur(28px) saturate(200%)",
-          border: "1px solid rgba(255,255,255,0.16)",
+          border: "none",
           boxShadow: `0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15)`,
           zIndex: 85,
           padding: "6px 4px",
