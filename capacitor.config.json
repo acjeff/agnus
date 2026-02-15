@@ -5,20 +5,13 @@
 	"ios": {
 		"contentInset": "automatic",
 		"preferredContentMode": "mobile",
-		"scheme": "capacitor"
+		"scheme": "http"
 	},
 	"server": {
-		"hostname": "localhost"
+		"hostname": "localhost",
+		"iosScheme": "http"
 	},
 	"packageClassList": [
 		"FirebaseAuthenticationPlugin"
-	],
-	"plugins": {
-		"FirebaseAuthentication": {
-			"skipNativeAuth": false,
-			"providers": [
-				"google.com"
-			]
-		}
-	}
+	]
 }
