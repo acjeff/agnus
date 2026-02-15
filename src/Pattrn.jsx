@@ -4522,9 +4522,6 @@ export default function Pattrn() {
     // Build play contextual items dynamically (some are conditional)
     const playRoot = [];
     playRoot.push({ id: "theme", icon: "palette", label: "Theme", action: () => { setShowThemePicker(true); } });
-    if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
-      playRoot.push({ id: "preview", icon: "search", label: "Preview", action: () => { setShowMosaicPreviewOverlay(true); } });
-    }
     if (!isCoop && gameState === "playing" && !isCascade && !isMosaic) {
       playRoot.push({ id: "coop-start", icon: "user-plus", label: "Play w/ Friends", action: () => {
         if (!firebaseUser) { coopPendingLoginRef.current = true; setShowAccountModal(true); return; }
@@ -13054,6 +13051,9 @@ export default function Pattrn() {
     }
     if (!isCoop && (Object.keys(fills).length > 0 || attempts > 0)) {
       playPillButtons.push({ id: "reset", icon: "refresh", color: "rgba(255,255,255,0.5)", onClick: resetBoard });
+    }
+    if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
+      playPillButtons.push({ id: "preview", icon: "search", color: C.accent, onClick: () => setShowMosaicPreviewOverlay(true) });
     }
   } else if (gameState === "won") {
     // Share
