@@ -12455,7 +12455,7 @@ export default function Pattrn() {
 
   // Pill action buttons for the bottom glass bar
   const playBackAction = () => {
-    if (isCoop) { leaveCoopSession(); return; }
+    if (isCoop) { leaveCoopSession(); setView("coop"); return; }
     if (difficulty === "cascade") {
       const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
       const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
