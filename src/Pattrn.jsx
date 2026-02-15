@@ -3007,7 +3007,7 @@ export default function Pattrn() {
   const [customMosaicProgress, setCustomMosaicProgress] = useState({}); // { tileIndex: attempts }
   const customMosaicPuzzlesRef = useRef(null); // array of 25 puzzle objects when playing custom mosaic
   const [creatorReturnView, setCreatorReturnView] = useState("menu"); // where to go when leaving creator
-  const [showSaveDrawer, setShowSaveDrawer] = useState(false); // drawer for naming mosaic on save
+  // mosaic save now uses Liquid Glass menu ("mosaic-save" in radialMenuStack)
   const creatorColorScrollRef = useRef(null); // color picker carousel scroll container
   const creatorColorDragRef = useRef({ active: false, startX: 0, scrollStart: 0, moved: false, lastX: 0, lastT: 0, velX: 0, rafId: 0 });
   const [friendsList, setFriendsList] = useState([]); // array of { uid, username, profilePicture }
@@ -3457,7 +3457,7 @@ export default function Pattrn() {
     if (!allFilled) { setMosaicMsg("Fill in all cells before saving!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
     // Pre-fill title for edits
     if (creatorEditingId && !creatorTitle.trim()) setCreatorTitle("");
-    setShowSaveDrawer(true);
+    setRadialMenuStack(["root", "mosaic-save"]);
   }, [firebaseUser, creatorGrid, creatorEditingId, creatorTitle]);
 
   const handleSaveMosaic = useCallback(async (titleFromDrawer) => {
@@ -3467,7 +3467,7 @@ export default function Pattrn() {
     const allFilled = creatorGrid.every(row => row.every(c => c !== null));
     if (!allFilled) { setMosaicMsg("Fill in all cells before saving!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
     setMosaicLoading(true);
-    setShowSaveDrawer(false);
+    setRadialMenuStack([]);
     try {
       const mosaicData = {
         title,
@@ -4753,7 +4753,8 @@ export default function Pattrn() {
     const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
     const isSubMenu = currentMenuKey !== "root";
     const isCoopStartMenu = currentMenuKey === "coop-start";
-    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : isCoopStartMenu ? [] : (menuTree[currentMenuKey] || []);
+    const isMosaicSaveMenu = currentMenuKey === "mosaic-save";
+    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : (isCoopStartMenu || isMosaicSaveMenu) ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
     const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-gallery", "custom-mosaic": "nav-gallery" };
@@ -4772,7 +4773,7 @@ export default function Pattrn() {
     const fabSize = 56;
     const hasPillButtons = pillButtons.length > 0;
     const closedWidth = hasPillButtons ? (pillButtons.length + 1) * fabSize : fabSize;
-    const panelWidth = isCoopStartMenu ? 280 : Math.max(200, closedWidth);
+    const panelWidth = (isCoopStartMenu || isMosaicSaveMenu) ? 280 : Math.max(200, closedWidth);
     const itemHeight = 44;
     const panelPad = 8;
     const dividerHeight = 13;
@@ -4786,7 +4787,7 @@ export default function Pattrn() {
     const showPassBanner = !!coopPassMode;
     const showPassPending = pendingPassOpen && !!coopPendingPassCell;
     const showPassIncoming = gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey;
-    const hasPassUI = isCoopStartMenu ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming);
+    const hasPassUI = (isCoopStartMenu || isMosaicSaveMenu) ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming);
     const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : 0;
     const passRowHeight = showPassPlayerPicker ? (passPlayerCount > 2 ? 88 : 56) : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
@@ -4819,7 +4820,18 @@ export default function Pattrn() {
       return h;
     })();
 
-    const contentHeight = isCoopStartMenu ? coopStartContentHeight : (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
+    // Mosaic save menu height — header + input + button
+    const mosaicSaveContentHeight = (() => {
+      if (!isMosaicSaveMenu) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 44 + 12; // input field + margin
+      h += 42; // save button
+      h += 12; // container bottom padding
+      return h;
+    })();
+
+    const contentHeight = isMosaicSaveMenu ? mosaicSaveContentHeight : isCoopStartMenu ? coopStartContentHeight : (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
     const bottomOffset = bottomPx; // matches the bottom positioning
     const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
@@ -4935,7 +4947,59 @@ export default function Pattrn() {
 
           {/* Menu content — always rendered, animated via transitions */}
           <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}>
-            {isCoopStartMenu ? (() => {
+            {isMosaicSaveMenu ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+                      {creatorEditingId ? "Update Mosaic" : "Name Your Mosaic"}
+                    </div>
+                    <input
+                      type="text"
+                      defaultValue={creatorTitle}
+                      placeholder="Mosaic title..."
+                      maxLength={40}
+                      autoFocus
+                      id="save-drawer-title-input"
+                      style={{
+                        width: "100%", padding: "10px 14px", borderRadius: 8,
+                        backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                        color: C.text, fontSize: 14, fontFamily: "'Inter', sans-serif",
+                        outline: "none", boxSizing: "border-box", letterSpacing: 0.3,
+                      }}
+                      onFocus={e => { e.target.style.borderColor = C.accent; }}
+                      onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") handleSaveMosaic(e.target.value);
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const input = document.getElementById("save-drawer-title-input");
+                        handleSaveMosaic(input ? input.value : "");
+                      }}
+                      disabled={mosaicLoading}
+                      style={{
+                        width: "100%", marginTop: 12, padding: "10px 0", borderRadius: 8,
+                        backgroundColor: C.accent, color: "#fff", border: "none",
+                        fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                        letterSpacing: 1, textTransform: "uppercase", cursor: mosaicLoading ? "default" : "pointer",
+                        opacity: mosaicLoading ? 0.5 : 1, transition: "opacity 0.15s",
+                      }}
+                    >
+                      {mosaicLoading ? "Saving..." : (creatorEditingId ? "Update" : "Save")}
+                    </button>
+                  </div>
+                </>
+              );
+            })() : isCoopStartMenu ? (() => {
               const isMosaicSession = isCoopFromMosaic || (isCoopMosaic && !!coopMosaicSessionId);
               const activeSessionId = isMosaicSession ? coopMosaicSessionId : coopSessionId;
               const hasSession = !!activeSessionId;
@@ -9894,52 +9958,6 @@ export default function Pattrn() {
         { id: "clear", icon: "refresh", color: "#fff", onClick: () => resetCreator() },
         { id: "save", icon: "upload", color: C.accent, onClick: handleSaveClick, disabled: mosaicLoading },
       ])}
-
-      {/* Save mosaic drawer — name prompt */}
-      <DraggableDrawer isOpen={showSaveDrawer} onClose={() => setShowSaveDrawer(false)} maxHeight="50vh">
-        <div style={{ padding: "8px 20px 24px" }}>
-          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, letterSpacing: 1, marginBottom: 16 }}>
-            {creatorEditingId ? "Update Mosaic" : "Name Your Mosaic"}
-          </div>
-          <input
-            type="text"
-            defaultValue={creatorTitle}
-            placeholder="Mosaic title..."
-            maxLength={40}
-            autoFocus
-            id="save-drawer-title-input"
-            style={{
-              width: "100%", padding: "12px 14px", borderRadius: 10,
-              backgroundColor: C.surface, border: `1px solid ${C.border}`,
-              color: C.text, fontSize: 16, fontFamily: "'Inter', sans-serif",
-              outline: "none", boxSizing: "border-box", letterSpacing: 0.5,
-            }}
-            onFocus={e => { e.target.style.borderColor = C.accent; }}
-            onBlur={e => { e.target.style.borderColor = C.border; }}
-            onKeyDown={e => {
-              if (e.key === "Enter") {
-                handleSaveMosaic(e.target.value);
-              }
-            }}
-          />
-          <button
-            onClick={() => {
-              const input = document.getElementById("save-drawer-title-input");
-              handleSaveMosaic(input ? input.value : "");
-            }}
-            disabled={mosaicLoading}
-            style={{
-              width: "100%", marginTop: 12, padding: "12px 0", borderRadius: 10,
-              backgroundColor: C.accent, color: "#fff", border: "none",
-              fontSize: 14, fontWeight: 700, fontFamily: "'Inter', sans-serif",
-              letterSpacing: 1, textTransform: "uppercase", cursor: mosaicLoading ? "default" : "pointer",
-              opacity: mosaicLoading ? 0.5 : 1, transition: "opacity 0.15s",
-            }}
-          >
-            {mosaicLoading ? "Saving..." : (creatorEditingId ? "Update" : "Save")}
-          </button>
-        </div>
-      </DraggableDrawer>
 
       {globalModalsEl}
       </div>
