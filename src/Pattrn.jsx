@@ -4741,7 +4741,7 @@ export default function Pattrn() {
             bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
             right: 20,
             width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
-            height: isOpen ? openHeight : fabSize + passUIHeight,
+            height: isOpen ? openHeight : (hasPassUI ? "auto" : fabSize),
             borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
             background: activeTheme.gridBg || C.surface,
             backdropFilter: "blur(28px) saturate(200%)",
@@ -4749,7 +4749,7 @@ export default function Pattrn() {
             border: isOpen ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(255,255,255,0.16)",
             boxShadow: defaultShadow,
             zIndex: 85,
-            overflow: "hidden",
+            overflow: isOpen ? "hidden" : "visible",
             display: "flex",
             flexDirection: "column",
             transition: isOpen
