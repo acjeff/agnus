@@ -9819,9 +9819,8 @@ export default function Pattrn() {
 
       {renderContextButton("creator", [
         { id: "back", icon: "back", color: "#fff", onClick: () => {
-          const returnTo = creatorReturnView || "menu";
           resetCreator(); setCreatorReturnView("menu");
-          if (returnTo === "gallery") { setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine"); } else { setView("menu"); }
+          setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine");
         }},
         { id: "clear", icon: "refresh", color: "#fff", onClick: () => resetCreator() },
         { id: "save", icon: "upload", color: C.accent, onClick: handleSaveClick, disabled: mosaicLoading },
