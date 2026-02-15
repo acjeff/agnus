@@ -4561,24 +4561,6 @@ export default function Pattrn() {
     if (isCoop) {
       playRoot.push({ id: "coop-invite", icon: "user-plus", label: "Invite", action: () => { setShowCoopInvite(true); } });
     }
-    if (gameState === "playing" && isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0) {
-      playRoot.push({ id: "pass-cell", icon: "pass", label: "Pass Cell", action: () => {
-        if (coopPassMode) {
-          setCoopPassMode(null);
-          setSelectedToken(null);
-          return;
-        }
-        setSelectedToken(null);
-        setSelectedCell(null);
-        const entries = Object.entries(coopPlayers);
-        if (entries.length === 1) {
-          const [uid, p] = entries[0];
-          setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
-        } else {
-          setCoopPassPlayerPicker(prev => !prev);
-        }
-      }});
-    }
     playRoot.push({ id: "back", icon: "back", label: customMosaicPuzzlesRef.current && isMosaic ? "Mosaic" : "Puzzles", action: () => {
       if (isCoop) { setShowLeaveConfirm(true); return; }
       if (difficulty === "cascade") {
@@ -13097,6 +13079,17 @@ export default function Pattrn() {
     }
     if (!isCoop && (Object.keys(fills).length > 0 || attempts > 0)) {
       playPillButtons.push({ id: "reset", icon: "refresh", color: "rgba(255,255,255,0.5)", onClick: resetBoard });
+    }
+    if (isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0) {
+      playPillButtons.push({ id: "pass-cell", icon: "pass", color: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF" : "rgba(255,255,255,0.5)", onClick: () => {
+        if (coopPassMode) { setCoopPassMode(null); setSelectedToken(null); return; }
+        setSelectedToken(null); setSelectedCell(null);
+        const entries = Object.entries(coopPlayers);
+        if (entries.length === 1) {
+          const [uid, p] = entries[0];
+          setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
+        } else { setCoopPassPlayerPicker(prev => !prev); }
+      }});
     }
     if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
       playPillButtons.push({ id: "preview", icon: "search", color: C.accent, onClick: () => setShowMosaicPreviewOverlay(true) });
