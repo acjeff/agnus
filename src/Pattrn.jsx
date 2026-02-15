@@ -1683,7 +1683,6 @@ const TIMES_KEY = "pattrn-times-v1";
 const BIRTHDAY_KEY = "pattrn-birthday-v1";
 const THEME_KEY = "pattrn-theme-v1";
 const ACHIEV_KEY = "pattrn-achievements-v1";
-const LOGIN_DISMISS_KEY = "pattrn-login-dismissed-v1";
 const CHEAT_BIRTHDAY = "23-06-1912";
 
 function loadTheme() {
@@ -2913,7 +2912,6 @@ export default function Pattrn() {
   // --- Account / Firebase state ---
   const [firebaseAuthReady, setFirebaseAuthReady] = useState(false);
   const [firebaseUser, setFirebaseUser] = useState(null);
-  const [showAccountModal, setShowAccountModal] = useState(false);
   const [accountTab, setAccountTab] = useState("login"); // "login" | "signup"
   const [accountEmail, setAccountEmail] = useState("");
   const [accountPassword, setAccountPassword] = useState("");
@@ -2922,10 +2920,6 @@ export default function Pattrn() {
   const [syncStatus, setSyncStatus] = useState(""); // "", "syncing", "synced", "error"
   const cloudSyncInFlight = useRef(false);
   const firebaseConfigured = isFirebaseConfigured();
-  const [autoLoginModal, setAutoLoginModal] = useState(false); // true when modal was auto-opened
-  const [loginHintToast, setLoginHintToast] = useState(false);
-  const [loginHintDismissing, setLoginHintDismissing] = useState(false);
-  const loginHintTimer = useRef(null);
   // Sync choice prompt state (shown when both local + cloud data exist on login)
   const [showSyncChoice, setShowSyncChoice] = useState(false);
   const [syncChoiceData, setSyncChoiceData] = useState(null); // { uid, localData, cloudData, localSummary, cloudSummary }
@@ -3007,7 +3001,7 @@ export default function Pattrn() {
   const [customMosaicProgress, setCustomMosaicProgress] = useState({}); // { tileIndex: attempts }
   const customMosaicPuzzlesRef = useRef(null); // array of 25 puzzle objects when playing custom mosaic
   const [creatorReturnView, setCreatorReturnView] = useState("menu"); // where to go when leaving creator
-  const [showSaveDrawer, setShowSaveDrawer] = useState(false); // drawer for naming mosaic on save
+  // mosaic save now uses Liquid Glass menu ("mosaic-save" in radialMenuStack)
   const creatorColorScrollRef = useRef(null); // color picker carousel scroll container
   const creatorColorDragRef = useRef({ active: false, startX: 0, scrollStart: 0, moved: false, lastX: 0, lastT: 0, velX: 0, rafId: 0 });
   const [friendsList, setFriendsList] = useState([]); // array of { uid, username, profilePicture }
@@ -3457,7 +3451,7 @@ export default function Pattrn() {
     if (!allFilled) { setMosaicMsg("Fill in all cells before saving!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
     // Pre-fill title for edits
     if (creatorEditingId && !creatorTitle.trim()) setCreatorTitle("");
-    setShowSaveDrawer(true);
+    setRadialMenuStack(["root", "mosaic-save"]);
   }, [firebaseUser, creatorGrid, creatorEditingId, creatorTitle]);
 
   const handleSaveMosaic = useCallback(async (titleFromDrawer) => {
@@ -3467,7 +3461,7 @@ export default function Pattrn() {
     const allFilled = creatorGrid.every(row => row.every(c => c !== null));
     if (!allFilled) { setMosaicMsg("Fill in all cells before saving!"); setTimeout(() => setMosaicMsg(""), 2500); return; }
     setMosaicLoading(true);
-    setShowSaveDrawer(false);
+    setRadialMenuStack([]);
     try {
       const mosaicData = {
         title,
@@ -3881,8 +3875,7 @@ export default function Pattrn() {
       // New account: push all local data to cloud
       const localData = gatherLocalData();
       await saveCloudData(user.uid, localData);
-      setShowAccountModal(false);
-      setAutoLoginModal(false);
+      setRadialMenuStack([]);
       setAccountEmail("");
       setAccountPassword("");
       setSyncStatus("synced");
@@ -3909,8 +3902,7 @@ export default function Pattrn() {
       // Both sides have progress — ask the user what to do
       setSyncChoiceData({ uid, localData, cloudData, localSummary, cloudSummary });
       setShowSyncChoice(true);
-      setShowAccountModal(false);
-      setAutoLoginModal(false);
+      setRadialMenuStack([]);
       setAccountEmail("");
       setAccountPassword("");
       return;
@@ -3920,8 +3912,7 @@ export default function Pattrn() {
     const merged = mergeGameData(localData, cloudData);
     applyMergedData(merged);
     await saveCloudData(uid, merged);
-    setShowAccountModal(false);
-    setAutoLoginModal(false);
+    setRadialMenuStack([]);
     setAccountEmail("");
     setAccountPassword("");
     setSyncStatus("synced");
@@ -3993,7 +3984,7 @@ export default function Pattrn() {
   const handleSignOut = useCallback(async () => {
     try {
       await logOut();
-      setShowAccountModal(false);
+      setRadialMenuStack([]);
       setShowProfilePage(false);
       setSyncStatus("");
       setUsername(null);
@@ -4035,7 +4026,7 @@ export default function Pattrn() {
       setBirthday(null);
       setActiveThemeId("classic");
       setShowDeleteAccountConfirm(false);
-      setShowAccountModal(false);
+      setRadialMenuStack([]);
       setShowProfilePage(false);
       setShowGameMenu(false);
       setSyncStatus("");
@@ -4173,49 +4164,6 @@ export default function Pattrn() {
   }, [firebaseUser]);
 
   // Show a toast hint that login is available via the menu button
-  const showLoginHint = useCallback(() => {
-    setLoginHintToast(true);
-    setLoginHintDismissing(false);
-    if (loginHintTimer.current) clearTimeout(loginHintTimer.current);
-    loginHintTimer.current = setTimeout(() => {
-      setLoginHintDismissing(true);
-      setTimeout(() => { setLoginHintToast(false); setLoginHintDismissing(false); loginHintTimer.current = null; }, 400);
-    }, 5000);
-  }, []);
-
-  // Close the auto-opened login modal (shows hint toast)
-  const dismissAutoLogin = useCallback(() => {
-    setShowAccountModal(false);
-    setAutoLoginModal(false);
-    showLoginHint();
-  }, [showLoginHint]);
-
-  // "Don't ask me again" handler
-  const dismissAutoLoginPermanently = useCallback(() => {
-    try { localStorage.setItem(LOGIN_DISMISS_KEY, "1"); } catch { /* ignore */ }
-    setShowAccountModal(false);
-    setAutoLoginModal(false);
-    showLoginHint();
-  }, [showLoginHint]);
-
-  // Auto-open login modal on first visit if not logged in and not dismissed
-  const hasAutoOpenedLogin = useRef(false);
-  useEffect(() => {
-    if (!firebaseConfigured || hasAutoOpenedLogin.current) return;
-    hasAutoOpenedLogin.current = true;
-    // Wait for auth state to settle, then check
-    const timeout = setTimeout(() => {
-      if (firebaseUser) return; // already logged in
-      try {
-        if (localStorage.getItem(LOGIN_DISMISS_KEY)) return; // user dismissed permanently
-      } catch { /* ignore */ }
-      setAutoLoginModal(true);
-      setShowAccountModal(true);
-      setAccountError("");
-    }, 800);
-    return () => clearTimeout(timeout);
-  }, [firebaseConfigured, firebaseUser]);
-
   // Auto-sync to cloud when data changes and user is logged in
   const cloudSyncTimer = useRef(null);
   useEffect(() => {
@@ -4659,7 +4607,7 @@ export default function Pattrn() {
     playRoot.push({ id: "theme", icon: "palette", label: "Theme", sub: "theme" });
     if (!isCoop && gameState === "playing" && !isCascade && !isMosaic) {
       playRoot.push({ id: "coop-start", icon: "user-plus", label: "Play w/ Friends", sub: "coop-start", beforeSub: () => {
-        if (!firebaseUser) { coopPendingLoginRef.current = true; setShowAccountModal(true); return false; }
+        if (!firebaseUser) { coopPendingLoginRef.current = true; setRadialMenuStack(["root", "sign-in"]); setAccountTab("login"); setAccountError(""); return false; }
         setCoopSelectedFriends(new Set());
         return true;
       }});
@@ -4671,9 +4619,6 @@ export default function Pattrn() {
 
     // Menu view items
     const menuRoot = [];
-    if (firebaseConfigured && !firebaseUser) {
-      menuRoot.push({ id: "sign-in", icon: "login", label: "Sign In", action: () => { setShowAccountModal(true); } });
-    }
     if (firebaseConfigured && firebaseUser) {
       menuRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
       menuRoot.push({ id: "notifications", icon: "bell", label: "Notifications", action: () => { setShowNotifications(!showNotifications); } });
@@ -4742,6 +4687,7 @@ export default function Pattrn() {
     { id: "nav-gallery", icon: "gallery", label: "Mosaic", action: () => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); } },
     { id: "nav-coop", icon: "users", label: "Co-op", action: () => { setView("coop"); } },
     { id: "nav-profile", icon: "profile", label: "Profile", action: () => { setView("profile"); } },
+    ...(firebaseConfigured && !firebaseUser ? [{ id: "nav-sign-in", icon: "login", label: "Sign In", sub: "sign-in", beforeSub: () => { setAccountTab("login"); setAccountError(""); return true; } }] : []),
   ];
 
   // FAB icon — always the burger menu
@@ -4753,7 +4699,10 @@ export default function Pattrn() {
     const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
     const isSubMenu = currentMenuKey !== "root";
     const isCoopStartMenu = currentMenuKey === "coop-start";
-    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : isCoopStartMenu ? [] : (menuTree[currentMenuKey] || []);
+    const isMosaicSaveMenu = currentMenuKey === "mosaic-save";
+    const isSignInMenu = currentMenuKey === "sign-in";
+    const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu;
+    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
     const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-gallery", "custom-mosaic": "nav-gallery" };
@@ -4772,7 +4721,7 @@ export default function Pattrn() {
     const fabSize = 56;
     const hasPillButtons = pillButtons.length > 0;
     const closedWidth = hasPillButtons ? (pillButtons.length + 1) * fabSize : fabSize;
-    const panelWidth = isCoopStartMenu ? 280 : Math.max(200, closedWidth);
+    const panelWidth = isCustomPanel ? 300 : Math.max(200, closedWidth);
     const itemHeight = 44;
     const panelPad = 8;
     const dividerHeight = 13;
@@ -4786,7 +4735,7 @@ export default function Pattrn() {
     const showPassBanner = !!coopPassMode;
     const showPassPending = pendingPassOpen && !!coopPendingPassCell;
     const showPassIncoming = gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey;
-    const hasPassUI = isCoopStartMenu ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming);
+    const hasPassUI = isCustomPanel ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming);
     const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : 0;
     const passRowHeight = showPassPlayerPicker ? (passPlayerCount > 2 ? 88 : 56) : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
@@ -4819,7 +4768,35 @@ export default function Pattrn() {
       return h;
     })();
 
-    const contentHeight = isCoopStartMenu ? coopStartContentHeight : (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
+    // Mosaic save menu height — header + input + button
+    const mosaicSaveContentHeight = (() => {
+      if (!isMosaicSaveMenu) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 44 + 12; // input field + margin
+      h += 42; // save button
+      h += 12; // container bottom padding
+      return h;
+    })();
+
+    // Sign-in menu height — header + subtitle + tabs + google btn + divider + email + password + error + submit
+    const signInContentHeight = (() => {
+      if (!isSignInMenu) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 18 + 4; // header + margin
+      h += 14 + 12; // subtitle + margin
+      h += 30 + 12; // tab toggle + margin
+      h += 36 + 8; // google button + margin
+      h += 16 + 8; // "or" divider + margin
+      h += 36 + 6; // email input + margin
+      h += 36 + 8; // password input + margin
+      if (accountError) h += 32 + 8; // error display + margin
+      h += 36; // submit button
+      h += 12; // container bottom padding
+      return h;
+    })();
+
+    const contentHeight = isSignInMenu ? signInContentHeight : isMosaicSaveMenu ? mosaicSaveContentHeight : isCoopStartMenu ? coopStartContentHeight : (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
     const bottomOffset = bottomPx; // matches the bottom positioning
     const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
@@ -4935,7 +4912,200 @@ export default function Pattrn() {
 
           {/* Menu content — always rendered, animated via transitions */}
           <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}>
-            {isCoopStartMenu ? (() => {
+            {isSignInMenu ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+                      {accountTab === "login" ? "Sign In" : "Create Account"}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12, fontFamily: "'Inter', sans-serif" }}>
+                      {accountTab === "login"
+                        ? "Sync your progress across devices"
+                        : "Progress will be saved to your account"}
+                    </div>
+
+                    {/* Tab toggle */}
+                    <div style={{
+                      display: "flex", borderRadius: 6, overflow: "hidden",
+                      border: "1px solid rgba(255,255,255,0.08)", marginBottom: 12,
+                    }}>
+                      {["login", "signup"].map(tab => (
+                        <button
+                          key={tab}
+                          onClick={() => { setAccountTab(tab); setAccountError(""); }}
+                          style={{
+                            flex: 1, padding: "6px 0", fontSize: 10, fontWeight: 700,
+                            fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                            background: accountTab === tab ? C.accent : "transparent",
+                            color: accountTab === tab ? C.bg : C.textDim,
+                            border: "none", cursor: "pointer", textTransform: "uppercase",
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          {tab === "login" ? "Sign In" : "Sign Up"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Google sign in */}
+                    <button
+                      onClick={handleGoogleSignIn}
+                      disabled={accountLoading}
+                      style={{
+                        width: "100%", padding: "8px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                        background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: C.text,
+                        cursor: accountLoading ? "not-allowed" : "pointer",
+                        opacity: accountLoading ? 0.5 : 1, textTransform: "uppercase",
+                        transition: "all 0.15s", marginBottom: 8,
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      }}
+                    >
+                      <svg aria-hidden="true" width="12" height="12" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                      </svg>
+                      Google
+                    </button>
+
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 8, marginBottom: 8,
+                    }}>
+                      <div style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.08)" }} />
+                      <span style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1 }}>or</span>
+                      <div style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.08)" }} />
+                    </div>
+
+                    {/* Email / password form */}
+                    <form onSubmit={e => {
+                      e.preventDefault();
+                      if (accountTab === "login") handleSignIn(accountEmail, accountPassword);
+                      else handleSignUp(accountEmail, accountPassword);
+                    }}>
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        value={accountEmail}
+                        onChange={e => setAccountEmail(e.target.value)}
+                        autoComplete="email"
+                        style={{
+                          width: "100%", padding: "8px 12px", borderRadius: 8, fontSize: 13,
+                          fontFamily: "'Inter', sans-serif",
+                          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: C.text,
+                          outline: "none", marginBottom: 6, boxSizing: "border-box",
+                          transition: "border-color 0.15s",
+                        }}
+                        onFocus={e => { e.target.style.borderColor = C.accent; }}
+                        onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                      />
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        value={accountPassword}
+                        onChange={e => setAccountPassword(e.target.value)}
+                        autoComplete={accountTab === "login" ? "current-password" : "new-password"}
+                        style={{
+                          width: "100%", padding: "8px 12px", borderRadius: 8, fontSize: 13,
+                          fontFamily: "'Inter', sans-serif",
+                          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: C.text,
+                          outline: "none", marginBottom: 8, boxSizing: "border-box",
+                          transition: "border-color 0.15s",
+                        }}
+                        onFocus={e => { e.target.style.borderColor = C.accent; }}
+                        onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                      />
+
+                      {accountError && (
+                        <div style={{
+                          padding: "6px 10px", borderRadius: 6, marginBottom: 8,
+                          backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
+                          fontSize: 10, color: C.incorrect, textAlign: "center",
+                        }}>
+                          {accountError}
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={accountLoading || !accountEmail || !accountPassword}
+                        style={{
+                          width: "100%", padding: "8px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                          fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                          background: C.accent, color: C.bg, border: "none",
+                          cursor: (accountLoading || !accountEmail || !accountPassword) ? "not-allowed" : "pointer",
+                          opacity: (accountLoading || !accountEmail || !accountPassword) ? 0.5 : 1,
+                          textTransform: "uppercase", transition: "all 0.15s",
+                        }}
+                      >
+                        {accountLoading ? "Loading..." : accountTab === "login" ? "Sign In" : "Create Account"}
+                      </button>
+                    </form>
+                  </div>
+                </>
+              );
+            })() : isMosaicSaveMenu ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 8 }}>
+                      {creatorEditingId ? "Update Mosaic" : "Name Your Mosaic"}
+                    </div>
+                    <input
+                      type="text"
+                      defaultValue={creatorTitle}
+                      placeholder="Mosaic title..."
+                      maxLength={40}
+                      autoFocus
+                      id="save-drawer-title-input"
+                      style={{
+                        width: "100%", padding: "10px 14px", borderRadius: 8,
+                        backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+                        color: C.text, fontSize: 14, fontFamily: "'Inter', sans-serif",
+                        outline: "none", boxSizing: "border-box", letterSpacing: 0.3,
+                      }}
+                      onFocus={e => { e.target.style.borderColor = C.accent; }}
+                      onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                      onKeyDown={e => {
+                        if (e.key === "Enter") handleSaveMosaic(e.target.value);
+                      }}
+                    />
+                    <button
+                      onClick={() => {
+                        const input = document.getElementById("save-drawer-title-input");
+                        handleSaveMosaic(input ? input.value : "");
+                      }}
+                      disabled={mosaicLoading}
+                      style={{
+                        width: "100%", marginTop: 12, padding: "10px 0", borderRadius: 8,
+                        backgroundColor: C.accent, color: "#fff", border: "none",
+                        fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                        letterSpacing: 1, textTransform: "uppercase", cursor: mosaicLoading ? "default" : "pointer",
+                        opacity: mosaicLoading ? 0.5 : 1, transition: "opacity 0.15s",
+                      }}
+                    >
+                      {mosaicLoading ? "Saving..." : (creatorEditingId ? "Update" : "Save")}
+                    </button>
+                  </div>
+                </>
+              );
+            })() : isCoopStartMenu ? (() => {
               const isMosaicSession = isCoopFromMosaic || (isCoopMosaic && !!coopMosaicSessionId);
               const activeSessionId = isMosaicSession ? coopMosaicSessionId : coopSessionId;
               const hasSession = !!activeSessionId;
@@ -7855,297 +8025,8 @@ export default function Pattrn() {
     };
   }, [isAdmin, view, buildAdminActivityList]);
 
-  // --- Account modal accessibility hooks (must be before early returns) ---
-  const accountModalRef = useRef(null);
-
-  useEffect(() => {
-    if (!showAccountModal) return;
-    const el = accountModalRef.current;
-    if (!el) return;
-    const prev = document.activeElement;
-    // Focus the first focusable element inside the modal
-    const focusable = el.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-    if (focusable.length) focusable[0].focus();
-
-    const trap = (e) => {
-      if (e.key !== "Tab" || !focusable.length) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (e.shiftKey) {
-        if (document.activeElement === first) { e.preventDefault(); last.focus(); }
-      } else {
-        if (document.activeElement === last) { e.preventDefault(); first.focus(); }
-      }
-    };
-    el.addEventListener("keydown", trap);
-    return () => {
-      el.removeEventListener("keydown", trap);
-      if (prev && prev.focus) prev.focus();
-    };
-  }, [showAccountModal]);
-
-  const accountModalDismiss = useCallback(() => {
-    if (autoLoginModal) dismissAutoLogin();
-    else setShowAccountModal(false);
-  }, [autoLoginModal]);
-
   // Shared modal elements — computed before any view early-returns so they're available everywhere.
-  let accountModalEl = null;
   let usernameModalEl = null;
-
-  // --- Account modal (shared across views) ---
-  accountModalEl = showAccountModal && firebaseConfigured && (
-    <DraggableDrawer isOpen={true} onClose={accountModalDismiss}>
-      <div ref={accountModalRef} style={{ padding: "0 24px 24px" }}>
-        {firebaseUser ? (
-          // Signed in: redirect to profile page
-          <>
-            <div style={{ textAlign: "center", marginBottom: 20 }}>
-              {/* Profile picture */}
-              <div style={{
-                width: 56, height: 56, borderRadius: "50%", margin: "0 auto 12px",
-                backgroundColor: C.surface, display: "flex", alignItems: "center", justifyContent: "center",
-                border: `2px solid ${C.border}`, overflow: "hidden",
-              }}>
-                {profilePicture ? (
-                  <img src={profilePicture} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                ) : (
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-                    <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
-                    <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                  </svg>
-                )}
-              </div>
-              <h3 id="account-modal-title" style={{
-                fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
-              }}>
-                {username || "Signed In"}
-              </h3>
-              <p style={{ color: C.textDim, fontSize: 12, margin: 0, wordBreak: "break-all" }}>
-                {firebaseUser.email}
-              </p>
-            </div>
-
-            <div style={{
-              padding: "12px 16px", borderRadius: 10, backgroundColor: C.surface,
-              border: `1px solid ${C.border}`, marginBottom: 12, textAlign: "center",
-            }}>
-              <div style={{ fontSize: 11, color: C.textDim, marginBottom: 4 }}>Cloud Sync</div>
-              <div style={{ fontSize: 13, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.correct }}>
-                {syncStatus === "syncing" ? "Syncing..." : syncStatus === "error" ? "Sync error" : "Active"}
-              </div>
-            </div>
-
-            <button
-              onClick={() => { setShowAccountModal(false); setShowProfilePage(true); }}
-              style={{
-                width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-                background: C.accent, color: C.bg, border: "none", cursor: "pointer",
-                textTransform: "uppercase", transition: "all 0.15s", marginBottom: 8,
-              }}
-            >
-              Edit Profile
-            </button>
-
-            <button
-              onClick={handleSignOut}
-              style={{
-                width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                textTransform: "uppercase", transition: "all 0.15s",
-              }}
-            >
-              Sign out
-            </button>
-          </>
-        ) : (
-          // Sign in / Sign up view
-          <>
-            <div style={{ textAlign: "center", marginBottom: 20 }}>
-              <div style={{
-                width: 48, height: 48, borderRadius: "50%", margin: "0 auto 12px",
-                backgroundColor: "#60A5FA22", display: "flex", alignItems: "center", justifyContent: "center",
-                border: "2px solid #60A5FA44",
-              }}>
-                <svg aria-hidden="true" width="24" height="24" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="8" r="4" stroke="#60A5FA" strokeWidth="2" fill="none"/>
-                  <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" stroke="#60A5FA" strokeWidth="2" fill="none" strokeLinecap="round"/>
-                </svg>
-              </div>
-              <h3 id="account-modal-title" style={{
-                fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.accent, margin: "0 0 6px",
-              }}>
-                {accountTab === "login" ? "Sign In" : "Create Account"}
-              </h3>
-              <p style={{ color: C.textDim, fontSize: 11, margin: 0, lineHeight: 1.5 }}>
-                {accountTab === "login"
-                  ? "Sign in to sync your progress across devices"
-                  : "Your current progress will be saved to your new account"}
-              </p>
-            </div>
-
-            {/* Tab toggle */}
-            <div role="tablist" aria-label="Account action" style={{
-              display: "flex", borderRadius: 8, overflow: "hidden",
-              border: `1px solid ${C.border}`, marginBottom: 16,
-            }}>
-              {["login", "signup"].map(tab => (
-                <button
-                  key={tab}
-                  role="tab"
-                  aria-selected={accountTab === tab}
-                  onClick={() => { setAccountTab(tab); setAccountError(""); }}
-                  style={{
-                    flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 700,
-                    fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                    background: accountTab === tab ? C.accent : "transparent",
-                    color: accountTab === tab ? C.bg : C.textDim,
-                    border: "none", cursor: "pointer", textTransform: "uppercase",
-                    transition: "all 0.15s",
-                  }}
-                >
-                  {tab === "login" ? "Sign In" : "Sign Up"}
-                </button>
-              ))}
-            </div>
-
-            {/* Google sign in */}
-            <button
-              onClick={handleGoogleSignIn}
-              disabled={accountLoading}
-              style={{
-                width: "100%", padding: "11px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                background: C.surface, border: `1px solid ${C.border}`, color: C.text,
-                cursor: accountLoading ? "not-allowed" : "pointer",
-                opacity: accountLoading ? 0.5 : 1, textTransform: "uppercase",
-                transition: "all 0.15s", marginBottom: 12,
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
-              }}
-            >
-              <svg aria-hidden="true" width="14" height="14" viewBox="0 0 48 48">
-                <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
-                <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
-                <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
-                <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
-              </svg>
-              Continue with Google
-            </button>
-
-            <div style={{
-              display: "flex", alignItems: "center", gap: 12, marginBottom: 12,
-            }}>
-              <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
-              <span style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1 }}>or</span>
-              <div style={{ flex: 1, height: 1, backgroundColor: C.border }} />
-            </div>
-
-            {/* Email / password form */}
-            <form onSubmit={e => {
-              e.preventDefault();
-              if (accountTab === "login") handleSignIn(accountEmail, accountPassword);
-              else handleSignUp(accountEmail, accountPassword);
-            }}>
-              <input
-                type="email"
-                placeholder="Email"
-                aria-label="Email address"
-                value={accountEmail}
-                onChange={e => setAccountEmail(e.target.value)}
-                autoComplete="email"
-                style={{
-                  width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
-                  fontFamily: "'Inter', sans-serif",
-                  background: C.surface, border: `1px solid ${C.border}`, color: C.text,
-                  outline: "none", marginBottom: 8, boxSizing: "border-box",
-                  transition: "border-color 0.15s",
-                }}
-                onFocus={e => e.target.style.borderColor = C.accent}
-                onBlur={e => e.target.style.borderColor = C.border}
-              />
-              <input
-                type="password"
-                placeholder="Password"
-                aria-label="Password"
-                aria-describedby={accountError ? "account-modal-error" : undefined}
-                value={accountPassword}
-                onChange={e => setAccountPassword(e.target.value)}
-                autoComplete={accountTab === "login" ? "current-password" : "new-password"}
-                style={{
-                  width: "100%", padding: "11px 14px", borderRadius: 10, fontSize: 16,
-                  fontFamily: "'Inter', sans-serif",
-                  background: C.surface, border: `1px solid ${C.border}`, color: C.text,
-                  outline: "none", marginBottom: 12, boxSizing: "border-box",
-                  transition: "border-color 0.15s",
-                }}
-                onFocus={e => e.target.style.borderColor = C.accent}
-                onBlur={e => e.target.style.borderColor = C.border}
-              />
-
-              <div id="account-modal-error" role="alert" aria-live="assertive" aria-atomic="true">
-                {accountError && (
-                  <div style={{
-                    padding: "8px 12px", borderRadius: 8, marginBottom: 12,
-                    backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
-                    fontSize: 11, color: C.incorrect, textAlign: "center",
-                  }}>
-                    {accountError}
-                  </div>
-                )}
-              </div>
-
-              <button
-                type="submit"
-                disabled={accountLoading || !accountEmail || !accountPassword}
-                aria-busy={accountLoading}
-                style={{
-                  width: "100%", padding: "12px 0", borderRadius: 10, fontSize: 12, fontWeight: 700,
-                  fontFamily: "'Inter', sans-serif", letterSpacing: 2,
-                  background: C.accent, color: C.bg, border: "none",
-                  cursor: (accountLoading || !accountEmail || !accountPassword) ? "not-allowed" : "pointer",
-                  opacity: (accountLoading || !accountEmail || !accountPassword) ? 0.5 : 1,
-                  textTransform: "uppercase", transition: "all 0.15s",
-                }}
-              >
-                {accountLoading ? "Loading\u2026" : accountTab === "login" ? "Sign In" : "Create Account"}
-              </button>
-            </form>
-          </>
-        )}
-
-        {/* Don't ask me again (only shown when modal was auto-opened and user is not signed in) */}
-        {autoLoginModal && !firebaseUser && (
-          <button
-            onClick={dismissAutoLoginPermanently}
-            style={{
-              width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 600,
-              fontFamily: "'Inter', sans-serif", letterSpacing: 0.3,
-              background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-              transition: "all 0.15s", marginTop: 12,
-            }}
-          >
-            Don't ask me again
-          </button>
-        )}
-
-        {/* Close button */}
-        <button
-          onClick={() => autoLoginModal ? dismissAutoLogin() : setShowAccountModal(false)}
-          aria-label="Close account dialog"
-          style={{
-            width: "100%", padding: "10px 0", borderRadius: 10, fontSize: 11, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-            background: "none", border: "none", color: C.textDim, cursor: "pointer",
-            textTransform: "uppercase", transition: "all 0.15s", marginTop: autoLoginModal && !firebaseUser ? 6 : 12,
-          }}
-        >
-          Close
-        </button>
-      </div>
-    </DraggableDrawer>
-  );
 
   // --- Username modal (non-dismissible when logged in without username, dismissible when changing) ---
   usernameModalEl = showUsernameModal && firebaseUser && firebaseConfigured && (
@@ -9235,7 +9116,6 @@ export default function Pattrn() {
   const globalModalsEl = (
     <>
       {themePickerEl}
-      {accountModalEl}
       {usernameModalEl}
       {profilePageEl}
       {friendsModalEl}
@@ -9283,7 +9163,7 @@ export default function Pattrn() {
               }}>
                 Sign in to join this session
               </div>
-              <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
+              <button onClick={() => { setRadialMenuStack(["root", "sign-in"]); setAccountTab("login"); setAccountError(""); }}
                 style={{
                   marginBottom: 8, background: C.coop, border: "none", borderRadius: 8,
                   padding: "10px 24px", color: "#fff", cursor: "pointer",
@@ -9832,7 +9712,8 @@ export default function Pattrn() {
       <div style={{
         position: "fixed",
         bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
-        right: 20,
+        left: "50%",
+        transform: "translateX(-50%)",
         borderRadius: 9999,
         background: activeTheme.gridBg || C.surface,
         backdropFilter: "blur(28px) saturate(200%)",
@@ -9894,52 +9775,6 @@ export default function Pattrn() {
         { id: "clear", icon: "refresh", color: "#fff", onClick: () => resetCreator() },
         { id: "save", icon: "upload", color: C.accent, onClick: handleSaveClick, disabled: mosaicLoading },
       ])}
-
-      {/* Save mosaic drawer — name prompt */}
-      <DraggableDrawer isOpen={showSaveDrawer} onClose={() => setShowSaveDrawer(false)} maxHeight="50vh">
-        <div style={{ padding: "8px 20px 24px" }}>
-          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, letterSpacing: 1, marginBottom: 16 }}>
-            {creatorEditingId ? "Update Mosaic" : "Name Your Mosaic"}
-          </div>
-          <input
-            type="text"
-            defaultValue={creatorTitle}
-            placeholder="Mosaic title..."
-            maxLength={40}
-            autoFocus
-            id="save-drawer-title-input"
-            style={{
-              width: "100%", padding: "12px 14px", borderRadius: 10,
-              backgroundColor: C.surface, border: `1px solid ${C.border}`,
-              color: C.text, fontSize: 16, fontFamily: "'Inter', sans-serif",
-              outline: "none", boxSizing: "border-box", letterSpacing: 0.5,
-            }}
-            onFocus={e => { e.target.style.borderColor = C.accent; }}
-            onBlur={e => { e.target.style.borderColor = C.border; }}
-            onKeyDown={e => {
-              if (e.key === "Enter") {
-                handleSaveMosaic(e.target.value);
-              }
-            }}
-          />
-          <button
-            onClick={() => {
-              const input = document.getElementById("save-drawer-title-input");
-              handleSaveMosaic(input ? input.value : "");
-            }}
-            disabled={mosaicLoading}
-            style={{
-              width: "100%", marginTop: 12, padding: "12px 0", borderRadius: 10,
-              backgroundColor: C.accent, color: "#fff", border: "none",
-              fontSize: 14, fontWeight: 700, fontFamily: "'Inter', sans-serif",
-              letterSpacing: 1, textTransform: "uppercase", cursor: mosaicLoading ? "default" : "pointer",
-              opacity: mosaicLoading ? 0.5 : 1, transition: "opacity 0.15s",
-            }}
-          >
-            {mosaicLoading ? "Saving..." : (creatorEditingId ? "Update" : "Save")}
-          </button>
-        </div>
-      </DraggableDrawer>
 
       {globalModalsEl}
       </div>
@@ -10119,7 +9954,7 @@ export default function Pattrn() {
           !firebaseUser ? (
             <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
               Sign in to manage friends<br/>
-              <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
+              <button onClick={() => { setRadialMenuStack(["root", "sign-in"]); setAccountTab("login"); setAccountError(""); }}
                 style={{ marginTop: 8, padding: "8px 20px", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", background: C.accent, color: C.bg, border: "none", cursor: "pointer" }}
               >Sign In</button>
             </div>
@@ -10218,7 +10053,7 @@ export default function Pattrn() {
         ) : !firebaseUser && mosaicGalleryTab !== "public" ? (
           <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, lineHeight: 1.8 }}>
             Sign in to see your mosaics<br/>
-            <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
+            <button onClick={() => { setRadialMenuStack(["root", "sign-in"]); setAccountTab("login"); setAccountError(""); }}
               style={{ marginTop: 8, padding: "8px 20px", borderRadius: 8, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", background: C.accent, color: C.bg, border: "none", cursor: "pointer" }}
             >Sign In</button>
           </div>
@@ -11103,7 +10938,7 @@ export default function Pattrn() {
               <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>
                 Add friends and solve puzzles together in real-time
               </div>
-              <button onClick={() => { setShowAccountModal(true); setAutoLoginModal(false); setAccountError(""); }}
+              <button onClick={() => { setRadialMenuStack(["root", "sign-in"]); setAccountTab("login"); setAccountError(""); }}
                 style={{
                   padding: "10px 24px", borderRadius: 10, fontSize: 12, fontWeight: 700,
                   fontFamily: "'Inter', sans-serif", letterSpacing: 1,
@@ -11565,7 +11400,7 @@ export default function Pattrn() {
                 if (firebaseUser) {
                   setShowProfilePage(true);
                 } else {
-                  setShowAccountModal(true); setAutoLoginModal(false); setAccountError("");
+                  setRadialMenuStack(["root", "sign-in"]); setAccountTab("login"); setAccountError("");
                 }
               }} style={{
                 width: "100%", padding: "14px 16px", borderRadius: 12,
@@ -12838,51 +12673,6 @@ export default function Pattrn() {
               onMouseLeave={e => { e.currentTarget.style.opacity = "1"; }}
             >
               Use it
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Login hint toast */}
-      {loginHintToast && (
-        <div style={{
-          position: "fixed", bottom: "calc(88px + env(safe-area-inset-bottom, 0px))", left: "50%",
-          transform: "translateX(-50%)", zIndex: 1200,
-          maxWidth: "calc(100vw - 32px)", boxSizing: "border-box",
-          animation: loginHintDismissing
-            ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
-            : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
-          pointerEvents: "auto",
-        }}>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 10,
-            padding: "12px 16px", borderRadius: 14,
-            backgroundColor: C.surface, border: `1.5px solid ${C.border}`,
-            boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-          }}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
-              <circle cx="12" cy="12" r="10" stroke={C.accent} strokeWidth="2" fill="none"/>
-              <path d="M12 7v6M12 16v1" stroke={C.accent} strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-            <span style={{
-              fontFamily: "'Inter', sans-serif", fontSize: 12, color: C.text, lineHeight: 1.4,
-            }}>
-              Sign in from the <strong style={{ color: C.accent }}>Profile</strong> tab to sync progress
-            </span>
-            <button
-              onClick={() => {
-                setLoginHintDismissing(true);
-                setTimeout(() => { setLoginHintToast(false); setLoginHintDismissing(false); }, 350);
-                if (loginHintTimer.current) { clearTimeout(loginHintTimer.current); loginHintTimer.current = null; }
-              }}
-              style={{
-                background: "none", border: "none", color: C.textDim, cursor: "pointer",
-                padding: 4, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center",
-              }}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
             </button>
           </div>
         </div>
