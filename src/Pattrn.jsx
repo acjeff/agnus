@@ -13131,12 +13131,6 @@ export default function Pattrn() {
           </div>
         );
       })()}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {globalModalsEl}
       </div>
