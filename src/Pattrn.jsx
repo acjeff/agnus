@@ -3040,6 +3040,9 @@ export default function Pattrn() {
   const coopGuestJoinedRef = useRef(false); // tracks whether guest has actually joined (prevents false kick detection)
   const [coopCompletedBreakdown, setCoopCompletedBreakdown] = useState(null); // session object to show completed breakdown modal
 
+  // --- Local mosaic navigate modal ---
+  const [showCoopMosaicNavigate, setShowCoopMosaicNavigate] = useState(false);
+
   // --- Global co-op invite toast (shown on any view) ---
   const [coopInviteToast, setCoopInviteToast] = useState(null); // notification object for the toast
   const coopInviteToastTimer = useRef(null);
@@ -4745,9 +4748,6 @@ export default function Pattrn() {
       "sign-in": [],
       "mosaic-save": [],
       "mosaic-preview": [],
-      "mosaic-leave-confirm": [],
-      "coop-leave-confirm": [],
-      "coop-mosaic-navigate": [],
     };
 
     // Build root menu with global Profile item
@@ -4845,13 +4845,10 @@ export default function Pattrn() {
     const isClearConfirm = currentMenuKey === "clear-confirm";
     const isThemeList = currentMenuKey === "theme-list";
     const isSyncChoice = currentMenuKey === "sync-choice";
-    const isMosaicLeaveConfirm = currentMenuKey === "mosaic-leave-confirm";
-    const isCoopLeaveConfirm = currentMenuKey === "coop-leave-confirm";
-    const isCoopMosaicNavigate = currentMenuKey === "coop-mosaic-navigate";
     const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu || isMosaicPreviewMenu ||
                           isAchievementsView || isFriendsView || isShareStats || isProfileView ||
                           isUsernameEdit || isBirthdayEdit || isDeleteAccount || isClearConfirm ||
-                          isThemeList || isSyncChoice || isMosaicLeaveConfirm || isCoopLeaveConfirm || isCoopMosaicNavigate;
+                          isThemeList || isSyncChoice;
     const contextualItems = isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
@@ -5080,41 +5077,6 @@ export default function Pattrn() {
       return h;
     })();
 
-    // Mosaic leave confirm height — header + message + buttons
-    const mosaicLeaveConfirmContentHeight = (() => {
-      if (!isMosaicLeaveConfirm) return 0;
-      let h = panelPad + fabSize; // padding + bottom bar
-      h += 20 + 8; // header + margin
-      h += 60 + 20; // message + margin
-      h += 42 + 8; // leave button + margin
-      h += 42; // stay button
-      h += 12; // bottom padding
-      return h;
-    })();
-
-    // Coop leave confirm height — header + message + buttons
-    const coopLeaveConfirmContentHeight = (() => {
-      if (!isCoopLeaveConfirm) return 0;
-      let h = panelPad + fabSize; // padding + bottom bar
-      h += 20 + 8; // header + margin
-      h += 60 + 20; // message + margin
-      h += 42 + 8; // leave button + margin
-      h += 42; // stay button
-      h += 12; // bottom padding
-      return h;
-    })();
-
-    // Coop mosaic navigate height — header + player list
-    const coopMosaicNavigateContentHeight = (() => {
-      if (!isCoopMosaicNavigate) return 0;
-      const playerCount = Object.keys(coopMosaicPlayers).length - 1; // exclude self
-      let h = panelPad + fabSize; // padding + bottom bar
-      h += 20 + 8; // header + margin
-      h += Math.min(playerCount, 5) * 46; // player items (cap at 5, rest scrolls)
-      h += 12; // bottom padding
-      return h;
-    })();
-
     const contentHeight = isAchievementsView ? achievementsContentHeight :
                           isFriendsView ? friendsContentHeight :
                           isShareStats ? shareStatsContentHeight :
@@ -5125,9 +5087,6 @@ export default function Pattrn() {
                           isClearConfirm ? clearConfirmContentHeight :
                           isThemeList ? themeListContentHeight :
                           isSyncChoice ? syncChoiceContentHeight :
-                          isMosaicLeaveConfirm ? mosaicLeaveConfirmContentHeight :
-                          isCoopLeaveConfirm ? coopLeaveConfirmContentHeight :
-                          isCoopMosaicNavigate ? coopMosaicNavigateContentHeight :
                           isMosaicPreviewMenu ? mosaicPreviewContentHeight :
                           isSignInMenu ? signInContentHeight :
                           isMosaicSaveMenu ? mosaicSaveContentHeight :
@@ -6060,90 +6019,6 @@ export default function Pattrn() {
                         </button>
                       </>
                     )}
-                  </div>
-                </>
-              );
-            })() : isMosaicLeaveConfirm ? (() => {
-              return (
-                <>
-                  <div style={{
-                    padding: "0 16px 12px",
-                    opacity: isOpen ? 1 : 0,
-                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
-                    transition: isOpen
-                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
-                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
-                  }}>
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>
-                      {coopMosaicRole === "host" ? "Go to Menu?" : "Leave Co-op?"}
-                    </div>
-                    <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
-                      {coopMosaicRole === "host" ? "Your session will stay active. You can rejoin anytime from the Active Co-op Sessions panel on the main menu." : "You will leave this session and your partner will need to invite you again to rejoin."}
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => { setRadialMenuStack([]); leaveCoopMosaicSession(); loadActiveCoopSessions(); setView("menu"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; }} style={{ flex: 1, backgroundColor: coopMosaicRole === "host" ? C.coop : "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
-                        {coopMosaicRole === "host" ? "Go to Menu" : "Leave"}
-                      </button>
-                      <button onClick={() => setRadialMenuStack(prev => prev.slice(0, -1))} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
-                    </div>
-                  </div>
-                </>
-              );
-            })() : isCoopLeaveConfirm ? (() => {
-              return (
-                <>
-                  <div style={{
-                    padding: "0 16px 12px",
-                    opacity: isOpen ? 1 : 0,
-                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
-                    transition: isOpen
-                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
-                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
-                  }}>
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 8 }}>
-                      {coopRole === "host" ? "End Session?" : "Leave Co-op?"}
-                    </div>
-                    <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20, lineHeight: 1.5 }}>
-                      {coopRole === "host" ? "Ending the session will disconnect all players." : "You will leave this session and your partner will need to invite you again to rejoin."}
-                    </div>
-                    <div style={{ display: "flex", gap: 8 }}>
-                      <button onClick={() => { setRadialMenuStack([]); leaveCoopSession(); }} style={{ flex: 1, backgroundColor: "#f87171", color: "#fff", border: "none", padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>
-                        Leave
-                      </button>
-                      <button onClick={() => setRadialMenuStack(prev => prev.slice(0, -1))} style={{ flex: 1, backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`, padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase" }}>Stay</button>
-                    </div>
-                  </div>
-                </>
-              );
-            })() : isCoopMosaicNavigate ? (() => {
-              return (
-                <>
-                  <div style={{
-                    padding: "0 16px 12px",
-                    opacity: isOpen ? 1 : 0,
-                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
-                    transition: isOpen
-                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
-                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
-                  }}>
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>Navigate to Tile</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                      {Object.entries(coopMosaicPlayers).filter(([uid]) => uid !== firebaseUser?.uid).map(([uid, player]) => (
-                        <button key={uid} onClick={() => {
-                          if (player.currentTileIndex != null) {
-                            setCustomMosaicCurrentTileIndex(player.currentTileIndex);
-                          }
-                          setRadialMenuStack([]);
-                        }} style={{
-                          display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 10,
-                          backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                          cursor: "pointer", transition: "all 0.15s",
-                        }}>
-                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text }}>{player.username || "Player"}</span>
-                          <span style={{ fontSize: 11, color: C.textDim }}>Tile {player.currentTileIndex != null ? player.currentTileIndex + 1 : "?"}</span>
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </>
               );
@@ -8978,6 +8853,40 @@ export default function Pattrn() {
 
   const coopFriendPickerEl = null; // Moved to Liquid Glass menu
 
+  // --- Local mosaic navigate modal ---
+  const coopMosaicNavigateEl = showCoopMosaicNavigate && (
+    <div onClick={() => setShowCoopMosaicNavigate(false)} style={{
+      position: "fixed", inset: 0, zIndex: 1200,
+      display: "flex", alignItems: "center", justifyContent: "center",
+      padding: "20px",
+      pointerEvents: "all",
+    }}>
+      <div onClick={(e) => e.stopPropagation()} style={{
+        backgroundColor: C.surface, borderRadius: 16, padding: "20px", maxWidth: 320, width: "100%",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.4)", border: `1px solid ${C.border}`,
+      }}>
+        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>Navigate to Tile</div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {Object.entries(coopMosaicPlayers).filter(([uid]) => uid !== firebaseUser?.uid).map(([uid, player]) => (
+            <button key={uid} onClick={() => {
+              if (player.currentTileIndex != null) {
+                setCustomMosaicCurrentTileIndex(player.currentTileIndex);
+              }
+              setShowCoopMosaicNavigate(false);
+            }} style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 12px", borderRadius: 10,
+              backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
+              cursor: "pointer", transition: "all 0.15s",
+            }}>
+              <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text }}>{player.username || "Player"}</span>
+              <span style={{ fontSize: 11, color: C.textDim }}>Tile {player.currentTileIndex != null ? player.currentTileIndex + 1 : "?"}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+
   // --- Global modals element (included in every return) ---
   const globalModalsEl = (
     <>
@@ -8985,6 +8894,7 @@ export default function Pattrn() {
       {coopFriendPickerEl}
       {coopMosaicInviteEl}
       {coopInviteToastEl}
+      {coopMosaicNavigateEl}
     </>
   );
 
@@ -9422,7 +9332,7 @@ export default function Pattrn() {
         })()}
 
         {renderBackButton(() => {
-          if (isCoopMosaic) { setRadialMenuStack(["root", "mosaic-leave-confirm"]); return; }
+          if (isCoopMosaic) { leaveCoopMosaicSession(); loadActiveCoopSessions(); setView("menu"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; return; }
           const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
         })}
         {renderContextButton("custom-mosaic")}
@@ -12545,7 +12455,7 @@ export default function Pattrn() {
 
   // Pill action buttons for the bottom glass bar
   const playBackAction = () => {
-    if (isCoop) { setRadialMenuStack(["root", "coop-leave-confirm"]); return; }
+    if (isCoop) { leaveCoopSession(); return; }
     if (difficulty === "cascade") {
       const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
       const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
@@ -13015,7 +12925,7 @@ export default function Pattrn() {
           <div
             onClick={() => {
               const anyOnOtherTile = Object.values(coopMosaicPlayers).some(p => p.currentTile != null && p.currentTile >= 0 && p.currentTile !== currentPuzzle);
-              if (anyOnOtherTile) setRadialMenuStack(["root", "coop-mosaic-navigate"]);
+              if (anyOnOtherTile) setShowCoopMosaicNavigate(true);
             }}
             style={{
               position: "absolute", top: 8, left: 12, zIndex: 10,
