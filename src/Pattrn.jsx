@@ -3881,15 +3881,22 @@ export default function Pattrn() {
 
   // After login, check for cloud vs local conflict and show choice prompt if needed
   const handlePostLoginSync = useCallback(async (uid) => {
+    console.log("[UI] handlePostLoginSync - loading cloud data for uid:", uid);
     const cloudData = await loadCloudData(uid);
+    console.log("[UI] handlePostLoginSync - cloud data loaded, gathering local data...");
     const localData = gatherLocalData();
+    console.log("[UI] handlePostLoginSync - generating summaries...");
     const localSummary = summariseGameData(localData);
     const cloudSummary = summariseGameData(cloudData);
+    console.log("[UI] handlePostLoginSync - local summary:", localSummary);
+    console.log("[UI] handlePostLoginSync - cloud summary:", cloudSummary);
     const hasLocal = localSummary.totalSolved > 0 || localSummary.achievements > 0;
     const hasCloud = cloudData && (cloudSummary.totalSolved > 0 || cloudSummary.achievements > 0);
+    console.log("[UI] handlePostLoginSync - hasLocal:", hasLocal, "hasCloud:", hasCloud);
 
     if (hasLocal && hasCloud) {
       // Both sides have progress — ask the user what to do
+      console.log("[UI] handlePostLoginSync - both have data, showing sync choice");
       setSyncChoiceData({ uid, localData, cloudData, localSummary, cloudSummary });
       setRadialMenuStack(["root", "sync-choice"]);
       setRadialMenuStack([]);
@@ -3899,14 +3906,19 @@ export default function Pattrn() {
     }
 
     // Only one side has data (or neither): use the merge path which handles it correctly
+    console.log("[UI] handlePostLoginSync - merging data...");
     const merged = mergeGameData(localData, cloudData);
+    console.log("[UI] handlePostLoginSync - applying merged data...");
     applyMergedData(merged);
+    console.log("[UI] handlePostLoginSync - saving to cloud...");
     await saveCloudData(uid, merged);
+    console.log("[UI] handlePostLoginSync - closing menu...");
     setRadialMenuStack([]);
     setAccountEmail("");
     setAccountPassword("");
     setSyncStatus("synced");
     setTimeout(() => setSyncStatus(""), 2000);
+    console.log("[UI] handlePostLoginSync - complete!");
   }, [gatherLocalData, applyMergedData]);
 
   // Handle sign in: pull cloud data, check for conflict

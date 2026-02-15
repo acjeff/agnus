@@ -44,10 +44,24 @@ let app = null;
 let auth = null;
 let db = null;
 let googleProvider = null;
+let capacitorAuthToken = null; // Store token for Capacitor
+let capacitorUser = null; // Store user for Capacitor
 
 if (hasConfig) {
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
+
+  // Configure auth for Capacitor environment
+  if (typeof window !== 'undefined' && window.Capacitor) {
+    console.log("[Firebase] Configuring for Capacitor environment");
+    // Import and set persistence
+    import('firebase/auth').then(({ browserLocalPersistence, setPersistence }) => {
+      setPersistence(auth, browserLocalPersistence).catch(err => {
+        console.error("[Firebase] Failed to set persistence:", err);
+      });
+    });
+  }
+
   db = getDatabase(app);
   googleProvider = new GoogleAuthProvider();
 }
@@ -60,9 +74,26 @@ export function getFirebaseAuth() {
   return auth;
 }
 
+let authStateListeners = [];
+
 export function subscribeToAuthChanges(callback) {
   if (!auth) return () => {};
-  return onAuthStateChanged(auth, callback);
+
+  // Store listener for manual notifications in Capacitor
+  authStateListeners.push(callback);
+
+  // Also subscribe to SDK changes (for web)
+  const unsubscribe = onAuthStateChanged(auth, callback);
+
+  // If we have a capacitor user, notify immediately
+  if (capacitorUser) {
+    callback(capacitorUser);
+  }
+
+  return () => {
+    authStateListeners = authStateListeners.filter(l => l !== callback);
+    unsubscribe();
+  };
 }
 
 export async function signUpWithEmail(email, password) {
@@ -73,17 +104,94 @@ export async function signUpWithEmail(email, password) {
 
 export async function signInWithEmail(email, password) {
   console.log("[Firebase Auth] Starting email/password sign-in");
+  console.log("[Firebase Auth] Auth object exists:", !!auth);
+  console.log("[Firebase Auth] Auth app name:", auth?.app?.name);
+  console.log("[Firebase Auth] Firebase config:", {
+    apiKey: firebaseConfig.apiKey?.substring(0, 10) + "...",
+    authDomain: firebaseConfig.authDomain,
+    projectId: firebaseConfig.projectId
+  });
+
   if (!auth) {
     console.error("[Firebase Auth] Auth not initialized");
     throw new Error("Firebase not configured");
   }
-  console.log("[Firebase Auth] Calling signInWithEmailAndPassword...");
+
+  // Check if running in Capacitor - use REST API to avoid iframe issues
+  const isCapacitor = typeof window !== 'undefined' && window.Capacitor;
+
+  if (isCapacitor) {
+    console.log("[Firebase Auth] Using REST API for Capacitor...");
+    try {
+      const response = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${firebaseConfig.apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email,
+            password,
+            returnSecureToken: true
+          })
+        }
+      );
+
+      console.log("[Firebase Auth] REST API response status:", response.status);
+      const data = await response.json();
+
+      if (!response.ok) {
+        console.error("[Firebase Auth] REST API error:", data);
+        const errorCode = data.error?.message || 'UNKNOWN_ERROR';
+        throw { code: `auth/${errorCode.toLowerCase().replace(/_/g, '-')}`, message: data.error?.message };
+      }
+
+      console.log("[Firebase Auth] REST sign-in successful!");
+      console.log("[Firebase Auth] User ID:", data.localId);
+
+      // Store token and user for Capacitor
+      capacitorAuthToken = data.idToken;
+
+      // Create a minimal user object that matches Firebase user structure
+      const user = {
+        uid: data.localId,
+        email: data.email,
+        emailVerified: data.emailVerified || false,
+        displayName: data.displayName || null,
+        photoURL: data.photoUrl || null,
+        getIdToken: async () => capacitorAuthToken,
+        getIdTokenResult: async () => ({ token: capacitorAuthToken }),
+        reload: async () => {},
+        toJSON: () => ({ uid: data.localId, email: data.email })
+      };
+
+      capacitorUser = user;
+      console.log("[Firebase Auth] Created user object for:", user.email);
+      console.log("[Firebase Auth] Stored auth token");
+
+      // Notify all auth state listeners
+      console.log("[Firebase Auth] Notifying", authStateListeners.length, "listeners");
+      authStateListeners.forEach(listener => {
+        try {
+          listener(user);
+        } catch (err) {
+          console.error("[Firebase Auth] Error notifying listener:", err);
+        }
+      });
+
+      return user;
+    } catch (error) {
+      console.error("[Firebase Auth] Capacitor sign-in failed:", error);
+      throw error;
+    }
+  }
+
+  console.log("[Firebase Auth] Using standard SDK flow...");
   try {
     const cred = await signInWithEmailAndPassword(auth, email, password);
     console.log("[Firebase Auth] Sign-in successful, user:", cred.user.uid);
     return cred.user;
   } catch (error) {
-    console.error("[Firebase Auth] Sign-in failed:", error.code, error.message);
+    console.error("[Firebase Auth] Sign-in failed:", error.code, error.message, error);
     throw error;
   }
 }
@@ -210,8 +318,50 @@ function userRef(uid) {
 }
 
 export async function loadCloudData(uid) {
-  if (!db) return null;
+  console.log("[Firebase DB] Loading cloud data for uid:", uid);
+  if (!db) {
+    console.log("[Firebase DB] DB not configured");
+    return null;
+  }
+
+  // Check if running in Capacitor - use REST API
+  const isCapacitor = typeof window !== 'undefined' && window.Capacitor;
+
+  if (isCapacitor) {
+    console.log("[Firebase DB] Using REST API for Capacitor...");
+    try {
+      // Use the stored Capacitor auth token
+      const idToken = capacitorAuthToken ||
+        (capacitorUser && typeof capacitorUser.getIdToken === 'function'
+          ? await capacitorUser.getIdToken()
+          : null);
+
+      console.log("[Firebase DB] Got auth token:", !!idToken);
+      console.log("[Firebase DB] Token source:", capacitorAuthToken ? "stored" : "user object");
+
+      const url = `${firebaseConfig.databaseURL}/users/${uid}/data/gameData.json${idToken ? `?auth=${idToken}` : ''}`;
+      console.log("[Firebase DB] Fetching from:", firebaseConfig.databaseURL);
+
+      const response = await fetch(url);
+      console.log("[Firebase DB] REST API response status:", response.status);
+
+      if (!response.ok) {
+        console.error("[Firebase DB] Failed to load data:", response.status);
+        return null;
+      }
+
+      const data = await response.json();
+      console.log("[Firebase DB] Data loaded successfully:", !!data);
+      return data;
+    } catch (error) {
+      console.error("[Firebase DB] Error loading cloud data:", error);
+      return null;
+    }
+  }
+
+  console.log("[Firebase DB] Using SDK...");
   const snap = await get(userRef(uid));
+  console.log("[Firebase DB] Snapshot exists:", snap.exists());
   if (!snap.exists()) return null;
   return snap.val();
 }
