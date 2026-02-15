@@ -13481,7 +13481,8 @@ export default function Pattrn() {
         <div style={{
           position: "fixed",
           bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
-          right: 20,
+          left: "50%",
+          transform: "translateX(-50%)",
           borderRadius: 9999,
           background: activeTheme.gridBg || C.surface,
           backdropFilter: "blur(28px) saturate(200%)",
