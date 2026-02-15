@@ -5268,29 +5268,29 @@ export default function Pattrn() {
       const getItemGlow = () => {
         const hasActiveSessions = activeCoopSessions.filter(s => s.status !== "complete").length > 0;
 
-        // Blue glow for notifications
+        // Blue glow for notifications (rectangular gradient from center)
         if (item.id === "notifications" && notifications.length > 0) {
           return {
-            background: "radial-gradient(ellipse at center, rgba(84, 160, 255, 0.25) 0%, rgba(84, 160, 255, 0.15) 40%, transparent 70%)",
-            hoverBackground: "radial-gradient(ellipse at center, rgba(84, 160, 255, 0.35) 0%, rgba(84, 160, 255, 0.22) 40%, transparent 70%)",
+            background: "linear-gradient(90deg, transparent 0%, rgba(84, 160, 255, 0.08) 20%, rgba(84, 160, 255, 0.25) 50%, rgba(84, 160, 255, 0.08) 80%, transparent 100%)",
+            hoverBackground: "linear-gradient(90deg, transparent 0%, rgba(84, 160, 255, 0.12) 20%, rgba(84, 160, 255, 0.35) 50%, rgba(84, 160, 255, 0.12) 80%, transparent 100%)",
             animation: "subtleGlowPulse 2.5s ease-in-out infinite",
           };
         }
 
-        // Purple glow for coop items when there are active sessions
+        // Purple glow for coop items when there are active sessions (rectangular gradient from center)
         if ((item.id === "nav-coop-menu" || item.id === "coop-active") && hasActiveSessions) {
           return {
-            background: "radial-gradient(ellipse at center, rgba(168, 85, 247, 0.25) 0%, rgba(168, 85, 247, 0.15) 40%, transparent 70%)",
-            hoverBackground: "radial-gradient(ellipse at center, rgba(168, 85, 247, 0.35) 0%, rgba(168, 85, 247, 0.22) 40%, transparent 70%)",
+            background: "linear-gradient(90deg, transparent 0%, rgba(168, 85, 247, 0.08) 20%, rgba(168, 85, 247, 0.25) 50%, rgba(168, 85, 247, 0.08) 80%, transparent 100%)",
+            hoverBackground: "linear-gradient(90deg, transparent 0%, rgba(168, 85, 247, 0.12) 20%, rgba(168, 85, 247, 0.35) 50%, rgba(168, 85, 247, 0.12) 80%, transparent 100%)",
             animation: "subtleGlowPulse 2.5s ease-in-out infinite",
           };
         }
 
-        // Rainbow glow for Quick Play
+        // Green glow for Quick Play (rectangular gradient from center)
         if (item.id === "nav-play") {
           return {
-            background: "radial-gradient(ellipse at center, rgba(255,0,0,0.18) 0%, rgba(255,127,0,0.16) 12%, rgba(255,255,0,0.14) 24%, rgba(0,255,0,0.14) 36%, rgba(0,127,255,0.14) 48%, rgba(148,0,211,0.12) 60%, transparent 70%)",
-            hoverBackground: "radial-gradient(ellipse at center, rgba(255,0,0,0.25) 0%, rgba(255,127,0,0.22) 12%, rgba(255,255,0,0.20) 24%, rgba(0,255,0,0.20) 36%, rgba(0,127,255,0.20) 48%, rgba(148,0,211,0.18) 60%, transparent 70%)",
+            background: "linear-gradient(90deg, transparent 0%, rgba(34, 197, 94, 0.08) 20%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.08) 80%, transparent 100%)",
+            hoverBackground: "linear-gradient(90deg, transparent 0%, rgba(34, 197, 94, 0.12) 20%, rgba(34, 197, 94, 0.35) 50%, rgba(34, 197, 94, 0.12) 80%, transparent 100%)",
             animation: "subtleGlowPulse 2.5s ease-in-out infinite",
           };
         }
