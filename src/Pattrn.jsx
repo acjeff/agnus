@@ -4519,40 +4519,25 @@ export default function Pattrn() {
     return trees[currentView] || { root: [] };
   };
 
-  // Persistent nav items — core page links, excluding the current page
-  const getNavItems = (currentView) => {
-    const allNav = [
-      { id: "nav-home", icon: "home", label: "Home", action: () => { setView("menu"); } },
-      { id: "nav-gallery", icon: "gallery", label: "Mosaic", action: () => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); } },
-      { id: "nav-coop", icon: "users", label: "Co-op", action: () => { setView("coop"); } },
-      { id: "nav-profile", icon: "profile", label: "Profile", action: () => { setView("profile"); } },
-    ];
-    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-home", "custom-mosaic": "nav-gallery" };
-    return allNav.filter(item => item.id !== viewToNavId[currentView]);
-  };
+  // Persistent nav items — always show all core page links
+  const navItems = [
+    { id: "nav-home", icon: "home", label: "Home", action: () => { setView("menu"); } },
+    { id: "nav-gallery", icon: "gallery", label: "Mosaic", action: () => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); } },
+    { id: "nav-coop", icon: "users", label: "Co-op", action: () => { setView("coop"); } },
+    { id: "nav-profile", icon: "profile", label: "Profile", action: () => { setView("profile"); } },
+  ];
 
-  // Context-aware FAB icon per view
-  const getFabIcon = (currentView) => {
-    switch (currentView) {
-      case "menu": return "burger";
-      case "gallery": return "gallery";
-      case "creator": return "create";
-      case "profile": return "profile";
-      case "coop": return "users";
-      case "custom-mosaic": return "gallery";
-      default: return "plus";
-    }
-  };
+  // FAB icon — always the burger menu
+  const getFabIcon = () => "burger";
 
   const renderContextButton = (currentView) => {
     const menuTree = getContextualMenuTree(currentView);
-    const navItems = getNavItems(currentView);
     const isOpen = radialMenuStack.length > 0;
     const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
     const isSubMenu = currentMenuKey !== "root";
     const contextualItems = menuTree[currentMenuKey] || [];
 
-    const fabIconKey = isOpen ? null : getFabIcon(currentView);
+    const fabIconKey = isOpen ? null : getFabIcon();
     const strokeColor = "rgba(255,255,255,0.85)";
     const activeStroke = C.accent;
     const renderIcon = (key, color) => radialIcons[key] ? radialIcons[key](color) : null;
@@ -10106,6 +10091,7 @@ export default function Pattrn() {
             ))}
           </div>
         )}
+        {renderContextButton("gallery")}
         {globalModalsEl}
       </div>
     );
@@ -10272,6 +10258,7 @@ export default function Pattrn() {
             })}
           </div>
         )}
+        {renderContextButton("admin-manage")}
         {globalModalsEl}
       </div>
     );
@@ -10565,6 +10552,7 @@ export default function Pattrn() {
             )}
           </div>
         )}
+        {renderContextButton("admin-metrics")}
         {globalModalsEl}
       </div>
     );
@@ -10809,6 +10797,7 @@ export default function Pattrn() {
             })}
           </div>
         )}
+        {renderContextButton("admin-users")}
         {globalModalsEl}
       </div>
     );
@@ -14244,6 +14233,7 @@ export default function Pattrn() {
         )}
       </div>
 
+      {renderContextButton("play")}
       {globalModalsEl}
     </div>
   );
