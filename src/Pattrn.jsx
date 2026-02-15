@@ -4648,7 +4648,17 @@ export default function Pattrn() {
     const hasContextual = contextualItems.length > 0;
     const showDivider = showNav && hasContextual;
     const visibleItemCount = (showNav ? filteredNav.length : 0) + contextualItems.length;
-    const contentHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize;
+
+    // Pass UI state — rendered inside the Liquid Glass panel
+    const showPassPlayerPicker = coopPassPlayerPicker && !coopPassMode;
+    const showPassBanner = !!coopPassMode;
+    const showPassPending = !!coopPendingPassCell;
+    const showPassIncoming = gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey;
+    const hasPassUI = showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming;
+    const passRowHeight = 44;
+    const passUIHeight = hasPassUI ? passRowHeight + 1 : 0; // +1 for top divider
+
+    const contentHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight;
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
     const bottomOffset = bottomPx; // matches the bottom positioning
     const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
@@ -4729,9 +4739,9 @@ export default function Pattrn() {
             position: "fixed",
             bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
             right: 20,
-            width: isOpen ? panelWidth : closedWidth,
-            height: isOpen ? openHeight : fabSize,
-            borderRadius: isOpen ? 22 : fabSize / 2,
+            width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
+            height: isOpen ? openHeight : fabSize + passUIHeight,
+            borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
             background: activeTheme.gridBg || C.surface,
             backdropFilter: "blur(28px) saturate(200%)",
             WebkitBackdropFilter: "blur(28px) saturate(200%)",
@@ -4780,11 +4790,120 @@ export default function Pattrn() {
             {contextualItems.map((item, i) => renderItem(item, filteredNav.length + (showDivider ? 1 : 0) + i, item.isBack || item.dimmed))}
           </div>
 
+          {/* Pass UI — player picker / banner / pending / incoming */}
+          {hasPassUI && (
+            <div style={{
+              borderTop: "1px solid rgba(255,255,255,0.06)",
+              padding: "6px 12px",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              gap: 6, flexShrink: 0, minHeight: passRowHeight,
+            }}>
+              {/* Player picker (multi-partner) */}
+              {showPassPlayerPicker && (
+                <>
+                  <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, marginRight: 2, whiteSpace: "nowrap" }}>
+                    Pass to:
+                  </span>
+                  {Object.entries(coopPlayers).map(([uid, p]) => {
+                    const playerColor = coopPlayerColorMap[uid] || "#FF9FF3";
+                    return (
+                      <button key={uid} onClick={(e) => {
+                        e.stopPropagation();
+                        setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: playerColor });
+                        setCoopPassPlayerPicker(false);
+                      }} style={{
+                        display: "flex", alignItems: "center", gap: 5, padding: "5px 10px",
+                        borderRadius: 8, border: `1px solid ${playerColor}44`, background: "none",
+                        cursor: "pointer", color: C.text, fontSize: 11, fontWeight: 600,
+                        fontFamily: "'Space Mono', monospace",
+                      }}
+                        onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${playerColor}22`; }}
+                        onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                      >
+                        <span style={{
+                          width: 14, height: 14, borderRadius: "50%", backgroundColor: playerColor,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 8, fontWeight: 700, color: "#fff", flexShrink: 0,
+                        }}>{(p.username || "P")[0].toUpperCase()}</span>
+                        {p.username || "Player"}
+                      </button>
+                    );
+                  })}
+                  <button onClick={(e) => { e.stopPropagation(); setCoopPassPlayerPicker(false); }} style={{
+                    background: "none", border: "none", color: C.textDim, cursor: "pointer",
+                    fontSize: 16, padding: "2px 6px", lineHeight: 1,
+                  }}>{"\u2715"}</button>
+                </>
+              )}
+              {/* Pass mode banner — tap a cell */}
+              {showPassBanner && (
+                <>
+                  <span style={{
+                    width: 10, height: 10, borderRadius: "50%", backgroundColor: coopPassMode.targetColor,
+                    display: "inline-block", flexShrink: 0,
+                  }} />
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text, whiteSpace: "nowrap" }}>
+                    Tap cell to pass to {coopPassMode.targetName}
+                  </span>
+                  <button onClick={(e) => { e.stopPropagation(); setCoopPassMode(null); setCoopPassPlayerPicker(false); }} style={{
+                    background: "none", border: "none", color: C.textDim, cursor: "pointer",
+                    fontSize: 14, padding: "2px 6px", lineHeight: 1, fontFamily: "'Space Mono', monospace",
+                  }}>Cancel</button>
+                </>
+              )}
+              {/* Pending pass — waiting for response */}
+              {showPassPending && (
+                <>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.textDim }}>
+                    Waiting for response...
+                  </span>
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    cancelCoopPassRequest(coopSessionId, coopPendingPassCell).catch(() => {});
+                    setCoopPendingPassCell(null);
+                  }} style={{
+                    background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
+                    color: C.textDim, cursor: "pointer", fontSize: 10, padding: "3px 8px",
+                    fontFamily: "'Space Mono', monospace", fontWeight: 600,
+                  }}>Cancel</button>
+                </>
+              )}
+              {/* Incoming pass — accept / reject */}
+              {showPassIncoming && (
+                <>
+                  <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.text, fontWeight: 600 }}>
+                    <span style={{ color: coopIncomingPass.fromColor, fontWeight: 700 }}>{coopIncomingPass.fromName}</span> wants to pass
+                  </span>
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, true).catch(() => {});
+                    setSelectedCell(null);
+                  }} style={{
+                    backgroundColor: C.correct, color: "#fff", border: "none",
+                    padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    textTransform: "uppercase",
+                  }}>Accept</button>
+                  <button onClick={(e) => {
+                    e.stopPropagation();
+                    respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, false).catch(() => {});
+                    setSelectedCell(null);
+                  }} style={{
+                    backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
+                    padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 700,
+                    fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
+                    textTransform: "uppercase",
+                  }}>Reject</button>
+                </>
+              )}
+            </div>
+          )}
+
           {/* Bottom bar: pill action buttons + menu toggle */}
           <div style={{
             display: "flex", alignItems: "center",
             height: fabSize, flexShrink: 0,
-            borderTop: isOpen ? "1px solid rgba(255,255,255,0.06)" : "none",
+            borderTop: (isOpen || hasPassUI) ? "1px solid rgba(255,255,255,0.06)" : "none",
           }}>
             {/* Action buttons in the pill */}
             {pillButtons.map((btn) => (
@@ -13725,121 +13844,6 @@ export default function Pattrn() {
 
       {/* Fixed bottom bar: coop UI + game state info */}
       <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: activeTheme.gridBg || C.surface, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-        {/* Pass player picker dropdown (multi-partner) */}
-        {coopPassPlayerPicker && !coopPassMode && (
-          <div style={{
-            padding: "8px 12px", backgroundColor: C.surface,
-            border: `1px solid ${C.border}`, borderRadius: 12,
-            display: "flex", gap: 6, alignItems: "center", justifyContent: "center",
-            animation: "fadeUp 0.2s ease both",
-          }}>
-            <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Space Mono', monospace", fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, marginRight: 4 }}>
-              Pass to:
-            </span>
-            {Object.entries(coopPlayers).map(([uid, p]) => {
-              const playerColor = coopPlayerColorMap[uid] || "#FF9FF3";
-              return (
-                <button key={uid} onClick={() => {
-                  setCoopPassMode({ targetUid: uid, targetName: p.username || "Player", targetColor: playerColor });
-                  setCoopPassPlayerPicker(false);
-                }} style={{
-                  display: "flex", alignItems: "center", gap: 6, padding: "6px 12px",
-                  borderRadius: 8, border: `1px solid ${playerColor}44`, background: "none",
-                  cursor: "pointer", color: C.text, fontSize: 12, fontWeight: 600,
-                  fontFamily: "'Space Mono', monospace",
-                }}
-                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = `${playerColor}22`; }}
-                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                >
-                  <span style={{
-                    width: 14, height: 14, borderRadius: "50%", backgroundColor: playerColor,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 8, fontWeight: 700, color: "#fff", flexShrink: 0,
-                  }}>{(p.username || "P")[0].toUpperCase()}</span>
-                  {p.username || "Player"}
-                </button>
-              );
-            })}
-            <button onClick={() => setCoopPassPlayerPicker(false)} style={{
-              background: "none", border: "none", color: C.textDim, cursor: "pointer",
-              fontSize: 16, padding: "2px 6px", lineHeight: 1,
-            }}>{"\u2715"}</button>
-          </div>
-        )}
-        {/* Pass mode banner — tap a cell to pass */}
-        {coopPassMode && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8, padding: "6px 16px",
-            backgroundColor: `${coopPassMode.targetColor}18`, border: `1px solid ${coopPassMode.targetColor}44`,
-            borderRadius: 10, animation: "fadeUp 0.2s ease both",
-          }}>
-            <span style={{
-              width: 10, height: 10, borderRadius: "50%", backgroundColor: coopPassMode.targetColor,
-              display: "inline-block", flexShrink: 0,
-            }} />
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.text }}>
-              Tap your cell to pass to {coopPassMode.targetName}
-            </span>
-            <button onClick={() => { setCoopPassMode(null); setCoopPassPlayerPicker(false); }} style={{
-              background: "none", border: "none", color: C.textDim, cursor: "pointer",
-              fontSize: 14, padding: "2px 6px", lineHeight: 1, fontFamily: "'Space Mono', monospace",
-            }}>Cancel</button>
-          </div>
-        )}
-        {/* Pending pass indicator */}
-        {coopPendingPassCell && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 6, padding: "6px 16px",
-            backgroundColor: `${COOP_MY_COLOR}18`, border: `1px solid ${COOP_MY_COLOR}44`,
-            borderRadius: 10, animation: "fadeUp 0.2s ease both",
-          }}>
-            <span style={{ fontFamily: "'Space Mono', monospace", fontSize: 11, fontWeight: 600, color: C.textDim }}>
-              Waiting for response...
-            </span>
-            <button onClick={() => {
-              cancelCoopPassRequest(coopSessionId, coopPendingPassCell).catch(() => {});
-              setCoopPendingPassCell(null);
-            }} style={{
-              background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
-              color: C.textDim, cursor: "pointer", fontSize: 10, padding: "3px 8px",
-              fontFamily: "'Space Mono', monospace", fontWeight: 600,
-            }}>Cancel</button>
-          </div>
-        )}
-        {/* Accept/reject incoming pass request — own row above lock in */}
-        {gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            padding: "6px 16px",
-            backgroundColor: `${coopIncomingPass.fromColor}18`, border: `1px solid ${coopIncomingPass.fromColor}44`,
-            borderRadius: 10, animation: "fadeUp 0.2s ease both",
-          }}>
-            <span style={{
-              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.text,
-              fontWeight: 600,
-            }}>
-              <span style={{ color: coopIncomingPass.fromColor, fontWeight: 700 }}>{coopIncomingPass.fromName}</span> wants to pass this cell
-            </span>
-            <button onClick={() => {
-              respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, true).catch(() => {});
-              setSelectedCell(null);
-            }} style={{
-              backgroundColor: C.correct, color: "#fff", border: "none",
-              padding: "8px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-              fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-              textTransform: "uppercase",
-            }}>Accept</button>
-            <button onClick={() => {
-              respondCoopPassRequest(coopSessionId, coopIncomingPass.cellKey, false).catch(() => {});
-              setSelectedCell(null);
-            }} style={{
-              backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-              padding: "8px 14px", borderRadius: 8, fontSize: 11, fontWeight: 700,
-              fontFamily: "'Space Mono', monospace", letterSpacing: 1, cursor: "pointer",
-              textTransform: "uppercase",
-            }}>Reject</button>
-          </div>
-        )}
         {gameState === "won" && (
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Space Mono', monospace", color: C.correct, marginBottom: isCoop ? 4 : 12, animation: "fadeUp 0.4s ease" }}>
