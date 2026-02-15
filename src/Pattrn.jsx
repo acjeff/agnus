@@ -4756,7 +4756,7 @@ export default function Pattrn() {
     const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : isCoopStartMenu ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
-    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-home", "custom-mosaic": "nav-gallery" };
+    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-gallery", "custom-mosaic": "nav-gallery" };
     const filteredNav = navItems.filter(item => item.id !== viewToNavId[currentView]);
 
     const fabIconKey = isOpen ? null : getFabIcon();
@@ -9785,11 +9785,11 @@ export default function Pattrn() {
           </div>
         )}
 
-      {/* Tool toggle — bottom left Liquid Glass pill */}
+      {/* Tool toggle — bottom left Liquid Glass pill, offset right of back button */}
       <div style={{
         position: "fixed",
         bottom: `calc(16px + env(safe-area-inset-bottom, 0px))`,
-        left: 20,
+        left: 84,
         display: "flex",
         borderRadius: 28,
         background: activeTheme.gridBg || C.surface,
