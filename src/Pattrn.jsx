@@ -4732,10 +4732,10 @@ export default function Pattrn() {
             width: isOpen ? panelWidth : closedWidth,
             height: isOpen ? openHeight : fabSize,
             borderRadius: isOpen ? 22 : fabSize / 2,
-            background: `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.55) 100%)`,
+            background: activeTheme.gridBg || C.surface,
             backdropFilter: "blur(28px) saturate(200%)",
             WebkitBackdropFilter: "blur(28px) saturate(200%)",
-            border: "none",
+            border: isOpen ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(255,255,255,0.16)",
             boxShadow: defaultShadow,
             zIndex: 85,
             overflow: "hidden",
@@ -4784,7 +4784,7 @@ export default function Pattrn() {
           <div style={{
             display: "flex", alignItems: "center",
             height: fabSize, flexShrink: 0,
-            borderTop: "none",
+            borderTop: isOpen ? "1px solid rgba(255,255,255,0.06)" : "none",
           }}>
             {/* Action buttons in the pill */}
             {pillButtons.map((btn) => (
@@ -13938,10 +13938,10 @@ export default function Pattrn() {
           bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
           right: 20,
           borderRadius: 9999,
-          background: `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.55) 100%)`,
+          background: activeTheme.gridBg || C.surface,
           backdropFilter: "blur(28px) saturate(200%)",
           WebkitBackdropFilter: "blur(28px) saturate(200%)",
-          border: "none",
+          border: "1px solid rgba(255,255,255,0.16)",
           boxShadow: `0 4px 16px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.15)`,
           zIndex: 85,
           padding: "6px 4px",
