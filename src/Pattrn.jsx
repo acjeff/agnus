@@ -4508,12 +4508,24 @@ export default function Pattrn() {
   };
 
   // Quick Play sub-menu — shared across all views (accessed from nav)
+  // Pick a random uncompleted puzzle index for a given difficulty, fallback to 0
+  const getRandomUncompletedPuzzle = (diff) => {
+    const puzzles = PUZZLE_SETS[diff] || [];
+    const diffProg = progress[diff] || {};
+    const uncompleted = [];
+    for (let i = 0; i < puzzles.length; i++) {
+      if (!diffProg[i] || diffProg[i] <= 0) uncompleted.push(i);
+    }
+    if (uncompleted.length === 0) return Math.floor(Math.random() * puzzles.length); // all done, pick random
+    return uncompleted[Math.floor(Math.random() * uncompleted.length)];
+  };
+
   const playSubMenu = [
     { id: "back", icon: "back", label: "Back", isBack: true },
-    { id: "easy", icon: "grid", label: "Easy", action: () => { setDifficulty("easy"); setCurrentPuzzle(0); setView("play"); } },
-    { id: "medium", icon: "layers", label: "Medium", action: () => { setDifficulty("medium"); setCurrentPuzzle(0); setView("play"); } },
-    { id: "hard", icon: "zap", label: "Hard", action: () => { setDifficulty("hard"); setCurrentPuzzle(0); setView("play"); } },
-    { id: "daily", icon: "calendar", label: "Daily", action: () => { setDifficulty("daily"); setView("play"); } },
+    { id: "easy", icon: "grid", label: "Easy", action: () => { const idx = getRandomUncompletedPuzzle("easy"); setDifficulty("easy"); setCurrentPuzzle(idx); setView("play"); } },
+    { id: "medium", icon: "layers", label: "Medium", action: () => { const idx = getRandomUncompletedPuzzle("medium"); setDifficulty("medium"); setCurrentPuzzle(idx); setView("play"); } },
+    { id: "hard", icon: "zap", label: "Hard", action: () => { const idx = getRandomUncompletedPuzzle("hard"); setDifficulty("hard"); setCurrentPuzzle(idx); setView("play"); } },
+    { id: "daily", icon: "calendar", label: "Daily", action: () => { setDifficulty("daily"); setCurrentDailyDate(getDateString()); setView("play"); } },
     { id: "cascade", icon: "layers", label: "Cascade", action: () => { setDifficulty("cascade"); setView("play"); } },
   ];
 
@@ -4552,9 +4564,7 @@ export default function Pattrn() {
 
     const trees = {
       menu: {
-        root: [
-          { id: "create", icon: "create", label: "Create", action: () => { setView("creator"); } },
-        ],
+        root: [],
       },
       gallery: {
         root: [
