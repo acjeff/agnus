@@ -9373,7 +9373,7 @@ export default function Pattrn() {
       onAdvance={() => {
         const isBasicTour = tourPhase === "basic";
         const isCoopIntro = tourPhase === "coopIntro";
-        const maxBasicSteps = 12; // Updated for new tour flow with gameplay guidance
+        const maxBasicSteps = 13; // Updated: intro, start, in-puzzle, tap-cell, enter, fill-more, check, menu, quick, daily, cascade, mosaic, coop
         const maxCoopSteps = 1;
         const maxSteps = isCoopIntro ? maxCoopSteps : maxBasicSteps;
         const isLastStep = guidedTourStep === maxSteps - 1;
@@ -13591,12 +13591,18 @@ export default function Pattrn() {
           display: "flex", flexDirection: "column", gap: gridGap, padding: gridPad,
           position: "relative", zIndex: 1,
         }}>
-          {puzzle.solution.map((row, r) => (
+          {puzzle.solution.map((row, r) => {
+            // Find first blank cell for tour (top-left unfilled blank)
+            const blankKeys = Array.from(puzzle.blanks);
+            const firstBlankKey = blankKeys.find(k => !fills[k] && !lockedCells.has(k)) || blankKeys[0];
+
+            return (
             <div key={r} style={{ display: "flex", gap: gridGap, position: "relative", zIndex: 1 }}>
               {row.map((token, c) => {
                 const key = `${r}-${c}`;
                 const isBlankCell = puzzle.blanks.has(key);
                 const isLockedCell = lockedCells.has(key);
+                const isFirstBlankCell = key === firstBlankKey;
                 // In coop mode, show partner fills for their blanks
                 const partnerFill = isCoop && coopPartnerBlanks?.has(key) ? coopPartnerFills[key] : null;
                 // In coop mosaic mode, show partner fills for any blank cell (no splitting)
@@ -13630,7 +13636,11 @@ export default function Pattrn() {
                 // Mosaic coop: show if cell was filled by partner (not by me)
                 const isMosaicCoopPartnerFill = isCoopMosaic && isBlankCell && !myFill && !!mosaicPartnerFill;
                 return (
-                  <div key={key} style={{ position: "relative" }}>
+                  <div
+                    key={key}
+                    style={{ position: "relative" }}
+                    data-tour-id={isFirstBlankCell ? "first-blank-cell" : undefined}
+                  >
                     <Cell token={displayToken} isBlank={isBlankCell}
                       isSelected={selectedCell === key}
                       isFilled={!!(myFill || partnerFill || mosaicPartnerFill) || isLockedCell}
@@ -13725,7 +13735,8 @@ export default function Pattrn() {
                 );
               })}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       </div>
