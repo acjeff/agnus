@@ -44,10 +44,10 @@ export function GuidedTourInteractive({
       },
       {
         id: "start-puzzle",
-        title: "Easy #1",
-        description: "Let's start with the easiest puzzle. Tap 'Play' to begin!",
+        title: "Tap to Begin",
+        description: "Click 'Let's Go!' to start your first puzzle!",
         targetSelector: "[data-tour-id='easy-puzzle-1']",
-        position: "top",
+        position: "bottom",
         showArrow: true,
         autoAdvance: true,
         condition: () => view === "play",
@@ -217,7 +217,27 @@ export function GuidedTourInteractive({
     const padding = 20;
 
     let tooltipX = centerX - tooltipWidth / 2;
-    let tooltipY = arrowY + (currentStep.position === "bottom" ? 50 : -tooltipHeight - 50);
+    let tooltipY;
+
+    // Position tooltip on opposite side of arrow
+    switch (currentStep.position) {
+      case "bottom":
+        tooltipY = rect.bottom + 60; // Below element
+        break;
+      case "top":
+        tooltipY = rect.top - tooltipHeight - 60; // Above element
+        break;
+      case "left":
+        tooltipY = arrowY - tooltipHeight / 2;
+        tooltipX = rect.left - tooltipWidth - 60;
+        break;
+      case "right":
+        tooltipY = arrowY - tooltipHeight / 2;
+        tooltipX = rect.right + 60;
+        break;
+      default:
+        tooltipY = arrowY - tooltipHeight / 2;
+    }
 
     // Keep tooltip on screen
     if (tooltipX < padding) tooltipX = padding;

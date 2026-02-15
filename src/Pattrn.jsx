@@ -9366,6 +9366,61 @@ export default function Pattrn() {
     </>
   );
 
+  // --- Guided Tour (rendered globally across all views) ---
+  const tourEl = showGuidedTour ? (
+    <GuidedTourInteractive
+      step={guidedTourStep}
+      onAdvance={() => {
+        const isBasicTour = tourPhase === "basic";
+        const isCoopIntro = tourPhase === "coopIntro";
+        const maxBasicSteps = 11;
+        const maxCoopSteps = 1;
+        const maxSteps = isCoopIntro ? maxCoopSteps : maxBasicSteps;
+        const isLastStep = guidedTourStep === maxSteps - 1;
+
+        if (!isLastStep) {
+          setGuidedTourStep(prev => prev + 1);
+        } else {
+          if (isBasicTour) {
+            if (firebaseUser) {
+              saveGuidedTourStatus(firebaseUser.uid, true, "basic").catch(() => {});
+            } else {
+              try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
+            }
+            setShowGuidedTour(false);
+            setHasSeenGuidedTour(true);
+            setRadialMenuStack([]);
+          } else if (isCoopIntro) {
+            saveGuidedTourStatus(firebaseUser.uid, true, "coop").catch(() => {});
+            setShowGuidedTour(false);
+            setRadialMenuStack([]);
+            setHasSeenCoopTour(true);
+          }
+        }
+      }}
+      onSkip={() => {
+        const tourType = tourPhase === "coopIntro" ? "coop" : "basic";
+        if (firebaseUser) {
+          saveGuidedTourStatus(firebaseUser.uid, true, tourType).catch(() => {});
+        } else if (tourPhase === "basic") {
+          try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
+        }
+        setShowGuidedTour(false);
+        setRadialMenuStack([]);
+        if (tourPhase === "coopIntro") setHasSeenCoopTour(true);
+        else setHasSeenGuidedTour(true);
+      }}
+      tourPhase={tourPhase}
+      colors={C}
+      view={view}
+      radialMenuStack={radialMenuStack}
+      selectedCell={selectedCell}
+      fills={fills}
+      puzzle={puzzle}
+      gameState={gameState}
+    />
+  ) : null;
+
   // --- Coop Mosaic joining overlay (shown while waiting for auth + session load) ---
   // Must be before all view checks so it takes priority when accepting an invite
   if (coopMosaicStatus === "joining") {
@@ -12993,63 +13048,7 @@ export default function Pattrn() {
       )}
 
       {renderContextButton("menu")}
-
-      {/* Guided Tour - Interactive */}
-      {showGuidedTour && (
-        <GuidedTourInteractive
-          step={guidedTourStep}
-          onAdvance={() => {
-            const isBasicTour = tourPhase === "basic";
-            const isCoopIntro = tourPhase === "coopIntro";
-            const maxBasicSteps = 11; // Updated for new flow
-            const maxCoopSteps = 1; // Just one popup
-            const maxSteps = isCoopIntro ? maxCoopSteps : maxBasicSteps;
-            const isLastStep = guidedTourStep === maxSteps - 1;
-
-            if (!isLastStep) {
-              setGuidedTourStep(prev => prev + 1);
-            } else {
-              // Last step logic
-              if (isBasicTour) {
-                if (firebaseUser) {
-                  saveGuidedTourStatus(firebaseUser.uid, true, "basic").catch(() => {});
-                } else {
-                  try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
-                }
-                setShowGuidedTour(false);
-                setHasSeenGuidedTour(true);
-                setRadialMenuStack([]);
-              } else if (isCoopIntro) {
-                saveGuidedTourStatus(firebaseUser.uid, true, "coop").catch(() => {});
-                setShowGuidedTour(false);
-                setRadialMenuStack([]);
-                setHasSeenCoopTour(true);
-              }
-            }
-          }}
-          onSkip={() => {
-            const tourType = tourPhase === "coopIntro" ? "coop" : "basic";
-            if (firebaseUser) {
-              saveGuidedTourStatus(firebaseUser.uid, true, tourType).catch(() => {});
-            } else if (tourPhase === "basic") {
-              try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
-            }
-            setShowGuidedTour(false);
-            setRadialMenuStack([]);
-            if (tourPhase === "coopIntro") setHasSeenCoopTour(true);
-            else setHasSeenGuidedTour(true);
-          }}
-          tourPhase={tourPhase}
-          colors={C}
-          view={view}
-          radialMenuStack={radialMenuStack}
-          selectedCell={selectedCell}
-          fills={fills}
-          puzzle={puzzle}
-          gameState={gameState}
-        />
-      )}
-
+      {tourEl}
       {globalModalsEl}
       </div>
     );
@@ -13867,6 +13866,7 @@ export default function Pattrn() {
       )}
       {renderBackButton(playBackAction)}
       {renderContextButton("play", playPillButtons)}
+      {tourEl}
       {globalModalsEl}
     </div>
   );
