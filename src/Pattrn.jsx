@@ -4613,7 +4613,6 @@ export default function Pattrn() {
       menu: { root: menuRoot },
       gallery: {
         root: [
-          { id: "new", icon: "plus", label: "Create New", action: () => { setView("creator"); } },
           { id: "public", icon: "globe", label: "Public", action: () => { setMosaicGalleryTab("public"); loadMosaicData("public"); } },
           { id: "mine", icon: "folder", label: "My Mosaics", action: () => { setMosaicGalleryTab("mine"); loadMosaicData("mine"); } },
         ],
@@ -10129,7 +10128,7 @@ export default function Pattrn() {
           </div>
         )}
 
-      {renderContextButton("gallery")}
+      {renderContextButton("gallery", [{ id: "create", icon: "plus", color: C.accent, onClick: () => setView("creator") }])}
       {globalModalsEl}
       </div>
     );
