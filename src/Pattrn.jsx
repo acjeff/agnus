@@ -4597,7 +4597,7 @@ export default function Pattrn() {
   // FAB icon — always the burger menu
   const getFabIcon = () => "burger";
 
-  const renderContextButton = (currentView, pillButtons = []) => {
+  const renderContextButton = (currentView, pillButtons = [], bottomPx = 80) => {
     const menuTree = getContextualMenuTree(currentView);
     const isOpen = radialMenuStack.length > 0;
     const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
@@ -4627,7 +4627,7 @@ export default function Pattrn() {
     const visibleItemCount = (showNav ? filteredNav.length : 0) + contextualItems.length;
     const contentHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize;
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
-    const bottomOffset = 80; // matches the bottom: calc(80px + ...) positioning
+    const bottomOffset = bottomPx; // matches the bottom positioning
     const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
     const openHeight = Math.min(contentHeight, maxPanelHeight);
     const needsScroll = contentHeight > maxPanelHeight;
@@ -4704,7 +4704,7 @@ export default function Pattrn() {
         <div
           style={{
             position: "fixed",
-            bottom: `calc(80px + env(safe-area-inset-bottom, 0px))`,
+            bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
             right: 20,
             width: isOpen ? panelWidth : closedWidth,
             height: isOpen ? openHeight : fabSize,
@@ -13484,8 +13484,8 @@ export default function Pattrn() {
         </div>
       )}
 
-      {/* Grid area: flex child between header/info and footer, centers grid */}
-      <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, boxSizing: "border-box", padding: edgePad }}>
+      {/* Grid area: flex child between header/info and footer, top-aligned */}
+      <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", alignItems: "flex-start", justifyContent: "center", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, boxSizing: "border-box", padding: edgePad }}>
         <GridDecoration decoration={activeTheme.decoration} />
         {/* Coop mosaic players indicator — positioned top-left of puzzle panel */}
         {isCoopMosaic && coopMosaicAnyConnected && gameState === "playing" && (
@@ -13956,7 +13956,7 @@ export default function Pattrn() {
           />
         </div>
       )}
-      {renderContextButton("play", playPillButtons)}
+      {renderContextButton("play", playPillButtons, gameState === "playing" && puzzle ? 88 : 80)}
       {globalModalsEl}
     </div>
   );
