@@ -5274,14 +5274,15 @@ export default function Pattrn() {
               onClick={(e) => { e.stopPropagation(); handleToggle(); }}
               style={{
                 flex: 1, height: fabSize,
-                display: "flex", alignItems: "center", justifyContent: "center",
+                display: "flex", alignItems: "center", justifyContent: isOpen ? "flex-end" : "center",
+                paddingRight: isOpen ? 19 : 0,
                 cursor: "pointer",
               }}
               onMouseEnter={e => { if (!isOpen && !hasPillButtons) { e.currentTarget.parentElement.parentElement.style.transform = "scale(1.08)"; e.currentTarget.parentElement.parentElement.style.boxShadow = hoverShadow; } }}
               onMouseLeave={e => { if (!isOpen && !hasPillButtons) { e.currentTarget.parentElement.parentElement.style.transform = "scale(1)"; e.currentTarget.parentElement.parentElement.style.boxShadow = defaultShadow; } }}
             >
               {isOpen ? (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={activeStroke} strokeWidth="2.5" strokeLinecap="round">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={strokeColor} strokeWidth="2.5" strokeLinecap="round">
                   <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
                 </svg>
               ) : (
