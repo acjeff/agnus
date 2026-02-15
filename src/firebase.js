@@ -540,6 +540,19 @@ export async function saveProfilePicture(uid, dataUrl) {
   await update(ref(db, `users/${uid}`), { profilePicture: dataUrl || null });
 }
 
+// Load guided tour status
+export async function loadGuidedTourStatus(uid) {
+  if (!db) return false;
+  const snap = await get(ref(db, `users/${uid}/hasSeenGuidedTour`));
+  return snap.exists() ? snap.val() : false;
+}
+
+// Save guided tour status (mark as seen/completed)
+export async function saveGuidedTourStatus(uid, hasSeen) {
+  if (!db) return;
+  await update(ref(db, `users/${uid}`), { hasSeenGuidedTour: hasSeen });
+}
+
 // Look up a user by username
 export async function lookupUserByUsername(username) {
   if (!db || !username) return null;
