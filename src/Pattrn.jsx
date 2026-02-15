@@ -4663,6 +4663,13 @@ export default function Pattrn() {
     { id: "admin-users", icon: "users", label: "Users", action: () => { setView("admin-users"); } },
   ];
 
+  // Co-op submenu — global co-op menu
+  const coopSubMenu = [
+    { id: "coop-create", icon: "play", label: "Create Session", sub: "coop-create" },
+    { id: "coop-active", icon: "users", label: "Active Sessions", sub: "coop-active" },
+    { id: "coop-completed", icon: "check", label: "Completed", sub: "coop-completed" },
+  ];
+
   // Profile submenu — now global, includes account items + admin
   const profileSubMenu = [
     { id: "profile-view-item", icon: "profile", label: "View Profile", sub: "profile-view" },
@@ -4734,6 +4741,10 @@ export default function Pattrn() {
       play: playSubMenu,
       profile: firebaseConfigured && firebaseUser ? profileSubMenu : [],
       admin: adminSubMenu,
+      coop: firebaseConfigured && firebaseUser ? coopSubMenu : [],
+      "coop-create": [],
+      "coop-active": [],
+      "coop-completed": [],
       "achievements-view": [],
       "share-stats": [],
       "profile-view": [],
@@ -4750,9 +4761,13 @@ export default function Pattrn() {
       "mosaic-preview": [],
     };
 
-    // Build root menu with global Profile item
+    // Build root menu with global Profile and Co-op items
     const buildRootWithProfile = (viewSpecificItems) => {
       const items = [...viewSpecificItems];
+      // Add Co-op as a permanent item if signed in
+      if (firebaseConfigured && firebaseUser) {
+        items.push({ id: "nav-coop-menu", icon: "users", label: "Co-op", sub: "coop" });
+      }
       // Add Profile as a permanent item if signed in
       if (firebaseConfigured && firebaseUser) {
         items.push({ id: "nav-profile-menu", icon: "profile", label: "Profile", sub: "profile" });
@@ -4819,7 +4834,6 @@ export default function Pattrn() {
     { id: "nav-play", icon: "play", label: "Quick Play", sub: "play" },
     { id: "nav-home", icon: "home", label: "Home", action: () => { setView("menu"); } },
     { id: "nav-gallery", icon: "gallery", label: "Mosaic", action: () => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); } },
-    { id: "nav-coop", icon: "users", label: "Co-op", action: () => { setView("coop"); } },
     ...(firebaseConfigured && !firebaseUser ? [{ id: "nav-sign-in", icon: "login", label: "Sign In", sub: "sign-in", beforeSub: () => { setAccountTab("login"); setAccountError(""); return true; } }] : []),
   ];
 
@@ -4845,14 +4859,17 @@ export default function Pattrn() {
     const isClearConfirm = currentMenuKey === "clear-confirm";
     const isThemeList = currentMenuKey === "theme-list";
     const isSyncChoice = currentMenuKey === "sync-choice";
+    const isCoopCreate = currentMenuKey === "coop-create";
+    const isCoopActive = currentMenuKey === "coop-active";
+    const isCoopCompleted = currentMenuKey === "coop-completed";
     const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu || isMosaicPreviewMenu ||
                           isAchievementsView || isFriendsView || isShareStats || isProfileView ||
                           isUsernameEdit || isBirthdayEdit || isDeleteAccount || isClearConfirm ||
-                          isThemeList || isSyncChoice;
+                          isThemeList || isSyncChoice || isCoopCreate || isCoopActive || isCoopCompleted;
     const contextualItems = isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
-    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", creator: "nav-gallery", "custom-mosaic": "nav-gallery" };
+    const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", creator: "nav-gallery", "custom-mosaic": "nav-gallery" };
     const filteredNav = navItems.filter(item => item.id !== viewToNavId[currentView]);
 
     const fabIconKey = isOpen ? null : getFabIcon();
@@ -5077,6 +5094,49 @@ export default function Pattrn() {
       return h;
     })();
 
+    // Co-op create session height — header + mode selection + puzzle selection + start button
+    const coopCreateContentHeight = (() => {
+      if (!isCoopCreate) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 40 + 16; // description + margin
+      h += 70 + 12; // mode selection + margin
+      h += 80 + 16; // puzzle/mosaic selection + margin
+      h += 48; // start button
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Co-op active sessions height — scrollable list
+    const coopActiveContentHeight = (() => {
+      if (!isCoopActive) return 0;
+      const activeSessions = activeCoopSessions.filter(s => s.status !== "complete");
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      if (activeSessions.length === 0) {
+        h += 80; // empty state
+      } else {
+        h += Math.min(activeSessions.length, 5) * 56; // session cards (cap at 5, rest scrolls)
+      }
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Co-op completed sessions height — scrollable list
+    const coopCompletedContentHeight = (() => {
+      if (!isCoopCompleted) return 0;
+      const completedSessions = activeCoopSessions.filter(s => s.status === "complete");
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      if (completedSessions.length === 0) {
+        h += 80; // empty state
+      } else {
+        h += Math.min(completedSessions.length, 5) * 56; // session cards (cap at 5, rest scrolls)
+      }
+      h += 12; // bottom padding
+      return h;
+    })();
+
     const contentHeight = isAchievementsView ? achievementsContentHeight :
                           isFriendsView ? friendsContentHeight :
                           isShareStats ? shareStatsContentHeight :
@@ -5087,6 +5147,9 @@ export default function Pattrn() {
                           isClearConfirm ? clearConfirmContentHeight :
                           isThemeList ? themeListContentHeight :
                           isSyncChoice ? syncChoiceContentHeight :
+                          isCoopCreate ? coopCreateContentHeight :
+                          isCoopActive ? coopActiveContentHeight :
+                          isCoopCompleted ? coopCompletedContentHeight :
                           isMosaicPreviewMenu ? mosaicPreviewContentHeight :
                           isSignInMenu ? signInContentHeight :
                           isMosaicSaveMenu ? mosaicSaveContentHeight :
@@ -6018,6 +6081,179 @@ export default function Pattrn() {
                           <div style={{ fontSize: 10, color: C.textDim }}>Combine best results from both</div>
                         </button>
                       </>
+                    )}
+                  </div>
+                </>
+              );
+            })() : isCoopCreate ? (() => {
+              const coopModes = DIFFICULTIES.filter(d => d.key !== "daily" && d.key !== "mosaic");
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>Create Session</div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16 }}>Choose a mode and puzzle, then start</div>
+
+                    {/* Mode selection */}
+                    <div style={{ marginBottom: 12 }}>
+                      <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Inter', sans-serif" }}>Game Mode</div>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                        {[...coopModes, { key: "mosaic", label: "Mosaic" }].map(d => (
+                          <button key={d.key} onClick={() => { setCoopSetupMode(d.key); setCoopSetupLevel(0); setCoopSetupMosaic(null); }}
+                            style={{
+                              padding: "8px 14px", borderRadius: 10,
+                              background: coopSetupMode === d.key ? C.coop : "rgba(255,255,255,0.04)",
+                              color: coopSetupMode === d.key ? "#fff" : C.textDim,
+                              border: `1px solid ${coopSetupMode === d.key ? C.coop : "rgba(255,255,255,0.08)"}`,
+                              cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 600,
+                              transition: "all 0.15s",
+                            }}>
+                            {d.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Puzzle selection */}
+                    {coopSetupMode && coopSetupMode !== "cascade" && coopSetupMode !== "mosaic" && (
+                      <div style={{ marginBottom: 16 }}>
+                        <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, marginBottom: 6, fontFamily: "'Inter', sans-serif" }}>Puzzle #{coopSetupLevel + 1}</div>
+                        <input type="range" min={0} max={49} value={coopSetupLevel}
+                          onChange={e => setCoopSetupLevel(Number(e.target.value))}
+                          style={{ width: "100%", accentColor: C.coop }} />
+                      </div>
+                    )}
+
+                    {/* Start button */}
+                    <button
+                      disabled={!coopSetupMode || coopSetupStarting || (coopSetupMode === "mosaic" && !coopSetupMosaic)}
+                      onClick={async () => {
+                        if (!coopSetupMode) return;
+                        setCoopSetupStarting(true);
+                        try {
+                          if (coopSetupMode === "mosaic") {
+                            await startCoopMosaicSession({ mosaicOverride: coopSetupMosaic });
+                          } else {
+                            setDifficulty(coopSetupMode);
+                            const level = coopSetupMode === "cascade" ? 0 : coopSetupLevel;
+                            startPuzzle(level, coopSetupMode);
+                            setView("play");
+                            setTimeout(() => { startCoopSession(); }, 300);
+                          }
+                        } catch { /* ignore */ }
+                        setCoopSetupStarting(false);
+                      }}
+                      style={{
+                        width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 13, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: (coopSetupMode && !(coopSetupMode === "mosaic" && !coopSetupMosaic)) ? C.coop : "rgba(255,255,255,0.08)",
+                        color: (coopSetupMode && !(coopSetupMode === "mosaic" && !coopSetupMosaic)) ? "#fff" : C.textDim,
+                        border: "none", cursor: (coopSetupMode && !(coopSetupMode === "mosaic" && !coopSetupMosaic)) ? "pointer" : "default",
+                        opacity: coopSetupStarting ? 0.6 : 1, transition: "all 0.15s",
+                      }}>
+                      {coopSetupStarting ? "Starting..." : "Start & Invite"}
+                    </button>
+                  </div>
+                </>
+              );
+            })() : isCoopActive ? (() => {
+              const activeSessions = activeCoopSessions.filter(s => s.status !== "complete");
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>Active Sessions</div>
+                    {activeSessions.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "24px 16px", borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div style={{ fontSize: 12, color: C.textDim }}>No active sessions</div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 300, overflowY: "auto" }}>
+                        {activeSessions.map(session => {
+                          const isHost = session.hostUid === firebaseUser.uid;
+                          const isMosaicSession = session._type === "mosaic";
+                          return (
+                            <div key={session.id} style={{
+                              display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
+                              borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)",
+                              border: `1px solid rgba(255,255,255,0.08)`,
+                            }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {isMosaicSession ? (session.mosaicTitle || "Mosaic") : `${(DIFFICULTIES.find(d => d.key === session.mode)?.label) || session.mode} #${(session.level ?? 0) + 1}`}
+                                </div>
+                                <div style={{ fontSize: 10, color: session.status === "playing" ? C.coop : C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                  {session.status === "waiting" ? "Waiting" : "In progress"}
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => isMosaicSession ? rejoinCoopMosaicSession(session) : rejoinCoopSession(session)}
+                                style={{
+                                  background: C.coop, border: "none", borderRadius: 8,
+                                  padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 10,
+                                  fontFamily: "'Inter', sans-serif", fontWeight: 700, letterSpacing: 0.5,
+                                }}>
+                                Rejoin
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              );
+            })() : isCoopCompleted ? (() => {
+              const completedSessions = activeCoopSessions.filter(s => s.status === "complete");
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>Completed</div>
+                    {completedSessions.length === 0 ? (
+                      <div style={{ textAlign: "center", padding: "24px 16px", borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
+                        <div style={{ fontSize: 12, color: C.textDim }}>No completed sessions</div>
+                      </div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 300, overflowY: "auto" }}>
+                        {completedSessions.map(session => {
+                          const isMosaicSession = session._type === "mosaic";
+                          return (
+                            <div key={session.id} style={{
+                              display: "flex", alignItems: "center", gap: 10, padding: "12px 14px",
+                              borderRadius: 12, backgroundColor: "rgba(255,255,255,0.04)",
+                              border: "1px solid rgba(84, 212, 152, 0.15)",
+                            }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {isMosaicSession ? (session.mosaicTitle || "Mosaic") : `${(DIFFICULTIES.find(d => d.key === session.mode)?.label) || session.mode} #${(session.level ?? 0) + 1}`}
+                                </div>
+                                <div style={{ fontSize: 10, color: C.correct, fontFamily: "'Inter', sans-serif" }}>
+                                  ✓ Complete
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
                   </div>
                 </>
@@ -12455,7 +12691,7 @@ export default function Pattrn() {
 
   // Pill action buttons for the bottom glass bar
   const playBackAction = () => {
-    if (isCoop) { leaveCoopSession(); setView("coop"); return; }
+    if (isCoop) { leaveCoopSession(); setView("menu"); return; }
     if (difficulty === "cascade") {
       const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
       const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
