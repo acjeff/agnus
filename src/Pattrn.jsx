@@ -13959,7 +13959,7 @@ export default function Pattrn() {
           position: "fixed",
           bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
           right: 20,
-          borderRadius: "50%",
+          borderRadius: 9999,
           background: `linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.65) 50%, rgba(0,0,0,0.55) 100%)`,
           backdropFilter: "blur(28px) saturate(200%)",
           WebkitBackdropFilter: "blur(28px) saturate(200%)",
