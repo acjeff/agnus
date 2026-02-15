@@ -31,6 +31,30 @@ export function GuidedTourInteractive({
   const [arrowPosition, setArrowPosition] = useState(null);
   const [tooltipPosition, setTooltipPosition] = useState(null);
 
+  // Track previous state to detect NEW actions (not just existing state)
+  const prevStepRef = useRef(step);
+  const prevFillCountRef = useRef(0);
+  const prevSelectedCellRef = useRef(null);
+  const prevGameStateRef = useRef(gameState);
+
+  // Initialize refs on mount
+  useEffect(() => {
+    prevStepRef.current = step;
+    prevFillCountRef.current = fills ? Object.keys(fills).length : 0;
+    prevSelectedCellRef.current = selectedCell;
+    prevGameStateRef.current = gameState;
+  }, []); // Only on mount
+
+  // Update refs when step changes (snapshot state at step transition)
+  useEffect(() => {
+    if (prevStepRef.current !== step) {
+      prevStepRef.current = step;
+      prevFillCountRef.current = fills ? Object.keys(fills).length : 0;
+      prevSelectedCellRef.current = selectedCell;
+      prevGameStateRef.current = gameState;
+    }
+  }, [step, fills, selectedCell, gameState]);
+
   // Tour step definitions
   const tourSteps = {
     basic: [
@@ -69,7 +93,10 @@ export function GuidedTourInteractive({
         position: "top",
         showArrow: true,
         autoAdvance: true,
-        condition: () => selectedCell !== null,
+        condition: () => {
+          // Only advance if cell was JUST selected (not if already selected)
+          return selectedCell !== null && prevSelectedCellRef.current !== selectedCell;
+        },
       },
       {
         id: "select-tile",
@@ -79,7 +106,11 @@ export function GuidedTourInteractive({
         position: "top",
         showArrow: true,
         autoAdvance: true,
-        condition: () => fills && Object.keys(fills).length > 0,
+        condition: () => {
+          // Only advance if a NEW fill was added (not if fills already exist)
+          const currentFillCount = fills ? Object.keys(fills).length : 0;
+          return currentFillCount > 0 && currentFillCount > prevFillCountRef.current;
+        },
       },
       {
         id: "fill-more",
@@ -91,11 +122,12 @@ export function GuidedTourInteractive({
         autoAdvance: true,
         allowAllInteractions: true, // Allow clicking cells AND check button during this step
         condition: () => {
-          // Advance when ALL blank cells are filled
+          // Advance when ALL blank cells are filled (and it's a NEW state)
           if (!fills || !puzzle || !puzzle.blanks) return false;
           const filledCount = Object.keys(fills).length;
           const blankCount = puzzle.blanks.size;
-          return filledCount === blankCount;
+          // Check if just NOW completed (not if was already complete)
+          return filledCount === blankCount && filledCount > prevFillCountRef.current;
         },
       },
       {
@@ -106,7 +138,12 @@ export function GuidedTourInteractive({
         position: "left",
         showArrow: true,
         autoAdvance: true,
-        condition: () => gameState === "won" || gameState === "failed", // Advance when they check (win or fail)
+        condition: () => {
+          // Only advance if game state JUST changed to won/failed (not if already was)
+          const isComplete = gameState === "won" || gameState === "failed";
+          const wasNotComplete = prevGameStateRef.current !== "won" && prevGameStateRef.current !== "failed";
+          return isComplete && wasNotComplete;
+        },
       },
       {
         id: "open-menu",
