@@ -1,13 +1,16 @@
 import React, { useEffect, useState, useRef } from "react";
 
 /**
- * Interactive Guided Tour Component
+ * Interactive Guided Tour Component - Redesigned
  *
- * Features:
- * - Spotlight effect that highlights specific UI elements
- * - Tooltips positioned near highlighted elements
- * - Automatic advancement when user performs correct actions
- * - Walks user through their first puzzle
+ * Flow:
+ * 1. Intro explaining the game
+ * 2. Point to Easy #1 puzzle (pre-selected)
+ * 3. In puzzle: guide through solving + checking
+ * 4. Menu tour: Quick Play, game modes
+ * 5. Mosaic explanation
+ * 6. Co-op explanation (requires account)
+ * 7. Post-account: "Tried playing with a friend?" popup
  */
 
 export function GuidedTourInteractive({
@@ -17,104 +20,133 @@ export function GuidedTourInteractive({
   tourPhase,
   colors,
   view,
-  radialMenuStack,
-  setRadialMenuStack,
-  setView,
-  setDifficulty,
-  puzzleIndex,
-  setPuzzleIndex,
+  onStartPuzzle, // Function to start Easy puzzle #1
   selectedCell,
   fills,
   puzzle,
-  firebaseUser,
+  gameState,
+  radialMenuStack,
 }) {
-  const [highlightElement, setHighlightElement] = useState(null);
-  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0, top: 0, left: 0 });
-  const observerRef = useRef(null);
+  const [targetElement, setTargetElement] = useState(null);
+  const [arrowPosition, setArrowPosition] = useState(null);
+  const [tooltipPosition, setTooltipPosition] = useState(null);
 
-  // Define tour steps with conditions for auto-advancement
+  // Tour step definitions
   const tourSteps = {
     basic: [
       {
-        id: "welcome",
+        id: "intro",
         title: "Welcome to Pattrn!",
-        description: "Let's take a quick interactive tour. I'll guide you through your first puzzle!",
-        action: "Click Next to begin",
-        targetSelector: null, // No highlight for welcome
-        advanceCondition: () => false, // Manual advancement
+        description: "Pattrn is a pattern puzzle game. Your goal is to complete grids by finding the hidden pattern. Let's solve your first puzzle!",
+        position: "center",
+        showArrow: false,
+        autoAdvance: false,
       },
       {
-        id: "menu-button",
-        title: "Menu Button",
-        description: "Click the menu button in the bottom right to get started",
-        targetSelector: ".menu-button, [data-tour-id='menu-button']",
-        advanceCondition: () => radialMenuStack.length > 0 && radialMenuStack[0] === "root",
+        id: "start-puzzle",
+        title: "Easy #1",
+        description: "Let's start with the easiest puzzle. Tap 'Play' to begin!",
+        targetSelector: "[data-tour-id='easy-puzzle-1']",
+        position: "top",
+        showArrow: true,
+        autoAdvance: true,
+        condition: () => view === "play",
+      },
+      {
+        id: "tap-cell",
+        title: "Tap a Cell",
+        description: "Look at the pattern! Try tapping the cells to fill them in.",
+        targetSelector: null, // Will point to a specific cell
+        position: "top",
+        showArrow: true,
+        autoAdvance: true,
+        condition: () => selectedCell !== null,
+      },
+      {
+        id: "enter-value",
+        title: "Enter a Number",
+        description: "Use the keypad at the bottom to enter your answer!",
+        targetSelector: "[data-tour-id='keypad']",
+        position: "top",
+        showArrow: true,
+        autoAdvance: true,
+        condition: () => fills && Object.keys(fills).length > 0,
+      },
+      {
+        id: "complete-puzzle",
+        title: "Check Your Answer",
+        description: "Once you've filled in the cells, tap the checkmark to verify your solution!",
+        targetSelector: "[data-tour-id='check-button']",
+        position: "bottom",
+        showArrow: true,
+        autoAdvance: true,
+        condition: () => gameState === "won",
+      },
+      {
+        id: "open-menu",
+        title: "Great Job!",
+        description: "Now let's explore the game! Tap the menu button to see all the features.",
+        targetSelector: "[data-tour-id='menu-button']",
+        position: "left",
+        showArrow: true,
+        autoAdvance: true,
+        condition: () => radialMenuStack.length > 0,
       },
       {
         id: "quick-play",
         title: "Quick Play",
-        description: "Click 'Quick Play' to choose a puzzle",
+        description: "Quick Play lets you jump into puzzles of different difficulties. Try Easy, Medium, or Hard!",
         targetSelector: "[data-tour-id='nav-play']",
-        advanceCondition: () => radialMenuStack.includes("play"),
+        position: "left",
+        showArrow: true,
+        autoAdvance: false,
       },
       {
-        id: "easy-difficulty",
-        title: "Choose Easy",
-        description: "Select 'Easy' to start with beginner-friendly puzzles",
-        targetSelector: "[data-tour-id='easy']",
-        advanceCondition: () => view === "play",
+        id: "daily",
+        title: "Daily Puzzle",
+        description: "Play a new Daily puzzle every day (Medium difficulty). Build your streak!",
+        targetSelector: "[data-tour-id='daily']",
+        position: "left",
+        showArrow: true,
+        autoAdvance: false,
       },
       {
-        id: "puzzle-intro",
-        title: "Let's Solve It!",
-        description: "This is a Patterning puzzle. Each row and column must contain the numbers 1-4 exactly once. Click any empty cell to get started!",
-        targetSelector: null,
-        advanceCondition: () => selectedCell !== null,
+        id: "cascade",
+        title: "Cascade Mode",
+        description: "Cascade puzzles start easy and get progressively harder. How far can you go?",
+        targetSelector: "[data-tour-id='cascade']",
+        position: "left",
+        showArrow: true,
+        autoAdvance: false,
       },
       {
-        id: "enter-number",
-        title: "Enter a Number",
-        description: "Great! Now enter a number (1-4) using the keypad at the bottom or your keyboard.",
-        targetSelector: ".play-keypad, [data-tour-id='keypad']",
-        advanceCondition: () => fills && Object.keys(fills).length > 0,
+        id: "mosaic",
+        title: "Mosaic Gallery",
+        description: "Create and share beautiful mosaic artworks using puzzle grids!",
+        targetSelector: "[data-tour-id='nav-gallery']",
+        position: "left",
+        showArrow: true,
+        autoAdvance: false,
       },
       {
-        id: "keep-going",
-        title: "You're Doing Great!",
-        description: "Keep filling in cells! Remember: each row and column needs 1-4 exactly once. I'll let you finish on your own now.",
-        targetSelector: null,
-        advanceCondition: () => fills && Object.keys(fills).length >= 3,
-      },
-      {
-        id: "completion",
-        title: "Tour Complete!",
-        description: "You're all set! Keep playing to improve your skills. Create an account to track progress and unlock co-op mode!",
-        targetSelector: null,
-        advanceCondition: () => false, // Manual advancement
+        id: "coop-teaser",
+        title: "Play with Friends!",
+        description: "Want to solve puzzles together? Create a free account to unlock Co-op mode!",
+        position: "center",
+        showArrow: false,
+        autoAdvance: false,
       },
     ],
-    coop: [
+    coopIntro: [
       {
-        id: "coop-intro",
-        title: "Co-op Mode 🤝",
-        description: "Now that you have an account, you can play puzzles with friends in real-time!",
-        targetSelector: null,
-        advanceCondition: () => false,
-      },
-      {
-        id: "find-coop",
-        title: "Find Co-op",
-        description: "Open the menu and click 'Co-op' to create or join a multiplayer session",
-        targetSelector: "[data-tour-id='coop']",
-        advanceCondition: () => radialMenuStack.includes("coop"),
-      },
-      {
-        id: "coop-complete",
-        title: "Ready to Play Together!",
-        description: "Create a session and invite friends to solve puzzles together. Have fun!",
-        targetSelector: null,
-        advanceCondition: () => false,
+        id: "coop-popup",
+        title: "Tried Playing with a Friend?",
+        description: "Open the menu and tap Co-op to create or join a multiplayer session!",
+        targetSelector: "[data-tour-id='menu-button']",
+        position: "left",
+        showArrow: true,
+        autoAdvance: true,
+        condition: () => radialMenuStack.includes("coop"),
       },
     ],
   };
@@ -122,232 +154,205 @@ export function GuidedTourInteractive({
   const steps = tourSteps[tourPhase] || tourSteps.basic;
   const currentStep = steps[step] || steps[0];
 
-  // Find and highlight target element
+  // Find target element and calculate positions
   useEffect(() => {
     if (!currentStep.targetSelector) {
-      setHighlightElement(null);
+      setTargetElement(null);
+      setArrowPosition(null);
       return;
     }
 
     const findElement = () => {
       const element = document.querySelector(currentStep.targetSelector);
       if (element) {
-        setHighlightElement(element);
-        updateDimensions(element);
+        setTargetElement(element);
+        updatePositions(element);
       }
     };
 
-    // Initial find
     findElement();
+    const interval = setInterval(findElement, 200);
 
-    // Re-find when DOM changes (e.g., menu opens)
-    const timer = setInterval(findElement, 100);
-
-    return () => clearInterval(timer);
+    return () => clearInterval(interval);
   }, [currentStep.targetSelector, step]);
 
-  // Update dimensions when element changes or resizes
-  const updateDimensions = (element) => {
+  const updatePositions = (element) => {
     if (!element) return;
 
     const rect = element.getBoundingClientRect();
-    setDimensions({
-      width: rect.width,
-      height: rect.height,
-      top: rect.top,
-      left: rect.left,
-    });
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
 
-    // Position tooltip
-    const tooltipHeight = 200;
-    const tooltipWidth = 300;
+    // Calculate arrow position based on desired position
+    let arrowX = centerX;
+    let arrowY = centerY;
+    let arrowRotation = 0;
+
+    switch (currentStep.position) {
+      case "top":
+        arrowY = rect.top - 40;
+        arrowRotation = 180;
+        break;
+      case "bottom":
+        arrowY = rect.bottom + 40;
+        arrowRotation = 0;
+        break;
+      case "left":
+        arrowX = rect.left - 40;
+        arrowY = centerY;
+        arrowRotation = 90;
+        break;
+      case "right":
+        arrowX = rect.right + 40;
+        arrowY = centerY;
+        arrowRotation = -90;
+        break;
+    }
+
+    setArrowPosition({ x: arrowX, y: arrowY, rotation: arrowRotation });
+
+    // Calculate tooltip position
+    const tooltipWidth = 280;
+    const tooltipHeight = 120;
     const padding = 20;
 
-    let top = rect.bottom + padding;
-    let left = rect.left + rect.width / 2 - tooltipWidth / 2;
+    let tooltipX = centerX - tooltipWidth / 2;
+    let tooltipY = arrowY + (currentStep.position === "bottom" ? 50 : -tooltipHeight - 50);
 
     // Keep tooltip on screen
-    if (top + tooltipHeight > window.innerHeight) {
-      top = rect.top - tooltipHeight - padding;
+    if (tooltipX < padding) tooltipX = padding;
+    if (tooltipX + tooltipWidth > window.innerWidth - padding) {
+      tooltipX = window.innerWidth - tooltipWidth - padding;
     }
-    if (left < padding) left = padding;
-    if (left + tooltipWidth > window.innerWidth - padding) {
-      left = window.innerWidth - tooltipWidth - padding;
+    if (tooltipY < padding) tooltipY = padding;
+    if (tooltipY + tooltipHeight > window.innerHeight - padding) {
+      tooltipY = window.innerHeight - tooltipHeight - padding;
     }
 
-    setTooltipPosition({ top, left });
+    setTooltipPosition({ x: tooltipX, y: tooltipY });
   };
 
-  // Set up ResizeObserver for highlighted element
+  // Check auto-advance conditions
   useEffect(() => {
-    if (!highlightElement) return;
-
-    if (observerRef.current) {
-      observerRef.current.disconnect();
-    }
-
-    observerRef.current = new ResizeObserver(() => {
-      updateDimensions(highlightElement);
-    });
-
-    observerRef.current.observe(highlightElement);
-
-    return () => {
-      if (observerRef.current) {
-        observerRef.current.disconnect();
-      }
-    };
-  }, [highlightElement]);
-
-  // Check for auto-advancement conditions
-  useEffect(() => {
-    if (!currentStep.advanceCondition) return;
+    if (!currentStep.autoAdvance || !currentStep.condition) return;
 
     const checkCondition = () => {
-      if (currentStep.advanceCondition()) {
-        setTimeout(() => onAdvance(), 500); // Small delay for smooth UX
+      if (currentStep.condition()) {
+        setTimeout(() => onAdvance(), 300);
       }
     };
 
     const interval = setInterval(checkCondition, 100);
     return () => clearInterval(interval);
-  }, [currentStep, onAdvance, radialMenuStack, view, puzzleIndex, selectedCell, fills]);
+  }, [currentStep, onAdvance]);
 
-  const isLastStep = step === steps.length - 1;
-  const hasHighlight = currentStep.targetSelector && highlightElement;
+  // Handle resize
+  useEffect(() => {
+    if (!targetElement) return;
+
+    const handleResize = () => updatePositions(targetElement);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [targetElement]);
+
+  const isCenterPosition = currentStep.position === "center" || !currentStep.targetSelector;
 
   return (
-    <div style={{
-      position: "fixed",
-      inset: 0,
-      zIndex: 9999,
-      pointerEvents: "none", // Allow clicks to pass through except on tooltip
-    }}>
-      {/* Dark overlay with spotlight cutout */}
-      {hasHighlight ? (
-        <svg
-          style={{
-            position: "absolute",
-            inset: 0,
-            width: "100%",
-            height: "100%",
-          }}
-        >
-          <defs>
-            <mask id="spotlight-mask">
-              <rect x="0" y="0" width="100%" height="100%" fill="white" />
-              <rect
-                x={dimensions.left - 8}
-                y={dimensions.top - 8}
-                width={dimensions.width + 16}
-                height={dimensions.height + 16}
-                rx="12"
-                fill="black"
-              />
-            </mask>
-          </defs>
-          <rect
-            x="0"
-            y="0"
-            width="100%"
-            height="100%"
-            fill="rgba(0, 0, 0, 0.75)"
-            mask="url(#spotlight-mask)"
-          />
-        </svg>
-      ) : (
-        <div style={{
-          position: "absolute",
+    <>
+      {/* Subtle overlay - only slightly dims, doesn't block */}
+      <div
+        style={{
+          position: "fixed",
           inset: 0,
-          backgroundColor: "rgba(0, 0, 0, 0.75)",
-        }} />
-      )}
+          backgroundColor: "rgba(0, 0, 0, 0.3)",
+          zIndex: 9998,
+          pointerEvents: "none",
+        }}
+      />
 
-      {/* Highlight ring around target element */}
-      {hasHighlight && (
+      {/* Animated arrow pointer */}
+      {currentStep.showArrow && arrowPosition && (
         <div
           style={{
-            position: "absolute",
-            top: dimensions.top - 8,
-            left: dimensions.left - 8,
-            width: dimensions.width + 16,
-            height: dimensions.height + 16,
-            borderRadius: 12,
-            border: `3px solid ${colors.accent}`,
-            boxShadow: `0 0 20px ${colors.accent}88, inset 0 0 20px ${colors.accent}33`,
-            animation: "pulse 2s ease-in-out infinite",
+            position: "fixed",
+            left: arrowPosition.x,
+            top: arrowPosition.y,
+            transform: `translate(-50%, -50%) rotate(${arrowPosition.rotation}deg)`,
+            zIndex: 9999,
             pointerEvents: "none",
+            animation: "bounce 1.5s ease-in-out infinite",
           }}
-        />
+        >
+          <svg width="40" height="40" viewBox="0 0 40 40" fill="none">
+            <path
+              d="M20 5 L20 30 M20 30 L12 22 M20 30 L28 22"
+              stroke={colors.accent}
+              strokeWidth="4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              filter="drop-shadow(0 0 8px rgba(255,255,255,0.8))"
+            />
+          </svg>
+        </div>
       )}
 
       {/* Tooltip card */}
       <div
         style={{
-          position: "absolute",
-          top: hasHighlight ? tooltipPosition.top : "50%",
-          left: hasHighlight ? tooltipPosition.left : "50%",
-          transform: hasHighlight ? "none" : "translate(-50%, -50%)",
+          position: "fixed",
+          left: isCenterPosition ? "50%" : tooltipPosition?.x,
+          top: isCenterPosition ? "50%" : tooltipPosition?.y,
+          transform: isCenterPosition ? "translate(-50%, -50%)" : "none",
           width: 320,
           maxWidth: "calc(100vw - 40px)",
           backgroundColor: colors.surface,
           borderRadius: 16,
-          border: `1px solid ${colors.accent}33`,
-          padding: 24,
-          boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
-          animation: "fadeUp 0.3s ease both",
+          border: `2px solid ${colors.accent}`,
+          padding: 20,
+          boxShadow: `0 8px 32px rgba(0,0,0,0.6), 0 0 0 2px ${colors.accent}22`,
+          zIndex: 10000,
           pointerEvents: "auto",
+          animation: "fadeIn 0.3s ease",
         }}
       >
-        {/* Header */}
+        {/* Progress indicator */}
         <div style={{
           display: "flex",
-          alignItems: "center",
-          gap: 12,
-          marginBottom: 16,
+          gap: 4,
+          marginBottom: 12,
         }}>
-          <div style={{
-            width: 40,
-            height: 40,
-            borderRadius: "50%",
-            background: `linear-gradient(135deg, ${colors.accent}22 0%, ${colors.accent}44 100%)`,
-            border: `2px solid ${colors.accent}66`,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: 20,
-          }}>
-            {tourPhase === "coop" ? "🤝" : "👋"}
-          </div>
-          <div style={{ flex: 1 }}>
-            <div style={{
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 16,
-              fontWeight: 700,
-              color: colors.text,
-              lineHeight: 1.2,
-            }}>
-              {currentStep.title}
-            </div>
-            <div style={{
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 11,
-              color: colors.textDim,
-              letterSpacing: 0.5,
-              textTransform: "uppercase",
-            }}>
-              Step {step + 1} of {steps.length}
-            </div>
-          </div>
+          {steps.map((_, idx) => (
+            <div
+              key={idx}
+              style={{
+                flex: 1,
+                height: 3,
+                borderRadius: 2,
+                backgroundColor: idx <= step ? colors.accent : `${colors.textDim}33`,
+                transition: "background-color 0.3s",
+              }}
+            />
+          ))}
         </div>
 
         {/* Content */}
         <div style={{
           fontFamily: "'Inter', sans-serif",
-          fontSize: 14,
+          fontSize: 16,
+          fontWeight: 700,
           color: colors.text,
-          lineHeight: 1.6,
-          marginBottom: 20,
+          marginBottom: 8,
+        }}>
+          {currentStep.title}
+        </div>
+
+        <div style={{
+          fontFamily: "'Inter', sans-serif",
+          fontSize: 13,
+          color: colors.text,
+          lineHeight: 1.5,
+          marginBottom: 16,
+          opacity: 0.9,
         }}>
           {currentStep.description}
         </div>
@@ -361,94 +366,85 @@ export function GuidedTourInteractive({
           <button
             onClick={onSkip}
             style={{
-              padding: "10px 16px",
-              borderRadius: 10,
-              fontSize: 12,
+              padding: "8px 14px",
+              borderRadius: 8,
+              fontSize: 11,
               fontWeight: 600,
               fontFamily: "'Inter', sans-serif",
+              textTransform: "uppercase",
               letterSpacing: 0.5,
               background: "none",
-              border: `1px solid ${colors.textDim}44`,
+              border: `1px solid ${colors.textDim}55`,
               color: colors.textDim,
               cursor: "pointer",
             }}
           >
-            Skip Tour
+            Skip
           </button>
-          <div style={{ display: "flex", gap: 8 }}>
-            {!currentStep.advanceCondition && (
-              <button
-                onClick={onAdvance}
-                style={{
-                  padding: "10px 20px",
-                  borderRadius: 10,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  fontFamily: "'Inter', sans-serif",
-                  letterSpacing: 1,
-                  background: colors.accent,
-                  color: colors.bg,
-                  border: "none",
-                  cursor: "pointer",
-                }}
-              >
-                {isLastStep ? "Finish" : "Next"}
-              </button>
-            )}
-          </div>
-        </div>
 
-        {/* Waiting indicator for auto-advance steps */}
-        {currentStep.advanceCondition && (
-          <div style={{
-            marginTop: 12,
-            padding: 8,
-            borderRadius: 8,
-            background: `${colors.accent}11`,
-            border: `1px solid ${colors.accent}22`,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}>
+          {!currentStep.autoAdvance && (
+            <button
+              onClick={onAdvance}
+              style={{
+                padding: "8px 20px",
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 700,
+                fontFamily: "'Inter', sans-serif",
+                textTransform: "uppercase",
+                letterSpacing: 1,
+                background: colors.accent,
+                color: colors.bg,
+                border: "none",
+                cursor: "pointer",
+              }}
+            >
+              {step === steps.length - 1 ? "Got It!" : "Next"}
+            </button>
+          )}
+
+          {currentStep.autoAdvance && (
             <div style={{
-              width: 16,
-              height: 16,
-              border: `2px solid ${colors.accent}`,
-              borderTopColor: "transparent",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-            }} />
-            <div style={{
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 11,
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "8px 14px",
+              fontSize: 10,
               color: colors.textDim,
+              fontFamily: "'Inter', sans-serif",
             }}>
-              Waiting for you to continue...
+              <div style={{
+                width: 12,
+                height: 12,
+                border: `2px solid ${colors.accent}`,
+                borderTopColor: "transparent",
+                borderRadius: "50%",
+                animation: "spin 1s linear infinite",
+              }} />
+              Waiting...
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <style>{`
-        @keyframes pulse {
+        @keyframes bounce {
           0%, 100% {
-            opacity: 1;
-            transform: scale(1);
+            transform: translate(-50%, -50%) rotate(${arrowPosition?.rotation || 0}deg) translateY(-5px);
           }
           50% {
-            opacity: 0.8;
-            transform: scale(1.02);
+            transform: translate(-50%, -50%) rotate(${arrowPosition?.rotation || 0}deg) translateY(5px);
           }
         }
 
-        @keyframes fadeUp {
+        @keyframes fadeIn {
           from {
             opacity: 0;
-            transform: ${hasHighlight ? "translateY(10px)" : "translate(-50%, calc(-50% + 10px))"};
+            transform: ${isCenterPosition ? "translate(-50%, -45%)" : "translateY(-10px)"};
           }
           to {
             opacity: 1;
-            transform: ${hasHighlight ? "translateY(0)" : "translate(-50%, -50%)"};
+            transform: ${isCenterPosition ? "translate(-50%, -50%)" : "translateY(0)"};
           }
         }
 
@@ -457,6 +453,6 @@ export function GuidedTourInteractive({
           to { transform: rotate(360deg); }
         }
       `}</style>
-    </div>
+    </>
   );
 }

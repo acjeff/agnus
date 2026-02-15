@@ -2093,7 +2093,7 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
   const arrowStyle = { width: 28, height: 28, borderRadius: "50%", backgroundColor: C.surface, border: `1px solid ${C.border}`, color: C.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0, transition: "opacity 0.2s" };
 
   return (
-    <div style={{ position: "relative", maxWidth: "100%", display: "flex", alignItems: "center", gap: 4 }}>
+    <div style={{ position: "relative", maxWidth: "100%", display: "flex", alignItems: "center", gap: 4 }} data-tour-id="keypad">
       {canScrollLeft && <button onClick={() => doScroll(-1)} style={arrowStyle} aria-label="Scroll left">{"\u2039"}</button>}
       <div ref={scrollRef} className="token-picker-scroll" style={{ display: "flex", gap: 10, justifyContent: overflows ? "flex-start" : "center", padding: "8px 16px", flexWrap: "nowrap", overflowX: "auto", flex: "1 1 auto", minWidth: 0, maxWidth: "100%", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", touchAction: "pan-x", willChange: "scroll-position" }}>
         {tokens.map((token, i) => {
@@ -6727,6 +6727,7 @@ export default function Pattrn() {
             {pillButtons.map((btn) => (
               <div
                 key={btn.id}
+                data-tour-id={btn.id === "check" ? "check-button" : btn.id}
                 onClick={btn.disabled ? undefined : (e) => { e.stopPropagation(); btn.onClick?.(); }}
                 style={{
                   width: fabSize, height: fabSize,
@@ -11989,6 +11990,85 @@ export default function Pattrn() {
         {/* ── Scrollable content area ── */}
         <div style={{ width: "100%", maxWidth: 480, paddingTop: "calc(20px + env(safe-area-inset-top, 0px))", boxSizing: "border-box" }}>
 
+        {/* ── First Puzzle Card (for new users) ── */}
+        {(() => {
+          const totalSolved = [...SOLVE_MODES].reduce((s, m) => s + countModeSolved(progress[m]), 0);
+          const isFirstTime = totalSolved === 0 && !hasSeenGuidedTour;
+          if (!isFirstTime) return null;
+
+          return (
+            <div
+              data-tour-id="easy-puzzle-1"
+              style={{
+                width: "100%",
+                marginBottom: 20,
+                animation: "fadeUp 0.4s ease both",
+                borderRadius: 16,
+                overflow: "hidden",
+                background: `linear-gradient(135deg, ${C.correct}22 0%, ${C.accent}11 100%)`,
+                border: `2px solid ${C.correct}44`,
+                padding: "20px",
+                boxSizing: "border-box",
+              }}
+            >
+              <div style={{ marginBottom: 12 }}>
+                <div style={{
+                  fontSize: 11,
+                  color: C.correct,
+                  textTransform: "uppercase",
+                  letterSpacing: 1.5,
+                  fontFamily: "'Inter', sans-serif",
+                  marginBottom: 4,
+                  fontWeight: 700,
+                }}>
+                  ✨ Start Here
+                </div>
+                <div style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: C.text,
+                  lineHeight: 1.2,
+                }}>
+                  Your First Puzzle
+                </div>
+                <div style={{
+                  fontSize: 12,
+                  color: C.textDim,
+                  marginTop: 6,
+                  fontFamily: "'Inter', sans-serif",
+                }}>
+                  Easy • Puzzle #1
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setDifficulty("easy");
+                  startPuzzle(0, "easy", false);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "14px 0",
+                  borderRadius: 12,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  fontFamily: "'Inter', sans-serif",
+                  letterSpacing: 1,
+                  background: C.correct,
+                  color: "#fff",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "transform 0.15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.02)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+              >
+                Let's Go! →
+              </button>
+            </div>
+          );
+        })()}
+
         {/* ── Daily hero card ── */}
         {(() => {
           const todayIdx = getTodayDailyIndex();
@@ -12920,26 +13000,26 @@ export default function Pattrn() {
           step={guidedTourStep}
           onAdvance={() => {
             const isBasicTour = tourPhase === "basic";
-            const isCoopTour = tourPhase === "coop";
-            const maxBasicSteps = 9;
-            const maxCoopSteps = 3;
-            const maxSteps = isCoopTour ? maxCoopSteps : maxBasicSteps;
+            const isCoopIntro = tourPhase === "coopIntro";
+            const maxBasicSteps = 11; // Updated for new flow
+            const maxCoopSteps = 1; // Just one popup
+            const maxSteps = isCoopIntro ? maxCoopSteps : maxBasicSteps;
             const isLastStep = guidedTourStep === maxSteps - 1;
 
             if (!isLastStep) {
               setGuidedTourStep(prev => prev + 1);
             } else {
               // Last step logic
-              if (isBasicTour && !firebaseUser) {
-                try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
+              if (isBasicTour) {
+                if (firebaseUser) {
+                  saveGuidedTourStatus(firebaseUser.uid, true, "basic").catch(() => {});
+                } else {
+                  try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
+                }
                 setShowGuidedTour(false);
                 setHasSeenGuidedTour(true);
-              } else if (isBasicTour && firebaseUser) {
-                saveGuidedTourStatus(firebaseUser.uid, true, "basic").catch(() => {});
-                setHasSeenGuidedTour(true);
-                setTourPhase("coop");
-                setGuidedTourStep(0);
-              } else if (isCoopTour) {
+                setRadialMenuStack([]);
+              } else if (isCoopIntro) {
                 saveGuidedTourStatus(firebaseUser.uid, true, "coop").catch(() => {});
                 setShowGuidedTour(false);
                 setRadialMenuStack([]);
@@ -12948,7 +13028,7 @@ export default function Pattrn() {
             }
           }}
           onSkip={() => {
-            const tourType = tourPhase === "coop" ? "coop" : "basic";
+            const tourType = tourPhase === "coopIntro" ? "coop" : "basic";
             if (firebaseUser) {
               saveGuidedTourStatus(firebaseUser.uid, true, tourType).catch(() => {});
             } else if (tourPhase === "basic") {
@@ -12956,22 +13036,17 @@ export default function Pattrn() {
             }
             setShowGuidedTour(false);
             setRadialMenuStack([]);
-            if (tourPhase === "coop") setHasSeenCoopTour(true);
+            if (tourPhase === "coopIntro") setHasSeenCoopTour(true);
             else setHasSeenGuidedTour(true);
           }}
           tourPhase={tourPhase}
           colors={C}
           view={view}
           radialMenuStack={radialMenuStack}
-          setRadialMenuStack={setRadialMenuStack}
-          setView={setView}
-          setDifficulty={setDifficulty}
-          puzzleIndex={currentPuzzle}
-          setPuzzleIndex={(idx) => {/* handled by tour advancement */}}
           selectedCell={selectedCell}
           fills={fills}
           puzzle={puzzle}
-          firebaseUser={firebaseUser}
+          gameState={gameState}
         />
       )}
 
