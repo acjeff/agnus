@@ -9785,11 +9785,11 @@ export default function Pattrn() {
           </div>
         )}
 
-      {/* Tool toggle — bottom left Liquid Glass pill */}
+      {/* Tool toggle — bottom left Liquid Glass pill, offset right of back button */}
       <div style={{
         position: "fixed",
         bottom: `calc(16px + env(safe-area-inset-bottom, 0px))`,
-        left: 20,
+        left: 84,
         display: "flex",
         borderRadius: 28,
         background: activeTheme.gridBg || C.surface,
