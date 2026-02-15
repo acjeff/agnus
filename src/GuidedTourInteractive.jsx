@@ -89,17 +89,24 @@ export function GuidedTourInteractive({
         position: "top",
         showArrow: true,
         autoAdvance: true,
-        condition: () => fills && Object.keys(fills).length >= 3, // Wait until they've filled a few more
+        allowAllInteractions: true, // Allow clicking cells AND check button during this step
+        condition: () => {
+          // Advance when ALL blank cells are filled
+          if (!fills || !puzzle || !puzzle.blanks) return false;
+          const filledCount = Object.keys(fills).length;
+          const blankCount = puzzle.blanks.size;
+          return filledCount === blankCount;
+        },
       },
       {
         id: "check-answer",
-        title: "Check Your Solution",
-        description: "All cells filled? Tap the checkmark ✓ to verify your answer!",
+        title: "Check Your Solution!",
+        description: "All cells filled! Tap the checkmark ✓ to see if you got it right!",
         targetSelector: "[data-tour-id='check-button']",
         position: "left",
         showArrow: true,
         autoAdvance: true,
-        condition: () => gameState === "won",
+        condition: () => gameState === "won" || gameState === "failed", // Advance when they check (win or fail)
       },
       {
         id: "open-menu",
@@ -358,7 +365,7 @@ export function GuidedTourInteractive({
           inset: 0,
           backgroundColor: "rgba(0, 0, 0, 0.7)",
           zIndex: 9998,
-          pointerEvents: "auto", // Block all clicks
+          pointerEvents: currentStep.allowAllInteractions ? "none" : "auto", // Allow all clicks if flag set
         }}
       />
 
