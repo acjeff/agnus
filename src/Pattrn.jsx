@@ -4566,6 +4566,26 @@ export default function Pattrn() {
     play: (c) => <Play size={18} color={c} strokeWidth={2} />,
     create: (c) => <Pencil size={18} color={c} strokeWidth={2} />,
     profile: (c) => <User size={18} color={c} strokeWidth={2} />,
+    "user-avatar": (c) => (
+      profilePicture ? (
+        <img src={profilePicture} alt="" style={{ width: 18, height: 18, borderRadius: "50%", objectFit: "cover" }} />
+      ) : (
+        <div style={{
+          width: 18,
+          height: 18,
+          borderRadius: "50%",
+          backgroundColor: C.accent + "33",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 10,
+          color: C.accent,
+          fontWeight: 700
+        }}>
+          {(username || firebaseUser?.email || "?")[0].toUpperCase()}
+        </div>
+      )
+    ),
     home: (c) => <Home size={18} color={c} strokeWidth={2} />,
     gallery: (c) => <LayoutGrid size={18} color={c} strokeWidth={2} />,
     trophy: (c) => <Trophy size={18} color={c} strokeWidth={2} />,
@@ -4767,7 +4787,7 @@ export default function Pattrn() {
       }
       // Add Profile as a permanent item if signed in
       if (firebaseConfigured && firebaseUser) {
-        items.push({ id: "nav-profile-menu", icon: "profile", label: "Profile", sub: "profile" });
+        items.push({ id: "nav-profile-menu", icon: "user-avatar", label: username || "Profile", sub: "profile" });
       }
       return items;
     };
