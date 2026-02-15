@@ -78,7 +78,39 @@ export async function signInWithEmail(email, password) {
 }
 
 export async function signInWithGoogle() {
-  if (!auth || !googleProvider) throw new Error("Firebase not configured");
+  if (!auth) throw new Error("Firebase not configured");
+
+  // Check if running in Capacitor iOS/Android - use native Google Auth
+  const isCapacitor = typeof window !== 'undefined' && window.Capacitor;
+
+  if (isCapacitor) {
+    try {
+      // Import GoogleAuth plugin dynamically
+      const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
+
+      // Initialize if needed
+      await GoogleAuth.initialize();
+
+      // Sign in with native plugin
+      const googleUser = await GoogleAuth.signIn();
+
+      // Get the ID token and sign in to Firebase
+      if (!googleUser.authentication?.idToken) {
+        throw new Error("No ID token received from Google");
+      }
+
+      const { GoogleAuthProvider, signInWithCredential } = await import('firebase/auth');
+      const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
+      const result = await signInWithCredential(auth, credential);
+      return result.user;
+    } catch (error) {
+      console.error("Native Google Sign-In error:", error);
+      throw error;
+    }
+  }
+
+  // Web flow - use popup
+  if (!googleProvider) throw new Error("Firebase not configured");
   const result = await signInWithPopup(auth, googleProvider);
   return result.user;
 }

@@ -1,14 +1,27 @@
 {
-  "appId": "com.pattrn.app",
-  "appName": "Agnus",
-  "webDir": "dist",
-  "ios": {
-    "contentInset": "automatic",
-    "preferredContentMode": "mobile",
-    "scheme": "Agnus"
-  },
-  "server": {
-    "iosScheme": "https",
-    "androidScheme": "https"
-  }
+	"appId": "com.agnus.app",
+	"appName": "Agnus",
+	"webDir": "dist",
+	"ios": {
+		"contentInset": "automatic",
+		"preferredContentMode": "mobile",
+		"scheme": "Agnus"
+	},
+	"server": {
+		"iosScheme": "https",
+		"androidScheme": "https"
+	},
+	"packageClassList": [
+		"GoogleAuth"
+	],
+	"plugins": {
+		"GoogleAuth": {
+			"scopes": [
+				"profile",
+				"email"
+			],
+			"serverClientId": "511503810684-eh4f90s0io8mh4tc275shdji0pir64hr.apps.googleusercontent.com",
+			"forceCodeForRefreshToken": true
+		}
+	}
 }

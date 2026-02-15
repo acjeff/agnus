@@ -1,4 +1,4 @@
-package com.pattrn.app;
+package com.agnus.app;
 
 import com.getcapacitor.BridgeActivity;
 
