@@ -4662,7 +4662,8 @@ export default function Pattrn() {
     if (!isCoop && gameState === "playing" && !isCascade && !isMosaic) {
       playRoot.push({ id: "coop-start", icon: "user-plus", label: "Play w/ Friends", action: () => {
         if (!firebaseUser) { coopPendingLoginRef.current = true; setShowAccountModal(true); return; }
-        setShowCoopFriendPicker(true);
+        setCoopSelectedFriends(new Set());
+        setRadialMenuStack(prev => [...prev, "coop-start"]);
       }});
     }
     if (isCoop) {
@@ -4689,7 +4690,10 @@ export default function Pattrn() {
     // Custom mosaic view items
     const customMosaicRoot = [];
     if (firebaseConfigured && firebaseUser && !isCoopMosaic) {
-      customMosaicRoot.push({ id: "coop-mosaic", icon: "user-plus", label: "Co-op", action: () => { setShowCoopFriendPicker(true); } });
+      customMosaicRoot.push({ id: "coop-mosaic", icon: "user-plus", label: "Co-op", action: () => {
+        setCoopSelectedFriends(new Set());
+        setRadialMenuStack(prev => [...prev, "coop-start"]);
+      } });
       customMosaicRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
     }
 
@@ -4750,7 +4754,8 @@ export default function Pattrn() {
     const isOpen = radialMenuStack.length > 0;
     const currentMenuKey = isOpen ? radialMenuStack[radialMenuStack.length - 1] : "root";
     const isSubMenu = currentMenuKey !== "root";
-    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : (menuTree[currentMenuKey] || []);
+    const isCoopStartMenu = currentMenuKey === "coop-start";
+    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : isCoopStartMenu ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
     const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-home", "custom-mosaic": "nav-gallery" };
@@ -4761,11 +4766,15 @@ export default function Pattrn() {
     const activeStroke = C.accent;
     const renderIcon = (key, color) => radialIcons[key] ? radialIcons[key](color) : null;
 
+    // Coop start menu state
+    const isCoopFromMosaic = isCoopStartMenu && currentView === "custom-mosaic" && !!customMosaicPlay;
+    const coopPickerColor = isCoopFromMosaic ? C.coop : "#54A0FF";
+
     // Panel sizing
     const fabSize = 56;
     const hasPillButtons = pillButtons.length > 0;
     const closedWidth = hasPillButtons ? (pillButtons.length + 1) * fabSize : fabSize;
-    const panelWidth = Math.max(200, closedWidth);
+    const panelWidth = isCoopStartMenu ? 280 : Math.max(200, closedWidth);
     const itemHeight = 44;
     const panelPad = 8;
     const dividerHeight = 13;
@@ -4779,12 +4788,30 @@ export default function Pattrn() {
     const showPassBanner = !!coopPassMode;
     const showPassPending = pendingPassOpen && !!coopPendingPassCell;
     const showPassIncoming = gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey;
-    const hasPassUI = showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming;
+    const hasPassUI = isCoopStartMenu ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming);
     const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : 0;
     const passRowHeight = showPassPlayerPicker ? (passPlayerCount > 2 ? 88 : 56) : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
 
-    const contentHeight = visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight;
+    // Coop start menu height — back button + header + subtitle + mosaic card + friends list + action buttons
+    const coopStartContentHeight = (() => {
+      if (!isCoopStartMenu) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 44; // back button row
+      h += 24 + 4 + 18 + 16; // header + gap + subtitle + margin
+      if (isCoopFromMosaic) h += 70; // mosaic info card
+      if (friendsList.length > 0) {
+        h += 24 + 8; // "Your Friends" label + margin
+        h += Math.min(friendsList.length, 4) * 46; // friend rows (cap visual height at 4, rest scrolls)
+        h += 16; // bottom margin
+      } else {
+        h += 50; // no friends message
+      }
+      h += 48 + 16; // action buttons + bottom padding
+      return h;
+    })();
+
+    const contentHeight = isCoopStartMenu ? coopStartContentHeight : (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
     const bottomOffset = bottomPx; // matches the bottom positioning
     const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
@@ -4897,24 +4924,106 @@ export default function Pattrn() {
 
           {/* Menu content — always rendered, animated via transitions */}
           <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}>
-            {/* Persistent nav items — always first */}
-            {showNav && filteredNav.map((item, i) => renderItem(item, i, false))}
+            {isCoopStartMenu ? (
+              <>
+                {/* Back button */}
+                {renderItem({ id: "coop-back", icon: "back", label: "Back", isBack: true }, 0, true)}
+                {/* Coop friend picker content */}
+                <div style={{
+                  padding: "0 16px 12px",
+                  opacity: isOpen ? 1 : 0,
+                  transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                  transition: isOpen
+                    ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                    : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                }}>
+                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>Start Co-op</div>
+                  <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16, fontFamily: "'Inter', sans-serif" }}>{isCoopFromMosaic ? "Play this mosaic together" : "Select friends to invite or share a link"}</div>
+                  {/* Mosaic info card */}
+                  {isCoopFromMosaic && (
+                    <div style={{ marginBottom: 14, padding: "8px 12px", borderRadius: 10, backgroundColor: C.coop + "12", border: `1px solid ${C.coop}33` }}>
+                      <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>Mosaic</div>
+                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.text }}>{customMosaicPlay.title || "Untitled"}</div>
+                      {customMosaicPlay.authorUsername && <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorUsername}</div>}
+                    </div>
+                  )}
+                  {/* Friends list */}
+                  {friendsList.length > 0 && (
+                    <div style={{ marginBottom: 16, maxHeight: 184, overflowY: "auto" }}>
+                      <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
+                        Your Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                        {friendsList.map(friend => {
+                          const isSelected = coopSelectedFriends.has(friend.uid);
+                          return (
+                            <button key={friend.uid} onClick={() => { setCoopSelectedFriends(prev => { const next = new Set(prev); if (next.has(friend.uid)) next.delete(friend.uid); else next.add(friend.uid); return next; }); }} style={{
+                              display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10,
+                              backgroundColor: isSelected ? coopPickerColor + "18" : "rgba(255,255,255,0.04)", border: `1px solid ${isSelected ? coopPickerColor : "rgba(255,255,255,0.08)"}`,
+                              cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                            }}>
+                              <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? coopPickerColor : "rgba(255,255,255,0.15)"}`, backgroundColor: isSelected ? coopPickerColor : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
+                                {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                              </div>
+                              {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} /> : <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: coopPickerColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: coopPickerColor, fontWeight: 700, flexShrink: 0 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
+                              <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {friendsList.length === 0 && (
+                    <div style={{ marginBottom: 16, textAlign: "center", padding: "12px 0", color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif" }}>No friends added yet. You can add friends in the Mosaic gallery.</div>
+                  )}
+                  {/* Action buttons */}
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {coopSelectedFriends.size > 0 ? (
+                      <button onClick={async () => {
+                        setRadialMenuStack([]);
+                        if (isCoopFromMosaic) { await startCoopMosaicSession({ inviteFriendUids: [...coopSelectedFriends], mosaicOverride: customMosaicPlay }); }
+                        else { await startCoopSession({ inviteFriendUids: [...coopSelectedFriends] }); }
+                      }} style={{
+                        flex: 1, backgroundColor: coopPickerColor, color: "#fff", border: "none",
+                        padding: "12px 16px", borderRadius: 10, fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        cursor: "pointer", textTransform: "uppercase",
+                      }}>{`Invite ${coopSelectedFriends.size} Friend${coopSelectedFriends.size > 1 ? "s" : ""}`}</button>
+                    ) : (
+                      <button onClick={async () => {
+                        setRadialMenuStack([]);
+                        if (isCoopFromMosaic) { await startCoopMosaicSession({ mosaicOverride: customMosaicPlay }); }
+                        else { startCoopSession(); }
+                      }} style={{
+                        flex: 1, backgroundColor: coopPickerColor, color: "#fff", border: "none",
+                        padding: "12px 16px", borderRadius: 10, fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        cursor: "pointer", textTransform: "uppercase",
+                      }}>Share Link</button>
+                    )}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* Persistent nav items — always first */}
+                {showNav && filteredNav.map((item, i) => renderItem(item, i, false))}
 
-            {/* Divider between nav and contextual */}
-            {showDivider && (
-              <div style={{
-                padding: "6px 16px",
-                opacity: isOpen ? 1 : 0,
-                transition: isOpen
-                  ? `opacity 0.2s ease ${0.04 + filteredNav.length * 0.03}s`
-                  : "opacity 0.08s ease 0s",
-              }}>
-                <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
-              </div>
+                {/* Divider between nav and contextual */}
+                {showDivider && (
+                  <div style={{
+                    padding: "6px 16px",
+                    opacity: isOpen ? 1 : 0,
+                    transition: isOpen
+                      ? `opacity 0.2s ease ${0.04 + filteredNav.length * 0.03}s`
+                      : "opacity 0.08s ease 0s",
+                  }}>
+                    <div style={{ height: 1, background: "rgba(255,255,255,0.08)" }} />
+                  </div>
+                )}
+
+                {/* Contextual items — page-specific actions */}
+                {contextualItems.map((item, i) => renderItem(item, filteredNav.length + (showDivider ? 1 : 0) + i, item.isBack || item.dimmed))}
+              </>
             )}
-
-            {/* Contextual items — page-specific actions */}
-            {contextualItems.map((item, i) => renderItem(item, filteredNav.length + (showDivider ? 1 : 0) + i, item.isBack || item.dimmed))}
           </div>
 
           {/* Pass UI — player picker / banner / pending / incoming */}
@@ -9117,81 +9226,7 @@ export default function Pattrn() {
     </DraggableDrawer>
   );
 
-  const coopFriendPickerEl = showCoopFriendPicker ? (() => {
-    const isFromMosaic = view === "custom-mosaic" && !!customMosaicPlay;
-    const pickerColor = isFromMosaic ? C.coop : "#54A0FF";
-    return (
-      <DraggableDrawer isOpen={true} onClose={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); }} zIndex={1200}>
-        <div data-drawer-scroll style={{ padding: "0 24px 24px", overflowY: "auto", flex: 1 }}>
-          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>Start Co-op</div>
-          <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16 }}>{isFromMosaic ? "Play this mosaic together" : "Select friends to invite or share a link"}</div>
-          {/* Show current mosaic info when opened from mosaic view */}
-          {isFromMosaic && (
-            <div style={{ marginBottom: 14, padding: "8px 12px", borderRadius: 10, backgroundColor: C.coop + "12", border: `1px solid ${C.coop}33` }}>
-              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>Mosaic</div>
-              <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.text }}>{customMosaicPlay.title || "Untitled"}</div>
-              {customMosaicPlay.authorUsername && <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>by {customMosaicPlay.authorUsername}</div>}
-            </div>
-          )}
-          {friendsList.length > 0 && (
-            <div style={{ marginBottom: 16, maxHeight: 200, overflowY: "auto" }}>
-              <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
-                Your Friends {coopSelectedFriends.size > 0 && `(${coopSelectedFriends.size} selected)`}
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                {friendsList.map(friend => {
-                  const isSelected = coopSelectedFriends.has(friend.uid);
-                  return (
-                    <button key={friend.uid} onClick={() => { setCoopSelectedFriends(prev => { const next = new Set(prev); if (next.has(friend.uid)) next.delete(friend.uid); else next.add(friend.uid); return next; }); }} style={{
-                      display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10,
-                      backgroundColor: isSelected ? pickerColor + "18" : C.bg, border: `1px solid ${isSelected ? pickerColor : C.border}`,
-                      cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
-                    }}>
-                      <div style={{ width: 18, height: 18, borderRadius: 4, border: `2px solid ${isSelected ? pickerColor : C.border}`, backgroundColor: isSelected ? pickerColor : "transparent", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "all 0.15s" }}>
-                        {isSelected && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
-                      </div>
-                      {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 28, height: 28, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} /> : <div style={{ width: 28, height: 28, borderRadius: "50%", backgroundColor: pickerColor + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: pickerColor, fontWeight: 700, flexShrink: 0 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
-                      <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          {friendsList.length === 0 && (
-            <div style={{ marginBottom: 16, textAlign: "center", padding: "12px 0", color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif" }}>No friends added yet. You can add friends in the Mosaic gallery.</div>
-          )}
-          <div style={{ display: "flex", gap: 8 }}>
-            {coopSelectedFriends.size > 0 ? (
-              <button onClick={async () => {
-                setShowCoopFriendPicker(false);
-                if (isFromMosaic) { await startCoopMosaicSession({ inviteFriendUids: [...coopSelectedFriends], mosaicOverride: customMosaicPlay }); }
-                else { await startCoopSession({ inviteFriendUids: [...coopSelectedFriends] }); }
-              }} style={{
-                flex: 1, backgroundColor: pickerColor, color: "#fff", border: "none",
-                padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-                cursor: "pointer", textTransform: "uppercase",
-              }}>{`Invite ${coopSelectedFriends.size} Friend${coopSelectedFriends.size > 1 ? "s" : ""}`}</button>
-            ) : (
-              <button onClick={async () => {
-                setShowCoopFriendPicker(false);
-                if (isFromMosaic) { await startCoopMosaicSession({ mosaicOverride: customMosaicPlay }); }
-                else { startCoopSession(); }
-              }} style={{
-                flex: 1, backgroundColor: pickerColor, color: "#fff", border: "none",
-                padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-                cursor: "pointer", textTransform: "uppercase",
-              }}>Share Link</button>
-            )}
-            <button onClick={() => { setShowCoopFriendPicker(false); setCoopSelectedFriends(new Set()); }} style={{
-              backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-              padding: "12px 16px", borderRadius: 10, fontSize: 12, fontWeight: 700, fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
-            }}>Cancel</button>
-          </div>
-        </div>
-      </DraggableDrawer>
-    );
-  })() : null;
+  const coopFriendPickerEl = null; // Moved to Liquid Glass menu
 
   // --- Global modals element (included in every return) ---
   const globalModalsEl = (
