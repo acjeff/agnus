@@ -5875,6 +5875,7 @@ export default function Pattrn() {
                 </>
               );
             })() : isProfileView ? (() => {
+              const syncEnabled = firebaseConfigured && !!firebaseUser;
               return (
                 <>
                   <div style={{
