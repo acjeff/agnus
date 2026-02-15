@@ -3882,6 +3882,7 @@ export default function Pattrn() {
       const localData = gatherLocalData();
       await saveCloudData(user.uid, localData);
       setShowAccountModal(false);
+      setRadialMenuStack([]);
       setAutoLoginModal(false);
       setAccountEmail("");
       setAccountPassword("");
@@ -3910,6 +3911,7 @@ export default function Pattrn() {
       setSyncChoiceData({ uid, localData, cloudData, localSummary, cloudSummary });
       setShowSyncChoice(true);
       setShowAccountModal(false);
+      setRadialMenuStack([]);
       setAutoLoginModal(false);
       setAccountEmail("");
       setAccountPassword("");
@@ -3921,6 +3923,7 @@ export default function Pattrn() {
     applyMergedData(merged);
     await saveCloudData(uid, merged);
     setShowAccountModal(false);
+    setRadialMenuStack([]);
     setAutoLoginModal(false);
     setAccountEmail("");
     setAccountPassword("");
@@ -3994,6 +3997,7 @@ export default function Pattrn() {
     try {
       await logOut();
       setShowAccountModal(false);
+      setRadialMenuStack([]);
       setShowProfilePage(false);
       setSyncStatus("");
       setUsername(null);
@@ -4671,9 +4675,6 @@ export default function Pattrn() {
 
     // Menu view items
     const menuRoot = [];
-    if (firebaseConfigured && !firebaseUser) {
-      menuRoot.push({ id: "sign-in", icon: "login", label: "Sign In", action: () => { setShowAccountModal(true); } });
-    }
     if (firebaseConfigured && firebaseUser) {
       menuRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
       menuRoot.push({ id: "notifications", icon: "bell", label: "Notifications", action: () => { setShowNotifications(!showNotifications); } });
@@ -4742,6 +4743,7 @@ export default function Pattrn() {
     { id: "nav-gallery", icon: "gallery", label: "Mosaic", action: () => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); } },
     { id: "nav-coop", icon: "users", label: "Co-op", action: () => { setView("coop"); } },
     { id: "nav-profile", icon: "profile", label: "Profile", action: () => { setView("profile"); } },
+    ...(firebaseConfigured && !firebaseUser ? [{ id: "nav-sign-in", icon: "login", label: "Sign In", sub: "sign-in", beforeSub: () => { setAccountTab("login"); setAccountError(""); return true; } }] : []),
   ];
 
   // FAB icon — always the burger menu
@@ -4754,7 +4756,9 @@ export default function Pattrn() {
     const isSubMenu = currentMenuKey !== "root";
     const isCoopStartMenu = currentMenuKey === "coop-start";
     const isMosaicSaveMenu = currentMenuKey === "mosaic-save";
-    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : (isCoopStartMenu || isMosaicSaveMenu) ? [] : (menuTree[currentMenuKey] || []);
+    const isSignInMenu = currentMenuKey === "sign-in";
+    const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu;
+    const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
     const viewToNavId = { menu: "nav-home", gallery: "nav-gallery", coop: "nav-coop", profile: "nav-profile", creator: "nav-gallery", "custom-mosaic": "nav-gallery" };
@@ -4773,7 +4777,7 @@ export default function Pattrn() {
     const fabSize = 56;
     const hasPillButtons = pillButtons.length > 0;
     const closedWidth = hasPillButtons ? (pillButtons.length + 1) * fabSize : fabSize;
-    const panelWidth = (isCoopStartMenu || isMosaicSaveMenu) ? 280 : Math.max(200, closedWidth);
+    const panelWidth = isCustomPanel ? 300 : Math.max(200, closedWidth);
     const itemHeight = 44;
     const panelPad = 8;
     const dividerHeight = 13;
@@ -4787,7 +4791,7 @@ export default function Pattrn() {
     const showPassBanner = !!coopPassMode;
     const showPassPending = pendingPassOpen && !!coopPendingPassCell;
     const showPassIncoming = gameState === "playing" && isCoop && coopIncomingPass && selectedCell === coopIncomingPass.cellKey;
-    const hasPassUI = (isCoopStartMenu || isMosaicSaveMenu) ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming);
+    const hasPassUI = isCustomPanel ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming);
     const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : 0;
     const passRowHeight = showPassPlayerPicker ? (passPlayerCount > 2 ? 88 : 56) : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
@@ -4831,7 +4835,24 @@ export default function Pattrn() {
       return h;
     })();
 
-    const contentHeight = isMosaicSaveMenu ? mosaicSaveContentHeight : isCoopStartMenu ? coopStartContentHeight : (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
+    // Sign-in menu height — header + subtitle + tabs + google btn + divider + email + password + error + submit
+    const signInContentHeight = (() => {
+      if (!isSignInMenu) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 18 + 4; // header + margin
+      h += 14 + 12; // subtitle + margin
+      h += 30 + 12; // tab toggle + margin
+      h += 36 + 8; // google button + margin
+      h += 16 + 8; // "or" divider + margin
+      h += 36 + 6; // email input + margin
+      h += 36 + 8; // password input + margin
+      if (accountError) h += 32 + 8; // error display + margin
+      h += 36; // submit button
+      h += 12; // container bottom padding
+      return h;
+    })();
+
+    const contentHeight = isSignInMenu ? signInContentHeight : isMosaicSaveMenu ? mosaicSaveContentHeight : isCoopStartMenu ? coopStartContentHeight : (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
     const bottomOffset = bottomPx; // matches the bottom positioning
     const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
@@ -4947,7 +4968,148 @@ export default function Pattrn() {
 
           {/* Menu content — always rendered, animated via transitions */}
           <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}>
-            {isMosaicSaveMenu ? (() => {
+            {isSignInMenu ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>
+                      {accountTab === "login" ? "Sign In" : "Create Account"}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 12, fontFamily: "'Inter', sans-serif" }}>
+                      {accountTab === "login"
+                        ? "Sync your progress across devices"
+                        : "Progress will be saved to your account"}
+                    </div>
+
+                    {/* Tab toggle */}
+                    <div style={{
+                      display: "flex", borderRadius: 6, overflow: "hidden",
+                      border: "1px solid rgba(255,255,255,0.08)", marginBottom: 12,
+                    }}>
+                      {["login", "signup"].map(tab => (
+                        <button
+                          key={tab}
+                          onClick={() => { setAccountTab(tab); setAccountError(""); }}
+                          style={{
+                            flex: 1, padding: "6px 0", fontSize: 10, fontWeight: 700,
+                            fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                            background: accountTab === tab ? C.accent : "transparent",
+                            color: accountTab === tab ? C.bg : C.textDim,
+                            border: "none", cursor: "pointer", textTransform: "uppercase",
+                            transition: "all 0.15s",
+                          }}
+                        >
+                          {tab === "login" ? "Sign In" : "Sign Up"}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Google sign in */}
+                    <button
+                      onClick={handleGoogleSignIn}
+                      disabled={accountLoading}
+                      style={{
+                        width: "100%", padding: "8px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                        background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: C.text,
+                        cursor: accountLoading ? "not-allowed" : "pointer",
+                        opacity: accountLoading ? 0.5 : 1, textTransform: "uppercase",
+                        transition: "all 0.15s", marginBottom: 8,
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                      }}
+                    >
+                      <svg aria-hidden="true" width="12" height="12" viewBox="0 0 48 48">
+                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+                      </svg>
+                      Google
+                    </button>
+
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 8, marginBottom: 8,
+                    }}>
+                      <div style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.08)" }} />
+                      <span style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1 }}>or</span>
+                      <div style={{ flex: 1, height: 1, backgroundColor: "rgba(255,255,255,0.08)" }} />
+                    </div>
+
+                    {/* Email / password form */}
+                    <form onSubmit={e => {
+                      e.preventDefault();
+                      if (accountTab === "login") handleSignIn(accountEmail, accountPassword);
+                      else handleSignUp(accountEmail, accountPassword);
+                    }}>
+                      <input
+                        type="email"
+                        placeholder="Email"
+                        value={accountEmail}
+                        onChange={e => setAccountEmail(e.target.value)}
+                        autoComplete="email"
+                        style={{
+                          width: "100%", padding: "8px 12px", borderRadius: 8, fontSize: 13,
+                          fontFamily: "'Inter', sans-serif",
+                          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: C.text,
+                          outline: "none", marginBottom: 6, boxSizing: "border-box",
+                          transition: "border-color 0.15s",
+                        }}
+                        onFocus={e => { e.target.style.borderColor = C.accent; }}
+                        onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                      />
+                      <input
+                        type="password"
+                        placeholder="Password"
+                        value={accountPassword}
+                        onChange={e => setAccountPassword(e.target.value)}
+                        autoComplete={accountTab === "login" ? "current-password" : "new-password"}
+                        style={{
+                          width: "100%", padding: "8px 12px", borderRadius: 8, fontSize: 13,
+                          fontFamily: "'Inter', sans-serif",
+                          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: C.text,
+                          outline: "none", marginBottom: 8, boxSizing: "border-box",
+                          transition: "border-color 0.15s",
+                        }}
+                        onFocus={e => { e.target.style.borderColor = C.accent; }}
+                        onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; }}
+                      />
+
+                      {accountError && (
+                        <div style={{
+                          padding: "6px 10px", borderRadius: 6, marginBottom: 8,
+                          backgroundColor: C.incorrect + "18", border: `1px solid ${C.incorrect}44`,
+                          fontSize: 10, color: C.incorrect, textAlign: "center",
+                        }}>
+                          {accountError}
+                        </div>
+                      )}
+
+                      <button
+                        type="submit"
+                        disabled={accountLoading || !accountEmail || !accountPassword}
+                        style={{
+                          width: "100%", padding: "8px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                          fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                          background: C.accent, color: C.bg, border: "none",
+                          cursor: (accountLoading || !accountEmail || !accountPassword) ? "not-allowed" : "pointer",
+                          opacity: (accountLoading || !accountEmail || !accountPassword) ? 0.5 : 1,
+                          textTransform: "uppercase", transition: "all 0.15s",
+                        }}
+                      >
+                        {accountLoading ? "Loading..." : accountTab === "login" ? "Sign In" : "Create Account"}
+                      </button>
+                    </form>
+                  </div>
+                </>
+              );
+            })() : isMosaicSaveMenu ? (() => {
               return (
                 <>
                   <div style={{
