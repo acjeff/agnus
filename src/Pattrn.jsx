@@ -11883,27 +11883,12 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 0, paddingRight: 0,
+        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 20, paddingRight: 20,
       }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } `}</style>
 
-        {/* ── Compact top app bar ── */}
-        <div style={{
-          width: "100%", maxWidth: 480,
-          display: "flex", alignItems: "center", justifyContent: "space-between",
-          paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 12, paddingLeft: 20, paddingRight: 20,
-          position: "sticky", top: 0, zIndex: 50,
-          backgroundColor: C.bg + "ee",
-          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
-        }}>
-          {/* Left: logo */}
-          <h1 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
-            Agnus
-          </h1>
-        </div>
-
         {/* ── Scrollable content area ── */}
-        <div style={{ width: "100%", maxWidth: 480, padding: "0 20px", boxSizing: "border-box" }}>
+        <div style={{ width: "100%", maxWidth: 480, paddingTop: "calc(20px + env(safe-area-inset-top, 0px))", boxSizing: "border-box" }}>
 
         {/* ── Daily hero card ── */}
         {(() => {
