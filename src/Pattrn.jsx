@@ -12945,18 +12945,6 @@ export default function Pattrn() {
     // Next / Done / Back — the primary action
     if (isCoop) {
       playPillButtons.push({ id: "done", icon: "home", color: "#54A0FF", onClick: () => { leaveCoopSession(); setView("menu"); } });
-    } else if (isDaily || isCascade || (customMosaicPuzzlesRef.current && isMosaic)) {
-      playPillButtons.push({ id: "back-done", icon: "back", color: C.accent, onClick: () => {
-        if (customMosaicPuzzlesRef.current && isMosaic) {
-          if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
-            coopMosaicCurrentTileRef.current = -1;
-            updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
-            setCoopMosaicOtherFills({});
-            coopMosaicWriteThrottleRef.current = {};
-          }
-          setView("custom-mosaic");
-        } else { setView("menu"); }
-      }});
     } else if (currentPuzzle < totalPuzzles - 1) {
       playPillButtons.push({ id: "next", icon: "forward", color: C.accent, onClick: () => startPuzzle(currentPuzzle + 1) });
     }
@@ -12979,7 +12967,6 @@ export default function Pattrn() {
       playPillButtons.push({ id: "done", icon: "home", color: "#54A0FF", onClick: () => { leaveCoopSession(); setView("menu"); } });
     } else if (isCascade) {
       playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => startPuzzle(cascadeRunIndex, "cascade", true) });
-      playPillButtons.push({ id: "back-done", icon: "home", color: C.accent, onClick: () => setView("menu") });
     } else {
       playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => startPuzzle(currentPuzzle) });
       if (currentPuzzle < totalPuzzles - 1) {
