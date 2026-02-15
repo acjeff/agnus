@@ -3911,30 +3911,44 @@ export default function Pattrn() {
 
   // Handle sign in: pull cloud data, check for conflict
   const handleSignIn = useCallback(async (email, password) => {
+    console.log("[UI] handleSignIn called with email:", email);
     setAccountLoading(true);
     setAccountError("");
     try {
+      console.log("[UI] Calling signInWithEmail...");
       const user = await signInWithEmail(email, password);
+      console.log("[UI] Sign-in successful, user:", user.uid);
+      console.log("[UI] Starting post-login sync...");
       await handlePostLoginSync(user.uid);
+      console.log("[UI] Post-login sync complete");
     } catch (e) {
+      console.error("[UI] Sign-in error:", e.code, e.message);
       setAccountError(friendlyAuthError(e.code));
     } finally {
+      console.log("[UI] Setting loading to false");
       setAccountLoading(false);
     }
   }, [handlePostLoginSync]);
 
   // Handle Google sign in
   const handleGoogleSignIn = useCallback(async () => {
+    console.log("[UI] handleGoogleSignIn called");
     setAccountLoading(true);
     setAccountError("");
     try {
+      console.log("[UI] Calling signInWithGoogle...");
       const user = await signInWithGoogle();
+      console.log("[UI] Google sign-in successful, user:", user.uid);
+      console.log("[UI] Starting post-login sync...");
       await handlePostLoginSync(user.uid);
+      console.log("[UI] Post-login sync complete");
     } catch (e) {
+      console.error("[UI] Google sign-in error:", e.code, e.message, e);
       if (e.code !== "auth/popup-closed-by-user") {
         setAccountError(friendlyAuthError(e.code));
       }
     } finally {
+      console.log("[UI] Setting loading to false");
       setAccountLoading(false);
     }
   }, [handlePostLoginSync]);

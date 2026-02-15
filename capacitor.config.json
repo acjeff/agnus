@@ -4,12 +4,12 @@
 	"webDir": "dist",
 	"ios": {
 		"contentInset": "automatic",
-		"preferredContentMode": "mobile",
-		"scheme": "Agnus"
+		"preferredContentMode": "mobile"
 	},
 	"server": {
-		"iosScheme": "https",
-		"androidScheme": "https"
+		"hostname": "localhost",
+		"iosScheme": "http",
+		"androidScheme": "http"
 	},
 	"packageClassList": [
 		"GoogleAuth"
