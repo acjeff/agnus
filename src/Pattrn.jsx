@@ -6212,15 +6212,30 @@ export default function Pattrn() {
                                   {session.status === "waiting" ? "Waiting" : "In progress"}
                                 </div>
                               </div>
-                              <button
-                                onClick={() => isMosaicSession ? rejoinCoopMosaicSession(session) : rejoinCoopSession(session)}
-                                style={{
-                                  background: C.coop, border: "none", borderRadius: 8,
-                                  padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 10,
-                                  fontFamily: "'Inter', sans-serif", fontWeight: 700, letterSpacing: 0.5,
-                                }}>
-                                Rejoin
-                              </button>
+                              <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                                <button
+                                  onClick={() => isMosaicSession ? rejoinCoopMosaicSession(session) : rejoinCoopSession(session)}
+                                  style={{
+                                    background: C.coop, border: "none", borderRadius: 8,
+                                    padding: "8px 14px", color: "#fff", cursor: "pointer", fontSize: 10,
+                                    fontFamily: "'Inter', sans-serif", fontWeight: 700, letterSpacing: 0.5,
+                                  }}>
+                                  Rejoin
+                                </button>
+                                {isHost && (
+                                  <button
+                                    onClick={() => isMosaicSession ? closeCoopMosaicSessionPermanently(session.id, session) : closeCoopSessionPermanently(session.id, session)}
+                                    style={{
+                                      background: "none", border: `1px solid rgba(255,255,255,0.08)`, borderRadius: 8,
+                                      padding: "8px 10px", color: C.textDim, cursor: "pointer", fontSize: 10,
+                                      fontFamily: "'Inter', sans-serif", transition: "all 0.15s",
+                                    }}
+                                    title="Close session"
+                                    onMouseEnter={e => { e.currentTarget.style.borderColor = "#f87171"; e.currentTarget.style.color = "#f87171"; }}
+                                    onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = C.textDim; }}
+                                  >✕</button>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
