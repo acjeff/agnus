@@ -3084,7 +3084,7 @@ export default function Pattrn() {
   // --- Staff Pick & Admin Manage state ---
   const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
   const staffPickPuzzlesRef = useRef(null); // puzzles built from staff pick grid
-  const [showMosaicPreviewOverlay, setShowMosaicPreviewOverlay] = useState(false); // magnifying glass preview overlay
+  // Mosaic preview now renders inside the Liquid Glass menu via "mosaic-preview" sub-menu
   const customMosaicReturnViewRef = useRef("gallery"); // where to go when leaving custom-mosaic view
 
   // Listen for auth state changes
@@ -4701,7 +4701,8 @@ export default function Pattrn() {
     const isCoopStartMenu = currentMenuKey === "coop-start";
     const isMosaicSaveMenu = currentMenuKey === "mosaic-save";
     const isSignInMenu = currentMenuKey === "sign-in";
-    const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu;
+    const isMosaicPreviewMenu = currentMenuKey === "mosaic-preview";
+    const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu || isMosaicPreviewMenu;
     const contextualItems = currentMenuKey === "play" ? playSubMenu : currentMenuKey === "theme" ? themeSubMenu : isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
@@ -4779,6 +4780,17 @@ export default function Pattrn() {
       return h;
     })();
 
+    // Mosaic preview menu height — header + canvas + bottom padding
+    const mosaicPreviewContentHeight = (() => {
+      if (!isMosaicPreviewMenu) return 0;
+      const canvasSize = 300 - 32 - 2; // panelWidth minus padding minus border
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += canvasSize + 2; // canvas + border
+      h += 12; // container bottom padding
+      return h;
+    })();
+
     // Sign-in menu height — header + subtitle + tabs + google btn + divider + email + password + error + submit
     const signInContentHeight = (() => {
       if (!isSignInMenu) return 0;
@@ -4796,7 +4808,7 @@ export default function Pattrn() {
       return h;
     })();
 
-    const contentHeight = isSignInMenu ? signInContentHeight : isMosaicSaveMenu ? mosaicSaveContentHeight : isCoopStartMenu ? coopStartContentHeight : (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
+    const contentHeight = isMosaicPreviewMenu ? mosaicPreviewContentHeight : isSignInMenu ? signInContentHeight : isMosaicSaveMenu ? mosaicSaveContentHeight : isCoopStartMenu ? coopStartContentHeight : (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
     const bottomOffset = bottomPx; // matches the bottom positioning
     const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
@@ -5102,6 +5114,61 @@ export default function Pattrn() {
                     >
                       {mosaicLoading ? "Saving..." : (creatorEditingId ? "Update" : "Save")}
                     </button>
+                  </div>
+                </>
+              );
+            })() : isMosaicPreviewMenu ? (() => {
+              const canvasSize = 300 - 32 - 2;
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: "uppercase", marginBottom: 8 }}>
+                      Mosaic Preview — Tile {currentPuzzle + 1}
+                    </div>
+                    <canvas ref={el => {
+                      if (!el || !customMosaicPlay?.grid) return;
+                      const grid = customMosaicPlay.grid;
+                      const gs = grid.length;
+                      const cellSz = canvasSize / gs;
+                      const ctx = el.getContext("2d");
+                      el.width = canvasSize; el.height = canvasSize;
+                      const dimColor = "#14141f";
+                      const tileRow = Math.floor(currentPuzzle / 5);
+                      const tileCol = currentPuzzle % 5;
+                      for (let r = 0; r < gs; r++) {
+                        for (let c = 0; c < (grid[r]?.length || 0); c++) {
+                          const tr = Math.floor(r / 5); const tc = Math.floor(c / 5);
+                          const tileIdx = tr * 5 + tc;
+                          const isCurrentTile = (tr === tileRow && tc === tileCol);
+                          const effectiveProgress = isCoopMosaic ? { ...customMosaicProgress, ...coopMosaicSharedProgress } : customMosaicProgress;
+                          const tileSolved = (effectiveProgress[tileIdx] || 0) > 0;
+                          if (isCurrentTile) {
+                            const localR = r - tileRow * 5; const localC = c - tileCol * 5;
+                            const cellKey = `${localR}-${localC}`;
+                            const puz = customMosaicPuzzlesRef.current?.[currentPuzzle];
+                            if (puz) {
+                              const isBlankCell = puz.blanks.has(cellKey);
+                              if (!isBlankCell || tileSolved) { ctx.fillStyle = grid[r][c] || dimColor; }
+                              else if (fills[cellKey]) {
+                                const parsed = fills[cellKey].split("|");
+                                ctx.fillStyle = parsed.length >= 2 ? parsed[1] : grid[r][c] || dimColor;
+                              } else { ctx.fillStyle = dimColor + "88"; }
+                            } else { ctx.fillStyle = grid[r][c] || dimColor; }
+                          } else if (tileSolved) { ctx.fillStyle = grid[r][c] || dimColor; }
+                          else { ctx.fillStyle = dimColor; }
+                          ctx.fillRect(c * cellSz, r * cellSz, cellSz, cellSz);
+                        }
+                      }
+                      ctx.strokeStyle = C.accent; ctx.lineWidth = 2;
+                      ctx.strokeRect(tileCol * 5 * cellSz, tileRow * 5 * cellSz, 5 * cellSz, 5 * cellSz);
+                    }} style={{ borderRadius: 8, border: `1px solid ${C.border}`, width: canvasSize, height: canvasSize, display: "block" }} />
                   </div>
                 </>
               );
@@ -9035,58 +9102,6 @@ export default function Pattrn() {
     ) : null;
   })() : null;
 
-  const mosaicPreviewOverlayEl = showMosaicPreviewOverlay && customMosaicPlay && customMosaicPuzzlesRef.current && (
-    <DraggableDrawer isOpen={true} onClose={() => setShowMosaicPreviewOverlay(false)} zIndex={1200}>
-      <div style={{ padding: "0 24px 24px", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
-        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.accent, letterSpacing: 1, textTransform: "uppercase" }}>
-          Mosaic Preview — Tile {currentPuzzle + 1}
-        </div>
-        <canvas ref={el => {
-          if (!el || !customMosaicPlay.grid) return;
-          const grid = customMosaicPlay.grid;
-          const gs = grid.length;
-          const canvasSize = Math.min(320, typeof window !== "undefined" ? window.innerWidth - 60 : 320);
-          const cellSz = canvasSize / gs;
-          const ctx = el.getContext("2d");
-          el.width = canvasSize; el.height = canvasSize;
-          const dimColor = "#14141f";
-          const tileRow = Math.floor(currentPuzzle / 5);
-          const tileCol = currentPuzzle % 5;
-          for (let r = 0; r < gs; r++) {
-            for (let c = 0; c < (grid[r]?.length || 0); c++) {
-              const tr = Math.floor(r / 5); const tc = Math.floor(c / 5);
-              const tileIdx = tr * 5 + tc;
-              const isCurrentTile = (tr === tileRow && tc === tileCol);
-              const effectiveProgress = isCoopMosaic ? { ...customMosaicProgress, ...coopMosaicSharedProgress } : customMosaicProgress;
-              const tileSolved = (effectiveProgress[tileIdx] || 0) > 0;
-              if (isCurrentTile) {
-                const localR = r - tileRow * 5; const localC = c - tileCol * 5;
-                const cellKey = `${localR}-${localC}`;
-                const puz = customMosaicPuzzlesRef.current[currentPuzzle];
-                if (puz) {
-                  const isBlankCell = puz.blanks.has(cellKey);
-                  if (!isBlankCell || tileSolved) { ctx.fillStyle = grid[r][c] || dimColor; }
-                  else if (fills[cellKey]) {
-                    const parsed = fills[cellKey].split("|");
-                    ctx.fillStyle = parsed.length >= 2 ? parsed[1] : grid[r][c] || dimColor;
-                  } else { ctx.fillStyle = dimColor + "88"; }
-                } else { ctx.fillStyle = grid[r][c] || dimColor; }
-              } else if (tileSolved) { ctx.fillStyle = grid[r][c] || dimColor; }
-              else { ctx.fillStyle = dimColor; }
-              ctx.fillRect(c * cellSz, r * cellSz, cellSz, cellSz);
-            }
-          }
-          ctx.strokeStyle = C.accent; ctx.lineWidth = 2;
-          ctx.strokeRect(tileCol * 5 * cellSz, tileRow * 5 * cellSz, 5 * cellSz, 5 * cellSz);
-        }} style={{ borderRadius: 8, border: `1px solid ${C.border}` }} />
-        <button onClick={() => setShowMosaicPreviewOverlay(false)} style={{
-          background: "none", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 20px",
-          color: C.textDim, cursor: "pointer", fontFamily: "'Inter', sans-serif", fontSize: 11, letterSpacing: 1,
-        }}>Close</button>
-      </div>
-    </DraggableDrawer>
-  );
-
   const mosaicLeaveConfirmEl = showMosaicLeaveConfirm && (
     <DraggableDrawer isOpen={true} onClose={() => setShowMosaicLeaveConfirm(false)} zIndex={1200}>
       <div style={{ padding: "0 24px 24px" }}>
@@ -9129,7 +9144,6 @@ export default function Pattrn() {
       {coopFriendPickerEl}
       {leaveConfirmEl}
       {coopMosaicNavigateEl}
-      {mosaicPreviewOverlayEl}
       {mosaicLeaveConfirmEl}
       {coopMosaicInviteEl}
       {coopInviteToastEl}
@@ -12699,7 +12713,7 @@ export default function Pattrn() {
       const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
       setProgress(nextProgress); saveProgress(nextProgress);
     }
-    stopTimer(); setShowMosaicPreviewOverlay(false);
+    stopTimer(); setRadialMenuStack(prev => prev.includes("mosaic-preview") ? [] : prev);
     if (customMosaicPuzzlesRef.current && isMosaic) {
       if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
         coopMosaicCurrentTileRef.current = -1;
@@ -12746,7 +12760,7 @@ export default function Pattrn() {
       }
     }
     if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
-      playPillButtons.push({ id: "preview", icon: "search", color: C.accent, onClick: () => setShowMosaicPreviewOverlay(true) });
+      playPillButtons.push({ id: "preview", icon: "search", color: C.accent, onClick: () => setRadialMenuStack(["root", "mosaic-preview"]) });
     }
   } else if (gameState === "won") {
     // Share
