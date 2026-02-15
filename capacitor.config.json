@@ -4,24 +4,21 @@
 	"webDir": "dist",
 	"ios": {
 		"contentInset": "automatic",
-		"preferredContentMode": "mobile"
+		"preferredContentMode": "mobile",
+		"scheme": "capacitor"
 	},
 	"server": {
-		"hostname": "localhost",
-		"iosScheme": "http",
-		"androidScheme": "http"
+		"hostname": "localhost"
 	},
 	"packageClassList": [
-		"GoogleAuth"
+		"FirebaseAuthenticationPlugin"
 	],
 	"plugins": {
-		"GoogleAuth": {
-			"scopes": [
-				"profile",
-				"email"
-			],
-			"serverClientId": "511503810684-eh4f90s0io8mh4tc275shdji0pir64hr.apps.googleusercontent.com",
-			"forceCodeForRefreshToken": true
+		"FirebaseAuthentication": {
+			"skipNativeAuth": false,
+			"providers": [
+				"google.com"
+			]
 		}
 	}
 }

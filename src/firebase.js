@@ -117,8 +117,39 @@ export async function signInWithEmail(email, password) {
     throw new Error("Firebase not configured");
   }
 
-  // Check if running in Capacitor - use REST API to avoid iframe issues
+  // Check if running in Capacitor - use native plugin
   const isCapacitor = typeof window !== 'undefined' && window.Capacitor;
+
+  if (isCapacitor) {
+    console.log("[Firebase Auth] Using Capacitor Firebase plugin...");
+    try {
+      // Use Capacitor Firebase Authentication plugin
+      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
+
+      const result = await FirebaseAuthentication.signInWithEmailAndPassword({
+        email,
+        password
+      });
+
+      console.log("[Firebase Auth] Native sign-in successful");
+
+      // The plugin automatically syncs with Firebase JS SDK
+      // Just return the current user from the SDK
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        console.log("[Firebase Auth] Got current user:", currentUser.uid);
+        return currentUser;
+      }
+
+      throw new Error("User not found after native sign-in");
+    } catch (error) {
+      console.error("[Firebase Auth] Capacitor plugin failed:", error);
+      throw error;
+    }
+  }
+
+  // Web: use standard SDK
+  console.log("[Firebase Auth] Using standard SDK for web...");
 
   if (isCapacitor) {
     console.log("[Firebase Auth] Using REST API for Capacitor...");
@@ -209,33 +240,22 @@ export async function signInWithGoogle() {
 
   if (isCapacitor) {
     try {
-      console.log("[Firebase Auth] Loading native GoogleAuth plugin...");
-      // Import GoogleAuth plugin dynamically
-      const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
-      console.log("[Firebase Auth] Plugin loaded, initializing...");
+      console.log("[Firebase Auth] Using Capacitor Firebase plugin for Google...");
+      const { FirebaseAuthentication } = await import('@capacitor-firebase/authentication');
 
-      // Initialize if needed
-      await GoogleAuth.initialize();
-      console.log("[Firebase Auth] Plugin initialized, showing sign-in UI...");
+      const result = await FirebaseAuthentication.signInWithGoogle();
+      console.log("[Firebase Auth] Google sign-in successful");
 
-      // Sign in with native plugin
-      const googleUser = await GoogleAuth.signIn();
-      console.log("[Firebase Auth] User signed in with Google, got user data:", googleUser?.email);
-
-      // Get the ID token and sign in to Firebase
-      if (!googleUser.authentication?.idToken) {
-        console.error("[Firebase Auth] No ID token in response");
-        throw new Error("No ID token received from Google");
+      // The plugin automatically syncs with Firebase JS SDK
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        console.log("[Firebase Auth] Got current user:", currentUser.uid);
+        return currentUser;
       }
 
-      console.log("[Firebase Auth] Got ID token, signing in to Firebase...");
-      const { GoogleAuthProvider, signInWithCredential } = await import('firebase/auth');
-      const credential = GoogleAuthProvider.credential(googleUser.authentication.idToken);
-      const result = await signInWithCredential(auth, credential);
-      console.log("[Firebase Auth] Firebase sign-in successful, user:", result.user.uid);
-      return result.user;
+      throw new Error("User not found after Google sign-in");
     } catch (error) {
-      console.error("[Firebase Auth] Native Google Sign-In error:", error);
+      console.error("[Firebase Auth] Google sign-in error:", error);
       throw error;
     }
   }
