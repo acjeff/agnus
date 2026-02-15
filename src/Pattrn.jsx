@@ -105,21 +105,258 @@ const C = {
   coop: "#60a5fa", // blue for co-op completions
 };
 
+// --- Bottom Tab Bar (Apple Liquid Glass style with draggable pill) ---
+const TAB_KEYS = ["home", "mosaic", "coop", "profile"];
+let _prevTabIdx = 0; // module-level: remembers last tab across unmount/mount
+
+function BottomTabBar({ active, onNavigate, coopBadgeCount, firebaseUser, profilePicture }) {
+  const activeIdx = TAB_KEYS.indexOf(active);
+  const pillRef = useRef(null);
+  const barRef = useRef(null);
+  const dragState = useRef({ active: false, startX: 0, pillStartLeft: 0, barWidth: 0, moved: false });
+
+  // Compute pill left in px from a tab index
+  const getPillLeft = (idx, barW) => {
+    const pad = 5; // inset from bar edge
+    const slotW = (barW - pad * 2) / 4;
+    return pad + idx * slotW;
+  };
+  const getPillWidth = (barW) => (barW - 10) / 4;
+
+  // Color for a given tab index
+  const colorForIdx = (idx) => TAB_KEYS[idx] === "coop" ? C.coop : C.accent;
+  const activeColor = colorForIdx(activeIdx);
+
+  // Animate pill from _prevTabIdx to activeIdx on mount/update
+  useEffect(() => {
+    const pill = pillRef.current;
+    const bar = barRef.current;
+    if (!pill || !bar || dragState.current.active) return;
+    const barW = bar.offsetWidth;
+    if (_prevTabIdx !== activeIdx) {
+      pill.style.transition = "none";
+      pill.style.left = getPillLeft(_prevTabIdx, barW) + "px";
+      pill.offsetHeight; // force reflow
+      pill.style.transition = "left 0.4s cubic-bezier(0.32, 0.72, 0, 1)";
+      pill.style.left = getPillLeft(activeIdx, barW) + "px";
+      _prevTabIdx = activeIdx;
+    } else {
+      pill.style.left = getPillLeft(activeIdx, barW) + "px";
+    }
+  }, [activeIdx]);
+
+  // --- Drag handling ---
+  const onDragStart = (clientX) => {
+    const pill = pillRef.current;
+    const bar = barRef.current;
+    if (!pill || !bar) return;
+    const barW = bar.offsetWidth;
+    pill.style.transition = "none";
+    dragState.current = {
+      active: true,
+      startX: clientX,
+      pillStartLeft: getPillLeft(activeIdx, barW),
+      barWidth: barW,
+      moved: false,
+    };
+  };
+
+  const onDragMove = (clientX) => {
+    const ds = dragState.current;
+    if (!ds.active) return;
+    const pill = pillRef.current;
+    if (!pill) return;
+    const dx = clientX - ds.startX;
+    if (Math.abs(dx) > 3) ds.moved = true;
+    const pillW = getPillWidth(ds.barWidth);
+    const minLeft = 5;
+    const maxLeft = ds.barWidth - pillW - 5;
+    const newLeft = Math.max(minLeft, Math.min(maxLeft, ds.pillStartLeft + dx));
+    pill.style.left = newLeft + "px";
+  };
+
+  const onDragEnd = () => {
+    const ds = dragState.current;
+    if (!ds.active) return;
+    ds.active = false;
+    const pill = pillRef.current;
+    if (!pill) return;
+    if (!ds.moved) return; // was just a tap, let onClick handle it
+    // Snap to nearest tab
+    const currentLeft = parseFloat(pill.style.left) || 0;
+    const pillW = getPillWidth(ds.barWidth);
+    const centerX = currentLeft + pillW / 2;
+    const slotW = (ds.barWidth - 10) / 4;
+    let nearest = Math.round((centerX - 5 - slotW / 2) / slotW);
+    nearest = Math.max(0, Math.min(3, nearest));
+    const targetLeft = getPillLeft(nearest, ds.barWidth);
+    pill.style.transition = "left 0.3s cubic-bezier(0.32, 0.72, 0, 1)";
+    pill.style.left = targetLeft + "px";
+    _prevTabIdx = nearest;
+    if (nearest !== activeIdx) {
+      onNavigate(TAB_KEYS[nearest]);
+    }
+    ds.moved = false;
+  };
+
+  // Pointer events on the pill
+  const onPointerDown = (e) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    onDragStart(e.clientX);
+  };
+  const onPointerMove = (e) => onDragMove(e.clientX);
+  const onPointerUp = () => onDragEnd();
+
+  return (
+    <nav className="bottom-tab-bar" style={{
+      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
+      display: "flex", justifyContent: "center",
+      paddingBottom: "calc(8px + env(safe-area-inset-bottom, 0px))",
+      paddingLeft: 12, paddingRight: 12,
+      pointerEvents: "none",
+    }}>
+      <div ref={barRef} style={{
+        display: "flex", width: "100%", maxWidth: 420, position: "relative",
+        justifyContent: "space-around", alignItems: "center",
+        padding: "6px 6px 5px",
+        backgroundColor: "rgba(18, 18, 32, 0.55)",
+        borderRadius: 9999,
+        border: "1px solid rgba(255, 255, 255, 0.1)",
+        boxShadow: "0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.2)",
+        backdropFilter: "blur(28px) saturate(1.8)",
+        WebkitBackdropFilter: "blur(28px) saturate(1.8)",
+        pointerEvents: "auto",
+        overflow: "hidden",
+        touchAction: "none",
+      }}>
+        {/* Draggable sliding pill indicator */}
+        {activeIdx >= 0 && (
+          <div ref={pillRef}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={onPointerUp}
+            onPointerCancel={onPointerUp}
+            style={{
+              position: "absolute", top: 4, bottom: 4,
+              left: 5,
+              width: "calc(25% - 2.5px)",
+              borderRadius: 9999,
+              background: `radial-gradient(ellipse at 50% 0%, ${activeColor}18 0%, ${activeColor}0a 70%, transparent 100%)`,
+              border: `1px solid ${activeColor}22`,
+              boxShadow: `0 0 20px ${activeColor}12, inset 0 1px 0 ${activeColor}15, inset 0 -1px 0 rgba(0,0,0,0.1)`,
+              cursor: "grab",
+              zIndex: 2,
+              touchAction: "none",
+            }} />
+        )}
+        {/* Home */}
+        <button onClick={() => { if (!dragState.current.moved) onNavigate("home"); }}
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
+          <svg width="21" height="21" viewBox="0 0 24 24" fill={active === "home" ? C.accent + "22" : "none"} stroke={active === "home" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "all 0.25s" }}>
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          <span style={{ fontSize: 9, fontWeight: active === "home" ? 700 : 500, color: active === "home" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace", transition: "color 0.25s", letterSpacing: 0.3 }}>Home</span>
+        </button>
+        {/* Mosaic */}
+        <button onClick={() => { if (!dragState.current.moved) onNavigate("mosaic"); }}
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
+          <svg width="21" height="21" viewBox="0 0 24 24" fill={active === "mosaic" ? C.accent + "22" : "none"} stroke={active === "mosaic" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "all 0.25s" }}>
+            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
+          </svg>
+          <span style={{ fontSize: 9, fontWeight: active === "mosaic" ? 700 : 500, color: active === "mosaic" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace", transition: "color 0.25s", letterSpacing: 0.3 }}>Mosaic</span>
+        </button>
+        {/* Co-op */}
+        <button onClick={() => { if (!dragState.current.moved) onNavigate("coop"); }}
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
+          <div style={{ position: "relative", display: "inline-flex" }}>
+            <svg width="21" height="21" viewBox="0 0 24 24" fill={active === "coop" ? C.coop + "22" : "none"} stroke={active === "coop" ? C.coop : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "all 0.25s" }}>
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            {coopBadgeCount > 0 && (
+              <div style={{
+                position: "absolute", top: -4, right: -8,
+                minWidth: 14, height: 14, borderRadius: 7,
+                backgroundColor: C.coop, display: "flex", alignItems: "center", justifyContent: "center",
+                padding: "0 3px", boxSizing: "border-box",
+              }}>
+                <span style={{ fontSize: 8, fontWeight: 700, color: "#fff", fontFamily: "'Space Mono', monospace", lineHeight: 1, paddingTop: 1 }}>
+                  {coopBadgeCount}
+                </span>
+              </div>
+            )}
+          </div>
+          <span style={{ fontSize: 9, fontWeight: active === "coop" ? 700 : 500, color: active === "coop" ? C.coop : C.textDim, fontFamily: "'Space Mono', monospace", transition: "color 0.25s", letterSpacing: 0.3 }}>Co-op</span>
+        </button>
+        {/* Profile */}
+        <button onClick={() => { if (!dragState.current.moved) onNavigate("profile"); }}
+          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "8px 0", position: "relative", zIndex: 1 }}>
+          {firebaseUser && profilePicture ? (
+            <img src={profilePicture} alt="" style={{ width: 21, height: 21, borderRadius: 11, objectFit: "cover", border: `1.5px solid ${active === "profile" ? C.accent : "transparent"}`, transition: "border-color 0.25s" }} />
+          ) : (
+            <svg width="21" height="21" viewBox="0 0 24 24" fill={active === "profile" ? C.accent + "22" : "none"} stroke={active === "profile" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transition: "all 0.25s" }}>
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+            </svg>
+          )}
+          <span style={{ fontSize: 9, fontWeight: active === "profile" ? 700 : 500, color: active === "profile" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace", transition: "color 0.25s", letterSpacing: 0.3 }}>Profile</span>
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 // --- Draggable Drawer (mobile bottom sheet with drag-to-dismiss) ---
 function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
   const drawerRef = useRef(null);
   const backdropRef = useRef(null);
   const handleRef = useRef(null);
   const dragState = useRef({ active: false, startY: 0, current: 0 });
+  const [visible, setVisible] = useState(isOpen);
+  const closingRef = useRef(false);
+  const prevIsOpen = useRef(isOpen);
+
+  // Track open/close with animation delay
+  useEffect(() => {
+    if (isOpen && !prevIsOpen.current) {
+      closingRef.current = false;
+      setVisible(true);
+    } else if (!isOpen && prevIsOpen.current && visible && !closingRef.current) {
+      // isOpen went false from a button click — animate out
+      closingRef.current = true;
+      if (drawerRef.current) {
+        drawerRef.current.style.transition = "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)";
+        drawerRef.current.style.transform = "translateY(100%)";
+      }
+      if (backdropRef.current) {
+        backdropRef.current.style.transition = "opacity 0.3s";
+        backdropRef.current.style.opacity = "0";
+      }
+      setTimeout(() => { setVisible(false); closingRef.current = false; }, 300);
+    }
+    prevIsOpen.current = isOpen;
+  }, [isOpen, visible]);
+
+  const animateClose = useCallback(() => {
+    if (closingRef.current) return;
+    closingRef.current = true;
+    if (drawerRef.current) {
+      drawerRef.current.style.transition = "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)";
+      drawerRef.current.style.transform = "translateY(100%)";
+    }
+    if (backdropRef.current) {
+      backdropRef.current.style.transition = "opacity 0.3s";
+      backdropRef.current.style.opacity = "0";
+    }
+    setTimeout(() => {
+      setVisible(false);
+      closingRef.current = false;
+      onClose();
+    }, 300);
+  }, [onClose]);
 
   const onTouchStart = useCallback((e) => {
-    const handleEl = handleRef.current;
     const drawerEl = drawerRef.current;
-    if (!handleEl || !drawerEl) return;
-    const isHandle = handleEl.contains(e.target);
-    const scrollEl = drawerEl.querySelector("[data-drawer-scroll]");
-    const isScrolledToTop = !scrollEl || scrollEl.scrollTop <= 0;
-    if (!isHandle && !isScrolledToTop) return;
+    if (!drawerEl) return;
     dragState.current = { active: true, startY: e.touches[0].clientY, current: 0 };
     drawerEl.style.transition = "none";
     drawerEl.style.animation = "none";
@@ -144,7 +381,7 @@ function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
     if (dy > 100) {
       if (drawerRef.current) drawerRef.current.style.transform = "translateY(100%)";
       if (backdropRef.current) { backdropRef.current.style.transition = "opacity 0.3s"; backdropRef.current.style.opacity = "0"; }
-      setTimeout(() => onClose(), 300);
+      setTimeout(() => { setVisible(false); closingRef.current = false; onClose(); }, 300);
     } else {
       if (drawerRef.current) drawerRef.current.style.transform = "translateY(0)";
       if (backdropRef.current) backdropRef.current.style.opacity = "1";
@@ -152,22 +389,22 @@ function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
     dragState.current.current = 0;
   }, [onClose]);
 
-  // Attach non-passive touch listeners so e.preventDefault() works on mobile
+  // Attach touch listeners to handle only so scrollable content works
   useEffect(() => {
-    const el = drawerRef.current;
-    if (!el) return;
-    el.addEventListener("touchstart", onTouchStart, { passive: true });
-    el.addEventListener("touchmove", onTouchMove, { passive: false });
-    el.addEventListener("touchend", onTouchEnd, { passive: true });
+    const handleEl = handleRef.current;
+    if (!handleEl) return;
+    handleEl.addEventListener("touchstart", onTouchStart, { passive: true });
+    handleEl.addEventListener("touchmove", onTouchMove, { passive: false });
+    handleEl.addEventListener("touchend", onTouchEnd, { passive: true });
     return () => {
-      el.removeEventListener("touchstart", onTouchStart);
-      el.removeEventListener("touchmove", onTouchMove);
-      el.removeEventListener("touchend", onTouchEnd);
+      handleEl.removeEventListener("touchstart", onTouchStart);
+      handleEl.removeEventListener("touchmove", onTouchMove);
+      handleEl.removeEventListener("touchend", onTouchEnd);
     };
-  }, [isOpen, onTouchStart, onTouchMove, onTouchEnd]);
+  }, [visible, onTouchStart, onTouchMove, onTouchEnd]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!visible) return;
     const scrollY = window.scrollY;
     const body = document.body;
     body.style.position = "fixed";
@@ -183,14 +420,14 @@ function DraggableDrawer({ isOpen, onClose, children, maxHeight, zIndex }) {
       body.style.overflow = "";
       window.scrollTo(0, scrollY);
     };
-  }, [isOpen]);
+  }, [visible]);
 
-  if (!isOpen) return null;
+  if (!visible) return null;
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: zIndex || 1100, display: "flex", flexDirection: "column", justifyContent: "flex-end" }} role="dialog" aria-modal="true">
       <style>{`@keyframes drawerSlideUp { from { transform: translateY(100%); } to { transform: translateY(0); } } @keyframes drawerOverlayFade { from { opacity: 0; } to { opacity: 1; } }`}</style>
-      <div ref={backdropRef} onClick={onClose} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", animation: "drawerOverlayFade 0.25s ease both" }} />
+      <div ref={backdropRef} onClick={animateClose} style={{ position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.6)", animation: "drawerOverlayFade 0.25s ease both" }} />
       <div ref={drawerRef} onClick={e => e.stopPropagation()} style={{
         position: "relative", backgroundColor: C.bg, borderRadius: "20px 20px 0 0",
         border: `1px solid ${C.border}`, borderBottom: "none",
@@ -2815,6 +3052,9 @@ export default function Pattrn() {
   const justHandledInPointerUpRef = useRef(null);
   const wrongCellClearTimeoutRef = useRef(null);
   const playViewScrollRef = useRef(null);
+  const playViewContainerRef = useRef(null);
+  const swipeBackState = useRef({ active: false, startX: 0, startY: 0, confirmed: false, moved: false });
+  const [playViewEntering, setPlayViewEntering] = useState(false); // true during slide-in
 
   const [currentDailyDate, setCurrentDailyDate] = useState(null); // "dd-mm-yyyy"
   const [calendarYear, setCalendarYear] = useState(() => new Date().getUTCFullYear());
@@ -2835,6 +3075,12 @@ export default function Pattrn() {
   const [showBirthdayPrompt, setShowBirthdayPrompt] = useState(false);
   const [showAchievements, setShowAchievements] = useState(false);
   const [showGameMenu, setShowGameMenu] = useState(false);
+  const [logoExpanded, setLogoExpanded] = useState(false);
+  useEffect(() => {
+    if (!logoExpanded) return;
+    const t = setTimeout(() => setLogoExpanded(false), 2000);
+    return () => clearTimeout(t);
+  }, [logoExpanded]);
   const [showClearConfirm, setShowClearConfirm] = useState(false);
   const [showDeleteAccountConfirm, setShowDeleteAccountConfirm] = useState(false);
   const [deleteAccountPassword, setDeleteAccountPassword] = useState("");
@@ -4450,73 +4696,18 @@ export default function Pattrn() {
     cascadeAttemptsRef.current = attempts;
     cascadeRunIndexRef.current = cascadeRunIndex;
   }
-  // --- Bottom Tab Bar helper ---
-  const BottomTabBar = ({ active }) => (
-    <nav className="bottom-tab-bar" style={{
-      position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 90,
-      backgroundColor: C.bg + "f0",
-      borderTop: `1px solid ${C.border}`,
-      paddingBottom: "env(safe-area-inset-bottom, 0px)",
-      display: "flex", justifyContent: "center",
-    }}>
-      <div style={{
-        display: "flex", width: "100%", maxWidth: 480,
-        justifyContent: "space-around", alignItems: "center",
-        padding: "6px 0 4px",
-      }}>
-        {/* Home */}
-        <button onClick={() => setView("menu")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "home" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
-          </svg>
-          <span style={{ fontSize: 10, fontWeight: active === "home" ? 700 : 500, color: active === "home" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Home</span>
-        </button>
-        {/* Mosaic (Gallery) */}
-        <button onClick={() => { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); }}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0" }}>
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "mosaic" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
-          </svg>
-          <span style={{ fontSize: 10, fontWeight: active === "mosaic" ? 700 : 500, color: active === "mosaic" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Mosaic</span>
-        </button>
-        {/* Co-op */}
-        <button onClick={() => setView("coop")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative" }}>
-          <div style={{ position: "relative", display: "inline-flex" }}>
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "coop" ? C.coop : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            {activeCoopSessions.filter(s => s.status !== "complete").length > 0 && (
-              <div style={{
-                position: "absolute", top: -4, right: -8,
-                minWidth: 16, height: 16, borderRadius: 8,
-                backgroundColor: C.coop, display: "flex", alignItems: "center", justifyContent: "center",
-                padding: "0 4px", boxSizing: "border-box",
-              }}>
-                <span style={{ fontSize: 9, fontWeight: 700, color: "#fff", fontFamily: "'Space Mono', monospace", lineHeight: 1, paddingTop: 1 }}>
-                  {activeCoopSessions.filter(s => s.status !== "complete").length}
-                </span>
-              </div>
-            )}
-          </div>
-          <span style={{ fontSize: 10, fontWeight: active === "coop" ? 700 : 500, color: active === "coop" ? C.coop : C.textDim, fontFamily: "'Space Mono', monospace" }}>Co-op</span>
-        </button>
-        {/* Profile */}
-        <button onClick={() => setView("profile")}
-          style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 2, background: "none", border: "none", cursor: "pointer", padding: "6px 0", position: "relative" }}>
-          {firebaseUser && profilePicture ? (
-            <img src={profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: 11, objectFit: "cover", border: `1.5px solid ${active === "profile" ? C.accent : C.border}` }} />
-          ) : (
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active === "profile" ? C.accent : C.textDim} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-            </svg>
-          )}
-          <span style={{ fontSize: 10, fontWeight: active === "profile" ? 700 : 500, color: active === "profile" ? C.accent : C.textDim, fontFamily: "'Space Mono', monospace" }}>Profile</span>
-        </button>
-      </div>
-    </nav>
+
+  // --- Bottom Tab Bar (delegates to module-level BottomTabBar) ---
+  const coopBadgeCount = activeCoopSessions.filter(s => s.status !== "complete").length;
+  const handleTabNavigate = useCallback((tab) => {
+    if (tab === "home") setView("menu");
+    else if (tab === "mosaic") { setMosaicGalleryTab("public"); setView("gallery"); loadMosaicData("public"); }
+    else if (tab === "coop") setView("coop");
+    else if (tab === "profile") setView("profile");
+  }, []);
+  const renderTabBar = (active) => (
+    <BottomTabBar active={active} onNavigate={handleTabNavigate}
+      coopBadgeCount={coopBadgeCount} firebaseUser={firebaseUser} profilePicture={profilePicture} />
   );
 
   const isMosaic = difficulty === "mosaic";
@@ -9164,9 +9355,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(84px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{
@@ -9365,52 +9556,62 @@ export default function Pattrn() {
           </div>
         </div>
 
-        {/* Actions */}
-        <div style={{ width: "100%", maxWidth: 400, display: "flex", flexDirection: "column", gap: 8, animation: "fadeUp 0.3s 0.08s ease both" }}>
-          {mosaicMsg && (
-            <div style={{
-              textAlign: "center", padding: "8px 12px", borderRadius: 8,
-              backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-              fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, letterSpacing: 0.5,
-            }}>
-              {mosaicMsg}
+        {/* Spacer for fixed bottom bar */}
+        <div style={{ height: 80 }} />
+
+        {/* Fixed bottom action bar */}
+        <div style={{
+          position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 80,
+          backgroundColor: C.bg + "ee", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
+          borderTop: `1px solid ${C.border}`,
+          paddingBottom: "env(safe-area-inset-bottom, 0px)",
+          display: "flex", justifyContent: "center",
+        }}>
+          <div style={{ width: "100%", maxWidth: 400, padding: "10px 16px", display: "flex", flexDirection: "column", gap: 6 }}>
+            {mosaicMsg && (
+              <div style={{
+                textAlign: "center", padding: "6px 12px", borderRadius: 8,
+                backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
+                fontFamily: "'Space Mono', monospace", fontSize: 11, color: C.accent, letterSpacing: 0.5,
+              }}>
+                {mosaicMsg}
+              </div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <button
+                onClick={handleSaveMosaic}
+                disabled={mosaicLoading}
+                style={{
+                  flex: 1, padding: "12px 0", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1.5,
+                  background: C.accent, color: C.bg, border: "none", cursor: mosaicLoading ? "not-allowed" : "pointer",
+                  textTransform: "uppercase", transition: "all 0.15s", opacity: mosaicLoading ? 0.6 : 1,
+                }}
+              >
+                {mosaicLoading ? "Saving..." : creatorEditingId ? "Update" : "Save"}
+              </button>
+              <button
+                onClick={() => { resetCreator(); }}
+                style={{
+                  padding: "12px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Space Mono', monospace", letterSpacing: 1,
+                  background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
+                  textTransform: "uppercase", transition: "all 0.15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
+              >
+                Clear
+              </button>
             </div>
-          )}
-          <div style={{ display: "flex", gap: 8 }}>
-            <button
-              onClick={handleSaveMosaic}
-              disabled={mosaicLoading}
-              style={{
-                flex: 1, padding: "12px 0", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1.5,
-                background: C.accent, color: C.bg, border: "none", cursor: mosaicLoading ? "not-allowed" : "pointer",
-                textTransform: "uppercase", transition: "all 0.15s", opacity: mosaicLoading ? 0.6 : 1,
-              }}
-            >
-              {mosaicLoading ? "Saving..." : creatorEditingId ? "Update" : "Save"}
-            </button>
-            <button
-              onClick={() => { resetCreator(); }}
-              style={{
-                padding: "12px 20px", borderRadius: 10, fontSize: 13, fontWeight: 700,
-                fontFamily: "'Space Mono', monospace", letterSpacing: 1,
-                background: "none", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer",
-                textTransform: "uppercase", transition: "all 0.15s",
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; }}
-            >
-              Clear
-            </button>
+            {!firebaseUser && firebaseConfigured && (
+              <div style={{ textAlign: "center", fontSize: 11, color: C.textDim }}>
+                Sign in from the menu to save your creations
+              </div>
+            )}
           </div>
-          {!firebaseUser && firebaseConfigured && (
-            <div style={{ textAlign: "center", fontSize: 11, color: C.textDim, marginTop: 4 }}>
-              Sign in from the menu to save your creations
-            </div>
-          )}
         </div>
 
-      <BottomTabBar active="mosaic" />
       {globalModalsEl}
       </div>
     );
@@ -9427,9 +9628,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(84px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{
@@ -9789,7 +9990,7 @@ export default function Pattrn() {
           </svg>
         </button>
       )}
-      <BottomTabBar active="mosaic" />
+      {renderTabBar("mosaic")}
       {globalModalsEl}
       </div>
     );
@@ -10622,9 +10823,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(84px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{
@@ -11022,9 +11223,9 @@ export default function Pattrn() {
                         <button onClick={() => setCoopCompletedBreakdown(null)}
                           style={{
                             width: "100%", marginTop: 16, padding: "10px 0", borderRadius: 10,
-                            backgroundColor: C.correct, color: "#fff", border: "none",
+                            backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
                             fontFamily: "'Space Mono', monospace", fontSize: 12, fontWeight: 700,
-                            letterSpacing: 1, cursor: "pointer",
+                            letterSpacing: 1, cursor: "pointer", textTransform: "uppercase",
                           }}
                         >
                           Close
@@ -11037,7 +11238,7 @@ export default function Pattrn() {
             );
           })()}
         </div>
-        <BottomTabBar active="coop" />
+        {renderTabBar("coop")}
         {globalModalsEl}
       </div>
     );
@@ -11055,9 +11256,9 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingBottom: "calc(84px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }`}</style>
 
         {/* Header */}
         <div style={{
@@ -11459,7 +11660,7 @@ export default function Pattrn() {
 
         {/* Delete Account confirmation dialog */}
 
-        <BottomTabBar active="profile" />
+        {renderTabBar("profile")}
         {globalModalsEl}
       </div>
     );
@@ -11472,38 +11673,70 @@ export default function Pattrn() {
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'DM Sans', 'Helvetica Neue', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(72px + env(safe-area-inset-bottom, 0px))", paddingLeft: 0, paddingRight: 0,
+        paddingBottom: "calc(84px + env(safe-area-inset-bottom, 0px))", paddingLeft: 0, paddingRight: 0,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } .bottom-tab-bar { backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); } `}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Syne:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } `}</style>
 
-        {/* ── Compact top app bar ── */}
+        {/* ── Floating liquid glass header ── */}
         <div style={{
           width: "100%", maxWidth: 480,
           display: "flex", alignItems: "center", justifyContent: "space-between",
-          paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 12, paddingLeft: 20, paddingRight: 20,
+          paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 12, paddingLeft: 16, paddingRight: 16,
           position: "sticky", top: 0, zIndex: 50,
-          backgroundColor: C.bg + "ee",
-          backdropFilter: "blur(12px)", WebkitBackdropFilter: "blur(12px)",
         }}>
-          {/* Left: logo */}
-          <h1 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, lineHeight: 1 }}>
-            Agnus
-          </h1>
-          {/* Right: action buttons */}
-          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-            {/* Friends button */}
-            {firebaseConfigured && firebaseUser && (
+          {/* Left: logo pill — tap to expand/reveal name */}
+          <div
+            onClick={() => setLogoExpanded(prev => !prev)}
+            style={{
+              display: "flex", alignItems: "center", gap: 0,
+              padding: 4,
+              backgroundColor: "rgba(18, 18, 32, 0.5)",
+              borderRadius: 100,
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.15)",
+              backdropFilter: "blur(28px) saturate(1.8)",
+              WebkitBackdropFilter: "blur(28px) saturate(1.8)",
+              cursor: "pointer",
+              overflow: "hidden",
+              transition: "padding 0.35s cubic-bezier(0.32, 0.72, 0, 1)",
+              ...(logoExpanded ? { paddingRight: 16, gap: 8 } : {}),
+            }}
+          >
+            <img src="/app-icon.png" alt="Agnus" style={{ width: 34, height: 34, borderRadius: 17, flexShrink: 0, display: "block" }} />
+            <div style={{
+              fontFamily: "'Syne', sans-serif", fontSize: 17, fontWeight: 700, letterSpacing: 1.5, color: C.accent, lineHeight: 1,
+              whiteSpace: "nowrap",
+              maxWidth: logoExpanded ? 80 : 0,
+              opacity: logoExpanded ? 1 : 0,
+              overflow: "hidden",
+              transition: "max-width 0.35s cubic-bezier(0.32, 0.72, 0, 1), opacity 0.25s ease",
+            }}>
+              Agnus
+            </div>
+          </div>
+          {/* Right: action buttons pill */}
+          {firebaseConfigured && firebaseUser && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 2,
+              padding: "4px 4px",
+              backgroundColor: "rgba(18, 18, 32, 0.5)",
+              borderRadius: 100,
+              border: "1px solid rgba(255, 255, 255, 0.1)",
+              boxShadow: "0 4px 20px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.07), inset 0 -1px 0 rgba(0,0,0,0.15)",
+              backdropFilter: "blur(28px) saturate(1.8)",
+              WebkitBackdropFilter: "blur(28px) saturate(1.8)",
+            }}>
+              {/* Friends button */}
               <button
                 onClick={() => {
                   setShowFriendsModal(true);
                   setFriendsModalTab("list");
                 }}
                 style={{
-                  background: "none", border: "none", borderRadius: 10,
+                  background: "none", border: "none", borderRadius: 100,
                   width: 36, height: 36, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.15s", position: "relative",
-                  backgroundColor: friendsList.length > 0 ? C.accent + "15" : "transparent",
                 }}
                 aria-label="Friends"
               >
@@ -11515,7 +11748,7 @@ export default function Pattrn() {
                 </svg>
                 {onlineFriendsCount > 0 && (
                   <span style={{
-                    position: "absolute", top: 2, right: 2,
+                    position: "absolute", top: 1, right: 1,
                     minWidth: 14, height: 14, borderRadius: 7, padding: "0 3px", boxSizing: "border-box",
                     backgroundColor: C.correct, color: "#fff",
                     fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
@@ -11525,17 +11758,14 @@ export default function Pattrn() {
                   </span>
                 )}
               </button>
-            )}
-            {/* Notification bell */}
-            {firebaseConfigured && firebaseUser && (
+              {/* Notification bell */}
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
                 style={{
-                  background: "none", border: "none", borderRadius: 10,
+                  background: "none", border: "none", borderRadius: 100,
                   width: 36, height: 36, cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   transition: "all 0.15s", position: "relative",
-                  backgroundColor: notifications.length > 0 ? "#54A0FF15" : "transparent",
                 }}
                 aria-label="Notifications"
               >
@@ -11545,7 +11775,7 @@ export default function Pattrn() {
                 </svg>
                 {notifications.length > 0 && (
                   <span style={{
-                    position: "absolute", top: 2, right: 2,
+                    position: "absolute", top: 1, right: 1,
                     width: 14, height: 14, borderRadius: "50%",
                     backgroundColor: "#f87171", color: "#fff",
                     fontSize: 8, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
@@ -11555,8 +11785,8 @@ export default function Pattrn() {
                   </span>
                 )}
               </button>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* ── Scrollable content area ── */}
@@ -12750,11 +12980,86 @@ export default function Pattrn() {
         </div>
       )}
 
-      <BottomTabBar active="home" />
+      {renderTabBar("home")}
       {globalModalsEl}
       </div>
     );
   }
+
+  // --- Play view slide-in / swipe-back ---
+  const prevViewRef = useRef(view);
+  useEffect(() => {
+    if (view === "play" && prevViewRef.current !== "play") {
+      setPlayViewEntering(true);
+    }
+    prevViewRef.current = view;
+  }, [view]);
+
+  const playViewGoBack = useCallback(() => {
+    const el = playViewContainerRef.current;
+    if (!el) return;
+    el.style.transition = "transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)";
+    el.style.transform = "translateX(100%)";
+    setTimeout(() => {
+      if (isCoop) { setShowLeaveConfirm(true); el.style.transition = "none"; el.style.transform = ""; return; }
+      if (difficulty === "cascade") {
+        const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
+        const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
+        setProgress(nextProgress);
+        saveProgress(nextProgress);
+      }
+      stopTimer();
+      setShowMosaicPreviewOverlay(false);
+      if (customMosaicPuzzlesRef.current && isMosaic) {
+        if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
+          coopMosaicCurrentTileRef.current = -1;
+          updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, -1).catch(() => {});
+          setCoopMosaicOtherFills({});
+          coopMosaicWriteThrottleRef.current = {};
+        }
+        setView("custom-mosaic");
+      } else {
+        setView("menu");
+      }
+    }, 300);
+  }, [isCoop, difficulty, cascadeLevel, fills, attempts, progress, cascadeRunIndex, isMosaic, isCoopMosaic, coopMosaicSessionId, firebaseUser]);
+
+  const onPlaySwipeStart = useCallback((e) => {
+    if (e.clientX > 24) return;
+    swipeBackState.current = { active: true, startX: e.clientX, startY: e.clientY, confirmed: false, moved: false };
+  }, []);
+
+  const onPlaySwipeMove = useCallback((e) => {
+    const s = swipeBackState.current;
+    if (!s.active) return;
+    const dx = e.clientX - s.startX;
+    const dy = e.clientY - s.startY;
+    if (!s.confirmed && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 10) {
+      s.active = false; return;
+    }
+    if (!s.confirmed && dx > 10) s.confirmed = true;
+    if (!s.confirmed) return;
+    s.moved = true;
+    const el = playViewContainerRef.current;
+    if (el) {
+      el.style.transition = "none";
+      el.style.transform = `translateX(${Math.max(0, dx)}px)`;
+    }
+  }, []);
+
+  const onPlaySwipeEnd = useCallback((e) => {
+    const s = swipeBackState.current;
+    if (!s.active || !s.confirmed) { s.active = false; return; }
+    s.active = false;
+    const dx = (e.clientX || 0) - s.startX;
+    const el = playViewContainerRef.current;
+    if (dx > 100) {
+      playViewGoBack();
+    } else if (el) {
+      el.style.transition = "transform 0.25s cubic-bezier(0.32, 0.72, 0, 1)";
+      el.style.transform = "translateX(0)";
+    }
+  }, [playViewGoBack]);
 
   // --- PLAY VIEW ---
   const diffLabel = isDaily ? "Daily" : isCascade ? "Cascade" : DIFFICULTIES.find(d => d.key === difficulty)?.label || "";
@@ -12765,6 +13070,19 @@ export default function Pattrn() {
 
   return (
     <div
+      ref={playViewContainerRef}
+      onPointerDown={onPlaySwipeStart}
+      onPointerMove={onPlaySwipeMove}
+      onPointerUp={onPlaySwipeEnd}
+      onPointerCancel={onPlaySwipeEnd}
+      style={{
+        position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 60,
+        animation: playViewEntering ? "playViewSlideIn 0.35s cubic-bezier(0.32, 0.72, 0, 1) both" : undefined,
+        willChange: "transform",
+      }}
+      onAnimationEnd={() => setPlayViewEntering(false)}
+    >
+    <div
       ref={playViewScrollRef}
       style={{
       height: "100dvh", minHeight: "100dvh", backgroundColor: C.bg, color: C.text,
@@ -12774,7 +13092,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; touch-action: manipulation; } @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} } @keyframes enigmaRotor { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} } @keyframes enigmaBgDrift { 0%{transform:translate(0%,0%) rotate(0deg)} 33%{transform:translate(5%,-3%) rotate(1deg)} 66%{transform:translate(-3%,5%) rotate(-1deg)} 100%{transform:translate(2%,2%) rotate(0.5deg)} } @keyframes enigmaWireDrift { 0%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(3%,-2%) scale(1.02)} 100%{transform:translate(-2%,3%) scale(0.98)} } @keyframes enigmaGlow { 0%,100%{box-shadow:inset 0 0 20px rgba(201,168,76,0.04),inset 0 0 60px rgba(140,107,30,0.02)} 50%{box-shadow:inset 0 0 30px rgba(201,168,76,0.08),inset 0 0 80px rgba(140,107,30,0.04)} } @keyframes enigmaDecrypt { 0%{transform:rotateY(0deg) scale(1);opacity:0.4;filter:brightness(0.5)} 25%{transform:rotateY(90deg) scale(0.9);opacity:0.6;filter:brightness(0.7)} 50%{transform:rotateY(180deg) scale(0.95);opacity:0.8;filter:brightness(1.3)} 75%{transform:rotateY(270deg) scale(1.02);filter:brightness(1.1)} 100%{transform:rotateY(360deg) scale(1);opacity:1;filter:brightness(1)} } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap'); * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; touch-action: manipulation; } @keyframes playViewSlideIn { from{transform:translateX(100%)} to{transform:translateX(0)} } @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} } @keyframes enigmaRotor { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} } @keyframes enigmaBgDrift { 0%{transform:translate(0%,0%) rotate(0deg)} 33%{transform:translate(5%,-3%) rotate(1deg)} 66%{transform:translate(-3%,5%) rotate(-1deg)} 100%{transform:translate(2%,2%) rotate(0.5deg)} } @keyframes enigmaWireDrift { 0%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(3%,-2%) scale(1.02)} 100%{transform:translate(-2%,3%) scale(0.98)} } @keyframes enigmaGlow { 0%,100%{box-shadow:inset 0 0 20px rgba(201,168,76,0.04),inset 0 0 60px rgba(140,107,30,0.02)} 50%{box-shadow:inset 0 0 30px rgba(201,168,76,0.08),inset 0 0 80px rgba(140,107,30,0.04)} } @keyframes enigmaDecrypt { 0%{transform:rotateY(0deg) scale(1);opacity:0.4;filter:brightness(0.5)} 25%{transform:rotateY(90deg) scale(0.9);opacity:0.6;filter:brightness(0.7)} 50%{transform:rotateY(180deg) scale(0.95);opacity:0.8;filter:brightness(1.3)} 75%{transform:rotateY(270deg) scale(1.02);filter:brightness(1.1)} 100%{transform:rotateY(360deg) scale(1);opacity:1;filter:brightness(1)} } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }`}</style>
 
       <Particles show={showParticles} />
 
@@ -13771,7 +14089,7 @@ export default function Pattrn() {
                 <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Space Mono', monospace", marginBottom: 6 }}>
                   Friends on this puzzle
                 </div>
-                <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
+                <div className="hide-scrollbar" style={{ display: "flex", gap: 8, overflowX: "auto", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", paddingBottom: 4 }}>
                   {Object.entries(friendsPuzzleData).map(([uid, data]) => {
                     const friend = friendsList.find(f => f.uid === uid);
                     if (!friend) return null;
@@ -13783,6 +14101,7 @@ export default function Pattrn() {
                         borderRadius: 8, backgroundColor: C.surface,
                         border: `1px solid ${theyWereFaster ? C.incorrect + "33" : iWasFaster ? C.correct + "33" : C.border}`,
                         fontSize: 11, fontFamily: "'Space Mono', monospace",
+                        flexShrink: 0, whiteSpace: "nowrap",
                       }}>
                         {friend.profilePicture ? (
                           <img src={friend.profilePicture} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} />
@@ -14044,6 +14363,7 @@ export default function Pattrn() {
       </div>
 
       {globalModalsEl}
+    </div>
     </div>
   );
 }
