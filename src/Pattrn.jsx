@@ -4511,14 +4511,13 @@ export default function Pattrn() {
       playRoot.push({ id: "preview", icon: "search", label: "Preview", action: () => { setShowMosaicPreviewOverlay(true); } });
     }
     if (!isCoop && gameState === "playing" && !isCascade && !isMosaic) {
-      playRoot.push({ id: "coop-start", icon: "user-plus", label: "Co-op", action: () => {
+      playRoot.push({ id: "coop-start", icon: "user-plus", label: "Play w/ Friends", action: () => {
         if (!firebaseUser) { coopPendingLoginRef.current = true; setShowAccountModal(true); return; }
         setShowCoopFriendPicker(true);
       }});
     }
     if (isCoop) {
-      playRoot.push({ id: "coop-invite", icon: "upload", label: "Invite", action: () => { setShowCoopInvite(true); } });
-      playRoot.push({ id: "coop-leave", icon: "logout", label: "Leave", action: () => { setShowLeaveConfirm(true); } });
+      playRoot.push({ id: "coop-invite", icon: "user-plus", label: "Invite", action: () => { setShowCoopInvite(true); } });
     }
     playRoot.push({ id: "back", icon: "back", label: customMosaicPuzzlesRef.current && isMosaic ? "Mosaic" : "Puzzles", action: () => {
       if (isCoop) { setShowLeaveConfirm(true); return; }
