@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell, PaintBucket, Eraser } from "lucide-react";
+import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell, PaintBucket, Eraser } from "lucide-react";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -4564,6 +4564,7 @@ export default function Pattrn() {
     search: (c) => <Search size={18} color={c} strokeWidth={2} />,
     "user-plus": (c) => <UserPlus size={18} color={c} strokeWidth={2} />,
     upload: (c) => <Upload size={18} color={c} strokeWidth={2} />,
+    login: (c) => <LogIn size={18} color={c} strokeWidth={2} />,
     logout: (c) => <LogOut size={18} color={c} strokeWidth={2} />,
     check: (c) => <Check size={20} color={c} strokeWidth={2.5} />,
     refresh: (c) => <RotateCcw size={18} color={c} strokeWidth={2} />,
@@ -4642,6 +4643,9 @@ export default function Pattrn() {
 
     // Menu view items
     const menuRoot = [];
+    if (firebaseConfigured && !firebaseUser) {
+      menuRoot.push({ id: "sign-in", icon: "login", label: "Sign In", action: () => { setShowAccountModal(true); } });
+    }
     if (firebaseConfigured && firebaseUser) {
       menuRoot.push({ id: "friends", icon: "users", label: "Friends", action: () => { setShowFriendsModal(true); setFriendsModalTab("list"); } });
       menuRoot.push({ id: "notifications", icon: "bell", label: "Notifications", action: () => { setShowNotifications(!showNotifications); } });
