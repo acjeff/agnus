@@ -13084,7 +13084,7 @@ export default function Pattrn() {
       playPillButtons.push({ id: "reset", icon: "refresh", color: "#fff", onClick: resetBoard });
     }
     if (isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0) {
-      playPillButtons.push({ id: "pass-cell", icon: "pass", color: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF" : "rgba(255,255,255,0.5)", onClick: () => {
+      playPillButtons.push({ id: "pass-cell", icon: "pass", color: (coopPassMode || coopPassPlayerPicker) ? "#54A0FF" : "#fff", onClick: () => {
         if (coopPassMode) { setCoopPassMode(null); setSelectedToken(null); return; }
         setSelectedToken(null); setSelectedCell(null);
         const entries = Object.entries(coopPlayers);
