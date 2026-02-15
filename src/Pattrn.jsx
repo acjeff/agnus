@@ -6721,6 +6721,52 @@ export default function Pattrn() {
     );
   };
 
+  const renderHomeButton = (bottomPx = 16) => {
+    const fabSize = 56;
+    const springOpen = "cubic-bezier(0.175, 0.885, 0.32, 1.175)";
+    const strokeColor = "#fff";
+    return (
+      <div
+        onClick={() => setView("menu")}
+        style={{
+          position: "fixed",
+          bottom: `calc(${bottomPx + 68}px + env(safe-area-inset-bottom, 0px))`,
+          left: 20,
+          width: fabSize,
+          height: fabSize,
+          borderRadius: fabSize / 2,
+          background: activeTheme.gridBg || C.surface,
+          backdropFilter: "blur(28px) saturate(200%)",
+          WebkitBackdropFilter: "blur(28px) saturate(200%)",
+          border: "1px solid rgba(255,255,255,0.16)",
+          boxShadow: "none",
+          zIndex: 85,
+          overflow: "hidden",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          cursor: "pointer",
+          transition: `transform 0.15s ${springOpen}, box-shadow 0.15s ease`,
+        }}
+        onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
+        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+        aria-label="Go home"
+      >
+        {/* Liquid Glass sheen highlight */}
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none",
+        }}>
+          <div style={{
+            position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%",
+            background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)",
+            borderRadius: "inherit",
+          }} />
+        </div>
+        <Home size={22} color={strokeColor} strokeWidth={2.5} />
+      </div>
+    );
+  };
+
   const isMosaic = difficulty === "mosaic";
   const mosaicMainPuzzles = isMosaic ? (staffPickPuzzlesRef.current || PUZZLE_SETS.mosaic) : null;
   const puzzles = isCascade ? [] : isDaily ? [] : (customMosaicPuzzlesRef.current && isMosaic ? customMosaicPuzzlesRef.current : isMosaic ? mosaicMainPuzzles : (PUZZLE_SETS[difficulty] || []));
@@ -9624,6 +9670,7 @@ export default function Pattrn() {
           );
         })()}
 
+        {renderHomeButton()}
         {renderBackButton(() => {
           if (isCoopMosaic) { leaveCoopMosaicSession(); loadActiveCoopSessions(); setView("menu"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; return; }
           const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
