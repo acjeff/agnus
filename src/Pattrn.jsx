@@ -4668,6 +4668,7 @@ export default function Pattrn() {
     { id: "coop-create", icon: "play", label: "Create Session", sub: "coop-create" },
     { id: "coop-active", icon: "users", label: "Active Sessions", sub: "coop-active" },
     { id: "coop-completed", icon: "check", label: "Completed", sub: "coop-completed" },
+    { id: "coop-friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } },
   ];
 
   // Profile submenu — now global, includes account items + admin
@@ -4702,16 +4703,12 @@ export default function Pattrn() {
 
     // Menu view items
     const menuRoot = [];
-    if (firebaseConfigured && firebaseUser) {
-      menuRoot.push({ id: "friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } });
-      menuRoot.push({ id: "notifications", icon: "bell", label: "Notifications", action: () => { setShowNotifications(!showNotifications); } });
+    if (firebaseConfigured && firebaseUser && notifications.length > 0) {
+      menuRoot.push({ id: "notifications", icon: "bell", label: "Notifications", sub: "notifications-view" });
     }
 
     // Creator view items
     const creatorRoot = [];
-    if (firebaseConfigured && firebaseUser) {
-      creatorRoot.push({ id: "friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } });
-    }
 
     // Custom mosaic view items
     const customMosaicRoot = [];
@@ -4720,7 +4717,6 @@ export default function Pattrn() {
         setCoopSelectedFriends(new Set());
         return true;
       } });
-      customMosaicRoot.push({ id: "friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } });
     }
 
     // Admin view items
@@ -4753,6 +4749,7 @@ export default function Pattrn() {
       "delete-account": [],
       "clear-confirm": [],
       "friends-view": [],
+      "notifications-view": [],
       "theme-list": [],
       theme: themeSubMenu,
       "coop-start": [],
@@ -4804,9 +4801,7 @@ export default function Pattrn() {
         ...globalMenuStructure,
       },
       coop: {
-        root: buildRootWithProfile(firebaseConfigured && firebaseUser ? [
-          { id: "friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } },
-        ] : []),
+        root: buildRootWithProfile([]),
         ...globalMenuStructure,
       },
       "admin-review": {
@@ -4862,10 +4857,11 @@ export default function Pattrn() {
     const isCoopCreate = currentMenuKey === "coop-create";
     const isCoopActive = currentMenuKey === "coop-active";
     const isCoopCompleted = currentMenuKey === "coop-completed";
+    const isNotificationsView = currentMenuKey === "notifications-view";
     const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu || isMosaicPreviewMenu ||
                           isAchievementsView || isFriendsView || isShareStats || isProfileView ||
                           isUsernameEdit || isBirthdayEdit || isDeleteAccount || isClearConfirm ||
-                          isThemeList || isSyncChoice || isCoopCreate || isCoopActive || isCoopCompleted;
+                          isThemeList || isSyncChoice || isCoopCreate || isCoopActive || isCoopCompleted || isNotificationsView;
     const contextualItems = isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
@@ -5137,6 +5133,16 @@ export default function Pattrn() {
       return h;
     })();
 
+    // Notifications view height — scrollable list
+    const notificationsViewContentHeight = (() => {
+      if (!isNotificationsView) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += Math.min(notifications.length, 5) * 60; // notification items (cap at 5, rest scrolls)
+      h += 12; // bottom padding
+      return h;
+    })();
+
     const contentHeight = isAchievementsView ? achievementsContentHeight :
                           isFriendsView ? friendsContentHeight :
                           isShareStats ? shareStatsContentHeight :
@@ -5150,6 +5156,7 @@ export default function Pattrn() {
                           isCoopCreate ? coopCreateContentHeight :
                           isCoopActive ? coopActiveContentHeight :
                           isCoopCompleted ? coopCompletedContentHeight :
+                          isNotificationsView ? notificationsViewContentHeight :
                           isMosaicPreviewMenu ? mosaicPreviewContentHeight :
                           isSignInMenu ? signInContentHeight :
                           isMosaicSaveMenu ? mosaicSaveContentHeight :
@@ -6255,6 +6262,56 @@ export default function Pattrn() {
                         })}
                       </div>
                     )}
+                  </div>
+                </>
+              );
+            })() : isNotificationsView ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>Notifications</div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 300, overflowY: "auto" }}>
+                      {notifications.map(notif => (
+                        <div key={notif.id} style={{
+                          display: "flex", alignItems: "center", gap: 10, padding: "10px 12px",
+                          borderRadius: 10, backgroundColor: "rgba(255,255,255,0.04)",
+                          border: `1px solid rgba(255,255,255,0.08)`,
+                        }}>
+                          <div style={{
+                            width: 28, height: 28, borderRadius: 7, flexShrink: 0,
+                            backgroundColor: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "22" : "#54A0FF22",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            border: `1.5px solid ${(notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "44" : "#54A0FF44"}`,
+                          }}>
+                            <span style={{ fontSize: 12, color: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop : "#54A0FF" }}>
+                              {notif.type === "coop_invite" ? "⚔" : notif.type === "coop_mosaic_invite" ? "◦" : "◦"}
+                            </span>
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 11, fontFamily: "'Inter', sans-serif", fontWeight: 600, color: C.text, lineHeight: 1.3 }}>
+                              {notif.type === "coop_invite"
+                                ? `${notif.fromUsername || "Someone"} invited you to co-op`
+                                : notif.type === "coop_mosaic_invite"
+                                ? `${notif.fromUsername || "Someone"} invited you to mosaic`
+                                : `${notif.fromUsername || "Someone"} shared`
+                              }
+                            </div>
+                            {notif.data?.mosaicTitle && (
+                              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
+                                "{notif.data.mosaicTitle}"
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 </>
               );
