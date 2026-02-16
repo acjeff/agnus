@@ -3018,8 +3018,8 @@ export default function Pattrn() {
   const [friendStats, setFriendStats] = useState({}); // { uid: { totalSolved, achievements, progress, updatedAt } }
   const [friendStatsLoading, setFriendStatsLoading] = useState(false);
 
-  // --- Confirmation modal for friend removal ---
-  const [removeFriendConfirm, setRemoveFriendConfirm] = useState(null); // { uid, username } or null
+  // --- Confirmation for friend removal (stores uid of friend being removed) ---
+  const [removeFriendConfirm, setRemoveFriendConfirm] = useState(null); // uid or null
 
   // --- Admin Metrics state ---
   const [adminMetrics, setAdminMetrics] = useState(null); // computed metrics object
@@ -5882,6 +5882,7 @@ export default function Pattrn() {
                                 const isOnline = presence && presence.lastSeen && (Date.now() - presence.lastSeen) < 120000;
                                 const isPlaying = isOnline && presence.status === "playing" && presence.currentMode;
                                 const currentSession = presence?.currentCoopSessionId;
+                                const showingConfirm = removeFriendConfirm === friend.uid;
 
                                 // Format activity text
                                 let activityText = "";
@@ -5917,154 +5918,216 @@ export default function Pattrn() {
                                 return (
                                   <div key={friend.uid} style={{
                                     padding: "12px 14px", borderRadius: 12,
-                                    backgroundColor: C.surface, border: `1px solid ${isOnline ? C.correct + "44" : C.border}`,
-                                    transition: "border-color 0.2s",
+                                    backgroundColor: C.surface, border: `1px solid ${showingConfirm ? C.incorrect : (isOnline ? C.correct + "44" : C.border)}`,
+                                    transition: "all 0.2s",
                                   }}>
-                                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                      {/* Online indicator dot */}
-                                      <div style={{
-                                        width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
-                                        backgroundColor: isOnline ? C.correct : C.textDim + "44",
-                                        boxShadow: isOnline ? `0 0 8px ${C.correct}66` : "none",
-                                      }} />
-
-                                      {/* Profile picture */}
-                                      <div style={{ position: "relative", flexShrink: 0 }}>
-                                        {friend.profilePicture ? (
-                                          <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} />
-                                        ) : (
-                                          <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>
-                                            {(friend.username || "?")[0].toUpperCase()}
-                                          </div>
-                                        )}
+                                    {showingConfirm ? (
+                                      // Inline confirmation view
+                                      <div>
+                                        <div style={{
+                                          fontFamily: "'Inter', sans-serif",
+                                          fontSize: 11,
+                                          fontWeight: 600,
+                                          color: C.text,
+                                          marginBottom: 8,
+                                        }}>
+                                          Remove <strong>{friend.username}</strong>?
+                                        </div>
+                                        <div style={{ display: "flex", gap: 6 }}>
+                                          <button
+                                            onClick={() => setRemoveFriendConfirm(null)}
+                                            style={{
+                                              flex: 1,
+                                              padding: "6px 12px",
+                                              borderRadius: 6,
+                                              fontSize: 10,
+                                              fontWeight: 700,
+                                              fontFamily: "'Inter', sans-serif",
+                                              textTransform: "uppercase",
+                                              letterSpacing: 0.5,
+                                              backgroundColor: C.surface,
+                                              border: `1px solid ${C.border}`,
+                                              color: C.text,
+                                              cursor: "pointer",
+                                              transition: "all 0.15s",
+                                            }}
+                                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.surfaceLight; }}
+                                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = C.surface; }}
+                                          >
+                                            Cancel
+                                          </button>
+                                          <button
+                                            onClick={() => handleRemoveFriend(friend.uid)}
+                                            style={{
+                                              flex: 1,
+                                              padding: "6px 12px",
+                                              borderRadius: 6,
+                                              fontSize: 10,
+                                              fontWeight: 700,
+                                              fontFamily: "'Inter', sans-serif",
+                                              textTransform: "uppercase",
+                                              letterSpacing: 0.5,
+                                              backgroundColor: C.incorrect,
+                                              border: "none",
+                                              color: "#fff",
+                                              cursor: "pointer",
+                                              transition: "all 0.15s",
+                                            }}
+                                            onMouseEnter={e => { e.currentTarget.style.opacity = 0.9; }}
+                                            onMouseLeave={e => { e.currentTarget.style.opacity = 1; }}
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
                                       </div>
+                                    ) : (
+                                      // Normal friend card view
+                                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                        {/* Online indicator dot */}
+                                        <div style={{
+                                          width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                                          backgroundColor: isOnline ? C.correct : C.textDim + "44",
+                                          boxShadow: isOnline ? `0 0 8px ${C.correct}66` : "none",
+                                        }} />
 
-                                      {/* User info */}
-                                      <div style={{ flex: 1, minWidth: 0 }}>
-                                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                                          <span style={{
-                                            fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text,
-                                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                          }}>
-                                            {friend.username}
-                                          </span>
-                                          {isPlaying && (
-                                            <span style={{
-                                              fontSize: 8, fontFamily: "'Inter', sans-serif", fontWeight: 700,
-                                              color: C.bg, backgroundColor: C.correct, padding: "1px 5px", borderRadius: 3,
-                                              textTransform: "uppercase", letterSpacing: 0.5,
-                                            }}>
-                                              Playing
-                                            </span>
-                                          )}
-                                          {isOnline && !isPlaying && (
-                                            <span style={{
-                                              fontSize: 8, fontFamily: "'Inter', sans-serif", fontWeight: 700,
-                                              color: C.bg, backgroundColor: "#06B6D4", padding: "1px 5px", borderRadius: 3,
-                                              textTransform: "uppercase", letterSpacing: 0.5,
-                                            }}>
-                                              Online
-                                            </span>
+                                        {/* Profile picture */}
+                                        <div style={{ position: "relative", flexShrink: 0 }}>
+                                          {friend.profilePicture ? (
+                                            <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} />
+                                          ) : (
+                                            <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>
+                                              {(friend.username || "?")[0].toUpperCase()}
+                                            </div>
                                           )}
                                         </div>
-                                        <div style={{ fontSize: 10, color: activityColor, fontFamily: "'Inter', sans-serif", marginBottom: 3 }}>
-                                          {activityText}
-                                        </div>
-                                        {/* Stats row */}
-                                        {stats && (
-                                          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
-                                            <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.accent }}>
-                                              {stats.totalSolved} solved
+
+                                        {/* User info */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                                            <span style={{
+                                              fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text,
+                                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                            }}>
+                                              {friend.username}
                                             </span>
-                                            <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.gold }}>
-                                              {stats.achievements} achievements
-                                            </span>
-                                            {stats.updatedAt > 0 && (
-                                              <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.textDim }}>
-                                                Synced {fmtTimeAgo(stats.updatedAt)}
+                                            {isPlaying && (
+                                              <span style={{
+                                                fontSize: 8, fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                                                color: C.bg, backgroundColor: C.correct, padding: "1px 5px", borderRadius: 3,
+                                                textTransform: "uppercase", letterSpacing: 0.5,
+                                              }}>
+                                                Playing
+                                              </span>
+                                            )}
+                                            {isOnline && !isPlaying && (
+                                              <span style={{
+                                                fontSize: 8, fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                                                color: C.bg, backgroundColor: "#06B6D4", padding: "1px 5px", borderRadius: 3,
+                                                textTransform: "uppercase", letterSpacing: 0.5,
+                                              }}>
+                                                Online
                                               </span>
                                             )}
                                           </div>
-                                        )}
-                                        {/* Mode breakdown */}
-                                        {stats && stats.totalSolved > 0 && (
-                                          <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
-                                            {["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"]
-                                              .filter(mode => (stats.progress[mode] || 0) > 0)
-                                              .map(mode => (
-                                                <span key={mode} style={{
-                                                  fontSize: 8, fontFamily: "'Inter', sans-serif",
-                                                  color: C.textDim, backgroundColor: C.surfaceLight,
-                                                  padding: "1px 4px", borderRadius: 3,
-                                                }}>
-                                                  {mode}: {stats.progress[mode]}
-                                                </span>
-                                              ))
-                                            }
+                                          <div style={{ fontSize: 10, color: activityColor, fontFamily: "'Inter', sans-serif", marginBottom: 3 }}>
+                                            {activityText}
                                           </div>
-                                        )}
-                                      </div>
-
-                                      {/* Action buttons */}
-                                      <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                                        {currentSession && (
-                                          <button onClick={async () => {
-                                            // Join friend's coop session
-                                            if (currentSession && presence.currentMode && presence.currentPuzzle) {
-                                              const mode = presence.currentMode;
-                                              const puzzleId = presence.currentPuzzle;
-
-                                              // Set up coop session
-                                              setCoopSessionId(currentSession);
-                                              setCoopRole("guest");
-                                              setCoopStatus("playing");
-                                              setDifficulty(mode);
-
-                                              // Set puzzle based on mode
-                                              if (mode === "daily") {
-                                                setDailyDate(puzzleId);
-                                                setCurrentDailyDate(puzzleId);
-                                              } else if (mode === "cascade") {
-                                                setCascadeRunIndex(parseInt(puzzleId) || 0);
-                                              } else {
-                                                setCurrentPuzzle(parseInt(puzzleId) || 0);
+                                          {/* Stats row */}
+                                          {stats && (
+                                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+                                              <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.accent }}>
+                                                {stats.totalSolved} solved
+                                              </span>
+                                              <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.gold }}>
+                                                {stats.achievements} achievements
+                                              </span>
+                                              {stats.updatedAt > 0 && (
+                                                <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.textDim }}>
+                                                  Synced {fmtTimeAgo(stats.updatedAt)}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+                                          {/* Mode breakdown */}
+                                          {stats && stats.totalSolved > 0 && (
+                                            <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+                                              {["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"]
+                                                .filter(mode => (stats.progress[mode] || 0) > 0)
+                                                .map(mode => (
+                                                  <span key={mode} style={{
+                                                    fontSize: 8, fontFamily: "'Inter', sans-serif",
+                                                    color: C.textDim, backgroundColor: C.surfaceLight,
+                                                    padding: "1px 4px", borderRadius: 3,
+                                                  }}>
+                                                    {mode}: {stats.progress[mode]}
+                                                  </span>
+                                                ))
                                               }
+                                            </div>
+                                          )}
+                                        </div>
 
-                                              // Close menu and load puzzle
-                                              setRadialMenuStack(["root"]);
+                                        {/* Action buttons */}
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                                          {currentSession && (
+                                            <button onClick={async () => {
+                                              // Join friend's coop session
+                                              if (currentSession && presence.currentMode && presence.currentPuzzle) {
+                                                const mode = presence.currentMode;
+                                                const puzzleId = presence.currentPuzzle;
 
-                                              // Try to join the session in Firebase
-                                              if (firebaseUser && username) {
-                                                joinCoopSession(currentSession, firebaseUser.uid, username).catch(() => {});
+                                                // Set up coop session
+                                                setCoopSessionId(currentSession);
+                                                setCoopRole("guest");
+                                                setCoopStatus("playing");
+                                                setDifficulty(mode);
+
+                                                // Set puzzle based on mode
+                                                if (mode === "daily") {
+                                                  setDailyDate(puzzleId);
+                                                  setCurrentDailyDate(puzzleId);
+                                                } else if (mode === "cascade") {
+                                                  setCascadeRunIndex(parseInt(puzzleId) || 0);
+                                                } else {
+                                                  setCurrentPuzzle(parseInt(puzzleId) || 0);
+                                                }
+
+                                                // Close menu and load puzzle
+                                                setRadialMenuStack(["root"]);
+
+                                                // Try to join the session in Firebase
+                                                if (firebaseUser && username) {
+                                                  joinCoopSession(currentSession, firebaseUser.uid, username).catch(() => {});
+                                                }
                                               }
-                                            }
-                                          }} style={{
-                                            padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
-                                            fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                                            background: C.correct + "22", color: C.correct,
-                                            border: "none", cursor: "pointer", textTransform: "uppercase",
-                                          }}>Join</button>
-                                        )}
-                                        <button
-                                          onClick={() => setRemoveFriendConfirm({ uid: friend.uid, username: friend.username })}
-                                          title="Remove friend"
-                                          style={{
-                                            width: 24, height: 24, borderRadius: 6,
-                                            backgroundColor: "transparent",
-                                            border: `1px solid ${C.border}`,
-                                            color: C.textDim,
-                                            cursor: "pointer",
-                                            display: "flex", alignItems: "center", justifyContent: "center",
-                                            transition: "all 0.15s",
-                                            flexShrink: 0,
-                                          }}
-                                          onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; e.currentTarget.style.backgroundColor = C.incorrect + "11"; }}
-                                          onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; e.currentTarget.style.backgroundColor = "transparent"; }}
-                                        >
-                                          <X size={14} strokeWidth={2.5} />
-                                        </button>
+                                            }} style={{
+                                              padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
+                                              fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                              background: C.correct + "22", color: C.correct,
+                                              border: "none", cursor: "pointer", textTransform: "uppercase",
+                                            }}>Join</button>
+                                          )}
+                                          <button
+                                            onClick={() => setRemoveFriendConfirm(friend.uid)}
+                                            title="Remove friend"
+                                            style={{
+                                              width: 24, height: 24, borderRadius: 6,
+                                              backgroundColor: "transparent",
+                                              border: `1px solid ${C.border}`,
+                                              color: C.textDim,
+                                              cursor: "pointer",
+                                              display: "flex", alignItems: "center", justifyContent: "center",
+                                              transition: "all 0.15s",
+                                              flexShrink: 0,
+                                            }}
+                                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; e.currentTarget.style.backgroundColor = C.incorrect + "11"; }}
+                                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; e.currentTarget.style.backgroundColor = "transparent"; }}
+                                          >
+                                            <X size={14} strokeWidth={2.5} />
+                                          </button>
+                                        </div>
                                       </div>
-                                    </div>
+                                    )}
                                   </div>
                                 );
                               });
@@ -9860,99 +9923,6 @@ export default function Pattrn() {
       {coopMosaicInviteEl}
       {coopInviteToastEl}
       {coopMosaicNavigateEl}
-
-      {/* Remove friend confirmation modal */}
-      {removeFriendConfirm && (
-        <div
-          onClick={() => setRemoveFriendConfirm(null)}
-          style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.75)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            zIndex: 10000, padding: 20,
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            style={{
-              backgroundColor: C.surface,
-              borderRadius: 16,
-              padding: 24,
-              maxWidth: 360,
-              width: "100%",
-              border: `1px solid ${C.border}`,
-              animation: "fadeUp 0.2s ease",
-            }}
-          >
-            <div style={{
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 16,
-              fontWeight: 700,
-              color: C.text,
-              marginBottom: 12,
-              textAlign: "center",
-            }}>
-              Remove Friend?
-            </div>
-            <div style={{
-              fontFamily: "'Inter', sans-serif",
-              fontSize: 13,
-              color: C.textDim,
-              marginBottom: 20,
-              textAlign: "center",
-              lineHeight: 1.6,
-            }}>
-              Are you sure you want to remove <strong style={{ color: C.text }}>{removeFriendConfirm.username}</strong> from your friends list?
-            </div>
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                onClick={() => setRemoveFriendConfirm(null)}
-                style={{
-                  flex: 1,
-                  padding: "10px 16px",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  fontFamily: "'Inter', sans-serif",
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                  backgroundColor: C.surface,
-                  border: `1px solid ${C.border}`,
-                  color: C.text,
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.surfaceLight; }}
-                onMouseLeave={e => { e.currentTarget.style.backgroundColor = C.surface; }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleRemoveFriend(removeFriendConfirm.uid)}
-                style={{
-                  flex: 1,
-                  padding: "10px 16px",
-                  borderRadius: 8,
-                  fontSize: 12,
-                  fontWeight: 700,
-                  fontFamily: "'Inter', sans-serif",
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                  backgroundColor: C.incorrect,
-                  border: "none",
-                  color: "#fff",
-                  cursor: "pointer",
-                  transition: "all 0.15s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.opacity = 0.9; }}
-                onMouseLeave={e => { e.currentTarget.style.opacity = 1; }}
-              >
-                Remove
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 
