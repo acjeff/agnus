@@ -31,7 +31,6 @@ import {
   respondCoopPassRequest,
   cancelCoopPassRequest,
   sendCoopCellSuggestion,
-  dismissCoopCellSuggestion,
   cancelCoopCellSuggestion,
   lockInCoopPlayer,
   unlockCoopPlayer,
@@ -2973,9 +2972,7 @@ export default function Pattrn() {
   const [coopSuggestMode, setCoopSuggestMode] = useState(null); // { targetUid, targetName, targetColor } — in suggest-cell-selection mode
   const [coopSuggestPlayerPicker, setCoopSuggestPlayerPicker] = useState(false); // show player picker for suggest
   const [coopSuggestCell, setCoopSuggestCell] = useState(null); // cellKey selected for suggestion, waiting for token pick
-  const [coopPendingSuggestCell, setCoopPendingSuggestCell] = useState(null); // cellKey of outgoing pending suggestion
-  const [pendingSuggestOpen, setPendingSuggestOpen] = useState(false); // toggle pending suggest UI in pill
-  const [coopIncomingSuggestions, setCoopIncomingSuggestions] = useState([]); // [{ fromUid, fromName, fromColor, cellKey, suggestedToken }]
+  const [coopAllSuggestions, setCoopAllSuggestions] = useState([]); // all suggestions (incoming + outgoing) for grid display: [{ fromUid, fromName, fromColor, cellKey, suggestedToken, isMine }]
   const COOP_NEON_COLORS = ["#FF6B6B", "#00E676", "#FF9100", "#E040FB", "#FFEA00", "#00E5FF", "#FF4081", "#76FF03"];
   const COOP_MY_COLOR = "#54A0FF";
 
@@ -5052,11 +5049,10 @@ export default function Pattrn() {
     const showSuggestPlayerPicker = coopSuggestPlayerPicker && !coopSuggestMode;
     const showSuggestBanner = !!coopSuggestMode && !coopSuggestCell;
     const showSuggestTokenPick = !!coopSuggestCell && !!coopSuggestMode;
-    const showSuggestPending = pendingSuggestOpen && !!coopPendingSuggestCell;
-    const showSuggestIncoming = gameState === "playing" && isCoop && coopIncomingSuggestions.length > 0;
-    const hasPassUI = isCustomPanel ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming || showSuggestPlayerPicker || showSuggestBanner || showSuggestTokenPick || showSuggestPending || showSuggestIncoming);
+    const hasPassUI = isCustomPanel ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming || showSuggestPlayerPicker || showSuggestBanner || showSuggestTokenPick);
     const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : (showSuggestPlayerPicker ? Object.keys(coopPlayers).length : 0);
-    const passRowHeight = (showPassPlayerPicker || showSuggestPlayerPicker) ? (passPlayerCount > 2 ? 88 : 56) : (showPassIncoming || showSuggestIncoming) ? 56 : showSuggestTokenPick ? 56 : 48;
+    const suggestTokenCount = showSuggestTokenPick ? (puzzle?.usedTokens?.length || 0) : 0;
+    const passRowHeight = (showPassPlayerPicker || showSuggestPlayerPicker) ? (passPlayerCount > 2 ? 88 : 56) : showSuggestTokenPick ? Math.max(56, 36 + Math.ceil(suggestTokenCount / 6) * 36) : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
 
     // Coop start menu height — back button + header + subtitle + mosaic card + friends list + action buttons
@@ -7118,11 +7114,17 @@ export default function Pattrn() {
               )}
               {/* Suggest token pick — pick what to suggest */}
               {showSuggestTokenPick && puzzle?.usedTokens && (
-                <>
-                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 600, color: C.textDim, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 1 }}>
-                    Suggest:
-                  </span>
-                  <div style={{ display: "flex", gap: 4, flexWrap: "wrap", justifyContent: "center" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, width: "100%" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 6, width: "100%" }}>
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 10, fontWeight: 600, color: C.textDim, whiteSpace: "nowrap", textTransform: "uppercase", letterSpacing: 1 }}>
+                      Suggest:
+                    </span>
+                    <button onClick={(e) => { e.stopPropagation(); setCoopSuggestCell(null); }} style={{
+                      background: "none", border: "none", color: C.textDim, cursor: "pointer",
+                      fontSize: 14, padding: "2px 6px", lineHeight: 1, fontFamily: "'Inter', sans-serif", marginLeft: "auto",
+                    }}>Cancel</button>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", maxWidth: "100%" }}>
                     {puzzle.usedTokens.map((token) => {
                       const { color, shapeIndex } = parseToken(token);
                       const displayColor = themeColorMap ? (themeColorMap[color] || color) : color;
@@ -7132,94 +7134,27 @@ export default function Pattrn() {
                           e.stopPropagation();
                           if (coopSessionId && firebaseUser && coopSuggestMode) {
                             sendCoopCellSuggestion(coopSessionId, coopSuggestCell, firebaseUser.uid, coopSuggestMode.targetUid, token).catch(() => {});
-                            setCoopPendingSuggestCell(coopSuggestCell);
                             setCoopSuggestCell(null);
                             setCoopSuggestMode(null);
                           }
                         }} style={{
-                          width: 28, height: 28, borderRadius: 7,
+                          width: 30, height: 30, borderRadius: 7,
                           backgroundColor: displayColor, cursor: "pointer",
                           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                          position: "relative",
                           border: `2px solid transparent`,
                           transition: "transform 0.15s, border-color 0.15s",
                         }}
                           onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.borderColor = `${C.text}`; }}
                           onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = "transparent"; }}
                         >
-                          {shapes[shapeIndex % shapes.length](14, getShapeStroke(displayColor, puzzle.mode === "easy" || puzzle.mode === "blind"))}
+                          {shapes[shapeIndex % shapes.length](15, getShapeStroke(displayColor, puzzle.mode === "easy" || puzzle.mode === "blind"))}
                         </div>
                       );
                     })}
                   </div>
-                  <button onClick={(e) => { e.stopPropagation(); setCoopSuggestCell(null); }} style={{
-                    background: "none", border: "none", color: C.textDim, cursor: "pointer",
-                    fontSize: 14, padding: "2px 6px", lineHeight: 1, fontFamily: "'Inter', sans-serif",
-                  }}>Cancel</button>
-                </>
+                </div>
               )}
-              {/* Pending suggestion — waiting for acknowledgment */}
-              {showSuggestPending && (
-                <>
-                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 600, color: C.textDim }}>
-                    Suggestion sent!
-                  </span>
-                  <button onClick={(e) => {
-                    e.stopPropagation();
-                    cancelCoopCellSuggestion(coopSessionId, coopPendingSuggestCell).catch(() => {});
-                    setCoopPendingSuggestCell(null);
-                    setPendingSuggestOpen(false);
-                  }} style={{
-                    background: "none", border: `1px solid ${C.border}`, borderRadius: 6,
-                    color: C.textDim, cursor: "pointer", fontSize: 10, padding: "3px 8px",
-                    fontFamily: "'Inter', sans-serif", fontWeight: 600,
-                  }}>Cancel</button>
-                </>
-              )}
-              {/* Incoming suggestions — dismiss */}
-              {showSuggestIncoming && (() => {
-                const sug = coopIncomingSuggestions[0];
-                const { color: sugColor, shapeIndex: sugShapeIdx } = parseToken(sug.suggestedToken);
-                const sugDisplayColor = themeColorMap ? (themeColorMap[sugColor] || sugColor) : sugColor;
-                const shapes = themedShapes || SHAPES;
-                return (
-                  <>
-                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.text, fontWeight: 600 }}>
-                      <span style={{ color: sug.fromColor, fontWeight: 700 }}>{sug.fromName}</span> suggests
-                    </span>
-                    <div style={{
-                      width: 24, height: 24, borderRadius: 6,
-                      backgroundColor: sugDisplayColor,
-                      display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-                      boxShadow: `0 0 8px ${sugDisplayColor}66`,
-                    }}>
-                      {shapes[sugShapeIdx % shapes.length](12, getShapeStroke(sugDisplayColor, puzzle?.mode === "easy" || puzzle?.mode === "blind"))}
-                    </div>
-                    <button onClick={(e) => {
-                      e.stopPropagation();
-                      dismissCoopCellSuggestion(coopSessionId, sug.cellKey).catch(() => {});
-                    }} style={{
-                      backgroundColor: "#E040FB33", color: "#E040FB", border: `1px solid #E040FB44`,
-                      padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 700,
-                      fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase",
-                    }}>Got it</button>
-                    <button onClick={(e) => {
-                      e.stopPropagation();
-                      dismissCoopCellSuggestion(coopSessionId, sug.cellKey).catch(() => {});
-                    }} style={{
-                      backgroundColor: "transparent", color: C.textDim, border: `1px solid ${C.border}`,
-                      padding: "6px 12px", borderRadius: 8, fontSize: 10, fontWeight: 700,
-                      fontFamily: "'Inter', sans-serif", letterSpacing: 1, cursor: "pointer",
-                      textTransform: "uppercase",
-                    }}>Dismiss</button>
-                    {coopIncomingSuggestions.length > 1 && (
-                      <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 9, color: C.textDim, fontWeight: 600 }}>
-                        +{coopIncomingSuggestions.length - 1} more
-                      </span>
-                    )}
-                  </>
-                );
-              })()}
             </div>
           )}
 
@@ -7886,9 +7821,25 @@ export default function Pattrn() {
     }
     // Coop suggest mode: tapping a partner's cell selects it for token suggestion
     if (coopSuggestMode && isCoop && coopMyBlanks && !coopMyBlanks.has(key) && !coopMyLockedIn && coopSessionId && firebaseUser) {
+      // If this cell already has my suggestion, remove it
+      const existingSug = coopAllSuggestions.find(s => s.cellKey === key && s.isMine);
+      if (existingSug) {
+        cancelCoopCellSuggestion(coopSessionId, key).catch(() => {});
+        setCoopSuggestMode(null);
+        setCoopSuggestCell(null);
+        return;
+      }
       setCoopSuggestCell(key);
       setSelectedCell(null);
       return;
+    }
+    // Coop: tapping a cell with my outgoing suggestion removes it
+    if (isCoop && !coopSuggestMode && coopSessionId && firebaseUser) {
+      const mySug = coopAllSuggestions.find(s => s.cellKey === key && s.isMine);
+      if (mySug) {
+        cancelCoopCellSuggestion(coopSessionId, key).catch(() => {});
+        return;
+      }
     }
     // Coop incoming pass: tapping the incoming pass cell selects it (to show accept/reject)
     if (isCoop && coopIncomingPass && coopIncomingPass.cellKey === key) {
@@ -7915,7 +7866,7 @@ export default function Pattrn() {
     } else {
       setSelectedCell(key);
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions]);
 
   const handleCellPointerUp = useCallback((r, c) => {
     if (gameState !== "playing") return;
@@ -8144,9 +8095,7 @@ export default function Pattrn() {
     setCoopSuggestMode(null);
     setCoopSuggestPlayerPicker(false);
     setCoopSuggestCell(null);
-    setCoopPendingSuggestCell(null);
-    setPendingSuggestOpen(false);
-    setCoopIncomingSuggestions([]);
+    setCoopAllSuggestions([]);
     coopPlayerUidsRef.current = "";
     setRadialMenuStack([]);
     coopWriteThrottleRef.current = {};
@@ -8322,29 +8271,25 @@ export default function Pattrn() {
         setPendingPassOpen(false);
       }
 
-      // Sync cell suggestions from Firebase
+      // Sync cell suggestions from Firebase — collect all for grid display
       const cellSuggestions = data.cellSuggestions || {};
-      // Collect all incoming suggestions targeted at me
-      const incomingSugs = Object.entries(cellSuggestions)
-        .filter(([, sug]) => sug.toUid === myUid && sug.status === "pending")
+      const allSugs = Object.entries(cellSuggestions)
+        .filter(([, sug]) => sug.status === "pending" && (sug.toUid === myUid || sug.fromUid === myUid))
         .map(([cellKey, sug]) => {
-          const fromPlayer = players[sug.fromUid];
-          const fromColor = colorMap[sug.fromUid] || "#54A0FF";
+          const isMine = sug.fromUid === myUid;
+          const otherUid = isMine ? sug.toUid : sug.fromUid;
+          const otherPlayer = players[otherUid];
+          const otherColor = colorMap[otherUid] || "#54A0FF";
           return {
             fromUid: sug.fromUid,
-            fromName: fromPlayer?.username || "Player",
-            fromColor,
+            fromName: isMine ? "You" : (otherPlayer?.username || "Player"),
+            fromColor: isMine ? COOP_MY_COLOR : otherColor,
             cellKey,
             suggestedToken: sug.suggestedToken,
+            isMine,
           };
         });
-      setCoopIncomingSuggestions(incomingSugs);
-      // Check if my outgoing suggestion was dismissed (no longer pending)
-      const myOutgoingSug = Object.entries(cellSuggestions).find(([, sug]) => sug.fromUid === myUid && sug.status === "pending");
-      if (!myOutgoingSug) {
-        setCoopPendingSuggestCell(null);
-        setPendingSuggestOpen(false);
-      }
+      setCoopAllSuggestions(allSugs);
 
       // Sync invited UIDs
       const invited = data.invitedUids || {};
@@ -8384,9 +8329,7 @@ export default function Pattrn() {
           setCoopSuggestMode(null);
           setCoopSuggestPlayerPicker(false);
           setCoopSuggestCell(null);
-          setCoopPendingSuggestCell(null);
-          setPendingSuggestOpen(false);
-          setCoopIncomingSuggestions([]);
+          setCoopAllSuggestions([]);
         }
       }
 
@@ -13610,25 +13553,18 @@ export default function Pattrn() {
     }
     // Suggest button — suggest what a cell could be to another player
     if (isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0) {
-      if (coopPendingSuggestCell) {
-        // Pending suggestion — show clock badge icon, tap toggles waiting UI
-        playPillButtons.push({ id: "suggest-cell", icon: "suggest-pending", color: "#f59e0b", onClick: () => {
-          setPendingSuggestOpen(prev => !prev);
-        }});
-      } else {
-        playPillButtons.push({ id: "suggest-cell", icon: "suggest", color: (coopSuggestMode || coopSuggestPlayerPicker || coopSuggestCell) ? "#E040FB" : "#fff", onClick: () => {
-          if (coopSuggestMode) { setCoopSuggestMode(null); setCoopSuggestCell(null); return; }
-          if (coopSuggestCell) { setCoopSuggestCell(null); return; }
-          setSelectedToken(null); setSelectedCell(null);
-          // Cancel any active pass mode
-          setCoopPassMode(null); setCoopPassPlayerPicker(false);
-          const entries = Object.entries(coopPlayers);
-          if (entries.length === 1) {
-            const [uid, p] = entries[0];
-            setCoopSuggestMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
-          } else { setCoopSuggestPlayerPicker(prev => !prev); }
-        }});
-      }
+      playPillButtons.push({ id: "suggest-cell", icon: "suggest", color: (coopSuggestMode || coopSuggestPlayerPicker || coopSuggestCell) ? "#E040FB" : "#fff", onClick: () => {
+        if (coopSuggestMode) { setCoopSuggestMode(null); setCoopSuggestCell(null); return; }
+        if (coopSuggestCell) { setCoopSuggestCell(null); return; }
+        setSelectedToken(null); setSelectedCell(null);
+        // Cancel any active pass mode
+        setCoopPassMode(null); setCoopPassPlayerPicker(false);
+        const entries = Object.entries(coopPlayers);
+        if (entries.length === 1) {
+          const [uid, p] = entries[0];
+          setCoopSuggestMode({ targetUid: uid, targetName: p.username || "Player", targetColor: coopPlayerColorMap[uid] || "#FF9FF3" });
+        } else { setCoopSuggestPlayerPicker(prev => !prev); }
+      }});
     }
     if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
       playPillButtons.push({ id: "preview", icon: "search", color: C.accent, onClick: () => setRadialMenuStack(["root", "mosaic-preview"]) });
@@ -14212,45 +14148,35 @@ export default function Pattrn() {
                         zIndex: 2,
                       }} />
                     )}
-                    {/* Incoming cell suggestion indicator — lightbulb glow */}
-                    {gameState === "playing" && coopIncomingSuggestions.length > 0 && (() => {
-                      const sug = coopIncomingSuggestions.find(s => s.cellKey === key);
+                    {/* Cell suggestion indicator — shown to both sender and receiver */}
+                    {gameState === "playing" && coopAllSuggestions.length > 0 && (() => {
+                      const sug = coopAllSuggestions.find(s => s.cellKey === key);
                       if (!sug) return null;
                       const { color: sugColor, shapeIndex: sugShapeIdx } = parseToken(sug.suggestedToken);
                       const sugDisplayColor = themeColorMap ? (themeColorMap[sugColor] || sugColor) : sugColor;
                       const shapes = themedShapes || SHAPES;
+                      const borderColor = sug.isMine ? COOP_MY_COLOR : sug.fromColor;
                       return (
                         <>
                           <div style={{
                             position: "absolute", inset: -2, borderRadius: 14, pointerEvents: "none",
-                            border: `2px solid #E040FB`,
-                            boxShadow: `0 0 12px #E040FB66, inset 0 0 8px #E040FB22`,
-                            animation: "pulse 1.5s infinite",
+                            border: `2px solid ${borderColor}88`,
                             zIndex: 2,
                           }} />
                           <div style={{
-                            position: "absolute", bottom: -4, left: "50%", transform: "translateX(-50%)",
-                            width: 18, height: 18, borderRadius: 5,
+                            position: "absolute", bottom: -3, left: "50%", transform: "translateX(-50%)",
+                            width: 16, height: 16, borderRadius: 4,
                             backgroundColor: sugDisplayColor,
                             display: "flex", alignItems: "center", justifyContent: "center",
                             boxShadow: `0 0 6px ${sugDisplayColor}88`,
                             zIndex: 3, pointerEvents: "none",
-                            border: `1.5px solid #E040FB`,
+                            border: `1.5px solid ${borderColor}`,
                           }}>
-                            {shapes[sugShapeIdx % shapes.length](10, getShapeStroke(sugDisplayColor, puzzle?.mode === "easy" || puzzle?.mode === "blind"))}
+                            {shapes[sugShapeIdx % shapes.length](9, getShapeStroke(sugDisplayColor, puzzle?.mode === "easy" || puzzle?.mode === "blind"))}
                           </div>
                         </>
                       );
                     })()}
-                    {/* Pending outgoing suggestion indicator */}
-                    {coopPendingSuggestCell === key && gameState === "playing" && (
-                      <div style={{
-                        position: "absolute", inset: -2, borderRadius: 14, pointerEvents: "none",
-                        border: `2px dashed #E040FB88`,
-                        animation: "pulse 2s infinite",
-                        zIndex: 2,
-                      }} />
-                    )}
                     {/* Suggest mode: highlight selected cell for suggestion */}
                     {coopSuggestCell === key && gameState === "playing" && (
                       <div style={{
