@@ -2979,8 +2979,7 @@ export default function Pattrn() {
   const [coopReactionTab, setCoopReactionTab] = useState("emoji"); // "emoji" | "pattern" | "text"
   const [coopFloatingReactions, setCoopFloatingReactions] = useState([]); // floating reaction animations: [{ id, emoji, fromName, fromColor, x, type }]
   const coopSeenReactionsRef = useRef(new Set()); // track already-seen reaction keys to detect new ones
-  const coopReactionSwipeRef = useRef(null); // ref to the swipeable tab container
-  const coopReactionDragRef = useRef({ active: false, startX: 0, currentX: 0, tabIndex: 0 }); // swipe drag state
+  const coopReactionScrollRef = useRef(null); // ref to scroll-snap container for reaction tabs
   const COOP_REACTIONS_EMOJI = [
     "\u{1F44D}", "\u{1F44E}", "\u2764\uFE0F", "\u{1F525}",
     "\u{1F602}", "\u{1F62E}", "\u{1F914}", "\u{1F44F}",
@@ -5087,11 +5086,11 @@ export default function Pattrn() {
     const suggestTokenCount = showSuggestTokenPick ? (puzzle?.usedTokens?.length || 0) : 0;
     const reactionPickerHeight = (() => {
       if (!showReactionPicker) return 0;
-      const tabBarH = 32;
+      const tabBarH = 30;
       const items = coopReactionTab === "emoji" ? COOP_REACTIONS_EMOJI.length : coopReactionTab === "pattern" ? COOP_REACTIONS_PATTERN.length : COOP_REACTIONS_TEXT.length;
-      const cols = coopReactionTab === "text" ? 4 : 6;
-      const rowH = coopReactionTab === "text" ? 34 : 44;
-      return tabBarH + 8 + Math.ceil(items / cols) * rowH;
+      const cols = coopReactionTab === "text" ? 4 : 8;
+      const rowH = coopReactionTab === "text" ? 30 : 32;
+      return tabBarH + 6 + Math.ceil(items / cols) * rowH;
     })();
     const passRowHeight = (showPassPlayerPicker || showSuggestPlayerPicker) ? (passPlayerCount > 2 ? 88 : 56) : showSuggestTokenPick ? Math.max(56, 36 + Math.ceil(suggestTokenCount / 6) * 36) : showReactionPicker ? reactionPickerHeight : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
@@ -7199,43 +7198,27 @@ export default function Pattrn() {
               {/* Reaction picker with swipeable tabs: Emoji / Pattern / Text */}
               {showReactionPicker && (() => {
                 const REACTION_TABS = ["emoji", "pattern", "text"];
-                const tabIndex = REACTION_TABS.indexOf(coopReactionTab);
                 const sendReaction = (content, type) => {
                   if (coopSessionId && firebaseUser) {
                     sendCoopReaction(coopSessionId, firebaseUser.uid, content, username || "Player", type).catch(() => {});
                     addFloatingReaction(content, "You", COOP_MY_COLOR, type);
                   }
                 };
-                const handleSwipeStart = (clientX) => {
-                  coopReactionDragRef.current = { active: true, startX: clientX, currentX: 0, tabIndex };
-                  if (coopReactionSwipeRef.current) coopReactionSwipeRef.current.style.transition = "none";
+                const scrollToTab = (tabId) => {
+                  const idx = REACTION_TABS.indexOf(tabId);
+                  const el = coopReactionScrollRef.current;
+                  if (el) el.scrollTo({ left: idx * el.offsetWidth, behavior: "smooth" });
+                  setCoopReactionTab(tabId);
                 };
-                const handleSwipeMove = (clientX) => {
-                  if (!coopReactionDragRef.current.active) return;
-                  const dx = clientX - coopReactionDragRef.current.startX;
-                  coopReactionDragRef.current.currentX = dx;
-                  if (coopReactionSwipeRef.current) {
-                    const base = -coopReactionDragRef.current.tabIndex * 100;
-                    const pct = (dx / (coopReactionSwipeRef.current.parentElement?.offsetWidth || 300)) * 100;
-                    coopReactionSwipeRef.current.style.transform = `translateX(${base + pct}%)`;
-                  }
-                };
-                const handleSwipeEnd = () => {
-                  if (!coopReactionDragRef.current.active) return;
-                  coopReactionDragRef.current.active = false;
-                  const dx = coopReactionDragRef.current.currentX;
-                  const threshold = 50;
-                  let newIdx = coopReactionDragRef.current.tabIndex;
-                  if (dx < -threshold && newIdx < REACTION_TABS.length - 1) newIdx++;
-                  else if (dx > threshold && newIdx > 0) newIdx--;
-                  setCoopReactionTab(REACTION_TABS[newIdx]);
-                  if (coopReactionSwipeRef.current) {
-                    coopReactionSwipeRef.current.style.transition = "transform 0.25s cubic-bezier(0.4,0,0.2,1)";
-                    coopReactionSwipeRef.current.style.transform = `translateX(${-newIdx * 100}%)`;
-                  }
+                const handleScroll = () => {
+                  const el = coopReactionScrollRef.current;
+                  if (!el) return;
+                  const idx = Math.round(el.scrollLeft / el.offsetWidth);
+                  const tab = REACTION_TABS[Math.min(idx, REACTION_TABS.length - 1)];
+                  if (tab && tab !== coopReactionTab) setCoopReactionTab(tab);
                 };
                 return (
-                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+                <div style={{ display: "flex", flexDirection: "column", gap: 4, width: "100%" }}>
                   {/* Tab bar */}
                   <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}>
                     {[
@@ -7245,14 +7228,7 @@ export default function Pattrn() {
                     ].map(tab => {
                       const active = coopReactionTab === tab.id;
                       return (
-                        <button key={tab.id} onClick={(e) => {
-                          e.stopPropagation();
-                          setCoopReactionTab(tab.id);
-                          if (coopReactionSwipeRef.current) {
-                            coopReactionSwipeRef.current.style.transition = "transform 0.25s cubic-bezier(0.4,0,0.2,1)";
-                            coopReactionSwipeRef.current.style.transform = `translateX(${-REACTION_TABS.indexOf(tab.id) * 100}%)`;
-                          }
-                        }} style={{
+                        <button key={tab.id} onClick={(e) => { e.stopPropagation(); scrollToTab(tab.id); }} style={{
                           flex: 1, padding: "5px 0", fontSize: 10, fontWeight: 700,
                           fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 0.8,
                           background: active ? "rgba(255,255,255,0.1)" : "none",
@@ -7267,59 +7243,54 @@ export default function Pattrn() {
                       color: C.textDim, cursor: "pointer", fontSize: 14, padding: "5px 8px", lineHeight: 1,
                     }}>{"\u2715"}</button>
                   </div>
-                  {/* Swipeable content area */}
-                  <div style={{ overflow: "hidden", width: "100%", touchAction: "pan-y" }}
-                    onTouchStart={(e) => handleSwipeStart(e.touches[0].clientX)}
-                    onTouchMove={(e) => handleSwipeMove(e.touches[0].clientX)}
-                    onTouchEnd={handleSwipeEnd}
-                    onMouseDown={(e) => { e.preventDefault(); handleSwipeStart(e.clientX); const onMove = (ev) => handleSwipeMove(ev.clientX); const onUp = () => { handleSwipeEnd(); window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); }; window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp); }}
-                  >
-                    <div ref={coopReactionSwipeRef} style={{
-                      display: "flex", width: "300%",
-                      transform: `translateX(${-tabIndex * 100}%)`,
-                      transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1)",
+                  {/* Scroll-snap swipeable content */}
+                  <div ref={coopReactionScrollRef} onScroll={handleScroll}
+                    className="reaction-scroll-container"
+                    style={{
+                      display: "flex", overflowX: "auto", scrollSnapType: "x mandatory",
+                      WebkitOverflowScrolling: "touch", scrollbarWidth: "none",
+                      msOverflowStyle: "none", width: "100%",
                     }}>
-                      {/* Emoji panel */}
-                      <div style={{ width: "33.333%", display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap", padding: "0 2px" }}>
-                        {COOP_REACTIONS_EMOJI.map((emoji) => (
-                          <button key={emoji} onClick={(e) => { e.stopPropagation(); sendReaction(emoji, "emoji"); }} style={{
-                            fontSize: 26, background: "none", border: "none",
-                            cursor: "pointer", padding: "5px 6px", borderRadius: 10,
-                            transition: "transform 0.15s, background-color 0.15s", lineHeight: 1,
-                          }}
-                            onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.25)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
-                            onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                          >{emoji}</button>
-                        ))}
-                      </div>
-                      {/* Pattern panel */}
-                      <div style={{ width: "33.333%", display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap", padding: "0 2px" }}>
-                        {COOP_REACTIONS_PATTERN.map((sym) => (
-                          <button key={sym} onClick={(e) => { e.stopPropagation(); sendReaction(sym, "pattern"); }} style={{
-                            fontSize: 24, background: "none", border: "none",
-                            cursor: "pointer", padding: "5px 8px", borderRadius: 10,
-                            color: C.text, transition: "transform 0.15s, background-color 0.15s", lineHeight: 1,
-                          }}
-                            onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.25)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
-                            onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                          >{sym}</button>
-                        ))}
-                      </div>
-                      {/* Text panel — Elden Ring style single words */}
-                      <div style={{ width: "33.333%", display: "flex", gap: 5, justifyContent: "center", flexWrap: "wrap", alignContent: "flex-start", padding: "0 2px" }}>
-                        {COOP_REACTIONS_TEXT.map((word) => (
-                          <button key={word} onClick={(e) => { e.stopPropagation(); sendReaction(word, "text"); }} style={{
-                            fontSize: 12, fontWeight: 600, fontFamily: "'Inter', sans-serif",
-                            background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
-                            cursor: "pointer", padding: "6px 10px", borderRadius: 8,
-                            color: C.text, transition: "transform 0.15s, background-color 0.15s, border-color 0.15s",
-                            letterSpacing: 0.3, lineHeight: 1.2,
-                          }}
-                            onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "#FFD700"; }}
-                            onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = C.border; }}
-                          >{word}</button>
-                        ))}
-                      </div>
+                    {/* Emoji panel */}
+                    <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap", padding: "0 4px", boxSizing: "border-box" }}>
+                      {COOP_REACTIONS_EMOJI.map((emoji) => (
+                        <button key={emoji} onClick={(e) => { e.stopPropagation(); sendReaction(emoji, "emoji"); }} style={{
+                          fontSize: 24, background: "none", border: "none",
+                          cursor: "pointer", padding: "3px 4px", borderRadius: 8,
+                          transition: "transform 0.12s, background-color 0.12s", lineHeight: 1,
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.25)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                        >{emoji}</button>
+                      ))}
+                    </div>
+                    {/* Pattern panel */}
+                    <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap", padding: "0 4px", boxSizing: "border-box" }}>
+                      {COOP_REACTIONS_PATTERN.map((sym) => (
+                        <button key={sym} onClick={(e) => { e.stopPropagation(); sendReaction(sym, "pattern"); }} style={{
+                          fontSize: 22, background: "none", border: "none",
+                          cursor: "pointer", padding: "3px 5px", borderRadius: 8,
+                          color: C.text, transition: "transform 0.12s, background-color 0.12s", lineHeight: 1,
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.25)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                        >{sym}</button>
+                      ))}
+                    </div>
+                    {/* Text panel — Elden Ring style single words */}
+                    <div style={{ minWidth: "100%", flexShrink: 0, scrollSnapAlign: "start", display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap", alignContent: "flex-start", padding: "0 4px", boxSizing: "border-box" }}>
+                      {COOP_REACTIONS_TEXT.map((word) => (
+                        <button key={word} onClick={(e) => { e.stopPropagation(); sendReaction(word, "text"); }} style={{
+                          fontSize: 11, fontWeight: 600, fontFamily: "'Inter', sans-serif",
+                          background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+                          cursor: "pointer", padding: "5px 8px", borderRadius: 7,
+                          color: C.text, transition: "transform 0.12s, background-color 0.12s, border-color 0.12s",
+                          letterSpacing: 0.3, lineHeight: 1.2,
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "#FFD700"; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = C.border; }}
+                        >{word}</button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -13771,7 +13742,7 @@ export default function Pattrn() {
     // Reaction button — send emoji reactions to all players
     if (isCoop && Object.keys(coopPlayers).length > 0) {
       playPillButtons.push({ id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
-        setCoopReactionPickerOpen(prev => !prev);
+        setCoopReactionPickerOpen(prev => { if (!prev) setCoopReactionTab("emoji"); return !prev; });
         // Cancel any active pass/suggest modes
         setCoopPassMode(null); setCoopPassPlayerPicker(false);
         setCoopSuggestMode(null); setCoopSuggestPlayerPicker(false); setCoopSuggestCell(null);
@@ -13851,7 +13822,7 @@ export default function Pattrn() {
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; touch-action: manipulation; } @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} } @keyframes enigmaRotor { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} } @keyframes enigmaBgDrift { 0%{transform:translate(0%,0%) rotate(0deg)} 33%{transform:translate(5%,-3%) rotate(1deg)} 66%{transform:translate(-3%,5%) rotate(-1deg)} 100%{transform:translate(2%,2%) rotate(0.5deg)} } @keyframes enigmaWireDrift { 0%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(3%,-2%) scale(1.02)} 100%{transform:translate(-2%,3%) scale(0.98)} } @keyframes enigmaGlow { 0%,100%{box-shadow:inset 0 0 20px rgba(201,168,76,0.04),inset 0 0 60px rgba(140,107,30,0.02)} 50%{box-shadow:inset 0 0 30px rgba(201,168,76,0.08),inset 0 0 80px rgba(140,107,30,0.04)} } @keyframes enigmaDecrypt { 0%{transform:rotateY(0deg) scale(1);opacity:0.4;filter:brightness(0.5)} 25%{transform:rotateY(90deg) scale(0.9);opacity:0.6;filter:brightness(0.7)} 50%{transform:rotateY(180deg) scale(0.95);opacity:0.8;filter:brightness(1.3)} 75%{transform:rotateY(270deg) scale(1.02);filter:brightness(1.1)} 100%{transform:rotateY(360deg) scale(1);opacity:1;filter:brightness(1)} } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes notificationPulse { 0%,100%{box-shadow:0 0 16px rgba(84,160,255,0.6),0 0 32px rgba(84,160,255,0.3)} 50%{box-shadow:0 0 24px rgba(84,160,255,0.8),0 0 48px rgba(84,160,255,0.5)} } @keyframes notificationMenuGlow { 0%,100%{box-shadow:0 0 20px rgba(84,160,255,0.4),inset 0 0 20px rgba(84,160,255,0.15)} 50%{box-shadow:0 0 30px rgba(84,160,255,0.6),inset 0 0 30px rgba(84,160,255,0.25)} } @keyframes subtleGlowPulse { 0%,100%{opacity:0.85} 50%{opacity:1} } @keyframes coopReactionFloat { 0%{transform:translateY(0) scale(0.5);opacity:0} 8%{transform:translateY(-5vh) scale(1.1);opacity:1} 15%{transform:translateY(-10vh) scale(1)} 70%{opacity:1} 100%{transform:translateY(-85vh) scale(1.2);opacity:0} }`}</style>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; touch-action: manipulation; } @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } .reaction-scroll-container::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} } @keyframes enigmaRotor { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} } @keyframes enigmaBgDrift { 0%{transform:translate(0%,0%) rotate(0deg)} 33%{transform:translate(5%,-3%) rotate(1deg)} 66%{transform:translate(-3%,5%) rotate(-1deg)} 100%{transform:translate(2%,2%) rotate(0.5deg)} } @keyframes enigmaWireDrift { 0%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(3%,-2%) scale(1.02)} 100%{transform:translate(-2%,3%) scale(0.98)} } @keyframes enigmaGlow { 0%,100%{box-shadow:inset 0 0 20px rgba(201,168,76,0.04),inset 0 0 60px rgba(140,107,30,0.02)} 50%{box-shadow:inset 0 0 30px rgba(201,168,76,0.08),inset 0 0 80px rgba(140,107,30,0.04)} } @keyframes enigmaDecrypt { 0%{transform:rotateY(0deg) scale(1);opacity:0.4;filter:brightness(0.5)} 25%{transform:rotateY(90deg) scale(0.9);opacity:0.6;filter:brightness(0.7)} 50%{transform:rotateY(180deg) scale(0.95);opacity:0.8;filter:brightness(1.3)} 75%{transform:rotateY(270deg) scale(1.02);filter:brightness(1.1)} 100%{transform:rotateY(360deg) scale(1);opacity:1;filter:brightness(1)} } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes notificationPulse { 0%,100%{box-shadow:0 0 16px rgba(84,160,255,0.6),0 0 32px rgba(84,160,255,0.3)} 50%{box-shadow:0 0 24px rgba(84,160,255,0.8),0 0 48px rgba(84,160,255,0.5)} } @keyframes notificationMenuGlow { 0%,100%{box-shadow:0 0 20px rgba(84,160,255,0.4),inset 0 0 20px rgba(84,160,255,0.15)} 50%{box-shadow:0 0 30px rgba(84,160,255,0.6),inset 0 0 30px rgba(84,160,255,0.25)} } @keyframes subtleGlowPulse { 0%,100%{opacity:0.85} 50%{opacity:1} } @keyframes coopReactionFloat { 0%{transform:translateY(0) scale(0.5);opacity:0} 8%{transform:translateY(-5vh) scale(1.1);opacity:1} 15%{transform:translateY(-10vh) scale(1)} 70%{opacity:1} 100%{transform:translateY(-85vh) scale(1.2);opacity:0} }`}</style>
 
       <Particles show={showParticles} />
 
