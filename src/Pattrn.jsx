@@ -5104,7 +5104,7 @@ export default function Pattrn() {
     const hasPassUI = isCustomPanel ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming || showSuggestPlayerPicker || showSuggestBanner || showSuggestTokenPick || showReactionPicker);
     const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : (showSuggestPlayerPicker ? Object.keys(coopPlayers).length : 0);
     const suggestTokenCount = showSuggestTokenPick ? (puzzle?.usedTokens?.length || 0) : 0;
-    const reactionPickerHeight = showReactionPicker ? 200 : 0;
+    const reactionPickerHeight = showReactionPicker ? 228 : 0;
     const passRowHeight = (showPassPlayerPicker || showSuggestPlayerPicker) ? (passPlayerCount > 2 ? 88 : 56) : showSuggestTokenPick ? Math.max(56, 36 + Math.ceil(suggestTokenCount / 6) * 36) : showReactionPicker ? reactionPickerHeight : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
 
@@ -7211,11 +7211,11 @@ export default function Pattrn() {
               {/* Reaction picker — single scrollable grid */}
               {showReactionPicker && (
                 <div className="reaction-scroll-container" style={{
-                  display: "flex", flexWrap: "wrap", gap: 3,
+                  display: "flex", flexWrap: "wrap", gap: 4,
                   justifyContent: "center", alignContent: "flex-start",
                   overflowY: "auto", WebkitOverflowScrolling: "touch",
                   scrollbarWidth: "none", msOverflowStyle: "none",
-                  maxHeight: 192, width: "100%", padding: "0 2px",
+                  maxHeight: 220, width: "100%", padding: "0 2px",
                   boxSizing: "border-box",
                 }}>
                   {COOP_REACTIONS.map((r) => (
@@ -7227,9 +7227,9 @@ export default function Pattrn() {
                           addFloatingReaction(r.content, "You", COOP_MY_COLOR, r.type);
                         }
                       }} style={{
-                        fontSize: 11, fontWeight: 600, fontFamily: "'Inter', sans-serif",
+                        fontSize: 13, fontWeight: 600, fontFamily: "'Inter', sans-serif",
                         background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
-                        cursor: "pointer", padding: "4px 8px", borderRadius: 6,
+                        cursor: "pointer", padding: "7px 12px", borderRadius: 8,
                         color: C.text, transition: "transform 0.12s, background-color 0.12s, border-color 0.12s",
                         letterSpacing: 0.3, lineHeight: 1.2,
                       }}
@@ -7244,8 +7244,8 @@ export default function Pattrn() {
                           addFloatingReaction(r.content, "You", COOP_MY_COLOR, r.type);
                         }
                       }} style={{
-                        fontSize: r.type === "emoji" ? 22 : 20, background: "none", border: "none",
-                        cursor: "pointer", padding: "3px 4px", borderRadius: 8,
+                        fontSize: r.type === "emoji" ? 28 : 24, background: "none", border: "none",
+                        cursor: "pointer", padding: "5px 6px", borderRadius: 10,
                         color: r.type === "pattern" ? C.text : undefined,
                         transition: "transform 0.12s, background-color 0.12s", lineHeight: 1,
                       }}
