@@ -3020,7 +3020,8 @@ export default function Pattrn() {
     { content: "Bravery", type: "text" }, { content: "Futile", type: "text" },
     { content: "Betrayal", type: "text" }, { content: "Madness", type: "text" },
     { content: "Victory", type: "text" }, { content: "Doubt", type: "text" },
-    { content: "Finger", type: "text" }, { content: "Edge", type: "text" },
+    { content: "Finger", type: "text" }, { content: "But", type: "text" },
+    { content: "Hole", type: "text" }, { content: "Edge", type: "text" },
   ];
   const COOP_NEON_COLORS = ["#FF6B6B", "#00E676", "#FF9100", "#E040FB", "#FFEA00", "#00E5FF", "#FF4081", "#76FF03"];
   const COOP_MY_COLOR = "#54A0FF";
