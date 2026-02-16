@@ -2943,6 +2943,7 @@ export default function Pattrn() {
   const [coopMyLockedIn, setCoopMyLockedIn] = useState(false);
   const [coopPartnerLockedIn, setCoopPartnerLockedIn] = useState(false);
   const [coopPartnerCorrect, setCoopPartnerCorrect] = useState(false);
+  const [coopEveryoneLockedCorrect, setCoopEveryoneLockedCorrect] = useState(false); // true only when Firebase confirms ALL players locked in + correct
   const [coopPartnerConnected, setCoopPartnerConnected] = useState(false);
   const [coopPartnerName, setCoopPartnerName] = useState(null); // partner's username in regular coop
   const [coopPartnerPic, setCoopPartnerPic] = useState(null); // partner's profile picture in regular coop
@@ -8360,6 +8361,7 @@ export default function Pattrn() {
     setCoopMyLockedIn(false);
     setCoopPartnerLockedIn(false);
     setCoopPartnerCorrect(false);
+    setCoopEveryoneLockedCorrect(false);
     setCoopPartnerConnected(false);
     setCoopPartnerFills({});
     setCoopPlayers({});
@@ -8454,6 +8456,7 @@ export default function Pattrn() {
     setCoopMyLockedIn(false);
     setCoopPartnerLockedIn(false);
     setCoopPartnerCorrect(false);
+    setCoopEveryoneLockedCorrect(false);
     setCoopPartnerConnected(false);
     setCoopStatus(null);
     setShowCoopInvite(false);
@@ -8513,6 +8516,7 @@ export default function Pattrn() {
     setCoopMyLockedIn(false);
     setCoopPartnerLockedIn(false);
     setCoopPartnerCorrect(false);
+    setCoopEveryoneLockedCorrect(false);
     const otherPlayers = session.players ? Object.keys(session.players).filter(uid => uid !== firebaseUser.uid).length : 0;
     setCoopPartnerConnected(otherPlayers > 0 || (isHost ? !!session.guestUid : true));
     setCoopPartnerFills({});
@@ -8567,6 +8571,7 @@ export default function Pattrn() {
     setCoopMyLockedIn(false);
     setCoopPartnerLockedIn(false);
     setCoopPartnerCorrect(false);
+    setCoopEveryoneLockedCorrect(false);
     setCoopPartnerFills({});
     coopWriteThrottleRef.current = {};
     // Clear suggestion state for fresh retry
@@ -8725,6 +8730,7 @@ export default function Pattrn() {
           setCoopMyLockedIn(false);
           setCoopPartnerLockedIn(false);
           setCoopPartnerCorrect(false);
+          setCoopEveryoneLockedCorrect(false);
           setCoopPartnerFills({});
           coopWriteThrottleRef.current = {};
           setCoopPassMode(null);
@@ -8836,6 +8842,10 @@ export default function Pattrn() {
       // Check if ALL players locked in correctly → complete
       const allPlayersLocked = Object.keys(players).length >= 2 && Object.values(players).every(p => !!p.lockedIn);
       const allPlayersCorrect = Object.values(players).every(p => !!p.correct);
+      // Only mark everyone-done when Firebase confirms ALL players are locked in AND correct.
+      // This is the single source of truth for puzzle completion — avoids premature completion
+      // when individual lock-in state variables are updated at different times.
+      setCoopEveryoneLockedCorrect(allPlayersLocked && allPlayersCorrect);
       if (allPlayersLocked && allPlayersCorrect && data.status !== "complete") {
         completeCoopSession(coopSessionId).catch(() => {});
       }
@@ -9796,8 +9806,12 @@ export default function Pattrn() {
     }
   };
 
-  // Detect coop completion: both players locked in correctly
-  const coopComplete = isCoop && coopMyLockedIn && coopPartnerLockedIn && coopPartnerCorrect && gameState === "playing";
+  // Detect coop completion: use the Firebase-derived flag (single source of truth) rather
+  // than combining separate state variables that may update in different render cycles.
+  // coopEveryoneLockedCorrect is set in the subscription handler only when Firebase data
+  // confirms ALL players are locked in AND correct — prevents premature completion when
+  // one player locks in but the other hasn't yet.
+  const coopComplete = isCoop && coopEveryoneLockedCorrect && gameState === "playing";
 
   // Effect: when coop is complete, trigger win state, save progress, then auto-close session
   useEffect(() => {
@@ -9812,7 +9826,7 @@ export default function Pattrn() {
     setLockedCells(new Set(puzzle.blanks));
 
     // Save progress as coop completion — read fresh from localStorage to avoid stale closure
-    const finalTime = timerStart.current ? Math.round((Date.now() - timerStart.current) / 1000) : elapsedTime;
+    const finalTime = timerStart.current ? Math.round((Date.now() - timerStart.current) / 1000) : 0;
     const freshProgress = loadProgress();
     const coopProgress = freshProgress.coop || {};
     const newCoopProgress = { ...coopProgress, [`${difficulty}_${progressKey}`]: attempts || 1 };
@@ -9845,7 +9859,7 @@ export default function Pattrn() {
         }
       }, 3000);
     }
-  }, [coopComplete, puzzle, stopTimer, elapsedTime, difficulty, progressKey, attempts, showNewAchievements, coopSessionId, coopRole]);
+  }, [coopComplete, puzzle, stopTimer, difficulty, progressKey, attempts, showNewAchievements, coopSessionId, coopRole]);
 
   // For blind mode: all non-locked blanks must be filled
   const activeBlanks = puzzle ? [...puzzle.blanks].filter(k => !lockedCells.has(k)) : [];
