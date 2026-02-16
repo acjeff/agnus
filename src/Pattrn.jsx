@@ -3123,7 +3123,7 @@ export default function Pattrn() {
   useEffect(() => {
     if (!firebaseUser || !firebaseConfigured) return;
     if (view === "menu" || view === "gallery" || view === "creator" || view === "profile" || view === "coop") {
-      updatePresence(firebaseUser.uid, { online: true, status: "idle", currentMode: null, currentPuzzle: null }).catch(() => {});
+      updatePresence(firebaseUser.uid, { online: true, status: "idle", currentMode: null, currentPuzzle: null, currentCoopSessionId: null }).catch(() => {});
     }
   }, [view, firebaseUser, firebaseConfigured]);
 
@@ -4769,7 +4769,7 @@ export default function Pattrn() {
     { id: "coop-create", icon: "play", label: "Create Session", sub: "coop-create" },
     { id: "coop-active", icon: "users", label: "Active Sessions", sub: "coop-active" },
     { id: "coop-completed", icon: "check", label: "Completed", sub: "coop-completed" },
-    { id: "coop-friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } },
+    { id: "coop-friends", icon: "users", label: "Friends", sub: "friends-view" },
   ];
 
   // Profile submenu — now global, includes account items + admin
@@ -5084,13 +5084,8 @@ export default function Pattrn() {
       if (!isFriendsView) return 0;
       let h = panelPad + fabSize; // padding + bottom bar
       h += 20 + 8; // header + margin
-      h += 32 + 12; // tabs + margin
-      if (friendsModalTab === "list") {
-        h += 36 + 8; // add friend input + margin
-        h += Math.min(friendsList.length, 5) * 46 + 16; // friend list items (cap at 5, rest scrolls)
-      } else { // compare tab
-        h += 300; // comparison content
-      }
+      h += 36 + 8; // add friend input + margin
+      h += Math.min(friendsList.length, 5) * 46 + 16; // friend list items (cap at 5, rest scrolls)
       h += 12; // bottom padding
       return h;
     })();
@@ -5747,7 +5742,7 @@ export default function Pattrn() {
                 </>
               );
             })() : isFriendsView ? (() => {
-              // Friends modal with tabs
+              // Friends modal
               return (
                 <>
                   <div style={{
@@ -5759,27 +5754,6 @@ export default function Pattrn() {
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
                   }}>
                     <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>Friends</div>
-                    {/* Tabs */}
-                    <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}`, marginBottom: 12 }}>
-                      {["list", "compare"].map(tab => (
-                        <button
-                          key={tab}
-                          onClick={() => setFriendsModalTab(tab)}
-                          style={{
-                            flex: 1, padding: "8px 0", fontSize: 10, fontWeight: 700,
-                            fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                            background: friendsModalTab === tab ? C.accent : "transparent",
-                            color: friendsModalTab === tab ? C.bg : C.textDim,
-                            border: "none", cursor: "pointer", textTransform: "uppercase",
-                            transition: "all 0.15s",
-                          }}
-                        >
-                          {tab === "list" ? "Your Friends" : "Compare"}
-                        </button>
-                      ))}
-                    </div>
-                    {friendsModalTab === "list" ? (
-                      <>
                         {/* Add friend input */}
                         <div style={{ display: "flex", gap: 6, marginBottom: addFriendMsg ? 4 : 12 }}>
                           <input
@@ -5820,47 +5794,113 @@ export default function Pattrn() {
                           {friendsList.length === 0 ? (
                             <div style={{ textAlign: "center", padding: "20px 0", color: C.textDim, fontSize: 11 }}>No friends yet. Add one above!</div>
                           ) : (
-                            friendsList.map(friend => (
-                              <div key={friend.uid} style={{
-                                display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10,
-                                backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                              }}>
-                                {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
-                                <div style={{ flex: 1 }}>
-                                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text }}>{friend.username}</div>
-                                </div>
-                                <button onClick={() => handleRemoveFriend(friend.uid)} style={{
-                                  padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
-                                  fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                                  background: C.incorrect + "22", color: C.incorrect,
-                                  border: "none", cursor: "pointer", textTransform: "uppercase",
-                                }}>Remove</button>
-                              </div>
-                            ))
+                            (() => {
+                              // Sort friends: online first, then offline
+                              const sortedFriends = [...friendsList].sort((a, b) => {
+                                const aPresence = friendPresence[a.uid];
+                                const bPresence = friendPresence[b.uid];
+                                const aOnline = aPresence && aPresence.lastSeen && (Date.now() - aPresence.lastSeen) < 120000;
+                                const bOnline = bPresence && bPresence.lastSeen && (Date.now() - bPresence.lastSeen) < 120000;
+                                if (aOnline && !bOnline) return -1;
+                                if (!aOnline && bOnline) return 1;
+                                return 0;
+                              });
+
+                              return sortedFriends.map(friend => {
+                                const presence = friendPresence[friend.uid];
+                                const isOnline = presence && presence.lastSeen && (Date.now() - presence.lastSeen) < 120000;
+                                const isPlaying = isOnline && presence.status === "playing" && presence.currentMode;
+                                const currentSession = presence?.currentCoopSessionId;
+
+                                // Format activity text
+                                let activityText = "";
+                                let activityColor = C.textDim;
+                                if (!isOnline) {
+                                  activityText = "Offline";
+                                } else if (isPlaying) {
+                                  const modeName = presence.currentMode === "easy" ? "Easy" :
+                                                   presence.currentMode === "medium" ? "Medium" :
+                                                   presence.currentMode === "hard" ? "Hard" :
+                                                   presence.currentMode === "cascade" ? "Cascade" :
+                                                   presence.currentMode === "daily" ? "Daily" :
+                                                   presence.currentMode === "mosaic" ? "Mosaic" :
+                                                   presence.currentMode;
+                                  activityText = currentSession ? `Playing ${modeName} (Co-op)` : `Playing ${modeName}`;
+                                  activityColor = C.correct;
+                                } else {
+                                  activityText = "Online";
+                                  activityColor = "#06B6D4";
+                                }
+
+                                return (
+                                  <div key={friend.uid} style={{
+                                    display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10,
+                                    backgroundColor: "rgba(255,255,255,0.04)", border: `1px solid ${isOnline ? C.correct + "33" : "rgba(255,255,255,0.08)"}`,
+                                  }}>
+                                    <div style={{ position: "relative" }}>
+                                      {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
+                                      {isOnline && (
+                                        <div style={{
+                                          position: "absolute", bottom: -2, right: -2, width: 10, height: 10,
+                                          borderRadius: "50%", backgroundColor: C.correct,
+                                          border: `2px solid ${C.bg}`, boxShadow: `0 0 8px ${C.correct}66`,
+                                        }} />
+                                      )}
+                                    </div>
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text }}>{friend.username}</div>
+                                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 9, color: activityColor, marginTop: 2 }}>{activityText}</div>
+                                    </div>
+                                    {currentSession && (
+                                      <button onClick={async () => {
+                                        // Join friend's coop session
+                                        if (currentSession && presence.currentMode && presence.currentPuzzle) {
+                                          const mode = presence.currentMode;
+                                          const puzzleId = presence.currentPuzzle;
+
+                                          // Set up coop session
+                                          setCoopSessionId(currentSession);
+                                          setCoopRole("guest");
+                                          setCoopStatus("playing");
+                                          setDifficulty(mode);
+
+                                          // Set puzzle based on mode
+                                          if (mode === "daily") {
+                                            setDailyDate(puzzleId);
+                                            setCurrentDailyDate(puzzleId);
+                                          } else if (mode === "cascade") {
+                                            setCascadeRunIndex(parseInt(puzzleId) || 0);
+                                          } else {
+                                            setCurrentPuzzle(parseInt(puzzleId) || 0);
+                                          }
+
+                                          // Close menu and load puzzle
+                                          setRadialMenuStack(["root"]);
+
+                                          // Try to join the session in Firebase
+                                          if (firebaseUser && username) {
+                                            joinCoopSession(currentSession, firebaseUser.uid, username).catch(() => {});
+                                          }
+                                        }
+                                      }} style={{
+                                        padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
+                                        fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                        background: C.correct + "22", color: C.correct,
+                                        border: "none", cursor: "pointer", textTransform: "uppercase",
+                                      }}>Join</button>
+                                    )}
+                                    <button onClick={() => handleRemoveFriend(friend.uid)} style={{
+                                      padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
+                                      fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                      background: C.incorrect + "22", color: C.incorrect,
+                                      border: "none", cursor: "pointer", textTransform: "uppercase",
+                                    }}>Remove</button>
+                                  </div>
+                                );
+                              });
+                            })()
                           )}
                         </div>
-                      </>
-                    ) : (
-                      <>
-                        {/* Compare tab - select friend to compare with */}
-                        {compareFriend ? (
-                          <div>Comparison view would go here</div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            {friendsList.map(friend => (
-                              <button key={friend.uid} onClick={() => setCompareFriend(friend)} style={{
-                                display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10,
-                                backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                                cursor: "pointer", transition: "all 0.15s",
-                              }}>
-                                {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
-                                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
                   </div>
                 </>
               );
@@ -7447,6 +7487,7 @@ export default function Pattrn() {
         online: true, status: "playing",
         currentMode: effectiveDiff,
         currentPuzzle: effectiveDiff === "daily" ? (dailyDate || "") : String(idx),
+        currentCoopSessionId: coopSessionId || null,
       }).catch(() => {});
     }
     setView("play");
@@ -8919,7 +8960,7 @@ export default function Pattrn() {
               lastSolvedMode: difficulty,
               lastSolvedPuzzle: compKey,
               lastSolvedAt: Date.now(),
-              currentMode: null, currentPuzzle: null,
+              currentMode: null, currentPuzzle: null, currentCoopSessionId: null,
             }).catch(() => {});
             // Ranking updates via real-time subscription
           }
@@ -12037,11 +12078,11 @@ export default function Pattrn() {
 
             {/* Friends */}
             {firebaseConfigured && firebaseUser && (
-              <button onClick={() => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); }} style={{
+              <button onClick={() => { setRadialMenuStack(["root", "friends-view"]); }} style={{
                 width: "100%", padding: "14px 16px", borderRadius: 12,
                 backgroundColor: C.surface, border: `1px solid ${C.border}`,
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
-                transition: "all 0.15s",
+                transition: "all 0.15s", position: "relative",
               }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = C.correct; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; }}
@@ -12061,9 +12102,20 @@ export default function Pattrn() {
                     Friends
                   </div>
                   <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>
-                    {friendsList.length} friend{friendsList.length !== 1 ? "s" : ""}{onlineFriendsCount > 0 ? `, ${onlineFriendsCount} online` : ""}
+                    {friendsList.length} friend{friendsList.length !== 1 ? "s" : ""}
                   </div>
                 </div>
+                {onlineFriendsCount > 0 && (
+                  <div style={{
+                    minWidth: 22, height: 22, borderRadius: 11,
+                    backgroundColor: C.correct, display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "0 6px", boxShadow: `0 0 12px ${C.correct}66`,
+                  }}>
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, color: C.bg }}>
+                      {onlineFriendsCount}
+                    </span>
+                  </div>
+                )}
                 <span style={{ color: C.textDim, fontSize: 16 }}>&rsaquo;</span>
               </button>
             )}
