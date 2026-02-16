@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell, PaintBucket, Eraser, Settings, Cake, Trash2, Edit3, Award, X, Copy } from "lucide-react";
+import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Handshake, Clock, Bell, PaintBucket, Eraser, Settings, Cake, Trash2, Edit3, Award, X, Copy } from "lucide-react";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -4650,12 +4650,13 @@ export default function Pattrn() {
     },
     folder: (c) => <FolderOpen size={18} color={c} strokeWidth={2} />,
     plus: (c) => <Plus size={18} color={c} strokeWidth={2} />,
-    users: (c) => {
-      const hasActiveSessions = activeCoopSessions.filter(s => s.status !== "complete").length > 0;
+    users: (c) => <Users size={18} color={c} strokeWidth={2} />,
+    handshake: (c) => {
+      const activeCount = activeCoopSessions.filter(s => s.status !== "complete").length;
       return (
         <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
-          <Users size={18} color={c} strokeWidth={2} />
-          {hasActiveSessions && (
+          <Handshake size={18} color={c} strokeWidth={2} />
+          {activeCount > 0 && (
             <span style={{
               position: "absolute",
               top: -6,
@@ -4674,7 +4675,7 @@ export default function Pattrn() {
               padding: "0 4px",
               boxShadow: "0 0 8px rgba(168, 85, 247, 0.6)",
             }}>
-              {activeCoopSessions.filter(s => s.status !== "complete").length > 99 ? "99+" : activeCoopSessions.filter(s => s.status !== "complete").length}
+              {activeCount > 99 ? "99+" : activeCount}
             </span>
           )}
         </span>
@@ -4799,7 +4800,7 @@ export default function Pattrn() {
   // Co-op submenu — global co-op menu
   const coopSubMenu = [
     { id: "coop-create", icon: "play", label: "Create Session", sub: "coop-create" },
-    { id: "coop-active", icon: "users", label: "Active Sessions", sub: "coop-active" },
+    { id: "coop-active", icon: "handshake", label: "Active Sessions", sub: "coop-active" },
     { id: "coop-completed", icon: "check", label: "Completed", sub: "coop-completed" },
     { id: "coop-friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } },
   ];
@@ -4896,7 +4897,7 @@ export default function Pattrn() {
       const items = [...viewSpecificItems];
       // Add Co-op as a permanent item if signed in
       if (firebaseConfigured && firebaseUser) {
-        items.push({ id: "nav-coop-menu", icon: "users", label: "Co-op", sub: "coop" });
+        items.push({ id: "nav-coop-menu", icon: "handshake", label: "Co-op", sub: "coop" });
       }
       // Add Profile as a permanent item if signed in
       if (firebaseConfigured && firebaseUser) {
@@ -13216,7 +13217,7 @@ export default function Pattrn() {
             menuPillButtons.push({ id: "notifications", icon: "bell", color: "#54A0FF", onClick: () => { setRadialMenuStack(["root", "notifications-view"]); } });
           }
           if (activeCoopSessions.filter(s => s.status !== "complete").length > 0) {
-            menuPillButtons.push({ id: "coop-active", icon: "users", color: "#A855F7", onClick: () => { loadActiveCoopSessions(); setRadialMenuStack(["root", "coop", "coop-active"]); } });
+            menuPillButtons.push({ id: "coop-active", icon: "handshake", color: "#A855F7", onClick: () => { loadActiveCoopSessions(); setRadialMenuStack(["root", "coop", "coop-active"]); } });
           }
           if (onlineFriendsCount > 0) {
             menuPillButtons.push({ id: "friends-online", icon: "friends", color: "#22C55E", onClick: () => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); } });
