@@ -8890,7 +8890,7 @@ export default function Pattrn() {
     return () => window.removeEventListener("keydown", handler);
   }, [view, gameState, puzzle, selectedToken, handleTokenSelect]);
 
-  const maxAttempts = isCoopMosaic ? Infinity : isCascade ? 11 : isBlind ? 6 : 5;
+  const maxAttempts = isCoopMosaic ? Infinity : isCascade ? 5 : isBlind ? 6 : 5;
 
   const checkSolution = () => {
     if (!puzzle) return;
