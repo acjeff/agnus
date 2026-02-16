@@ -7845,8 +7845,22 @@ export default function Pattrn() {
       setSelectedCell(key);
       return;
     }
-    // Coop: only allow filling my blanks, and not if I'm locked in
-    if (isCoop && coopMyBlanks && !coopMyBlanks.has(key)) return;
+    // Coop: tapping another player's blank cell auto-opens suggest for that cell
+    if (isCoop && coopMyBlanks && !coopMyBlanks.has(key) && !coopMyLockedIn && coopSessionId && firebaseUser) {
+      const ownerUid = coopCellOwnerMap[key];
+      if (ownerUid && coopPlayers[ownerUid]) {
+        const p = coopPlayers[ownerUid];
+        const playerColor = coopPlayerColorMap[ownerUid] || "#FF9FF3";
+        setCoopSuggestMode({ targetUid: ownerUid, targetName: p.username || "Player", targetColor: playerColor });
+        setCoopSuggestCell(key);
+        setSelectedCell(null);
+        setSelectedToken(null);
+        // Cancel any active pass mode
+        setCoopPassMode(null); setCoopPassPlayerPicker(false);
+      }
+      return;
+    }
+    // Coop: don't allow filling if locked in
     if (isCoop && coopMyLockedIn) return;
     if (selectedToken) {
       if (fills[key] === selectedToken) {
@@ -7865,7 +7879,7 @@ export default function Pattrn() {
     } else {
       setSelectedCell(key);
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions, coopCellOwnerMap, coopPlayers, coopPlayerColorMap]);
 
   const handleCellPointerUp = useCallback((r, c) => {
     if (gameState !== "playing") return;
