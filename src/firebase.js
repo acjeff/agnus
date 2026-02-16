@@ -1000,11 +1000,11 @@ export async function cancelCoopCellSuggestion(sessionId, cellKey) {
   await remove(ref(db, `coopSessions/${sessionId}/cellSuggestions/${cellKey}`));
 }
 
-// Send a reaction emoji to all players in a coop session
-export async function sendCoopReaction(sessionId, uid, emoji, username) {
+// Send a reaction to all players in a coop session (type: "emoji" | "pattern" | "text")
+export async function sendCoopReaction(sessionId, uid, emoji, username, type = "emoji") {
   if (!db) return;
   const reactionRef = push(ref(db, `coopSessions/${sessionId}/reactions`));
-  await set(reactionRef, { uid, emoji, username, timestamp: Date.now() });
+  await set(reactionRef, { uid, emoji, username, type, timestamp: Date.now() });
   // Auto-cleanup after 6 seconds so reactions don't accumulate
   setTimeout(() => {
     remove(reactionRef).catch(() => {});

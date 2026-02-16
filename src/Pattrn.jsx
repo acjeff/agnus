@@ -2976,17 +2976,30 @@ export default function Pattrn() {
   const [coopAllSuggestions, setCoopAllSuggestions] = useState([]); // all suggestions (incoming + outgoing) for grid display: [{ fromUid, fromName, fromColor, cellKey, suggestedToken, isMine }]
   // --- Coop reaction state ---
   const [coopReactionPickerOpen, setCoopReactionPickerOpen] = useState(false); // show emoji reaction picker
-  const [coopFloatingReactions, setCoopFloatingReactions] = useState([]); // floating reaction animations: [{ id, emoji, fromName, fromColor, x }]
+  const [coopReactionTab, setCoopReactionTab] = useState("emoji"); // "emoji" | "pattern" | "text"
+  const [coopFloatingReactions, setCoopFloatingReactions] = useState([]); // floating reaction animations: [{ id, emoji, fromName, fromColor, x, type }]
   const coopSeenReactionsRef = useRef(new Set()); // track already-seen reaction keys to detect new ones
-  const COOP_REACTIONS = [
-    { emoji: "\u{1F44D}", label: "Thumbs up" },
-    { emoji: "\u2764\uFE0F", label: "Heart" },
-    { emoji: "\u{1F602}", label: "Laughing" },
-    { emoji: "\u{1F62E}", label: "Wow" },
-    { emoji: "\u{1F44F}", label: "Clapping" },
-    { emoji: "\u{1F389}", label: "Party" },
-    { emoji: "\u{1F914}", label: "Thinking" },
-    { emoji: "\u{1F525}", label: "Fire" },
+  const COOP_REACTIONS_EMOJI = [
+    "\u{1F44D}", "\u{1F44E}", "\u2764\uFE0F", "\u{1F525}",
+    "\u{1F602}", "\u{1F62E}", "\u{1F914}", "\u{1F44F}",
+    "\u{1F389}", "\u{1F4AF}", "\u{1F60E}", "\u{1F622}",
+    "\u{1F631}", "\u{1F92F}", "\u{1F64F}", "\u{1F440}",
+    "\u{1F680}", "\u{1F3AF}", "\u{1F4A1}", "\u{1F48E}",
+    "\u26A1", "\u{1F47B}", "\u{1F984}", "\u2728",
+  ];
+  const COOP_REACTIONS_PATTERN = [
+    "\u25CB", "\u25C7", "\u25B3", "\u271A", "\u25A1", "\u2606", "\u2735",
+    "\u2191", "\u2193", "\u2190", "\u2192", "\u2195", "\u2194",
+    "\u25CF", "\u25C6", "\u25B2", "\u25A0", "\u2605",
+    "\u2573", "\u2502", "\u2500", "\u254B",
+  ];
+  const COOP_REACTIONS_TEXT = [
+    "Behold", "Dog", "Seek", "Hidden", "Praise",
+    "Likely", "Liar", "Ahh", "Try", "Fort",
+    "Visions", "Gorgeous", "Vigor", "Offer", "Ahead",
+    "Rump", "Pickle", "Huzzah", "Why", "Treasure",
+    "Despair", "Grace", "Bravery", "Futile", "Betrayal",
+    "Madness", "Victory", "Doubt", "Finger", "Edge",
   ];
   const COOP_NEON_COLORS = ["#FF6B6B", "#00E676", "#FF9100", "#E040FB", "#FFEA00", "#00E5FF", "#FF4081", "#76FF03"];
   const COOP_MY_COLOR = "#54A0FF";
@@ -5070,7 +5083,15 @@ export default function Pattrn() {
     const hasPassUI = isCustomPanel ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming || showSuggestPlayerPicker || showSuggestBanner || showSuggestTokenPick || showReactionPicker);
     const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : (showSuggestPlayerPicker ? Object.keys(coopPlayers).length : 0);
     const suggestTokenCount = showSuggestTokenPick ? (puzzle?.usedTokens?.length || 0) : 0;
-    const passRowHeight = (showPassPlayerPicker || showSuggestPlayerPicker) ? (passPlayerCount > 2 ? 88 : 56) : showSuggestTokenPick ? Math.max(56, 36 + Math.ceil(suggestTokenCount / 6) * 36) : showReactionPicker ? 56 : showPassIncoming ? 56 : 48;
+    const reactionPickerHeight = (() => {
+      if (!showReactionPicker) return 0;
+      const tabBarH = 30;
+      const items = coopReactionTab === "emoji" ? COOP_REACTIONS_EMOJI.length : coopReactionTab === "pattern" ? COOP_REACTIONS_PATTERN.length : COOP_REACTIONS_TEXT.length;
+      const cols = coopReactionTab === "text" ? 4 : 8;
+      const rowH = coopReactionTab === "text" ? 30 : 36;
+      return tabBarH + 6 + Math.ceil(items / cols) * rowH;
+    })();
+    const passRowHeight = (showPassPlayerPicker || showSuggestPlayerPicker) ? (passPlayerCount > 2 ? 88 : 56) : showSuggestTokenPick ? Math.max(56, 36 + Math.ceil(suggestTokenCount / 6) * 36) : showReactionPicker ? reactionPickerHeight : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
 
     // Coop start menu height — back button + header + subtitle + mosaic card + friends list + action buttons
@@ -7173,34 +7194,101 @@ export default function Pattrn() {
                   </div>
                 </div>
               )}
-              {/* Reaction emoji picker */}
+              {/* Reaction picker with tabs: Emoji / Pattern / Text */}
               {showReactionPicker && (
-                <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap", width: "100%" }}>
-                  {COOP_REACTIONS.map(({ emoji, label }) => (
-                    <button key={label} onClick={(e) => {
-                      e.stopPropagation();
-                      if (coopSessionId && firebaseUser) {
-                        sendCoopReaction(coopSessionId, firebaseUser.uid, emoji, username || "Player").catch(() => {});
-                        addFloatingReaction(emoji, "You", COOP_MY_COLOR);
-                      }
-                      setCoopReactionPickerOpen(false);
-                    }} style={{
-                      fontSize: 22, background: "none", border: "none",
-                      cursor: "pointer", padding: "4px 5px", borderRadius: 8,
-                      transition: "transform 0.15s, background-color 0.15s",
-                      lineHeight: 1,
-                    }}
-                      onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.3)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
-                      onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                      title={label}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                  <button onClick={(e) => { e.stopPropagation(); setCoopReactionPickerOpen(false); }} style={{
-                    background: "none", border: "none", color: C.textDim, cursor: "pointer",
-                    fontSize: 16, padding: "2px 6px", lineHeight: 1,
-                  }}>{"\u2715"}</button>
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+                  {/* Tab bar */}
+                  <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}>
+                    {[
+                      { id: "emoji", label: "Emoji" },
+                      { id: "pattern", label: "Pattern" },
+                      { id: "text", label: "Text" },
+                    ].map(tab => {
+                      const active = coopReactionTab === tab.id;
+                      return (
+                        <button key={tab.id} onClick={(e) => { e.stopPropagation(); setCoopReactionTab(tab.id); }} style={{
+                          flex: 1, padding: "4px 0", fontSize: 10, fontWeight: 700,
+                          fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 0.8,
+                          background: active ? "rgba(255,255,255,0.1)" : "none",
+                          border: "none", borderBottom: active ? "2px solid #FFD700" : "2px solid transparent",
+                          color: active ? "#FFD700" : C.textDim, cursor: "pointer",
+                          transition: "color 0.15s, border-color 0.15s, background 0.15s",
+                        }}>{tab.label}</button>
+                      );
+                    })}
+                    <button onClick={(e) => { e.stopPropagation(); setCoopReactionPickerOpen(false); }} style={{
+                      background: "none", border: "none", borderBottom: "2px solid transparent",
+                      color: C.textDim, cursor: "pointer", fontSize: 14, padding: "4px 8px", lineHeight: 1,
+                    }}>{"\u2715"}</button>
+                  </div>
+                  {/* Emoji grid */}
+                  {coopReactionTab === "emoji" && (
+                    <div style={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
+                      {COOP_REACTIONS_EMOJI.map((emoji) => (
+                        <button key={emoji} onClick={(e) => {
+                          e.stopPropagation();
+                          if (coopSessionId && firebaseUser) {
+                            sendCoopReaction(coopSessionId, firebaseUser.uid, emoji, username || "Player", "emoji").catch(() => {});
+                            addFloatingReaction(emoji, "You", COOP_MY_COLOR, "emoji");
+                          }
+                          setCoopReactionPickerOpen(false);
+                        }} style={{
+                          fontSize: 20, background: "none", border: "none",
+                          cursor: "pointer", padding: "4px 5px", borderRadius: 8,
+                          transition: "transform 0.15s, background-color 0.15s", lineHeight: 1,
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.3)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                        >{emoji}</button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Pattern grid */}
+                  {coopReactionTab === "pattern" && (
+                    <div style={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
+                      {COOP_REACTIONS_PATTERN.map((sym) => (
+                        <button key={sym} onClick={(e) => {
+                          e.stopPropagation();
+                          if (coopSessionId && firebaseUser) {
+                            sendCoopReaction(coopSessionId, firebaseUser.uid, sym, username || "Player", "pattern").catch(() => {});
+                            addFloatingReaction(sym, "You", COOP_MY_COLOR, "pattern");
+                          }
+                          setCoopReactionPickerOpen(false);
+                        }} style={{
+                          fontSize: 18, background: "none", border: "none",
+                          cursor: "pointer", padding: "4px 6px", borderRadius: 8,
+                          color: C.text, transition: "transform 0.15s, background-color 0.15s", lineHeight: 1,
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.3)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                        >{sym}</button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Text grid — Elden Ring style single words */}
+                  {coopReactionTab === "text" && (
+                    <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
+                      {COOP_REACTIONS_TEXT.map((word) => (
+                        <button key={word} onClick={(e) => {
+                          e.stopPropagation();
+                          if (coopSessionId && firebaseUser) {
+                            sendCoopReaction(coopSessionId, firebaseUser.uid, word, username || "Player", "text").catch(() => {});
+                            addFloatingReaction(word, "You", COOP_MY_COLOR, "text");
+                          }
+                          setCoopReactionPickerOpen(false);
+                        }} style={{
+                          fontSize: 10, fontWeight: 600, fontFamily: "'Inter', sans-serif",
+                          background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+                          cursor: "pointer", padding: "4px 8px", borderRadius: 6,
+                          color: C.text, transition: "transform 0.15s, background-color 0.15s, border-color 0.15s",
+                          letterSpacing: 0.3, lineHeight: 1.2,
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "#FFD700"; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = C.border; }}
+                        >{word}</button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -8102,10 +8190,10 @@ export default function Pattrn() {
   }, [firebaseUser, coopSessionId, puzzle, startCoopSession]);
 
   // Add a floating reaction to the screen (used for both local + remote reactions)
-  const addFloatingReaction = useCallback((emoji, fromName, fromColor) => {
+  const addFloatingReaction = useCallback((emoji, fromName, fromColor, type = "emoji") => {
     const id = Date.now() + Math.random();
     const x = 10 + Math.random() * 80; // random horizontal position (10% to 90%)
-    setCoopFloatingReactions(prev => [...prev, { id, emoji, fromName, fromColor, x }]);
+    setCoopFloatingReactions(prev => [...prev, { id, emoji, fromName, fromColor, x, type }]);
     setTimeout(() => {
       setCoopFloatingReactions(prev => prev.filter(r => r.id !== id));
     }, 3000);
@@ -8155,6 +8243,7 @@ export default function Pattrn() {
     setCoopSuggestCell(null);
     setCoopAllSuggestions([]);
     setCoopReactionPickerOpen(false);
+    setCoopReactionTab("emoji");
     setCoopFloatingReactions([]);
     coopSeenReactionsRef.current = new Set();
     coopPlayerUidsRef.current = "";
@@ -8362,7 +8451,7 @@ export default function Pattrn() {
           // Only show animation for other players' reactions (local user's are shown immediately)
           if (r.uid !== myUid) {
             const playerColor = colorMap[r.uid] || "#FF9FF3";
-            addFloatingReaction(r.emoji, r.username || "Player", playerColor);
+            addFloatingReaction(r.emoji, r.username || "Player", playerColor, r.type || "emoji");
           }
         }
       });
@@ -14456,7 +14545,21 @@ export default function Pattrn() {
               display: "flex", flexDirection: "column", alignItems: "center",
               transform: "translateX(-50%)",
             }}>
-              <span style={{ fontSize: 48, lineHeight: 1, filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))" }}>{r.emoji}</span>
+              {r.type === "text" ? (
+                <span style={{
+                  fontSize: 20, fontWeight: 800, fontFamily: "'Inter', sans-serif",
+                  color: "#fff", lineHeight: 1,
+                  textShadow: `0 0 12px ${r.fromColor}88, 0 2px 8px rgba(0,0,0,0.7)`,
+                  letterSpacing: 1,
+                }}>{r.emoji}</span>
+              ) : r.type === "pattern" ? (
+                <span style={{
+                  fontSize: 56, lineHeight: 1, color: r.fromColor,
+                  filter: `drop-shadow(0 0 10px ${r.fromColor}88) drop-shadow(0 2px 6px rgba(0,0,0,0.5))`,
+                }}>{r.emoji}</span>
+              ) : (
+                <span style={{ fontSize: 48, lineHeight: 1, filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))" }}>{r.emoji}</span>
+              )}
               <span style={{
                 fontSize: 10, fontWeight: 700, color: r.fromColor,
                 fontFamily: "'Inter', sans-serif",
