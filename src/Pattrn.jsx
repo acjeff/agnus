@@ -12311,6 +12311,181 @@ export default function Pattrn() {
           );
         })()}
 
+        {/* Friends Activity Panel */}
+        {(() => {
+          if (!firebaseUser || friendsList.length === 0) return null;
+
+          const oneWeekAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+
+          // Filter friends active in the last week and sort by most recent
+          const activeFriends = friendsList
+            .map(friend => ({
+              ...friend,
+              presence: friendPresence[friend.uid]
+            }))
+            .filter(friend => friend.presence?.lastSeen && friend.presence.lastSeen > oneWeekAgo)
+            .sort((a, b) => (b.presence?.lastSeen || 0) - (a.presence?.lastSeen || 0));
+
+          if (activeFriends.length === 0) return null;
+
+          const getActivitySummary = (presence) => {
+            if (!presence) return null;
+
+            // If currently playing
+            if (presence.currentMode && presence.currentPuzzle) {
+              return `Playing ${formatPuzzleLabel(presence.currentMode, presence.currentPuzzle)}`;
+            }
+
+            // If recently solved a puzzle
+            if (presence.lastSolvedMode && presence.lastSolvedPuzzle && presence.lastSolvedAt) {
+              const timeSince = Date.now() - presence.lastSolvedAt;
+              const minutesAgo = Math.floor(timeSince / 60000);
+              const hoursAgo = Math.floor(timeSince / 3600000);
+              const daysAgo = Math.floor(timeSince / 86400000);
+
+              let timeStr;
+              if (minutesAgo < 1) timeStr = "just now";
+              else if (minutesAgo < 60) timeStr = `${minutesAgo}m ago`;
+              else if (hoursAgo < 24) timeStr = `${hoursAgo}h ago`;
+              else timeStr = `${daysAgo}d ago`;
+
+              return `Solved ${formatPuzzleLabel(presence.lastSolvedMode, presence.lastSolvedPuzzle)} ${timeStr}`;
+            }
+
+            return null;
+          };
+
+          const getLastSeenText = (presence) => {
+            if (!presence?.lastSeen) return "";
+            const timeSince = Date.now() - presence.lastSeen;
+            const minutesAgo = Math.floor(timeSince / 60000);
+            const hoursAgo = Math.floor(timeSince / 3600000);
+            const daysAgo = Math.floor(timeSince / 86400000);
+
+            if (minutesAgo < 1) return "Active now";
+            if (minutesAgo < 60) return `Active ${minutesAgo}m ago`;
+            if (hoursAgo < 24) return `Active ${hoursAgo}h ago`;
+            return `Active ${daysAgo}d ago`;
+          };
+
+          return (
+            <div style={{
+              width: "100%", marginBottom: 16, animation: "fadeUp 0.4s 0.05s ease both",
+              borderRadius: 16, overflow: "hidden",
+              background: C.surface,
+              border: `1px solid ${C.border}`,
+              padding: "16px", boxSizing: "border-box",
+            }}>
+              <div style={{
+                fontSize: 11, color: C.textDim, textTransform: "uppercase",
+                letterSpacing: 1.5, fontFamily: "'Inter', sans-serif", marginBottom: 12,
+              }}>
+                Friends Activity
+              </div>
+
+              <div style={{
+                display: "flex", flexDirection: "column", gap: 10,
+              }}>
+                {activeFriends.map(friend => {
+                  const isOnline = isFriendOnline(friend.presence);
+                  const activitySummary = getActivitySummary(friend.presence);
+                  const lastSeenText = getLastSeenText(friend.presence);
+
+                  return (
+                    <div key={friend.uid} style={{
+                      display: "flex", alignItems: "center", gap: 10,
+                      padding: "10px", borderRadius: 10,
+                      backgroundColor: C.bg, border: `1px solid ${C.border}`,
+                    }}>
+                      {/* Profile picture or initial */}
+                      <div style={{ position: "relative", flexShrink: 0 }}>
+                        {friend.profilePicture ? (
+                          <img
+                            src={friend.profilePicture}
+                            alt={friend.username}
+                            style={{
+                              width: 36, height: 36, borderRadius: 9,
+                              objectFit: "cover",
+                            }}
+                          />
+                        ) : (
+                          <div style={{
+                            width: 36, height: 36, borderRadius: 9,
+                            backgroundColor: C.accent + "22",
+                            border: `1.5px solid ${C.accent}44`,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700,
+                            color: C.accent,
+                          }}>
+                            {(friend.username || "?")[0].toUpperCase()}
+                          </div>
+                        )}
+
+                        {/* Online indicator */}
+                        {isOnline && (
+                          <div style={{
+                            position: "absolute", bottom: 0, right: 0,
+                            width: 10, height: 10, borderRadius: "50%",
+                            backgroundColor: C.correct,
+                            border: `2px solid ${C.bg}`,
+                            boxShadow: `0 0 4px ${C.correct}66`,
+                          }} />
+                        )}
+                      </div>
+
+                      {/* Friend info */}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{
+                          fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600,
+                          color: C.text, marginBottom: 2,
+                        }}>
+                          {friend.username}
+                        </div>
+
+                        {activitySummary && (
+                          <div style={{
+                            fontSize: 11, color: C.textDim,
+                            fontFamily: "'Inter', sans-serif",
+                            lineHeight: 1.3,
+                          }}>
+                            {activitySummary}
+                          </div>
+                        )}
+
+                        {!activitySummary && (
+                          <div style={{
+                            fontSize: 11, color: C.textDim,
+                            fontFamily: "'Inter', sans-serif",
+                          }}>
+                            {lastSeenText}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Online status badge */}
+                      {isOnline && (
+                        <div style={{
+                          padding: "3px 8px", borderRadius: 6,
+                          backgroundColor: C.correct + "18",
+                          border: `1px solid ${C.correct}33`,
+                        }}>
+                          <span style={{
+                            fontFamily: "'Inter', sans-serif", fontSize: 9,
+                            fontWeight: 700, color: C.correct,
+                            letterSpacing: 0.5, textTransform: "uppercase",
+                          }}>
+                            Online
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Notification panel - dropdown when bell is clicked */}
         {showNotifications && firebaseUser && notifications.length > 0 && (
           <div style={{
