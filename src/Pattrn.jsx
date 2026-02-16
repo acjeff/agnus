@@ -14799,7 +14799,7 @@ export default function Pattrn() {
             <div style={{
               marginTop: 12, animation: "fadeUp 0.5s 0.2s ease both", pointerEvents: "auto",
             }}>
-              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8 }}>
+              <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 8, textAlign: "center" }}>
                 Friends on this puzzle
               </div>
               <div style={{ display: "flex", gap: 6, justifyContent: "center", flexWrap: "wrap" }}>
