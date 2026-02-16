@@ -7427,7 +7427,7 @@ export default function Pattrn() {
                             setCoopSuggestMode(null);
                           }
                         }} style={{
-                          width: 30, height: 30, borderRadius: 7,
+                          width: 40, height: 40, borderRadius: 7,
                           backgroundColor: displayColor, cursor: "pointer",
                           display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                           position: "relative",
@@ -7437,7 +7437,7 @@ export default function Pattrn() {
                           onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.15)"; e.currentTarget.style.borderColor = `${C.text}`; }}
                           onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = "transparent"; }}
                         >
-                          {shapes[shapeIndex % shapes.length](15, getShapeStroke(displayColor, puzzle.mode === "easy" || puzzle.mode === "blind"))}
+                          {shapes[shapeIndex % shapes.length](18, getShapeStroke(displayColor, puzzle.mode === "easy" || puzzle.mode === "blind"))}
                         </div>
                       );
                     })}
