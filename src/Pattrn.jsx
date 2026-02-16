@@ -5272,6 +5272,8 @@ export default function Pattrn() {
     const springClose = "cubic-bezier(0.4, 0, 0.7, 1)";
 
     const handleToggle = () => {
+      // Don't allow closing if username is required
+      if (isOpen && !username && isUsernameEdit) return;
       if (isOpen) setRadialMenuStack([]);
       else setRadialMenuStack(["root"]);
     };
@@ -5279,6 +5281,8 @@ export default function Pattrn() {
     // Shared item renderer — uses CSS transitions (not animations) so items animate in AND out
     const renderItem = (item, animIndex, dimmed) => {
       const handleClick = () => {
+        // Don't allow navigation away from username-edit if username is required
+        if (!username && isUsernameEdit) return;
         if (item.isBack) setRadialMenuStack(prev => prev.slice(0, -1));
         else if (item.sub) {
           if (item.beforeSub && !item.beforeSub()) return; // guard check — return false to cancel
@@ -5398,7 +5402,11 @@ export default function Pattrn() {
         {/* Click-away layer — blocks scrolling underneath */}
         {isOpen && (
           <div
-            onClick={() => setRadialMenuStack([])}
+            onClick={() => {
+              // Don't allow closing modal if username is required
+              if (!username && isUsernameEdit) return;
+              setRadialMenuStack([]);
+            }}
             onTouchMove={e => e.preventDefault()}
             style={{ position: "fixed", inset: 0, zIndex: 84, touchAction: "none", overscrollBehavior: "none" }}
           />
@@ -5907,6 +5915,19 @@ export default function Pattrn() {
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
                   }}>
                     <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>Change Username</div>
+                    {!username && (
+                      <div style={{
+                        fontFamily: "'Inter', sans-serif",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: C.accent,
+                        marginBottom: 12,
+                        padding: "8px 12px",
+                        backgroundColor: "rgba(255,255,255,0.06)",
+                        borderRadius: 8,
+                        border: "1px solid rgba(255,255,255,0.12)"
+                      }}>Must have a username to continue</div>
+                    )}
                     <input
                       type="text"
                       placeholder="Enter new username..."
