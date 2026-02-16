@@ -1057,6 +1057,7 @@ export async function resetCoopSession(sessionId) {
     guestCorrect: false,
     attempts: 0,
     hostTimerStart: Date.now(),
+    cellSuggestions: {},
   };
   // Also reset all players' lock-in states in the players map
   const snap = await get(sessionRef);
