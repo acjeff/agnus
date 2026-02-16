@@ -3437,6 +3437,7 @@ export default function Pattrn() {
     // Restore saved progress for this mosaic if available
     const saved = mosaic.id ? (progress.mosaicCompletions || {})[mosaic.id] : null;
     setCustomMosaicProgress(saved && typeof saved === "object" ? { ...saved } : {});
+    setDifficulty("mosaic");
     setView("custom-mosaic");
   }, [buildCustomMosaicPuzzles, progress.mosaicCompletions]);
 
@@ -8378,6 +8379,7 @@ export default function Pattrn() {
       customMosaicPuzzlesRef.current = puzzles;
       setCustomMosaicPlay(mosaicOverride);
       setCustomMosaicProgress({});
+      setDifficulty("mosaic");
       setView("custom-mosaic");
     }
     const sessionId = await createCoopMosaicSession(firebaseUser.uid, {
@@ -8538,6 +8540,7 @@ export default function Pattrn() {
     // Keep session ID in URL so page refresh rejoins the session
     setCoopUrlParam("coopMosaic", session.id);
     customMosaicReturnViewRef.current = "menu";
+    setDifficulty("mosaic");
     setView("custom-mosaic");
   }, [firebaseUser, buildCustomMosaicPuzzles]);
 
@@ -8804,6 +8807,7 @@ export default function Pattrn() {
         }
         coopMosaicPrevSolvedRef.current = guestAlreadySolved;
         customMosaicReturnViewRef.current = "menu";
+        setDifficulty("mosaic");
         setView("custom-mosaic");
       } catch (e) {
         console.error("Failed to join coop mosaic session:", e);
