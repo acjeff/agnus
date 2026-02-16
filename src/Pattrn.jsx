@@ -8617,6 +8617,21 @@ export default function Pattrn() {
       }
       prevCoopPartnerLockedRef.current = anyLocked;
 
+      // Restore my own lock-in state from Firebase (e.g., after page refresh/rejoin)
+      const myPlayer = players[myUid];
+      if (myPlayer?.lockedIn && myPlayer?.correct && coopMyBlanks) {
+        setCoopMyLockedIn(true);
+        // Restore locked cells visually so my blanks are no longer editable
+        setLockedCells(prev => {
+          const next = new Set(prev);
+          let changed = false;
+          for (const k of coopMyBlanks) {
+            if (!prev.has(k)) { next.add(k); changed = true; }
+          }
+          return changed ? next : prev;
+        });
+      }
+
       // Sync fills from Firebase
       const remoteFills = data.fills || {};
       if (coopMyBlanks) {
@@ -8627,6 +8642,21 @@ export default function Pattrn() {
           }
         }
         setCoopPartnerFills(partnerFillsObj);
+
+        // Restore my own fills from Firebase when locked in (e.g., after page refresh)
+        if (myPlayer?.lockedIn && myPlayer?.correct) {
+          setFills(prev => {
+            const next = { ...prev };
+            let changed = false;
+            for (const key of coopMyBlanks) {
+              if (remoteFills[key] !== undefined && prev[key] !== remoteFills[key]) {
+                next[key] = remoteFills[key];
+                changed = true;
+              }
+            }
+            return changed ? next : prev;
+          });
+        }
       }
 
       // Check if ALL players locked in correctly → complete
