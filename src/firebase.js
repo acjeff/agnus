@@ -980,6 +980,26 @@ export async function cancelCoopPassRequest(sessionId, cellKey) {
   await remove(ref(db, `coopSessions/${sessionId}/passRequests/${cellKey}`));
 }
 
+// Send a cell suggestion to another player (suggest what a cell could be)
+export async function sendCoopCellSuggestion(sessionId, cellKey, fromUid, toUid, suggestedToken) {
+  if (!db) return;
+  await set(ref(db, `coopSessions/${sessionId}/cellSuggestions/${cellKey}`), {
+    fromUid, toUid, suggestedToken, status: "pending", timestamp: Date.now(),
+  });
+}
+
+// Dismiss a cell suggestion (recipient acknowledges it)
+export async function dismissCoopCellSuggestion(sessionId, cellKey) {
+  if (!db) return;
+  await remove(ref(db, `coopSessions/${sessionId}/cellSuggestions/${cellKey}`));
+}
+
+// Cancel an outgoing cell suggestion
+export async function cancelCoopCellSuggestion(sessionId, cellKey) {
+  if (!db) return;
+  await remove(ref(db, `coopSessions/${sessionId}/cellSuggestions/${cellKey}`));
+}
+
 // Lock in a player's blanks (supports multi-player via uid)
 export async function lockInCoopPlayer(sessionId, role, isCorrect, uid) {
   if (!db) return;
