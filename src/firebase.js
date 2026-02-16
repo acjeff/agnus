@@ -540,6 +540,26 @@ export async function saveProfilePicture(uid, dataUrl) {
   await update(ref(db, `users/${uid}`), { profilePicture: dataUrl || null });
 }
 
+// Load guided tour status (returns { basic: boolean, coop: boolean })
+export async function loadGuidedTourStatus(uid) {
+  if (!db) return { basic: false, coop: false };
+  const [basicSnap, coopSnap] = await Promise.all([
+    get(ref(db, `users/${uid}/hasSeenGuidedTour`)),
+    get(ref(db, `users/${uid}/hasSeenCoopTour`)),
+  ]);
+  return {
+    basic: basicSnap.exists() ? basicSnap.val() : false,
+    coop: coopSnap.exists() ? coopSnap.val() : false,
+  };
+}
+
+// Save guided tour status (mark as seen/completed)
+export async function saveGuidedTourStatus(uid, hasSeen, tourType = "basic") {
+  if (!db) return;
+  const field = tourType === "coop" ? "hasSeenCoopTour" : "hasSeenGuidedTour";
+  await update(ref(db, `users/${uid}`), { [field]: hasSeen });
+}
+
 // Look up a user by username
 export async function lookupUserByUsername(username) {
   if (!db || !username) return null;

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell, PaintBucket, Eraser, Settings, Cake, Trash2, Edit3, Award, X, Copy } from "lucide-react";
+import { GuidedTourInteractive } from "./GuidedTourInteractive";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -47,6 +48,8 @@ import {
   saveUsername,
   loadUserProfile,
   saveProfilePicture,
+  loadGuidedTourStatus,
+  saveGuidedTourStatus,
   lookupUserByUsername,
   updatePublicMosaicFields,
   unpublishMosaic,
@@ -2090,7 +2093,7 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
   const arrowStyle = { width: 28, height: 28, borderRadius: "50%", backgroundColor: C.surface, border: `1px solid ${C.border}`, color: C.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0, transition: "opacity 0.2s" };
 
   return (
-    <div style={{ position: "relative", maxWidth: "100%", display: "flex", alignItems: "center", gap: 4 }}>
+    <div style={{ position: "relative", maxWidth: "100%", display: "flex", alignItems: "center", gap: 4 }} data-tour-id="keypad">
       {canScrollLeft && <button onClick={() => doScroll(-1)} style={arrowStyle} aria-label="Scroll left">{"\u2039"}</button>}
       <div ref={scrollRef} className="token-picker-scroll" style={{ display: "flex", gap: 10, justifyContent: overflows ? "flex-start" : "center", padding: "8px 16px", flexWrap: "nowrap", overflowX: "auto", flex: "1 1 auto", minWidth: 0, maxWidth: "100%", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", touchAction: "pan-x", willChange: "scroll-position" }}>
         {tokens.map((token, i) => {
@@ -3052,6 +3055,49 @@ export default function Pattrn() {
   const seenNotifIdsRef = useRef(new Set()); // track previously seen notification IDs
   const notifInitialLoadRef = useRef(true); // skip toasting on initial load
 
+  // --- Guided Tour state ---
+  const [hasSeenGuidedTour, setHasSeenGuidedTour] = useState(true); // default true to avoid flash before loading
+  const [hasSeenCoopTour, setHasSeenCoopTour] = useState(true); // track co-op portion of tour separately
+  const [guidedTourStep, setGuidedTourStep] = useState(0); // current step in the tour (0-based)
+  const [showGuidedTour, setShowGuidedTour] = useState(false); // whether tour is currently active
+  const [tourPhase, setTourPhase] = useState("basic"); // "basic" (logged-out) or "coop" (after account creation)
+  const guidedTourLoadedRef = useRef(false); // track if we've loaded tour status from Firebase
+  const TOUR_STORAGE_KEY = "pattrn_has_seen_basic_tour"; // localStorage key for non-authenticated users
+
+  // Helper function to manually start/restart the tour (useful for testing)
+  const startGuidedTour = useCallback((phase = "basic") => {
+    setShowGuidedTour(true);
+    setGuidedTourStep(0);
+    setTourPhase(phase);
+    setRadialMenuStack(["root"]);
+    setView("menu");
+  }, []);
+
+  // Expose tour controls to window for easy testing in browser console
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.startTour = () => startGuidedTour("basic");
+      window.startCoopTour = () => startGuidedTour("coop");
+      window.resetTour = () => {
+        try { localStorage.removeItem(TOUR_STORAGE_KEY); } catch {}
+        if (firebaseUser) {
+          saveGuidedTourStatus(firebaseUser.uid, false, "basic").catch(() => {});
+          saveGuidedTourStatus(firebaseUser.uid, false, "coop").catch(() => {});
+        }
+        setHasSeenGuidedTour(false);
+        setHasSeenCoopTour(false);
+        startGuidedTour("basic");
+      };
+    }
+    return () => {
+      if (typeof window !== "undefined") {
+        delete window.startTour;
+        delete window.startCoopTour;
+        delete window.resetTour;
+      }
+    };
+  }, [startGuidedTour, firebaseUser]);
+
   // --- Coop Mosaic state (n-player) ---
   const [coopMosaicSessionId, setCoopMosaicSessionId] = useState(null);
   const [coopMosaicRole, setCoopMosaicRole] = useState(null); // "host" | "guest"
@@ -3186,6 +3232,64 @@ export default function Pattrn() {
       setRadialMenuStack(["root", "profile", "username-edit"]);
     });
   }, [firebaseUser, firebaseConfigured]);
+
+  // Load guided tour status - handle both logged-in and logged-out users
+  useEffect(() => {
+    // For logged-out users, check localStorage
+    if (!firebaseUser || !firebaseConfigured) {
+      guidedTourLoadedRef.current = false;
+      try {
+        const hasSeenBasic = localStorage.getItem(TOUR_STORAGE_KEY) === "true";
+        setHasSeenGuidedTour(hasSeenBasic);
+        setHasSeenCoopTour(true); // co-op tour only for logged-in users
+
+        // Show tour for first-time logged-out visitors on menu view
+        if (!hasSeenBasic && view === "menu" && !showGuidedTour) {
+          // Small delay to ensure UI is ready
+          setTimeout(() => {
+            setShowGuidedTour(true);
+            setGuidedTourStep(0);
+            setTourPhase("basic");
+            setRadialMenuStack(["root"]);
+          }, 500);
+        }
+      } catch {
+        setHasSeenGuidedTour(false);
+      }
+      return;
+    }
+
+    // For logged-in users, load from Firebase
+    if (guidedTourLoadedRef.current) return;
+    guidedTourLoadedRef.current = true;
+
+    loadGuidedTourStatus(firebaseUser.uid).then(tourStatus => {
+      setHasSeenGuidedTour(tourStatus.basic);
+      setHasSeenCoopTour(tourStatus.coop);
+
+      // If user just created account and hasn't seen co-op tour, show it
+      if (tourStatus.basic && !tourStatus.coop && username && view === "menu") {
+        setTimeout(() => {
+          setShowGuidedTour(true);
+          setGuidedTourStep(0);
+          setTourPhase("coop");
+          setRadialMenuStack(["root"]);
+        }, 500);
+      }
+      // If user hasn't seen basic tour and has username (not first-time setup), show it
+      else if (!tourStatus.basic && username && view === "menu") {
+        setTimeout(() => {
+          setShowGuidedTour(true);
+          setGuidedTourStep(0);
+          setTourPhase("basic");
+          setRadialMenuStack(["root"]);
+        }, 500);
+      }
+    }).catch(() => {
+      setHasSeenGuidedTour(false);
+      setHasSeenCoopTour(false);
+    });
+  }, [firebaseUser, firebaseConfigured, username, view, showGuidedTour]);
 
   // Subscribe to real-time notifications when user is signed in
   useEffect(() => {
@@ -5329,6 +5433,7 @@ export default function Pattrn() {
         <button
           key={item.id}
           onClick={handleClick}
+          data-tour-id={item.id}
           style={{
             width: "100%", height: itemHeight,
             display: "flex", alignItems: "center", gap: 12,
@@ -6954,6 +7059,7 @@ export default function Pattrn() {
             {pillButtons.map((btn) => (
               <div
                 key={btn.id}
+                data-tour-id={btn.id === "check" ? "check-button" : btn.id}
                 onClick={btn.disabled ? undefined : (e) => { e.stopPropagation(); btn.onClick?.(); }}
                 style={{
                   width: fabSize, height: fabSize,
@@ -7005,6 +7111,7 @@ export default function Pattrn() {
             {/* Menu toggle button */}
             <div
               onClick={(e) => { e.stopPropagation(); handleToggle(); }}
+              data-tour-id="menu-button"
               style={{
                 flex: 1, height: fabSize,
                 display: "flex", alignItems: "center", justifyContent: isOpen ? "flex-end" : "center",
@@ -9590,6 +9697,61 @@ export default function Pattrn() {
       {coopMosaicNavigateEl}
     </>
   );
+
+  // --- Guided Tour (rendered globally across all views) ---
+  const tourEl = showGuidedTour ? (
+    <GuidedTourInteractive
+      step={guidedTourStep}
+      onAdvance={() => {
+        const isBasicTour = tourPhase === "basic";
+        const isCoopIntro = tourPhase === "coopIntro";
+        const maxBasicSteps = 13; // Updated: intro, start, in-puzzle, tap-cell, enter, fill-more, check, menu, quick, daily, cascade, mosaic, coop
+        const maxCoopSteps = 1;
+        const maxSteps = isCoopIntro ? maxCoopSteps : maxBasicSteps;
+        const isLastStep = guidedTourStep === maxSteps - 1;
+
+        if (!isLastStep) {
+          setGuidedTourStep(prev => prev + 1);
+        } else {
+          if (isBasicTour) {
+            if (firebaseUser) {
+              saveGuidedTourStatus(firebaseUser.uid, true, "basic").catch(() => {});
+            } else {
+              try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
+            }
+            setShowGuidedTour(false);
+            setHasSeenGuidedTour(true);
+            setRadialMenuStack([]);
+          } else if (isCoopIntro) {
+            saveGuidedTourStatus(firebaseUser.uid, true, "coop").catch(() => {});
+            setShowGuidedTour(false);
+            setRadialMenuStack([]);
+            setHasSeenCoopTour(true);
+          }
+        }
+      }}
+      onSkip={() => {
+        const tourType = tourPhase === "coopIntro" ? "coop" : "basic";
+        if (firebaseUser) {
+          saveGuidedTourStatus(firebaseUser.uid, true, tourType).catch(() => {});
+        } else if (tourPhase === "basic") {
+          try { localStorage.setItem(TOUR_STORAGE_KEY, "true"); } catch {}
+        }
+        setShowGuidedTour(false);
+        setRadialMenuStack([]);
+        if (tourPhase === "coopIntro") setHasSeenCoopTour(true);
+        else setHasSeenGuidedTour(true);
+      }}
+      tourPhase={tourPhase}
+      colors={C}
+      view={view}
+      radialMenuStack={radialMenuStack}
+      selectedCell={selectedCell}
+      fills={fills}
+      puzzle={puzzle}
+      gameState={gameState}
+    />
+  ) : null;
 
   // --- Coop Mosaic joining overlay (shown while waiting for auth + session load) ---
   // Must be before all view checks so it takes priority when accepting an invite
@@ -12215,6 +12377,85 @@ export default function Pattrn() {
         {/* ── Scrollable content area ── */}
         <div style={{ width: "100%", maxWidth: 480, paddingTop: "calc(20px + env(safe-area-inset-top, 0px))", boxSizing: "border-box" }}>
 
+        {/* ── First Puzzle Card (for new users) ── */}
+        {(() => {
+          const totalSolved = [...SOLVE_MODES].reduce((s, m) => s + countModeSolved(progress[m]), 0);
+          const isFirstTime = totalSolved === 0 && !hasSeenGuidedTour;
+          if (!isFirstTime) return null;
+
+          return (
+            <div
+              data-tour-id="easy-puzzle-1"
+              style={{
+                width: "100%",
+                marginBottom: 20,
+                animation: "fadeUp 0.4s ease both",
+                borderRadius: 16,
+                overflow: "hidden",
+                background: `linear-gradient(135deg, ${C.correct}22 0%, ${C.accent}11 100%)`,
+                border: `2px solid ${C.correct}44`,
+                padding: "20px",
+                boxSizing: "border-box",
+              }}
+            >
+              <div style={{ marginBottom: 12 }}>
+                <div style={{
+                  fontSize: 11,
+                  color: C.correct,
+                  textTransform: "uppercase",
+                  letterSpacing: 1.5,
+                  fontFamily: "'Inter', sans-serif",
+                  marginBottom: 4,
+                  fontWeight: 700,
+                }}>
+                  ✨ Start Here
+                </div>
+                <div style={{
+                  fontFamily: "'Inter', sans-serif",
+                  fontSize: 20,
+                  fontWeight: 700,
+                  color: C.text,
+                  lineHeight: 1.2,
+                }}>
+                  Your First Puzzle
+                </div>
+                <div style={{
+                  fontSize: 12,
+                  color: C.textDim,
+                  marginTop: 6,
+                  fontFamily: "'Inter', sans-serif",
+                }}>
+                  Easy • Puzzle #1
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setDifficulty("easy");
+                  startPuzzle(0, "easy", false);
+                }}
+                style={{
+                  width: "100%",
+                  padding: "14px 0",
+                  borderRadius: 12,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  fontFamily: "'Inter', sans-serif",
+                  letterSpacing: 1,
+                  background: C.correct,
+                  color: "#fff",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "transform 0.15s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(1.02)"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+              >
+                Let's Go! →
+              </button>
+            </div>
+          );
+        })()}
+
         {/* ── Daily hero card ── */}
         {(() => {
           const todayIdx = getTodayDailyIndex();
@@ -13139,6 +13380,7 @@ export default function Pattrn() {
       )}
 
       {renderContextButton("menu")}
+      {tourEl}
       {globalModalsEl}
       </div>
     );
@@ -13672,7 +13914,7 @@ export default function Pattrn() {
             )}
           </div>
         )}
-      <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
+      <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }} data-tour-id="grid">
       <div style={{
         transform: isSpin ? `rotate(${spinAngle}deg)` : undefined,
         transition: isSpin ? "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
@@ -13681,12 +13923,18 @@ export default function Pattrn() {
           display: "flex", flexDirection: "column", gap: gridGap, padding: gridPad,
           position: "relative", zIndex: 1,
         }}>
-          {puzzle.solution.map((row, r) => (
+          {puzzle.solution.map((row, r) => {
+            // Find first blank cell for tour (top-left unfilled blank)
+            const blankKeys = Array.from(puzzle.blanks);
+            const firstBlankKey = blankKeys.find(k => !fills[k] && !lockedCells.has(k)) || blankKeys[0];
+
+            return (
             <div key={r} style={{ display: "flex", gap: gridGap, position: "relative", zIndex: 1 }}>
               {row.map((token, c) => {
                 const key = `${r}-${c}`;
                 const isBlankCell = puzzle.blanks.has(key);
                 const isLockedCell = lockedCells.has(key);
+                const isFirstBlankCell = key === firstBlankKey;
                 // In coop mode, show partner fills for their blanks
                 const partnerFill = isCoop && coopPartnerBlanks?.has(key) ? coopPartnerFills[key] : null;
                 // In coop mosaic mode, show partner fills for any blank cell (no splitting)
@@ -13720,7 +13968,11 @@ export default function Pattrn() {
                 // Mosaic coop: show if cell was filled by partner (not by me)
                 const isMosaicCoopPartnerFill = isCoopMosaic && isBlankCell && !myFill && !!mosaicPartnerFill;
                 return (
-                  <div key={key} style={{ position: "relative" }}>
+                  <div
+                    key={key}
+                    style={{ position: "relative" }}
+                    data-tour-id={isFirstBlankCell ? "first-blank-cell" : undefined}
+                  >
                     <Cell token={displayToken} isBlank={isBlankCell}
                       isSelected={selectedCell === key}
                       isFilled={!!(myFill || partnerFill || mosaicPartnerFill) || isLockedCell}
@@ -13815,7 +14067,8 @@ export default function Pattrn() {
                 );
               })}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
       </div>
@@ -13956,6 +14209,7 @@ export default function Pattrn() {
       )}
       {renderBackButton(playBackAction)}
       {renderContextButton("play", playPillButtons)}
+      {tourEl}
       {globalModalsEl}
     </div>
   );
