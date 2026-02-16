@@ -1507,6 +1507,17 @@ export async function closeCoopMosaicSession(sessionId, playerUids) {
   await remove(ref(db, `coopMosaicSessions/${sessionId}`));
 }
 
+// Send a reaction to all players in a coop mosaic session (type: "emoji" | "pattern" | "text")
+export async function sendCoopMosaicReaction(sessionId, uid, emoji, username, type = "emoji") {
+  if (!db) return;
+  const reactionRef = push(ref(db, `coopMosaicSessions/${sessionId}/reactions`));
+  await set(reactionRef, { uid, emoji, username, type, timestamp: Date.now() });
+  // Auto-cleanup after 6 seconds so reactions don't accumulate
+  setTimeout(() => {
+    remove(reactionRef).catch(() => {});
+  }, 6000);
+}
+
 // Load a coop mosaic session by ID
 export async function loadCoopMosaicSession(sessionId) {
   if (!db) return null;
