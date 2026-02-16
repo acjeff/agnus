@@ -7806,6 +7806,11 @@ export default function Pattrn() {
     setRemovingCells({});
     setShowParticles(false);
     setGridEpoch((e) => e + 1);
+    // Clear coop suggestion state so stale suggestions don't persist across puzzles
+    setCoopSuggestMode(null);
+    setCoopSuggestPlayerPicker(false);
+    setCoopSuggestCell(null);
+    setCoopAllSuggestions([]);
     // Reset spin angle
     setSpinAngle(0);
     if (effectiveDiff !== "cascade") setElapsedTime(0);
@@ -8216,6 +8221,11 @@ export default function Pattrn() {
     setCoopInvitedUids(new Set());
     coopPlayerUidsRef.current = "";
     prevCoopPartnerLockedRef.current = false;
+    // Clear suggestion state for fresh session
+    setCoopSuggestMode(null);
+    setCoopSuggestPlayerPicker(false);
+    setCoopSuggestCell(null);
+    setCoopAllSuggestions([]);
     // Split blanks — host starts with all blanks, will re-split when players join
     setCoopMyBlanks(new Set(puzzle.blanks));
     setCoopPartnerBlanks(new Set());
@@ -8352,6 +8362,11 @@ export default function Pattrn() {
     setCoopInvitedUids(new Set());
     coopPlayerUidsRef.current = "";
     prevCoopPartnerLockedRef.current = false;
+    // Clear suggestion state so stale suggestions from a previous session don't persist
+    setCoopSuggestMode(null);
+    setCoopSuggestPlayerPicker(false);
+    setCoopSuggestCell(null);
+    setCoopAllSuggestions([]);
     // Clear blanks so the effect can re-split once puzzle is loaded
     setCoopMyBlanks(null);
     setCoopPartnerBlanks(null);
@@ -8396,6 +8411,11 @@ export default function Pattrn() {
     setCoopPartnerCorrect(false);
     setCoopPartnerFills({});
     coopWriteThrottleRef.current = {};
+    // Clear suggestion state for fresh retry
+    setCoopSuggestMode(null);
+    setCoopSuggestPlayerPicker(false);
+    setCoopSuggestCell(null);
+    setCoopAllSuggestions([]);
     // Restart timer (host writes hostTimerStart via resetCoopSession)
     stopTimer();
     setElapsedTime(0);
