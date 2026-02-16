@@ -2708,17 +2708,18 @@ function ScoreBadge({ attempts }) {
 }
 
 const DIFFICULTIES = [
-  { key: "easy", label: "Easy", desc: "5\u00D75 \u2022 Paired", cat: "classic" },
-  { key: "medium", label: "Medium", desc: "7\u00D77 \u2022 Paired", cat: "classic" },
-  { key: "hard", label: "Hard", desc: "7\u00D77 \u2022 Mixed", cat: "classic" },
-  { key: "blind", label: "Blind", desc: "5\u00D75 \u2022 No Clues", cat: "special" },
-  { key: "daily", label: "Daily", desc: "1 a day", cat: "special" },
-  { key: "cascade", label: "Cascade", desc: "Keep on", cat: "special" },
-  { key: "spin", label: "Spin", desc: "7\u00D77 \u2022 Dizzy", cat: "special" },
-  { key: "mosaic", label: "Mosaic", desc: "5\u00D75 \u2022 Big picture", cat: "special" },
+  { key: "easy", label: "Easy", desc: "5\u00D75 \u2022 Paired", cat: "classic", icon: "🟢" },
+  { key: "medium", label: "Medium", desc: "7\u00D77 \u2022 Paired", cat: "classic", icon: "🟡" },
+  { key: "hard", label: "Hard", desc: "7\u00D77 \u2022 Mixed", cat: "classic", icon: "🔴" },
+  { key: "blind", label: "Blind", desc: "5\u00D75 \u2022 No Clues", cat: "special", icon: "👁️" },
+  { key: "daily", label: "Daily", desc: "1 a day", cat: "special", icon: "📅" },
+  { key: "cascade", label: "Cascade", desc: "Keep on", cat: "special", icon: "⬇️" },
+  { key: "spin", label: "Spin", desc: "7\u00D77 \u2022 Dizzy", cat: "special", icon: "🌀" },
+  { key: "mosaic", label: "Mosaic", desc: "5\u00D75 \u2022 Big picture", cat: "special", icon: "🧩" },
 ];
 
 const MODE_CATEGORIES = ["classic", "special"];
+const CATEGORY_ICONS = { classic: "🎯", special: "✨" };
 const VALID_MODES = new Set(["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"]);
 
 const VALID_VIEWS = new Set(["gallery", "creator", "custom-mosaic", "coop", "profile"]);
@@ -12150,12 +12151,15 @@ export default function Pattrn() {
               padding: "20px", boxSizing: "border-box",
             }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
-                <div>
-                  <div style={{ fontSize: 11, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
-                    Daily Puzzle
-                  </div>
-                  <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
-                    {todayLabel}
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <span style={{ fontSize: 32, lineHeight: 1 }}>📅</span>
+                  <div>
+                    <div style={{ fontSize: 11, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
+                      Daily Puzzle
+                    </div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
+                      {todayLabel}
+                    </div>
                   </div>
                 </div>
                 {streak > 0 && (
@@ -12405,7 +12409,11 @@ export default function Pattrn() {
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
                 letterSpacing: 1.5, marginBottom: 6,
                 fontFamily: "'Inter', sans-serif",
-              }}>{cat}</div>
+                display: "flex", alignItems: "center", gap: 4,
+              }}>
+                <span style={{ fontSize: 14 }}>{CATEGORY_ICONS[cat]}</span>
+                <span>{cat}</span>
+              </div>
               <div style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
@@ -12443,6 +12451,7 @@ export default function Pattrn() {
                         position: "relative",
                       }}
                     >
+                      <span style={{ fontSize: 20, lineHeight: 1 }}>{d.icon}</span>
                       <span style={{ whiteSpace: "nowrap" }}>{d.label}</span>
                       <span style={{
                         fontSize: 8,
