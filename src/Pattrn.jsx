@@ -2708,18 +2708,18 @@ function ScoreBadge({ attempts }) {
 }
 
 const DIFFICULTIES = [
-  { key: "easy", label: "Easy", desc: "5\u00D75 \u2022 Paired", cat: "classic", icon: "🟢" },
-  { key: "medium", label: "Medium", desc: "7\u00D77 \u2022 Paired", cat: "classic", icon: "🟡" },
-  { key: "hard", label: "Hard", desc: "7\u00D77 \u2022 Mixed", cat: "classic", icon: "🔴" },
-  { key: "blind", label: "Blind", desc: "5\u00D75 \u2022 No Clues", cat: "special", icon: "👁️" },
-  { key: "daily", label: "Daily", desc: "1 a day", cat: "special", icon: "📅" },
-  { key: "cascade", label: "Cascade", desc: "Keep on", cat: "special", icon: "⬇️" },
-  { key: "spin", label: "Spin", desc: "7\u00D77 \u2022 Dizzy", cat: "special", icon: "🌀" },
-  { key: "mosaic", label: "Mosaic", desc: "5\u00D75 \u2022 Big picture", cat: "special", icon: "🧩" },
+  { key: "easy", label: "Easy", desc: "5\u00D75 \u2022 Paired", cat: "classic", icon: "grid" },
+  { key: "medium", label: "Medium", desc: "7\u00D77 \u2022 Paired", cat: "classic", icon: "layers" },
+  { key: "hard", label: "Hard", desc: "7\u00D77 \u2022 Mixed", cat: "classic", icon: "zap" },
+  { key: "blind", label: "Blind", desc: "5\u00D75 \u2022 No Clues", cat: "special", icon: "eye" },
+  { key: "daily", label: "Daily", desc: "1 a day", cat: "special", icon: "calendar" },
+  { key: "cascade", label: "Cascade", desc: "Keep on", cat: "special", icon: "layers" },
+  { key: "spin", label: "Spin", desc: "7\u00D77 \u2022 Dizzy", cat: "special", icon: "shuffle" },
+  { key: "mosaic", label: "Mosaic", desc: "5\u00D75 \u2022 Big picture", cat: "special", icon: "gallery" },
 ];
 
 const MODE_CATEGORIES = ["classic", "special"];
-const CATEGORY_ICONS = { classic: "🎯", special: "✨" };
+const CATEGORY_ICONS = { classic: "compass", special: "star" };
 const VALID_MODES = new Set(["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"]);
 
 const VALID_VIEWS = new Set(["gallery", "creator", "custom-mosaic", "coop", "profile"]);
@@ -12152,7 +12152,9 @@ export default function Pattrn() {
             }}>
               <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <span style={{ fontSize: 32, lineHeight: 1 }}>📅</span>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32 }}>
+                    <Calendar size={28} color={C.accent} strokeWidth={2} />
+                  </div>
                   <div>
                     <div style={{ fontSize: 11, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
                       Daily Puzzle
@@ -12411,7 +12413,7 @@ export default function Pattrn() {
                 fontFamily: "'Inter', sans-serif",
                 display: "flex", alignItems: "center", gap: 4,
               }}>
-                <span style={{ fontSize: 14 }}>{CATEGORY_ICONS[cat]}</span>
+                {radialIcons[CATEGORY_ICONS[cat]](C.textDim)}
                 <span>{cat}</span>
               </div>
               <div style={{
@@ -12451,7 +12453,7 @@ export default function Pattrn() {
                         position: "relative",
                       }}
                     >
-                      <span style={{ fontSize: 20, lineHeight: 1 }}>{d.icon}</span>
+                      {radialIcons[d.icon](active ? (d.key === "blind" && !isCleared ? "#fff" : C.bg) : isCleared ? C.gold : C.textDim)}
                       <span style={{ whiteSpace: "nowrap" }}>{d.label}</span>
                       <span style={{
                         fontSize: 8,
