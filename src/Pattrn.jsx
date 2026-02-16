@@ -5574,9 +5574,17 @@ export default function Pattrn() {
               // Don't allow closing modal if username is required
               if (!username && isUsernameEdit) return;
               setRadialMenuStack([]);
+              setCoopReactionPickerOpen(false);
             }}
             onTouchMove={e => e.preventDefault()}
             style={{ position: "fixed", inset: 0, zIndex: 84, touchAction: "none", overscrollBehavior: "none" }}
+          />
+        )}
+        {/* Click-away layer for reaction picker when menu is closed */}
+        {!isOpen && showReactionPicker && (
+          <div
+            onClick={() => setCoopReactionPickerOpen(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 84 }}
           />
         )}
 
