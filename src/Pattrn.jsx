@@ -4619,6 +4619,35 @@ export default function Pattrn() {
     gallery: (c) => <LayoutGrid size={18} color={c} strokeWidth={2} />,
     trophy: (c) => <Trophy size={18} color={c} strokeWidth={2} />,
     globe: (c) => <Globe size={18} color={c} strokeWidth={2} />,
+    friends: (c) => {
+      return (
+        <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+          <Users size={18} color={c} strokeWidth={2} />
+          {onlineFriendsCount > 0 && (
+            <span style={{
+              position: "absolute",
+              top: -6,
+              right: -8,
+              minWidth: 16,
+              height: 16,
+              borderRadius: 8,
+              backgroundColor: "#22C55E",
+              color: "#fff",
+              fontSize: 9,
+              fontWeight: 700,
+              fontFamily: "'Inter', sans-serif",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 4px",
+              boxShadow: "0 0 8px rgba(34, 197, 94, 0.6)",
+            }}>
+              {onlineFriendsCount > 99 ? "99+" : onlineFriendsCount}
+            </span>
+          )}
+        </span>
+      );
+    },
     folder: (c) => <FolderOpen size={18} color={c} strokeWidth={2} />,
     plus: (c) => <Plus size={18} color={c} strokeWidth={2} />,
     users: (c) => {
@@ -7030,86 +7059,6 @@ export default function Pattrn() {
             </div>
           </div>
         </div>
-
-        {/* ── Floating shortcut buttons to the left of burger (menu view only) ── */}
-        {currentView === "menu" && firebaseConfigured && firebaseUser && !isOpen && (() => {
-          const activeCount = activeCoopSessions.filter(s => s.status !== "complete").length;
-          const showCoop = activeCount > 0;
-          const showFriends = onlineFriendsCount > 0;
-          if (!showCoop && !showFriends) return null;
-          // Position buttons to the left of the main pill
-          const mainPillWidth = hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth;
-          const gap = 10;
-          const btnList = [];
-          if (showFriends) btnList.push({ key: "friends", count: onlineFriendsCount, color: "#22C55E", icon: <Globe size={18} color="#22C55E" strokeWidth={2} />, onClick: () => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); } });
-          if (showCoop) btnList.push({ key: "coop", count: activeCount, color: "#A855F7", icon: <Users size={18} color="#A855F7" strokeWidth={2} />, onClick: () => { loadActiveCoopSessions(); setRadialMenuStack(["root", "coop", "coop-active"]); } });
-          return btnList.map((btn, i) => {
-            const rightOffset = 20 + mainPillWidth + gap + i * (fabSize + gap);
-            return (
-              <div
-                key={btn.key}
-                onClick={btn.onClick}
-                style={{
-                  position: "fixed",
-                  bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
-                  right: rightOffset,
-                  width: fabSize,
-                  height: fabSize,
-                  borderRadius: fabSize / 2,
-                  background: activeTheme.gridBg || C.surface,
-                  backdropFilter: "blur(28px) saturate(200%)",
-                  WebkitBackdropFilter: "blur(28px) saturate(200%)",
-                  border: "1px solid rgba(255,255,255,0.16)",
-                  boxShadow: "none",
-                  zIndex: 85,
-                  overflow: "visible",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  transition: "transform 0.15s cubic-bezier(0.175, 0.885, 0.32, 1.175), box-shadow 0.15s ease",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
-              >
-                {/* Liquid Glass sheen */}
-                <div style={{
-                  position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none",
-                }}>
-                  <div style={{
-                    position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%",
-                    background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)",
-                    borderRadius: "inherit",
-                  }} />
-                </div>
-                {/* Icon */}
-                {btn.icon}
-                {/* Badge */}
-                <span style={{
-                  position: "absolute",
-                  top: -2,
-                  right: -2,
-                  minWidth: 18,
-                  height: 18,
-                  borderRadius: 9,
-                  backgroundColor: btn.color,
-                  color: "#fff",
-                  fontSize: 9,
-                  fontWeight: 700,
-                  fontFamily: "'Inter', sans-serif",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 5px",
-                  boxShadow: `0 0 8px ${btn.color}88`,
-                  border: `2px solid ${activeTheme.gridBg || C.surface}`,
-                }}>
-                  {btn.count > 99 ? "99+" : btn.count}
-                </span>
-              </div>
-            );
-          });
-        })()}
       </>
     );
   };
@@ -13260,7 +13209,21 @@ export default function Pattrn() {
         </div>
       )}
 
-      {renderContextButton("menu")}
+      {(() => {
+        const menuPillButtons = [];
+        if (firebaseConfigured && firebaseUser) {
+          if (notifications.length > 0) {
+            menuPillButtons.push({ id: "notifications", icon: "bell", color: "#54A0FF", onClick: () => { setRadialMenuStack(["root", "notifications-view"]); } });
+          }
+          if (activeCoopSessions.filter(s => s.status !== "complete").length > 0) {
+            menuPillButtons.push({ id: "coop-active", icon: "users", color: "#A855F7", onClick: () => { loadActiveCoopSessions(); setRadialMenuStack(["root", "coop", "coop-active"]); } });
+          }
+          if (onlineFriendsCount > 0) {
+            menuPillButtons.push({ id: "friends-online", icon: "friends", color: "#22C55E", onClick: () => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); } });
+          }
+        }
+        return renderContextButton("menu", menuPillButtons);
+      })()}
       {globalModalsEl}
       </div>
     );
