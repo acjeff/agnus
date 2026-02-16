@@ -12255,6 +12255,84 @@ export default function Pattrn() {
         {/* ── Scrollable content area ── */}
         <div style={{ width: "100%", maxWidth: 480, paddingTop: "calc(20px + env(safe-area-inset-top, 0px))", boxSizing: "border-box" }}>
 
+        {/* ── Top-level quick-access buttons (coop sessions + online friends) ── */}
+        {firebaseConfigured && firebaseUser && (() => {
+          const activeCount = activeCoopSessions.filter(s => s.status !== "complete").length;
+          const showCoop = activeCount > 0;
+          const showFriends = onlineFriendsCount > 0;
+          if (!showCoop && !showFriends) return null;
+          return (
+            <div style={{ display: "flex", gap: 8, marginBottom: 12, animation: "fadeUp 0.3s ease both" }}>
+              {showCoop && (
+                <button
+                  onClick={() => { loadActiveCoopSessions(); setRadialMenuStack(["root", "coop", "coop-active"]); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "8px 14px", borderRadius: 20,
+                    background: C.surface,
+                    backdropFilter: "blur(20px) saturate(180%)",
+                    WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                    border: `1px solid rgba(168, 85, 247, 0.25)`,
+                    cursor: "pointer", transition: "all 0.15s",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(168, 85, 247, 0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(168, 85, 247, 0.25)"; }}
+                >
+                  <Users size={14} color="#A855F7" strokeWidth={2.5} />
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, color: C.text, letterSpacing: 0.3 }}>
+                    Co-op
+                  </span>
+                  <span style={{
+                    minWidth: 18, height: 18, borderRadius: 9,
+                    backgroundColor: "#A855F7",
+                    color: "#fff", fontSize: 9, fontWeight: 700,
+                    fontFamily: "'Inter', sans-serif",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "0 5px",
+                    boxShadow: "0 0 8px rgba(168, 85, 247, 0.5)",
+                  }}>
+                    {activeCount > 99 ? "99+" : activeCount}
+                  </span>
+                </button>
+              )}
+              {showFriends && (
+                <button
+                  onClick={() => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    padding: "8px 14px", borderRadius: 20,
+                    background: C.surface,
+                    backdropFilter: "blur(20px) saturate(180%)",
+                    WebkitBackdropFilter: "blur(20px) saturate(180%)",
+                    border: `1px solid rgba(34, 197, 94, 0.25)`,
+                    cursor: "pointer", transition: "all 0.15s",
+                    boxShadow: "0 2px 8px rgba(0,0,0,0.12)",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(34, 197, 94, 0.5)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(34, 197, 94, 0.25)"; }}
+                >
+                  <Globe size={14} color="#22C55E" strokeWidth={2.5} />
+                  <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, color: C.text, letterSpacing: 0.3 }}>
+                    Friends
+                  </span>
+                  <span style={{
+                    minWidth: 18, height: 18, borderRadius: 9,
+                    backgroundColor: "#22C55E",
+                    color: "#fff", fontSize: 9, fontWeight: 700,
+                    fontFamily: "'Inter', sans-serif",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    padding: "0 5px",
+                    boxShadow: "0 0 8px rgba(34, 197, 94, 0.5)",
+                  }}>
+                    {onlineFriendsCount > 99 ? "99+" : onlineFriendsCount}
+                  </span>
+                </button>
+              )}
+            </div>
+          );
+        })()}
+
         {/* ── Daily hero card ── */}
         {(() => {
           const todayIdx = getTodayDailyIndex();
