@@ -3014,6 +3014,8 @@ export default function Pattrn() {
   const [friendPresence, setFriendPresence] = useState({}); // { uid: { online, lastSeen, currentMode, currentPuzzle, lastSolvedMode, lastSolvedPuzzle, lastSolvedAt } }
   const [friendPresenceLoading, setFriendPresenceLoading] = useState(false);
   const presenceIntervalRef = useRef(null);
+  const [friendsPanelCollapsed, setFriendsPanelCollapsed] = useState(false);
+  const [friendsPanelExpanded, setFriendsPanelExpanded] = useState(false);
 
   // --- Admin Metrics state ---
   const [adminMetrics, setAdminMetrics] = useState(null); // computed metrics object
@@ -12328,6 +12330,10 @@ export default function Pattrn() {
 
           if (activeFriends.length === 0) return null;
 
+          const MAX_PREVIEW_COUNT = 3;
+          const displayFriends = friendsPanelExpanded ? activeFriends : activeFriends.slice(0, MAX_PREVIEW_COUNT);
+          const hasMore = activeFriends.length > MAX_PREVIEW_COUNT;
+
           const getActivitySummary = (presence) => {
             if (!presence) return null;
 
@@ -12368,6 +12374,20 @@ export default function Pattrn() {
             return `Active ${daysAgo}d ago`;
           };
 
+          const isCurrentlyPlaying = (presence) => {
+            return presence?.currentMode && presence?.currentPuzzle;
+          };
+
+          const handleJoinFriend = (presence) => {
+            if (!presence?.currentMode || !presence?.currentPuzzle) return;
+
+            const mode = presence.currentMode;
+            const puzzleIndex = parseInt(presence.currentPuzzle) || 0;
+
+            setDifficulty(mode);
+            startPuzzle(puzzleIndex, mode);
+          };
+
           return (
             <div style={{
               width: "100%", marginBottom: 16, animation: "fadeUp 0.4s 0.05s ease both",
@@ -12376,112 +12396,196 @@ export default function Pattrn() {
               border: `1px solid ${C.border}`,
               padding: "16px", boxSizing: "border-box",
             }}>
+              {/* Header with collapse button */}
               <div style={{
-                fontSize: 11, color: C.textDim, textTransform: "uppercase",
-                letterSpacing: 1.5, fontFamily: "'Inter', sans-serif", marginBottom: 12,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginBottom: friendsPanelCollapsed ? 0 : 12,
               }}>
-                Friends Activity
+                <div style={{
+                  fontSize: 11, color: C.textDim, textTransform: "uppercase",
+                  letterSpacing: 1.5, fontFamily: "'Inter', sans-serif",
+                }}>
+                  Friends Activity {!friendsPanelCollapsed && `(${activeFriends.length})`}
+                </div>
+                <button
+                  onClick={() => setFriendsPanelCollapsed(!friendsPanelCollapsed)}
+                  style={{
+                    background: "none", border: "none",
+                    color: C.textDim, cursor: "pointer",
+                    fontSize: 16, padding: "4px 8px",
+                    transition: "transform 0.2s, color 0.15s",
+                    transform: friendsPanelCollapsed ? "rotate(0deg)" : "rotate(180deg)",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = C.accent; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = C.textDim; }}
+                >
+                  ▼
+                </button>
               </div>
 
-              <div style={{
-                display: "flex", flexDirection: "column", gap: 10,
-              }}>
-                {activeFriends.map(friend => {
-                  const isOnline = isFriendOnline(friend.presence);
-                  const activitySummary = getActivitySummary(friend.presence);
-                  const lastSeenText = getLastSeenText(friend.presence);
+              {/* Friends list */}
+              {!friendsPanelCollapsed && (
+                <>
+                  <div style={{
+                    display: "flex", flexDirection: "column", gap: 10,
+                    maxHeight: friendsPanelExpanded ? "none" : "280px",
+                    overflowY: friendsPanelExpanded ? "visible" : "auto",
+                  }}>
+                    {displayFriends.map(friend => {
+                      const isOnline = isFriendOnline(friend.presence);
+                      const activitySummary = getActivitySummary(friend.presence);
+                      const lastSeenText = getLastSeenText(friend.presence);
+                      const currentlyPlaying = isCurrentlyPlaying(friend.presence);
 
-                  return (
-                    <div key={friend.uid} style={{
-                      display: "flex", alignItems: "center", gap: 10,
-                      padding: "10px", borderRadius: 10,
-                      backgroundColor: C.bg, border: `1px solid ${C.border}`,
-                    }}>
-                      {/* Profile picture or initial */}
-                      <div style={{ position: "relative", flexShrink: 0 }}>
-                        {friend.profilePicture ? (
-                          <img
-                            src={friend.profilePicture}
-                            alt={friend.username}
-                            style={{
-                              width: 36, height: 36, borderRadius: 9,
-                              objectFit: "cover",
-                            }}
-                          />
-                        ) : (
-                          <div style={{
-                            width: 36, height: 36, borderRadius: 9,
-                            backgroundColor: C.accent + "22",
-                            border: `1.5px solid ${C.accent}44`,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700,
-                            color: C.accent,
-                          }}>
-                            {(friend.username || "?")[0].toUpperCase()}
-                          </div>
-                        )}
-
-                        {/* Online indicator */}
-                        {isOnline && (
-                          <div style={{
-                            position: "absolute", bottom: 0, right: 0,
-                            width: 10, height: 10, borderRadius: "50%",
-                            backgroundColor: C.correct,
-                            border: `2px solid ${C.bg}`,
-                            boxShadow: `0 0 4px ${C.correct}66`,
-                          }} />
-                        )}
-                      </div>
-
-                      {/* Friend info */}
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{
-                          fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600,
-                          color: C.text, marginBottom: 2,
+                      return (
+                        <div key={friend.uid} style={{
+                          display: "flex", alignItems: "center", gap: 10,
+                          padding: "10px", borderRadius: 10,
+                          backgroundColor: C.bg, border: `1px solid ${C.border}`,
                         }}>
-                          {friend.username}
-                        </div>
+                          {/* Profile picture or initial */}
+                          <div style={{ position: "relative", flexShrink: 0 }}>
+                            {friend.profilePicture ? (
+                              <img
+                                src={friend.profilePicture}
+                                alt={friend.username}
+                                style={{
+                                  width: 36, height: 36, borderRadius: 9,
+                                  objectFit: "cover",
+                                }}
+                              />
+                            ) : (
+                              <div style={{
+                                width: 36, height: 36, borderRadius: 9,
+                                backgroundColor: C.accent + "22",
+                                border: `1.5px solid ${C.accent}44`,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700,
+                                color: C.accent,
+                              }}>
+                                {(friend.username || "?")[0].toUpperCase()}
+                              </div>
+                            )}
 
-                        {activitySummary && (
-                          <div style={{
-                            fontSize: 11, color: C.textDim,
-                            fontFamily: "'Inter', sans-serif",
-                            lineHeight: 1.3,
-                          }}>
-                            {activitySummary}
+                            {/* Online indicator */}
+                            {isOnline && (
+                              <div style={{
+                                position: "absolute", bottom: 0, right: 0,
+                                width: 10, height: 10, borderRadius: "50%",
+                                backgroundColor: C.correct,
+                                border: `2px solid ${C.bg}`,
+                                boxShadow: `0 0 4px ${C.correct}66`,
+                              }} />
+                            )}
                           </div>
-                        )}
 
-                        {!activitySummary && (
-                          <div style={{
-                            fontSize: 11, color: C.textDim,
-                            fontFamily: "'Inter', sans-serif",
-                          }}>
-                            {lastSeenText}
+                          {/* Friend info */}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600,
+                              color: C.text, marginBottom: 2,
+                            }}>
+                              {friend.username}
+                            </div>
+
+                            {activitySummary && (
+                              <div style={{
+                                fontSize: 11, color: C.textDim,
+                                fontFamily: "'Inter', sans-serif",
+                                lineHeight: 1.3,
+                              }}>
+                                {activitySummary}
+                              </div>
+                            )}
+
+                            {!activitySummary && (
+                              <div style={{
+                                fontSize: 11, color: C.textDim,
+                                fontFamily: "'Inter', sans-serif",
+                              }}>
+                                {lastSeenText}
+                              </div>
+                            )}
                           </div>
-                        )}
-                      </div>
 
-                      {/* Online status badge */}
-                      {isOnline && (
-                        <div style={{
-                          padding: "3px 8px", borderRadius: 6,
-                          backgroundColor: C.correct + "18",
-                          border: `1px solid ${C.correct}33`,
-                        }}>
-                          <span style={{
-                            fontFamily: "'Inter', sans-serif", fontSize: 9,
-                            fontWeight: 700, color: C.correct,
-                            letterSpacing: 0.5, textTransform: "uppercase",
-                          }}>
-                            Online
-                          </span>
+                          {/* Join button if currently playing */}
+                          {currentlyPlaying && (
+                            <button
+                              onClick={() => handleJoinFriend(friend.presence)}
+                              style={{
+                                padding: "6px 12px", borderRadius: 8,
+                                backgroundColor: C.accent + "18",
+                                border: `1px solid ${C.accent}44`,
+                                cursor: "pointer", transition: "all 0.15s",
+                                fontFamily: "'Inter', sans-serif", fontSize: 11,
+                                fontWeight: 700, color: C.accent,
+                                letterSpacing: 0.5,
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.backgroundColor = C.accent + "28";
+                                e.currentTarget.style.borderColor = C.accent + "66";
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.backgroundColor = C.accent + "18";
+                                e.currentTarget.style.borderColor = C.accent + "44";
+                              }}
+                            >
+                              Join
+                            </button>
+                          )}
+
+                          {/* Online status badge if not playing */}
+                          {!currentlyPlaying && isOnline && (
+                            <div style={{
+                              padding: "3px 8px", borderRadius: 6,
+                              backgroundColor: C.correct + "18",
+                              border: `1px solid ${C.correct}33`,
+                            }}>
+                              <span style={{
+                                fontFamily: "'Inter', sans-serif", fontSize: 9,
+                                fontWeight: 700, color: C.correct,
+                                letterSpacing: 0.5, textTransform: "uppercase",
+                              }}>
+                                Online
+                              </span>
+                            </div>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Show more/less button */}
+                  {hasMore && (
+                    <button
+                      onClick={() => setFriendsPanelExpanded(!friendsPanelExpanded)}
+                      style={{
+                        width: "100%", marginTop: 10, padding: "8px",
+                        borderRadius: 8, border: `1px solid ${C.border}`,
+                        backgroundColor: "transparent",
+                        cursor: "pointer", transition: "all 0.15s",
+                        fontFamily: "'Inter', sans-serif", fontSize: 11,
+                        fontWeight: 600, color: C.textDim,
+                        letterSpacing: 0.5,
+                      }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.backgroundColor = C.bg;
+                        e.currentTarget.style.borderColor = C.accent + "44";
+                        e.currentTarget.style.color = C.accent;
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.backgroundColor = "transparent";
+                        e.currentTarget.style.borderColor = C.border;
+                        e.currentTarget.style.color = C.textDim;
+                      }}
+                    >
+                      {friendsPanelExpanded
+                        ? "Show Less"
+                        : `Show ${activeFriends.length - MAX_PREVIEW_COUNT} More`}
+                    </button>
+                  )}
+                </>
+              )}
             </div>
           );
         })()}
