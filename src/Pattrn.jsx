@@ -3022,6 +3022,11 @@ export default function Pattrn() {
   const [friendPresence, setFriendPresence] = useState({}); // { uid: { online, lastSeen, currentMode, currentPuzzle, lastSolvedMode, lastSolvedPuzzle, lastSolvedAt } }
   const [friendPresenceLoading, setFriendPresenceLoading] = useState(false);
   const presenceIntervalRef = useRef(null);
+  const [friendStats, setFriendStats] = useState({}); // { uid: { totalSolved, achievements, progress, updatedAt } }
+  const [friendStatsLoading, setFriendStatsLoading] = useState(false);
+
+  // --- Confirmation for friend removal (stores uid of friend being removed) ---
+  const [removeFriendConfirm, setRemoveFriendConfirm] = useState(null); // uid or null
 
   // --- Admin Metrics state ---
   const [adminMetrics, setAdminMetrics] = useState(null); // computed metrics object
@@ -3163,6 +3168,35 @@ export default function Pattrn() {
       friendPresenceUnsubsRef.current = [];
     };
   }, [firebaseUser, firebaseConfigured, friendsList]);
+
+  // Fetch public stats for all friends
+  useEffect(() => {
+    if (!firebaseConfigured || friendsList.length === 0) return;
+    setFriendStatsLoading(true);
+    const fetchStats = async () => {
+      const stats = {};
+      await Promise.all(
+        friendsList.map(async (friend) => {
+          try {
+            const publicStats = await loadPublicStats(friend.uid);
+            if (publicStats) {
+              stats[friend.uid] = {
+                totalSolved: publicStats.totalSolved || 0,
+                achievements: publicStats.achievements || 0,
+                progress: publicStats.progress || {},
+                updatedAt: publicStats.updatedAt || 0,
+              };
+            }
+          } catch (e) {
+            console.error(`Failed to load stats for ${friend.uid}:`, e);
+          }
+        })
+      );
+      setFriendStats(stats);
+      setFriendStatsLoading(false);
+    };
+    fetchStats();
+  }, [firebaseConfigured, friendsList]);
 
   // Compute online friends count from real-time presence data
   const onlineFriendsCount = useMemo(() => {
@@ -3616,6 +3650,7 @@ export default function Pattrn() {
     if (!firebaseUser) return;
     try {
       await removeFriend(firebaseUser.uid, friendUid);
+      setRemoveFriendConfirm(null); // Close confirmation modal
     } catch (e) {
       console.error("Remove friend failed:", e);
     }
@@ -5862,9 +5897,11 @@ export default function Pattrn() {
 
                               return sortedFriends.map(friend => {
                                 const presence = friendPresence[friend.uid];
+                                const stats = friendStats[friend.uid];
                                 const isOnline = presence && presence.lastSeen && (Date.now() - presence.lastSeen) < 120000;
                                 const isPlaying = isOnline && presence.status === "playing" && presence.currentMode;
                                 const currentSession = presence?.currentCoopSessionId;
+                                const showingConfirm = removeFriendConfirm === friend.uid;
 
                                 // Format activity text
                                 let activityText = "";
@@ -5886,69 +5923,230 @@ export default function Pattrn() {
                                   activityColor = "#06B6D4";
                                 }
 
+                                // Helper: format time ago
+                                const fmtTimeAgo = (ts) => {
+                                  if (!ts) return "Never";
+                                  const diff = Date.now() - ts;
+                                  if (diff < 60000) return "Just now";
+                                  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+                                  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+                                  if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
+                                  return new Date(ts).toLocaleDateString();
+                                };
+
                                 return (
                                   <div key={friend.uid} style={{
-                                    display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderRadius: 10,
-                                    backgroundColor: "rgba(255,255,255,0.04)", border: `1px solid ${isOnline ? C.correct + "33" : "rgba(255,255,255,0.08)"}`,
+                                    padding: "12px 14px", borderRadius: 12,
+                                    backgroundColor: C.surface, border: `1px solid ${showingConfirm ? C.incorrect : (isOnline ? C.correct + "44" : C.border)}`,
+                                    transition: "all 0.2s",
                                   }}>
-                                    <div style={{ position: "relative" }}>
-                                      {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
-                                      {isOnline && (
+                                    {showingConfirm ? (
+                                      // Inline confirmation view
+                                      <div>
                                         <div style={{
-                                          position: "absolute", bottom: -2, right: -2, width: 10, height: 10,
-                                          borderRadius: "50%", backgroundColor: C.correct,
-                                          border: `2px solid ${C.bg}`, boxShadow: `0 0 8px ${C.correct}66`,
+                                          fontFamily: "'Inter', sans-serif",
+                                          fontSize: 11,
+                                          fontWeight: 600,
+                                          color: C.text,
+                                          marginBottom: 8,
+                                        }}>
+                                          Remove <strong>{friend.username}</strong>?
+                                        </div>
+                                        <div style={{ display: "flex", gap: 6 }}>
+                                          <button
+                                            onClick={() => setRemoveFriendConfirm(null)}
+                                            style={{
+                                              flex: 1,
+                                              padding: "6px 12px",
+                                              borderRadius: 6,
+                                              fontSize: 10,
+                                              fontWeight: 700,
+                                              fontFamily: "'Inter', sans-serif",
+                                              textTransform: "uppercase",
+                                              letterSpacing: 0.5,
+                                              backgroundColor: C.surface,
+                                              border: `1px solid ${C.border}`,
+                                              color: C.text,
+                                              cursor: "pointer",
+                                              transition: "all 0.15s",
+                                            }}
+                                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.surfaceLight; }}
+                                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = C.surface; }}
+                                          >
+                                            Cancel
+                                          </button>
+                                          <button
+                                            onClick={() => handleRemoveFriend(friend.uid)}
+                                            style={{
+                                              flex: 1,
+                                              padding: "6px 12px",
+                                              borderRadius: 6,
+                                              fontSize: 10,
+                                              fontWeight: 700,
+                                              fontFamily: "'Inter', sans-serif",
+                                              textTransform: "uppercase",
+                                              letterSpacing: 0.5,
+                                              backgroundColor: C.incorrect,
+                                              border: "none",
+                                              color: "#fff",
+                                              cursor: "pointer",
+                                              transition: "all 0.15s",
+                                            }}
+                                            onMouseEnter={e => { e.currentTarget.style.opacity = 0.9; }}
+                                            onMouseLeave={e => { e.currentTarget.style.opacity = 1; }}
+                                          >
+                                            Remove
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      // Normal friend card view
+                                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                                        {/* Online indicator dot */}
+                                        <div style={{
+                                          width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
+                                          backgroundColor: isOnline ? C.correct : C.textDim + "44",
+                                          boxShadow: isOnline ? `0 0 8px ${C.correct}66` : "none",
                                         }} />
-                                      )}
-                                    </div>
-                                    <div style={{ flex: 1, minWidth: 0 }}>
-                                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text }}>{friend.username}</div>
-                                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 9, color: activityColor, marginTop: 2 }}>{activityText}</div>
-                                    </div>
-                                    {currentSession && (
-                                      <button onClick={async () => {
-                                        // Join friend's coop session
-                                        if (currentSession && presence.currentMode && presence.currentPuzzle) {
-                                          const mode = presence.currentMode;
-                                          const puzzleId = presence.currentPuzzle;
 
-                                          // Set up coop session
-                                          setCoopSessionId(currentSession);
-                                          setCoopRole("guest");
-                                          setCoopStatus("playing");
-                                          setDifficulty(mode);
+                                        {/* Profile picture */}
+                                        <div style={{ position: "relative", flexShrink: 0 }}>
+                                          {friend.profilePicture ? (
+                                            <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} />
+                                          ) : (
+                                            <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>
+                                              {(friend.username || "?")[0].toUpperCase()}
+                                            </div>
+                                          )}
+                                        </div>
 
-                                          // Set puzzle based on mode
-                                          if (mode === "daily") {
-                                            setDailyDate(puzzleId);
-                                            setCurrentDailyDate(puzzleId);
-                                          } else if (mode === "cascade") {
-                                            setCascadeRunIndex(parseInt(puzzleId) || 0);
-                                          } else {
-                                            setCurrentPuzzle(parseInt(puzzleId) || 0);
-                                          }
+                                        {/* User info */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                                            <span style={{
+                                              fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text,
+                                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                            }}>
+                                              {friend.username}
+                                            </span>
+                                            {isPlaying && (
+                                              <span style={{
+                                                fontSize: 8, fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                                                color: C.bg, backgroundColor: C.correct, padding: "1px 5px", borderRadius: 3,
+                                                textTransform: "uppercase", letterSpacing: 0.5,
+                                              }}>
+                                                Playing
+                                              </span>
+                                            )}
+                                            {isOnline && !isPlaying && (
+                                              <span style={{
+                                                fontSize: 8, fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                                                color: C.bg, backgroundColor: "#06B6D4", padding: "1px 5px", borderRadius: 3,
+                                                textTransform: "uppercase", letterSpacing: 0.5,
+                                              }}>
+                                                Online
+                                              </span>
+                                            )}
+                                          </div>
+                                          <div style={{ fontSize: 10, color: activityColor, fontFamily: "'Inter', sans-serif", marginBottom: 3 }}>
+                                            {activityText}
+                                          </div>
+                                          {/* Stats row */}
+                                          {stats && (
+                                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
+                                              <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.accent }}>
+                                                {stats.totalSolved} solved
+                                              </span>
+                                              <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.gold }}>
+                                                {stats.achievements} achievements
+                                              </span>
+                                              {stats.updatedAt > 0 && (
+                                                <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.textDim }}>
+                                                  Synced {fmtTimeAgo(stats.updatedAt)}
+                                                </span>
+                                              )}
+                                            </div>
+                                          )}
+                                          {/* Mode breakdown */}
+                                          {stats && stats.totalSolved > 0 && (
+                                            <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
+                                              {["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"]
+                                                .filter(mode => (stats.progress[mode] || 0) > 0)
+                                                .map(mode => (
+                                                  <span key={mode} style={{
+                                                    fontSize: 8, fontFamily: "'Inter', sans-serif",
+                                                    color: C.textDim, backgroundColor: C.surfaceLight,
+                                                    padding: "1px 4px", borderRadius: 3,
+                                                  }}>
+                                                    {mode}: {stats.progress[mode]}
+                                                  </span>
+                                                ))
+                                              }
+                                            </div>
+                                          )}
+                                        </div>
 
-                                          // Close menu and load puzzle
-                                          setRadialMenuStack(["root"]);
+                                        {/* Action buttons */}
+                                        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                                          {currentSession && (
+                                            <button onClick={async () => {
+                                              // Join friend's coop session
+                                              if (currentSession && presence.currentMode && presence.currentPuzzle) {
+                                                const mode = presence.currentMode;
+                                                const puzzleId = presence.currentPuzzle;
 
-                                          // Try to join the session in Firebase
-                                          if (firebaseUser && username) {
-                                            joinCoopSession(currentSession, firebaseUser.uid, username).catch(() => {});
-                                          }
-                                        }
-                                      }} style={{
-                                        padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
-                                        fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                                        background: C.correct + "22", color: C.correct,
-                                        border: "none", cursor: "pointer", textTransform: "uppercase",
-                                      }}>Join</button>
+                                                // Set up coop session
+                                                setCoopSessionId(currentSession);
+                                                setCoopRole("guest");
+                                                setCoopStatus("playing");
+                                                setDifficulty(mode);
+
+                                                // Set puzzle based on mode
+                                                if (mode === "daily") {
+                                                  setDailyDate(puzzleId);
+                                                  setCurrentDailyDate(puzzleId);
+                                                } else if (mode === "cascade") {
+                                                  setCascadeRunIndex(parseInt(puzzleId) || 0);
+                                                } else {
+                                                  setCurrentPuzzle(parseInt(puzzleId) || 0);
+                                                }
+
+                                                // Close menu and load puzzle
+                                                setRadialMenuStack(["root"]);
+
+                                                // Try to join the session in Firebase
+                                                if (firebaseUser && username) {
+                                                  joinCoopSession(currentSession, firebaseUser.uid, username).catch(() => {});
+                                                }
+                                              }
+                                            }} style={{
+                                              padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
+                                              fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                              background: C.correct + "22", color: C.correct,
+                                              border: "none", cursor: "pointer", textTransform: "uppercase",
+                                            }}>Join</button>
+                                          )}
+                                          <button
+                                            onClick={() => setRemoveFriendConfirm(friend.uid)}
+                                            title="Remove friend"
+                                            style={{
+                                              width: 24, height: 24, borderRadius: 6,
+                                              backgroundColor: "transparent",
+                                              border: `1px solid ${C.border}`,
+                                              color: C.textDim,
+                                              cursor: "pointer",
+                                              display: "flex", alignItems: "center", justifyContent: "center",
+                                              transition: "all 0.15s",
+                                              flexShrink: 0,
+                                            }}
+                                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; e.currentTarget.style.backgroundColor = C.incorrect + "11"; }}
+                                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; e.currentTarget.style.backgroundColor = "transparent"; }}
+                                          >
+                                            <X size={14} strokeWidth={2.5} />
+                                          </button>
+                                        </div>
+                                      </div>
                                     )}
-                                    <button onClick={() => handleRemoveFriend(friend.uid)} style={{
-                                      padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
-                                      fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                                      background: C.incorrect + "22", color: C.incorrect,
-                                      border: "none", cursor: "pointer", textTransform: "uppercase",
-                                    }}>Remove</button>
                                   </div>
                                 );
                               });
