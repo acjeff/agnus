@@ -3034,6 +3034,9 @@ export default function Pattrn() {
   const [activeSessionsLoading, setActiveSessionsLoading] = useState(false);
   const [showCoopFriendPicker, setShowCoopFriendPicker] = useState(false); // friend picker for coop
   const [coopSelectedFriends, setCoopSelectedFriends] = useState(new Set()); // multi-select friends for coop invites
+  const [coopInviteUsernameInput, setCoopInviteUsernameInput] = useState(""); // username input for inviting non-friends in coop
+  const [coopInviteUsernameMsg, setCoopInviteUsernameMsg] = useState(""); // feedback message for coop username invite
+  const [coopInviteUsernameLoading, setCoopInviteUsernameLoading] = useState(false); // loading state for coop username invite
   const [coopPartnerLockToast, setCoopPartnerLockToast] = useState(null); // toast when partner locks in
   const coopPartnerLockToastTimer = useRef(null);
   const prevCoopPartnerLockedRef = useRef(false); // track partner lock state changes
@@ -3575,6 +3578,28 @@ export default function Pattrn() {
       setTimeout(() => setAddFriendMsg(""), 3000);
     }
   }, [firebaseUser, addFriendInput, friendsList]);
+
+  // Invite a user by username in the coop start menu (looks up user, adds to selected friends for invite)
+  const handleCoopInviteByUsername = useCallback(async () => {
+    if (!firebaseUser || !coopInviteUsernameInput.trim()) return;
+    setCoopInviteUsernameLoading(true);
+    setCoopInviteUsernameMsg("");
+    try {
+      const target = await lookupUserByUsername(coopInviteUsernameInput.trim());
+      if (!target) { setCoopInviteUsernameMsg("User not found"); return; }
+      if (target.uid === firebaseUser.uid) { setCoopInviteUsernameMsg("Can't invite yourself"); return; }
+      if (coopSelectedFriends.has(target.uid)) { setCoopInviteUsernameMsg("Already selected"); return; }
+      setCoopSelectedFriends(prev => { const next = new Set(prev); next.add(target.uid); return next; });
+      setCoopInviteUsernameInput("");
+      setCoopInviteUsernameMsg(`${target.username} added!`);
+    } catch (e) {
+      console.error("Coop invite by username failed:", e);
+      setCoopInviteUsernameMsg("Failed to look up user");
+    } finally {
+      setCoopInviteUsernameLoading(false);
+      setTimeout(() => setCoopInviteUsernameMsg(""), 3000);
+    }
+  }, [firebaseUser, coopInviteUsernameInput, coopSelectedFriends]);
 
   const handleRemoveFriend = useCallback(async (friendUid) => {
     if (!firebaseUser) return;
@@ -4767,12 +4792,12 @@ export default function Pattrn() {
     if (!isCoop && gameState === "playing" && !isCascade && !isMosaic) {
       playRoot.push({ id: "coop-start", icon: "user-plus", label: "Play w/ Friends", sub: "coop-start", beforeSub: () => {
         if (!firebaseUser) { coopPendingLoginRef.current = true; setRadialMenuStack(["root", "sign-in"]); setAccountTab("login"); setAccountError(""); return false; }
-        setCoopSelectedFriends(new Set());
+        setCoopSelectedFriends(new Set()); setCoopInviteUsernameInput(""); setCoopInviteUsernameMsg("");
         return true;
       }});
     }
     if (isCoop) {
-      playRoot.push({ id: "coop-invite", icon: "user-plus", label: "Invite", sub: "coop-start", beforeSub: () => { setCoopSelectedFriends(new Set()); return true; } });
+      playRoot.push({ id: "coop-invite", icon: "user-plus", label: "Invite", sub: "coop-start", beforeSub: () => { setCoopSelectedFriends(new Set()); setCoopInviteUsernameInput(""); setCoopInviteUsernameMsg(""); return true; } });
     }
     // Back action defined as pill button at call site
 
@@ -4789,7 +4814,7 @@ export default function Pattrn() {
     const customMosaicRoot = [];
     if (firebaseConfigured && firebaseUser && !isCoopMosaic) {
       customMosaicRoot.push({ id: "coop-mosaic", icon: "user-plus", label: "Play w/ Friends", sub: "coop-start", beforeSub: () => {
-        setCoopSelectedFriends(new Set());
+        setCoopSelectedFriends(new Set()); setCoopInviteUsernameInput(""); setCoopInviteUsernameMsg("");
         return true;
       } });
     }
@@ -4995,9 +5020,8 @@ export default function Pattrn() {
         h += 24 + 8; // "Friends" label + margin
         h += Math.min(friendsList.length, 4) * 46; // friend rows (cap visual height at 4, rest scrolls)
         h += 16; // bottom margin
-      } else if (!coopHasActiveSession) {
-        h += 50; // no friends message
       }
+      h += 18 + 6 + 36 + 12; // invite by username: label + margin + input row + bottom margin
       if (!coopHasActiveSession) h += 48; // action buttons
       if (coopHasActiveSession && !((isCoopFromMosaic || isCoopMosaic) ? false : coopPartnerConnected)) h += 30; // waiting text
       return h;
@@ -5748,19 +5772,40 @@ export default function Pattrn() {
                     {friendsModalTab === "list" ? (
                       <>
                         {/* Add friend input */}
-                        <input
-                          type="text"
-                          placeholder="Add friend by username..."
-                          value={addFriendInput}
-                          onChange={(e) => setAddFriendInput(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === "Enter") handleAddFriend(); }}
-                          style={{
-                            width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 13,
-                            fontFamily: "'Inter', sans-serif",
-                            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: C.text,
-                            outline: "none", marginBottom: 12, boxSizing: "border-box",
-                          }}
-                        />
+                        <div style={{ display: "flex", gap: 6, marginBottom: addFriendMsg ? 4 : 12 }}>
+                          <input
+                            type="text"
+                            placeholder="Add friend by username..."
+                            value={addFriendInput}
+                            onChange={(e) => setAddFriendInput(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === "Enter" && addFriendInput.trim()) handleAddFriend(); }}
+                            style={{
+                              flex: 1, padding: "10px 12px", borderRadius: 8, fontSize: 13,
+                              fontFamily: "'Inter', sans-serif",
+                              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: C.text,
+                              outline: "none", boxSizing: "border-box",
+                            }}
+                          />
+                          <button
+                            onClick={handleAddFriend}
+                            disabled={!addFriendInput.trim() || addFriendLoading}
+                            style={{
+                              padding: "10px 14px", borderRadius: 8, fontSize: 10, fontWeight: 700,
+                              fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                              background: addFriendInput.trim() ? C.accent : "rgba(255,255,255,0.06)",
+                              color: addFriendInput.trim() ? C.bg : C.textDim,
+                              border: "none", cursor: addFriendInput.trim() ? "pointer" : "not-allowed",
+                              textTransform: "uppercase", flexShrink: 0,
+                            }}
+                          >
+                            {addFriendLoading ? "..." : "Add"}
+                          </button>
+                        </div>
+                        {addFriendMsg && (
+                          <div style={{ fontSize: 11, color: addFriendMsg.includes("added") ? C.correct : C.textDim, marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>
+                            {addFriendMsg}
+                          </div>
+                        )}
                         {/* Friends list */}
                         <div style={{ maxHeight: 230, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
                           {friendsList.length === 0 ? (
@@ -5866,7 +5911,7 @@ export default function Pattrn() {
                       type="text"
                       placeholder="Enter new username..."
                       value={usernameInput}
-                      onChange={(e) => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20); setUsernameInput(v); if (v) checkUsernameAvailability(v); }}
+                      onChange={(e) => { const v = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, "").slice(0, 20); setUsernameInput(v); checkUsernameDebounced(v); }}
                       style={{
                         width: "100%", padding: "10px 14px", borderRadius: 8,
                         backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
@@ -6676,9 +6721,46 @@ export default function Pattrn() {
                         </div>
                       </div>
                     )}
-                    {friendsList.length === 0 && !hasSession && (
-                      <div style={{ marginBottom: 16, textAlign: "center", padding: "12px 0", color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif" }}>No friends added yet. You can add friends in the Mosaic gallery.</div>
-                    )}
+                    {/* Invite by username */}
+                    <div style={{ marginBottom: hasSession ? 8 : 12 }}>
+                      <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 6 }}>
+                        Invite by Username
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <input
+                          type="text"
+                          placeholder="Enter username..."
+                          value={coopInviteUsernameInput}
+                          onChange={(e) => setCoopInviteUsernameInput(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Enter" && coopInviteUsernameInput.trim()) handleCoopInviteByUsername(); }}
+                          style={{
+                            flex: 1, padding: "8px 10px", borderRadius: 8, fontSize: 12,
+                            fontFamily: "'Inter', sans-serif",
+                            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: C.text,
+                            outline: "none", boxSizing: "border-box",
+                          }}
+                        />
+                        <button
+                          onClick={handleCoopInviteByUsername}
+                          disabled={!coopInviteUsernameInput.trim() || coopInviteUsernameLoading}
+                          style={{
+                            padding: "8px 12px", borderRadius: 8, fontSize: 10, fontWeight: 700,
+                            fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                            background: coopInviteUsernameInput.trim() ? coopPickerColor : "rgba(255,255,255,0.06)",
+                            color: coopInviteUsernameInput.trim() ? "#fff" : C.textDim,
+                            border: "none", cursor: coopInviteUsernameInput.trim() ? "pointer" : "not-allowed",
+                            textTransform: "uppercase", flexShrink: 0,
+                          }}
+                        >
+                          {coopInviteUsernameLoading ? "..." : "Add"}
+                        </button>
+                      </div>
+                      {coopInviteUsernameMsg && (
+                        <div style={{ fontSize: 10, color: coopInviteUsernameMsg.includes("added") ? C.correct : coopPickerColor, marginTop: 4, fontFamily: "'Inter', sans-serif" }}>
+                          {coopInviteUsernameMsg}
+                        </div>
+                      )}
+                    </div>
                     {/* Action buttons */}
                     {!hasSession && (
                       <div style={{ display: "flex", gap: 8 }}>
