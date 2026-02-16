@@ -4768,7 +4768,7 @@ export default function Pattrn() {
     { id: "coop-create", icon: "play", label: "Create Session", sub: "coop-create" },
     { id: "coop-active", icon: "users", label: "Active Sessions", sub: "coop-active" },
     { id: "coop-completed", icon: "check", label: "Completed", sub: "coop-completed" },
-    { id: "coop-friends", icon: "users", label: "Friends", sub: "friends-view", beforeSub: () => { setFriendsModalTab("list"); return true; } },
+    { id: "coop-friends", icon: "users", label: "Friends", sub: "friends-view" },
   ];
 
   // Profile submenu — now global, includes account items + admin
@@ -5083,13 +5083,8 @@ export default function Pattrn() {
       if (!isFriendsView) return 0;
       let h = panelPad + fabSize; // padding + bottom bar
       h += 20 + 8; // header + margin
-      h += 32 + 12; // tabs + margin
-      if (friendsModalTab === "list") {
-        h += 36 + 8; // add friend input + margin
-        h += Math.min(friendsList.length, 5) * 46 + 16; // friend list items (cap at 5, rest scrolls)
-      } else { // compare tab
-        h += 300; // comparison content
-      }
+      h += 36 + 8; // add friend input + margin
+      h += Math.min(friendsList.length, 5) * 46 + 16; // friend list items (cap at 5, rest scrolls)
       h += 12; // bottom padding
       return h;
     })();
@@ -5738,7 +5733,7 @@ export default function Pattrn() {
                 </>
               );
             })() : isFriendsView ? (() => {
-              // Friends modal with tabs
+              // Friends modal
               return (
                 <>
                   <div style={{
@@ -5750,27 +5745,6 @@ export default function Pattrn() {
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
                   }}>
                     <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>Friends</div>
-                    {/* Tabs */}
-                    <div style={{ display: "flex", borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}`, marginBottom: 12 }}>
-                      {["list", "compare"].map(tab => (
-                        <button
-                          key={tab}
-                          onClick={() => setFriendsModalTab(tab)}
-                          style={{
-                            flex: 1, padding: "8px 0", fontSize: 10, fontWeight: 700,
-                            fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                            background: friendsModalTab === tab ? C.accent : "transparent",
-                            color: friendsModalTab === tab ? C.bg : C.textDim,
-                            border: "none", cursor: "pointer", textTransform: "uppercase",
-                            transition: "all 0.15s",
-                          }}
-                        >
-                          {tab === "list" ? "Your Friends" : "Compare"}
-                        </button>
-                      ))}
-                    </div>
-                    {friendsModalTab === "list" ? (
-                      <>
                         {/* Add friend input */}
                         <div style={{ display: "flex", gap: 6, marginBottom: addFriendMsg ? 4 : 12 }}>
                           <input
@@ -5918,28 +5892,6 @@ export default function Pattrn() {
                             })()
                           )}
                         </div>
-                      </>
-                    ) : (
-                      <>
-                        {/* Compare tab - select friend to compare with */}
-                        {compareFriend ? (
-                          <div>Comparison view would go here</div>
-                        ) : (
-                          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                            {friendsList.map(friend => (
-                              <button key={friend.uid} onClick={() => setCompareFriend(friend)} style={{
-                                display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", borderRadius: 10,
-                                backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)",
-                                cursor: "pointer", transition: "all 0.15s",
-                              }}>
-                                {friend.profilePicture ? <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} /> : <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>{(friend.username || "?")[0].toUpperCase()}</div>}
-                                <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 600, color: C.text, flex: 1 }}>{friend.username}</span>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </>
-                    )}
                   </div>
                 </>
               );
@@ -12104,7 +12056,7 @@ export default function Pattrn() {
 
             {/* Friends */}
             {firebaseConfigured && firebaseUser && (
-              <button onClick={() => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); }} style={{
+              <button onClick={() => { setRadialMenuStack(["root", "friends-view"]); }} style={{
                 width: "100%", padding: "14px 16px", borderRadius: 12,
                 backgroundColor: C.surface, border: `1px solid ${C.border}`,
                 cursor: "pointer", display: "flex", alignItems: "center", gap: 12,
