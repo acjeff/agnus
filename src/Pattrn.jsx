@@ -87,6 +87,7 @@ import {
   closeCoopMosaicSession,
   loadCoopMosaicSession,
   updateCoopMosaicTileLockedCells,
+  sendCoopMosaicReaction,
   addCoopInvitedUid,
   addCoopMosaicInvitedUid,
 } from "./firebase.js";
@@ -3133,6 +3134,7 @@ export default function Pattrn() {
   const coopMosaicJoinedRef = useRef(false); // tracks whether we've actually joined (prevents false kick detection)
   const coopMosaicJoiningRef = useRef(false); // true while mosaic guest join is in-flight
   const coopMosaicPrevSolvedRef = useRef(new Set()); // tracks tiles already seen as solved to detect partner completions
+  const coopMosaicSeenReactionsRef = useRef(new Set()); // tracks reaction keys already displayed
   const isCoopMosaic = !!coopMosaicSessionId;
   const [coopMosaicInvitedUids, setCoopMosaicInvitedUids] = useState(new Set()); // UIDs invited to coop mosaic session
   // Derived: number of other connected players (currentTile != null means connected)
@@ -3522,6 +3524,33 @@ export default function Pattrn() {
   }, []);
 
   const startCustomMosaicPlay = useCallback((mosaic) => {
+    // If a coop mosaic session is active, leave it before starting solo play.
+    // Without this, isCoopMosaic stays true and solo completions bleed into
+    // the coop Firebase session instead of persisting to local storage.
+    if (coopMosaicSessionId) {
+      if (firebaseUser) {
+        updateCoopMosaicCurrentTile(coopMosaicSessionId, firebaseUser.uid, null).catch(() => {});
+      }
+      if (coopMosaicUnsubRef.current) {
+        coopMosaicUnsubRef.current();
+        coopMosaicUnsubRef.current = null;
+      }
+      clearCoopUrlParam("coopMosaic");
+      setCoopMosaicSessionId(null);
+      setCoopMosaicRole(null);
+      setCoopMosaicStatus(null);
+      setCoopMosaicPlayers({});
+      setCoopMosaicSharedProgress({});
+      setCoopMosaicSharedTileTimes({});
+      setCoopMosaicOtherFills({});
+      setShowCoopMosaicInvite(false);
+      coopMosaicWriteThrottleRef.current = {};
+      coopMosaicCurrentTileRef.current = null;
+      coopMosaicJoinedRef.current = false;
+      coopMosaicJoiningRef.current = false;
+      coopMosaicPrevSolvedRef.current = new Set();
+      coopMosaicSeenReactionsRef.current = new Set();
+    }
     const puzzles = buildCustomMosaicPuzzles(mosaic.grid);
     customMosaicPuzzlesRef.current = puzzles;
     setCustomMosaicPlay(mosaic);
@@ -3530,7 +3559,7 @@ export default function Pattrn() {
     setCustomMosaicProgress(saved && typeof saved === "object" ? { ...saved } : {});
     setDifficulty("mosaic");
     setView("custom-mosaic");
-  }, [buildCustomMosaicPuzzles, progress.mosaicCompletions]);
+  }, [buildCustomMosaicPuzzles, progress.mosaicCompletions, coopMosaicSessionId, firebaseUser]);
 
   // Pre-save validation — opens the naming drawer if valid
   const handleSaveClick = useCallback(() => {
@@ -5545,9 +5574,17 @@ export default function Pattrn() {
               // Don't allow closing modal if username is required
               if (!username && isUsernameEdit) return;
               setRadialMenuStack([]);
+              setCoopReactionPickerOpen(false);
             }}
             onTouchMove={e => e.preventDefault()}
             style={{ position: "fixed", inset: 0, zIndex: 84, touchAction: "none", overscrollBehavior: "none" }}
+          />
+        )}
+        {/* Click-away layer for reaction picker when menu is closed */}
+        {!isOpen && showReactionPicker && (
+          <div
+            onClick={() => setCoopReactionPickerOpen(false)}
+            style={{ position: "fixed", inset: 0, zIndex: 84 }}
           />
         )}
 
@@ -7421,7 +7458,10 @@ export default function Pattrn() {
                     r.type === "text" ? (
                       <button key={r.content} onClick={(e) => {
                         e.stopPropagation();
-                        if (coopSessionId && firebaseUser) {
+                        if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
+                          sendCoopMosaicReaction(coopMosaicSessionId, firebaseUser.uid, r.content, username || "Player", r.type).catch(() => {});
+                          addFloatingReaction(r.content, "You", COOP_MY_COLOR, r.type);
+                        } else if (coopSessionId && firebaseUser) {
                           sendCoopReaction(coopSessionId, firebaseUser.uid, r.content, username || "Player", r.type).catch(() => {});
                           addFloatingReaction(r.content, "You", COOP_MY_COLOR, r.type);
                         }
@@ -7438,7 +7478,10 @@ export default function Pattrn() {
                     ) : (
                       <button key={r.content} onClick={(e) => {
                         e.stopPropagation();
-                        if (coopSessionId && firebaseUser) {
+                        if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
+                          sendCoopMosaicReaction(coopMosaicSessionId, firebaseUser.uid, r.content, username || "Player", r.type).catch(() => {});
+                          addFloatingReaction(r.content, "You", COOP_MY_COLOR, r.type);
+                        } else if (coopSessionId && firebaseUser) {
                           sendCoopReaction(coopSessionId, firebaseUser.uid, r.content, username || "Player", r.type).catch(() => {});
                           addFloatingReaction(r.content, "You", COOP_MY_COLOR, r.type);
                         }
@@ -9039,6 +9082,7 @@ export default function Pattrn() {
     coopMosaicJoinedRef.current = false;
     coopMosaicJoiningRef.current = false;
     coopMosaicPrevSolvedRef.current = new Set();
+    coopMosaicSeenReactionsRef.current = new Set();
   }, [coopMosaicSessionId, firebaseUser, coopMosaicRole]);
 
   // Rejoin an existing coop mosaic session from the active sessions panel
@@ -9253,6 +9297,22 @@ export default function Pattrn() {
         setCoopMosaicOtherFills({});
       }
 
+      // Sync reactions from Firebase — detect new reactions and trigger floating animation
+      const reactions = data.reactions || {};
+      const reactionKeys = Object.keys(reactions);
+      const prevSeenMosaic = coopMosaicSeenReactionsRef.current;
+      reactionKeys.forEach(key => {
+        if (!prevSeenMosaic.has(key)) {
+          const r = reactions[key];
+          // Only animate other players' reactions (local user's are shown immediately on send)
+          if (r.uid !== myUid) {
+            const playerColor = "#FF9FF3";
+            addFloatingReaction(r.emoji, r.username || "Player", playerColor, r.type || "emoji");
+          }
+        }
+      });
+      coopMosaicSeenReactionsRef.current = new Set(reactionKeys);
+
       // Check if all 25 tiles are solved
       const allTp = data.tileProgress || {};
       const allSolvedCount = Object.values(allTp).filter(v => v > 0).length;
@@ -9266,7 +9326,7 @@ export default function Pattrn() {
       unsub();
       coopMosaicUnsubRef.current = null;
     };
-  }, [coopMosaicSessionId, firebaseUser, leaveCoopMosaicSession, stopTimer]);
+  }, [coopMosaicSessionId, firebaseUser, leaveCoopMosaicSession, stopTimer, addFloatingReaction]);
 
   // Load profile pictures for coop mosaic players as they join
   useEffect(() => {
@@ -9537,19 +9597,22 @@ export default function Pattrn() {
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
         // Custom mosaic: track progress
+        // Store attempts + 1 so that first-try solves (attempts=0) are stored as 1,
+        // ensuring all >0 completion checks recognise the tile as solved.
         if (customMosaicPuzzlesRef.current && isMosaic) {
-          setCustomMosaicProgress(prev => ({ ...prev, [progressKey]: attempts }));
+          const mosaicAttempts = attempts + 1;
+          setCustomMosaicProgress(prev => ({ ...prev, [progressKey]: mosaicAttempts }));
           if (isCoopMosaic && coopMosaicSessionId) {
             // Coop mosaic: write ONLY to Firebase session (single source of truth)
             // Local progress will be synced via subscription; personal save happens after mosaic completion
-            updateCoopMosaicTileProgress(coopMosaicSessionId, progressKey, attempts, finalTime).catch(() => {});
+            updateCoopMosaicTileProgress(coopMosaicSessionId, progressKey, mosaicAttempts, finalTime).catch(() => {});
             clearCoopMosaicTileFills(coopMosaicSessionId, progressKey).catch(() => {});
           } else if (customMosaicPlay?.id) {
             // Solo mosaic: persist to local progress.mosaicCompletions
             const mosaicId = customMosaicPlay.id;
             const prevCompletions = progress.mosaicCompletions || {};
             const prevMosaic = prevCompletions[mosaicId] || {};
-            const newMosaicProgress = { ...prevMosaic, [progressKey]: attempts };
+            const newMosaicProgress = { ...prevMosaic, [progressKey]: mosaicAttempts };
             const newCompletions = { ...prevCompletions, [mosaicId]: newMosaicProgress };
             const newProgress = { ...progress, mosaicCompletions: newCompletions };
             setProgress(newProgress);
@@ -10382,7 +10445,7 @@ export default function Pattrn() {
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 32, paddingLeft: 16, paddingRight: 16,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes coopPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } }`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes coopPulse { 0%, 100% { opacity: 0.6; } 50% { opacity: 1; } } @keyframes coopReactionFloat { 0%{transform:translateY(0) scale(0.5);opacity:0} 8%{transform:translateY(-5vh) scale(1.1);opacity:1} 15%{transform:translateY(-10vh) scale(1)} 70%{opacity:1} 100%{transform:translateY(-85vh) scale(1.2);opacity:0} } .reaction-scroll-container::-webkit-scrollbar { display: none; }`}</style>
 
         {/* Header */}
         <div style={{ width: "100%", maxWidth: 400, display: "flex", alignItems: "center", gap: 12, marginBottom: 16, animation: "fadeUp 0.3s ease" }}>
@@ -10729,7 +10792,49 @@ export default function Pattrn() {
           if (isCoopMosaic) { leaveCoopMosaicSession(); loadActiveCoopSessions(); setView("menu"); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery"; return; }
           const returnTo = customMosaicReturnViewRef.current || "gallery"; setView(returnTo); setCustomMosaicPlay(null); customMosaicPuzzlesRef.current = null; customMosaicReturnViewRef.current = "gallery";
         })}
-        {renderContextButton("custom-mosaic")}
+        {/* Floating coop mosaic reactions overlay */}
+        {coopFloatingReactions.length > 0 && (
+          <div style={{
+            position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9999,
+            overflow: "hidden",
+          }}>
+            {coopFloatingReactions.map(r => (
+              <div key={r.id} style={{
+                position: "absolute",
+                left: `${r.x}%`,
+                bottom: 60,
+                animation: "coopReactionFloat 3s ease-out forwards",
+                display: "flex", flexDirection: "column", alignItems: "center",
+                transform: "translateX(-50%)",
+              }}>
+                {r.type === "text" ? (
+                  <span style={{
+                    fontSize: 20, fontWeight: 800, fontFamily: "'Inter', sans-serif",
+                    color: "#fff", lineHeight: 1,
+                    textShadow: `0 0 12px ${r.fromColor}88, 0 2px 8px rgba(0,0,0,0.7)`,
+                    letterSpacing: 1,
+                  }}>{r.emoji}</span>
+                ) : r.type === "pattern" ? (
+                  <span style={{
+                    fontSize: 56, lineHeight: 1, color: r.fromColor,
+                    filter: `drop-shadow(0 0 10px ${r.fromColor}88) drop-shadow(0 2px 6px rgba(0,0,0,0.5))`,
+                  }}>{r.emoji}</span>
+                ) : (
+                  <span style={{ fontSize: 48, lineHeight: 1, filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))" }}>{r.emoji}</span>
+                )}
+                <span style={{
+                  fontSize: 10, fontWeight: 700, color: r.fromColor,
+                  fontFamily: "'Inter', sans-serif",
+                  textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+                  whiteSpace: "nowrap", marginTop: 2,
+                }}>{r.fromName}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        {renderContextButton("custom-mosaic", isCoopMosaic && coopMosaicAnyConnected ? [
+          { id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => setCoopReactionPickerOpen(prev => !prev) },
+        ] : [])}
         {globalModalsEl}
       </div>
     );
@@ -13897,6 +14002,7 @@ export default function Pattrn() {
       setProgress(nextProgress); saveProgress(nextProgress);
     }
     stopTimer(); setRadialMenuStack(prev => prev.includes("mosaic-preview") ? [] : prev);
+    setCoopReactionPickerOpen(false);
     if (customMosaicPuzzlesRef.current && isMosaic) {
       if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
         coopMosaicCurrentTileRef.current = -1;
@@ -13970,6 +14076,12 @@ export default function Pattrn() {
         setCoopSuggestMode(null); setCoopSuggestPlayerPicker(false); setCoopSuggestCell(null);
       }});
     }
+    // Mosaic coop: reaction button (visible on tile views when any player is connected)
+    if (isCoopMosaic && coopMosaicAnyConnected) {
+      playPillButtons.push({ id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
+        setCoopReactionPickerOpen(prev => !prev);
+      }});
+    }
     if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
       playPillButtons.push({ id: "preview", icon: "search", color: C.accent, onClick: () => setRadialMenuStack(["root", "mosaic-preview"]) });
     }
@@ -14005,6 +14117,12 @@ export default function Pattrn() {
       playPillButtons.push({ id: "done", icon: "home", color: "#54A0FF", onClick: () => { leaveCoopSession(); setView("menu"); } });
     } else if (currentPuzzle < totalPuzzles - 1) {
       playPillButtons.push({ id: "next", icon: "forward", color: C.accent, onClick: () => startPuzzle(currentPuzzle + 1) });
+    }
+    // Mosaic coop: reaction button in won state too
+    if (isCoopMosaic && coopMosaicAnyConnected) {
+      playPillButtons.push({ id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
+        setCoopReactionPickerOpen(prev => !prev);
+      }});
     }
   } else if (gameState === "lost") {
     // Share (cascade only)
