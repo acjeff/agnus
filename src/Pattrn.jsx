@@ -8916,9 +8916,6 @@ export default function Pattrn() {
       }
     }
 
-    const newAttempts = attempts + 1;
-    setAttempts(newAttempts);
-
     // In blind mode, also need all locked from before to count
     if (isBlind) {
       // Check if ALL blanks are now correct (locked + newly correct active)
@@ -8936,7 +8933,7 @@ export default function Pattrn() {
         const newBest = Math.max(prevBest, levelsCompleted);
         const nextLevel = cascadeLevel + 1;
         if (cascadeLevel < CASCADE_LEVELS.length - 1) {
-          const runState = { level: nextLevel, elapsedSeconds: getElapsedSeconds(), fills: {}, attempts: newAttempts };
+          const runState = { level: nextLevel, elapsedSeconds: getElapsedSeconds(), fills: {}, attempts };
           const nextRunState = { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState };
           const newProgress = { ...progress, cascade: { ...(progress.cascade || {}), [cascadeRunIndex]: newBest }, cascadeRunState: nextRunState, cascadeRunStateLastIndex: cascadeRunIndex };
           setProgress(newProgress);
@@ -8979,18 +8976,18 @@ export default function Pattrn() {
         setTimeout(() => setShowParticles(false), 1500);
         // Custom mosaic: track progress
         if (customMosaicPuzzlesRef.current && isMosaic) {
-          setCustomMosaicProgress(prev => ({ ...prev, [progressKey]: newAttempts }));
+          setCustomMosaicProgress(prev => ({ ...prev, [progressKey]: attempts }));
           if (isCoopMosaic && coopMosaicSessionId) {
             // Coop mosaic: write ONLY to Firebase session (single source of truth)
             // Local progress will be synced via subscription; personal save happens after mosaic completion
-            updateCoopMosaicTileProgress(coopMosaicSessionId, progressKey, newAttempts, finalTime).catch(() => {});
+            updateCoopMosaicTileProgress(coopMosaicSessionId, progressKey, attempts, finalTime).catch(() => {});
             clearCoopMosaicTileFills(coopMosaicSessionId, progressKey).catch(() => {});
           } else if (customMosaicPlay?.id) {
             // Solo mosaic: persist to local progress.mosaicCompletions
             const mosaicId = customMosaicPlay.id;
             const prevCompletions = progress.mosaicCompletions || {};
             const prevMosaic = prevCompletions[mosaicId] || {};
-            const newMosaicProgress = { ...prevMosaic, [progressKey]: newAttempts };
+            const newMosaicProgress = { ...prevMosaic, [progressKey]: attempts };
             const newCompletions = { ...prevCompletions, [mosaicId]: newMosaicProgress };
             const newProgress = { ...progress, mosaicCompletions: newCompletions };
             setProgress(newProgress);
@@ -9004,7 +9001,7 @@ export default function Pattrn() {
             saveTimes(newTimes);
           }
         } else {
-          const newDiffProgress = { ...diffProgress, [progressKey]: newAttempts };
+          const newDiffProgress = { ...diffProgress, [progressKey]: attempts };
           const newProgress = { ...progress, [difficulty]: newDiffProgress };
           setProgress(newProgress);
           saveProgress(newProgress);
@@ -9018,7 +9015,7 @@ export default function Pattrn() {
           if (firebaseUser && progressKey != null) {
             const compKey = isDaily && currentDailyDate ? currentDailyDate : String(progressKey);
             savePuzzleCompletion(firebaseUser.uid, difficulty, compKey, {
-              attempts: newAttempts,
+              attempts,
               time: finalTime,
               username: username || null,
             }).catch(() => {});
@@ -9034,7 +9031,9 @@ export default function Pattrn() {
           }
         }
       }
-      } else if (newAttempts >= maxAttempts) {
+    } else if (attempts + 1 >= maxAttempts) {
+      // Failed - increment attempts
+      setAttempts(attempts + 1);
       if (isCascade) {
         const levelsReached = cascadeLevel;
         const prevBest = (progress.cascade || {})[cascadeRunIndex] ?? 0;
@@ -9060,6 +9059,8 @@ export default function Pattrn() {
         showNewAchievements(newProgress, times);
       }
     } else {
+      // Wrong guess but still have attempts - increment
+      setAttempts(attempts + 1);
       setWrongCells(wrong);
       if (isBlind || isCoopMosaic) {
         setLockedCells(newLocked);
@@ -9120,10 +9121,6 @@ export default function Pattrn() {
         wrong.add(key);
       }
     }
-    // Shared attempt counter: increment and sync to Firebase for both players
-    const newAttempts = attempts + 1;
-    setAttempts(newAttempts);
-    updateCoopAttempts(coopSessionId, newAttempts).catch(() => {});
 
     if (allCorrect) {
       setCoopMyLockedIn(true);
@@ -9136,12 +9133,20 @@ export default function Pattrn() {
       await lockInCoopPlayer(coopSessionId, coopRole, true, firebaseUser?.uid);
       setShowParticles(true);
       setTimeout(() => setShowParticles(false), 1500);
-    } else if (newAttempts >= 5) {
-      // Failed all shared attempts — all players lose (subscription handles others)
+    } else if (attempts + 1 >= 5) {
+      // Failed all shared attempts — increment and sync to Firebase
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      updateCoopAttempts(coopSessionId, newAttempts).catch(() => {});
+      // All players lose (subscription handles others)
       setGameState("lost");
       setWrongCells(wrong);
       await lockInCoopPlayer(coopSessionId, coopRole, false, firebaseUser?.uid);
     } else {
+      // Wrong guess but still have attempts - increment and sync
+      const newAttempts = attempts + 1;
+      setAttempts(newAttempts);
+      updateCoopAttempts(coopSessionId, newAttempts).catch(() => {});
       // Show wrong cells, allow retry
       setWrongCells(wrong);
       if (wrongCellClearTimeoutRef.current) {
