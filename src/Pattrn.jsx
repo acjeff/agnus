@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Clock, Bell, PaintBucket, Eraser, Settings, Cake, Trash2, Edit3, Award, X, Copy } from "lucide-react";
+import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Handshake, Clock, Bell, PaintBucket, Eraser, Settings, Cake, Trash2, Edit3, Award, X, Copy } from "lucide-react";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -3042,6 +3042,7 @@ export default function Pattrn() {
   const coopPartnerLockToastTimer = useRef(null);
   const prevCoopPartnerLockedRef = useRef(false); // track partner lock state changes
   const coopGuestJoinedRef = useRef(false); // tracks whether guest has actually joined (prevents false kick detection)
+  const coopJoiningRef = useRef(false); // true while guest join is in-flight (prevents subscription from overriding status)
   const [coopCompletedBreakdown, setCoopCompletedBreakdown] = useState(null); // session object to show completed breakdown modal
 
   // --- Local mosaic navigate modal ---
@@ -3068,6 +3069,7 @@ export default function Pattrn() {
   const coopMosaicWriteThrottleRef = useRef({});
   const coopMosaicCurrentTileRef = useRef(null); // tracks which tile index the local player is in (-1 for overview)
   const coopMosaicJoinedRef = useRef(false); // tracks whether we've actually joined (prevents false kick detection)
+  const coopMosaicJoiningRef = useRef(false); // true while mosaic guest join is in-flight
   const coopMosaicPrevSolvedRef = useRef(new Set()); // tracks tiles already seen as solved to detect partner completions
   const isCoopMosaic = !!coopMosaicSessionId;
   const [coopMosaicInvitedUids, setCoopMosaicInvitedUids] = useState(new Set()); // UIDs invited to coop mosaic session
@@ -4345,6 +4347,7 @@ export default function Pattrn() {
       setCoopMosaicSessionId(coopMosaicParam);
       setCoopMosaicRole("guest");
       setCoopMosaicStatus("joining");
+      coopMosaicJoiningRef.current = true;
       return;
     }
 
@@ -4357,6 +4360,7 @@ export default function Pattrn() {
       setCoopSessionId(coopParam);
       setCoopRole("guest");
       setCoopStatus("joining");
+      coopJoiningRef.current = true;
       setFills({});
       setAttempts(0);
       setElapsedTime(0);
@@ -4616,14 +4620,44 @@ export default function Pattrn() {
     gallery: (c) => <LayoutGrid size={18} color={c} strokeWidth={2} />,
     trophy: (c) => <Trophy size={18} color={c} strokeWidth={2} />,
     globe: (c) => <Globe size={18} color={c} strokeWidth={2} />,
-    folder: (c) => <FolderOpen size={18} color={c} strokeWidth={2} />,
-    plus: (c) => <Plus size={18} color={c} strokeWidth={2} />,
-    users: (c) => {
-      const hasActiveSessions = activeCoopSessions.filter(s => s.status !== "complete").length > 0;
+    friends: (c) => {
       return (
         <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
           <Users size={18} color={c} strokeWidth={2} />
-          {hasActiveSessions && (
+          {onlineFriendsCount > 0 && (
+            <span style={{
+              position: "absolute",
+              top: -6,
+              right: -8,
+              minWidth: 16,
+              height: 16,
+              borderRadius: 8,
+              backgroundColor: "#22C55E",
+              color: "#fff",
+              fontSize: 9,
+              fontWeight: 700,
+              fontFamily: "'Inter', sans-serif",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              padding: "0 4px",
+              boxShadow: "0 0 8px rgba(34, 197, 94, 0.6)",
+            }}>
+              {onlineFriendsCount > 99 ? "99+" : onlineFriendsCount}
+            </span>
+          )}
+        </span>
+      );
+    },
+    folder: (c) => <FolderOpen size={18} color={c} strokeWidth={2} />,
+    plus: (c) => <Plus size={18} color={c} strokeWidth={2} />,
+    users: (c) => <Users size={18} color={c} strokeWidth={2} />,
+    handshake: (c) => {
+      const activeCount = activeCoopSessions.filter(s => s.status !== "complete").length;
+      return (
+        <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+          <Handshake size={18} color={c} strokeWidth={2} />
+          {activeCount > 0 && (
             <span style={{
               position: "absolute",
               top: -6,
@@ -4642,7 +4676,7 @@ export default function Pattrn() {
               padding: "0 4px",
               boxShadow: "0 0 8px rgba(168, 85, 247, 0.6)",
             }}>
-              {activeCoopSessions.filter(s => s.status !== "complete").length > 99 ? "99+" : activeCoopSessions.filter(s => s.status !== "complete").length}
+              {activeCount > 99 ? "99+" : activeCount}
             </span>
           )}
         </span>
@@ -4767,7 +4801,7 @@ export default function Pattrn() {
   // Co-op submenu — global co-op menu
   const coopSubMenu = [
     { id: "coop-create", icon: "play", label: "Create Session", sub: "coop-create" },
-    { id: "coop-active", icon: "users", label: "Active Sessions", sub: "coop-active" },
+    { id: "coop-active", icon: "handshake", label: "Active Sessions", sub: "coop-active" },
     { id: "coop-completed", icon: "check", label: "Completed", sub: "coop-completed" },
     { id: "coop-friends", icon: "users", label: "Friends", sub: "friends-view" },
   ];
@@ -4864,7 +4898,7 @@ export default function Pattrn() {
       const items = [...viewSpecificItems];
       // Add Co-op as a permanent item if signed in
       if (firebaseConfigured && firebaseUser) {
-        items.push({ id: "nav-coop-menu", icon: "users", label: "Co-op", sub: "coop" });
+        items.push({ id: "nav-coop-menu", icon: "handshake", label: "Co-op", sub: "coop" });
       }
       // Add Profile as a permanent item if signed in
       if (firebaseConfigured && firebaseUser) {
@@ -6604,6 +6638,7 @@ export default function Pattrn() {
                                     setCoopSessionId(session.id);
                                     setCoopRole("guest");
                                     setCoopStatus("joining");
+                                    coopJoiningRef.current = true;
                                     setFills({});
                                     setAttempts(0);
                                     setGameState("playing");
@@ -6632,6 +6667,7 @@ export default function Pattrn() {
                                   setCoopMosaicSessionId(notif.data.sessionId);
                                   setCoopMosaicRole("guest");
                                   setCoopMosaicStatus("joining");
+                                  coopMosaicJoiningRef.current = true;
                                   dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
                                   setMenuOpen(false);
                                 }}
@@ -7924,6 +7960,7 @@ export default function Pattrn() {
     coopHostTimerStartRef.current = null;
     prevCoopPartnerLockedRef.current = false;
     coopGuestJoinedRef.current = false;
+    coopJoiningRef.current = false;
   }, [coopSessionId, firebaseUser]);
 
   // Close coop session permanently (owner only)
@@ -8054,7 +8091,8 @@ export default function Pattrn() {
       setCoopPlayers(otherPlayers);
       const otherPlayerCount = Object.keys(otherPlayers).length;
       setCoopPartnerConnected(otherPlayerCount > 0);
-      setCoopStatus(data.status);
+      // Don't override status while guest join is in-flight — the join effect manages the transition
+      if (!coopJoiningRef.current) setCoopStatus(data.status);
 
       // Build per-player color map (deterministic: sorted other UIDs → neon colors)
       const sortedOtherUids = Object.keys(otherPlayers).sort();
@@ -8212,34 +8250,48 @@ export default function Pattrn() {
   useEffect(() => {
     if (coopRole !== "guest" || coopStatus !== "joining" || !firebaseUser || !coopSessionId) return;
     let cancelled = false;
+    coopJoiningRef.current = true;
     (async () => {
-      const session = await joinCoopSession(coopSessionId, firebaseUser.uid, username);
-      if (cancelled || !session) {
+      try {
+        const session = await joinCoopSession(coopSessionId, firebaseUser.uid, username);
+        if (cancelled || !session) {
+          if (!cancelled) {
+            // Session doesn't exist or is full — clean URL param
+            clearCoopUrlParam("coop");
+            setCoopSessionId(null);
+            setCoopRole(null);
+            setCoopStatus(null);
+            setView("menu");
+          }
+          return;
+        }
+        // Set the puzzle info from the session
+        const mode = session.mode;
+        const level = session.level;
+        if (mode) setDifficulty(mode);
+        if (level != null) setCurrentPuzzle(level);
+        if (session.dailyDate) setCurrentDailyDate(session.dailyDate);
+
+        // Detect correct role — on page refresh the init code always sets "guest",
+        // but if this user is actually the host we need to correct that
+        if (session.hostUid === firebaseUser.uid) {
+          setCoopRole("host");
+        }
+        setCoopStatus("playing");
+      } catch (e) {
+        console.error("Failed to join coop session:", e);
         if (!cancelled) {
-          // Session doesn't exist or is full — clean URL param
           clearCoopUrlParam("coop");
           setCoopSessionId(null);
           setCoopRole(null);
           setCoopStatus(null);
           setView("menu");
         }
-        return;
+      } finally {
+        coopJoiningRef.current = false;
       }
-      // Set the puzzle info from the session
-      const mode = session.mode;
-      const level = session.level;
-      if (mode) setDifficulty(mode);
-      if (level != null) setCurrentPuzzle(level);
-      if (session.dailyDate) setCurrentDailyDate(session.dailyDate);
-
-      // Detect correct role — on page refresh the init code always sets "guest",
-      // but if this user is actually the host we need to correct that
-      if (session.hostUid === firebaseUser.uid) {
-        setCoopRole("host");
-      }
-      setCoopStatus("playing");
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; coopJoiningRef.current = false; };
   }, [coopRole, coopStatus, firebaseUser, coopSessionId]);
 
   // Once player has joined/rejoined and puzzle is loaded, split blanks among N players
@@ -8425,6 +8477,7 @@ export default function Pattrn() {
     coopMosaicWriteThrottleRef.current = {};
     coopMosaicCurrentTileRef.current = null;
     coopMosaicJoinedRef.current = false;
+    coopMosaicJoiningRef.current = false;
     coopMosaicPrevSolvedRef.current = new Set();
   }, [coopMosaicSessionId, firebaseUser, coopMosaicRole]);
 
@@ -8533,7 +8586,8 @@ export default function Pattrn() {
         }
       }
       setCoopMosaicPlayers(otherPlayers);
-      setCoopMosaicStatus(data.status);
+      // Don't override status while mosaic guest join is in-flight
+      if (!coopMosaicJoiningRef.current) setCoopMosaicStatus(data.status);
 
       // Sync invited UIDs
       const mosaicInvited = data.invitedUids || {};
@@ -8683,74 +8737,88 @@ export default function Pattrn() {
   useEffect(() => {
     if (coopMosaicRole !== "guest" || coopMosaicStatus !== "joining" || !firebaseUser || !coopMosaicSessionId) return;
     let cancelled = false;
+    coopMosaicJoiningRef.current = true;
     (async () => {
-      const session = await joinCoopMosaicSession(coopMosaicSessionId, firebaseUser.uid, username);
-      if (cancelled || !session) {
+      try {
+        const session = await joinCoopMosaicSession(coopMosaicSessionId, firebaseUser.uid, username);
+        if (cancelled || !session) {
+          if (!cancelled) {
+            // Session doesn't exist — clean URL param
+            clearCoopUrlParam("coopMosaic");
+            setCoopMosaicSessionId(null);
+            setCoopMosaicRole(null);
+            setCoopMosaicStatus(null);
+            setView("menu");
+          }
+          return;
+        }
+        // Normalize grid from Firebase (may have been stored as object with numeric keys)
+        const rawGrid = session.mosaicGrid;
+        const normalizeRow = (row) => {
+          if (Array.isArray(row)) return row;
+          const arr = [];
+          for (let i = 0; i < 25; i++) arr.push((row && row[i]) ?? null);
+          return arr;
+        };
+        const gridArr = Array.isArray(rawGrid) ? rawGrid : (() => {
+          const arr = [];
+          for (let i = 0; i < 25; i++) arr.push(rawGrid?.[i] ?? null);
+          return arr;
+        })();
+        const grid = gridArr.map(normalizeRow);
+        // Build mosaic puzzles from session grid
+        const puzzles = buildCustomMosaicPuzzles(grid);
+        customMosaicPuzzlesRef.current = puzzles;
+        // Resolve host username from players map
+        const players = session.players || {};
+        const hostPlayer = players[session.hostUid];
+        setCustomMosaicPlay({
+          id: session.mosaicId,
+          title: session.mosaicTitle,
+          grid: grid,
+          authorUsername: hostPlayer?.username || null,
+        });
+        // Build other players map
+        const otherPlayers = {};
+        for (const [uid, p] of Object.entries(players)) {
+          if (uid !== firebaseUser.uid) otherPlayers[uid] = { username: p.username || null, currentTile: p.currentTile ?? null };
+        }
+        // Restore shared progress
+        setCoopMosaicSharedProgress(session.tileProgress || {});
+        setCoopMosaicSharedTileTimes(session.tileTimes || {});
+        setCustomMosaicProgress(session.tileProgress || {});
+        // Detect correct role — on page refresh the init code always sets "guest",
+        // but if this user is actually the host we need to correct that
+        if (session.hostUid === firebaseUser.uid) {
+          setCoopMosaicRole("host");
+        }
+        setCoopMosaicStatus("playing");
+        setCoopMosaicPlayers(otherPlayers);
+        coopMosaicCurrentTileRef.current = -1;
+        coopMosaicJoinedRef.current = true;
+        coopMosaicWriteThrottleRef.current = {};
+        // Initialize prev-solved with tiles already solved in the session
+        const guestAlreadySolved = new Set();
+        for (const [k, v] of Object.entries(session.tileProgress || {})) {
+          if (v > 0) guestAlreadySolved.add(Number(k));
+        }
+        coopMosaicPrevSolvedRef.current = guestAlreadySolved;
+        customMosaicReturnViewRef.current = "menu";
+        setView("custom-mosaic");
+      } catch (e) {
+        console.error("Failed to join coop mosaic session:", e);
         if (!cancelled) {
-          // Session doesn't exist — clean URL param
           clearCoopUrlParam("coopMosaic");
           setCoopMosaicSessionId(null);
           setCoopMosaicRole(null);
           setCoopMosaicStatus(null);
           setView("menu");
         }
-        return;
+      } finally {
+        coopMosaicJoiningRef.current = false;
       }
-      // Normalize grid from Firebase (may have been stored as object with numeric keys)
-      const rawGrid = session.mosaicGrid;
-      const normalizeRow = (row) => {
-        if (Array.isArray(row)) return row;
-        const arr = [];
-        for (let i = 0; i < 25; i++) arr.push((row && row[i]) ?? null);
-        return arr;
-      };
-      const gridArr = Array.isArray(rawGrid) ? rawGrid : (() => {
-        const arr = [];
-        for (let i = 0; i < 25; i++) arr.push(rawGrid?.[i] ?? null);
-        return arr;
-      })();
-      const grid = gridArr.map(normalizeRow);
-      // Build mosaic puzzles from session grid
-      const puzzles = buildCustomMosaicPuzzles(grid);
-      customMosaicPuzzlesRef.current = puzzles;
-      // Resolve host username from players map
-      const players = session.players || {};
-      const hostPlayer = players[session.hostUid];
-      setCustomMosaicPlay({
-        id: session.mosaicId,
-        title: session.mosaicTitle,
-        grid: grid,
-        authorUsername: hostPlayer?.username || null,
-      });
-      // Build other players map
-      const otherPlayers = {};
-      for (const [uid, p] of Object.entries(players)) {
-        if (uid !== firebaseUser.uid) otherPlayers[uid] = { username: p.username || null, currentTile: p.currentTile ?? null };
-      }
-      // Restore shared progress
-      setCoopMosaicSharedProgress(session.tileProgress || {});
-      setCoopMosaicSharedTileTimes(session.tileTimes || {});
-      setCustomMosaicProgress(session.tileProgress || {});
-      // Detect correct role — on page refresh the init code always sets "guest",
-      // but if this user is actually the host we need to correct that
-      if (session.hostUid === firebaseUser.uid) {
-        setCoopMosaicRole("host");
-      }
-      setCoopMosaicStatus("playing");
-      setCoopMosaicPlayers(otherPlayers);
-      coopMosaicCurrentTileRef.current = -1;
-      coopMosaicJoinedRef.current = true;
-      coopMosaicWriteThrottleRef.current = {};
-      // Initialize prev-solved with tiles already solved in the session
-      const guestAlreadySolved = new Set();
-      for (const [k, v] of Object.entries(session.tileProgress || {})) {
-        if (v > 0) guestAlreadySolved.add(Number(k));
-      }
-      coopMosaicPrevSolvedRef.current = guestAlreadySolved;
-      customMosaicReturnViewRef.current = "menu";
-      setView("custom-mosaic");
     })();
-    return () => { cancelled = true; };
+    return () => { cancelled = true; coopMosaicJoiningRef.current = false; };
   }, [coopMosaicRole, coopMosaicStatus, firebaseUser, coopMosaicSessionId, username, buildCustomMosaicPuzzles]);
 
   // Sync my fills to Firebase in coop mosaic mode when they change
@@ -9372,6 +9440,7 @@ export default function Pattrn() {
                   setCoopMosaicSessionId(coopInviteToast.data.sessionId);
                   setCoopMosaicRole("guest");
                   setCoopMosaicStatus("joining");
+                  coopMosaicJoiningRef.current = true;
                 } else {
                   const session = await loadCoopSession(coopInviteToast.data.sessionId);
                   if (session && session.status !== "complete") {
@@ -9381,6 +9450,7 @@ export default function Pattrn() {
                     setCoopSessionId(session.id);
                     setCoopRole("guest");
                     setCoopStatus("joining");
+                    coopJoiningRef.current = true;
                     setFills({});
                     setAttempts(0);
                     setGameState("playing");
@@ -12464,6 +12534,7 @@ export default function Pattrn() {
                             setCoopSessionId(session.id);
                             setCoopRole("guest");
                             setCoopStatus("joining");
+                            coopJoiningRef.current = true;
                             setFills({});
                             setAttempts(0);
                             setGameState("playing");
@@ -12492,6 +12563,7 @@ export default function Pattrn() {
                           setCoopMosaicSessionId(notif.data.sessionId);
                           setCoopMosaicRole("guest");
                           setCoopMosaicStatus("joining");
+                          coopMosaicJoiningRef.current = true;
                           dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
                           setShowNotifications(false);
                         }}
@@ -13222,7 +13294,21 @@ export default function Pattrn() {
         </div>
       )}
 
-      {renderContextButton("menu")}
+      {(() => {
+        const menuPillButtons = [];
+        if (firebaseConfigured && firebaseUser) {
+          if (notifications.length > 0) {
+            menuPillButtons.push({ id: "notifications", icon: "bell", color: "#54A0FF", onClick: () => { setRadialMenuStack(["root", "notifications-view"]); } });
+          }
+          if (activeCoopSessions.filter(s => s.status !== "complete").length > 0) {
+            menuPillButtons.push({ id: "coop-active", icon: "handshake", color: "#A855F7", onClick: () => { loadActiveCoopSessions(); setRadialMenuStack(["root", "coop", "coop-active"]); } });
+          }
+          if (onlineFriendsCount > 0) {
+            menuPillButtons.push({ id: "friends-online", icon: "friends", color: "#22C55E", onClick: () => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); } });
+          }
+        }
+        return renderContextButton("menu", menuPillButtons);
+      })()}
       {globalModalsEl}
       </div>
     );
