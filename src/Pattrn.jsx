@@ -2979,6 +2979,8 @@ export default function Pattrn() {
   const [coopReactionTab, setCoopReactionTab] = useState("emoji"); // "emoji" | "pattern" | "text"
   const [coopFloatingReactions, setCoopFloatingReactions] = useState([]); // floating reaction animations: [{ id, emoji, fromName, fromColor, x, type }]
   const coopSeenReactionsRef = useRef(new Set()); // track already-seen reaction keys to detect new ones
+  const coopReactionSwipeRef = useRef(null); // ref to the swipeable tab container
+  const coopReactionDragRef = useRef({ active: false, startX: 0, currentX: 0, tabIndex: 0 }); // swipe drag state
   const COOP_REACTIONS_EMOJI = [
     "\u{1F44D}", "\u{1F44E}", "\u2764\uFE0F", "\u{1F525}",
     "\u{1F602}", "\u{1F62E}", "\u{1F914}", "\u{1F44F}",
@@ -5085,11 +5087,11 @@ export default function Pattrn() {
     const suggestTokenCount = showSuggestTokenPick ? (puzzle?.usedTokens?.length || 0) : 0;
     const reactionPickerHeight = (() => {
       if (!showReactionPicker) return 0;
-      const tabBarH = 30;
+      const tabBarH = 32;
       const items = coopReactionTab === "emoji" ? COOP_REACTIONS_EMOJI.length : coopReactionTab === "pattern" ? COOP_REACTIONS_PATTERN.length : COOP_REACTIONS_TEXT.length;
-      const cols = coopReactionTab === "text" ? 4 : 8;
-      const rowH = coopReactionTab === "text" ? 30 : 36;
-      return tabBarH + 6 + Math.ceil(items / cols) * rowH;
+      const cols = coopReactionTab === "text" ? 4 : 6;
+      const rowH = coopReactionTab === "text" ? 34 : 44;
+      return tabBarH + 8 + Math.ceil(items / cols) * rowH;
     })();
     const passRowHeight = (showPassPlayerPicker || showSuggestPlayerPicker) ? (passPlayerCount > 2 ? 88 : 56) : showSuggestTokenPick ? Math.max(56, 36 + Math.ceil(suggestTokenCount / 6) * 36) : showReactionPicker ? reactionPickerHeight : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
@@ -7194,8 +7196,45 @@ export default function Pattrn() {
                   </div>
                 </div>
               )}
-              {/* Reaction picker with tabs: Emoji / Pattern / Text */}
-              {showReactionPicker && (
+              {/* Reaction picker with swipeable tabs: Emoji / Pattern / Text */}
+              {showReactionPicker && (() => {
+                const REACTION_TABS = ["emoji", "pattern", "text"];
+                const tabIndex = REACTION_TABS.indexOf(coopReactionTab);
+                const sendReaction = (content, type) => {
+                  if (coopSessionId && firebaseUser) {
+                    sendCoopReaction(coopSessionId, firebaseUser.uid, content, username || "Player", type).catch(() => {});
+                    addFloatingReaction(content, "You", COOP_MY_COLOR, type);
+                  }
+                };
+                const handleSwipeStart = (clientX) => {
+                  coopReactionDragRef.current = { active: true, startX: clientX, currentX: 0, tabIndex };
+                  if (coopReactionSwipeRef.current) coopReactionSwipeRef.current.style.transition = "none";
+                };
+                const handleSwipeMove = (clientX) => {
+                  if (!coopReactionDragRef.current.active) return;
+                  const dx = clientX - coopReactionDragRef.current.startX;
+                  coopReactionDragRef.current.currentX = dx;
+                  if (coopReactionSwipeRef.current) {
+                    const base = -coopReactionDragRef.current.tabIndex * 100;
+                    const pct = (dx / (coopReactionSwipeRef.current.parentElement?.offsetWidth || 300)) * 100;
+                    coopReactionSwipeRef.current.style.transform = `translateX(${base + pct}%)`;
+                  }
+                };
+                const handleSwipeEnd = () => {
+                  if (!coopReactionDragRef.current.active) return;
+                  coopReactionDragRef.current.active = false;
+                  const dx = coopReactionDragRef.current.currentX;
+                  const threshold = 50;
+                  let newIdx = coopReactionDragRef.current.tabIndex;
+                  if (dx < -threshold && newIdx < REACTION_TABS.length - 1) newIdx++;
+                  else if (dx > threshold && newIdx > 0) newIdx--;
+                  setCoopReactionTab(REACTION_TABS[newIdx]);
+                  if (coopReactionSwipeRef.current) {
+                    coopReactionSwipeRef.current.style.transition = "transform 0.25s cubic-bezier(0.4,0,0.2,1)";
+                    coopReactionSwipeRef.current.style.transform = `translateX(${-newIdx * 100}%)`;
+                  }
+                };
+                return (
                 <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
                   {/* Tab bar */}
                   <div style={{ display: "flex", alignItems: "center", gap: 0, width: "100%" }}>
@@ -7206,8 +7245,15 @@ export default function Pattrn() {
                     ].map(tab => {
                       const active = coopReactionTab === tab.id;
                       return (
-                        <button key={tab.id} onClick={(e) => { e.stopPropagation(); setCoopReactionTab(tab.id); }} style={{
-                          flex: 1, padding: "4px 0", fontSize: 10, fontWeight: 700,
+                        <button key={tab.id} onClick={(e) => {
+                          e.stopPropagation();
+                          setCoopReactionTab(tab.id);
+                          if (coopReactionSwipeRef.current) {
+                            coopReactionSwipeRef.current.style.transition = "transform 0.25s cubic-bezier(0.4,0,0.2,1)";
+                            coopReactionSwipeRef.current.style.transform = `translateX(${-REACTION_TABS.indexOf(tab.id) * 100}%)`;
+                          }
+                        }} style={{
+                          flex: 1, padding: "5px 0", fontSize: 10, fontWeight: 700,
                           fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 0.8,
                           background: active ? "rgba(255,255,255,0.1)" : "none",
                           border: "none", borderBottom: active ? "2px solid #FFD700" : "2px solid transparent",
@@ -7218,79 +7264,67 @@ export default function Pattrn() {
                     })}
                     <button onClick={(e) => { e.stopPropagation(); setCoopReactionPickerOpen(false); }} style={{
                       background: "none", border: "none", borderBottom: "2px solid transparent",
-                      color: C.textDim, cursor: "pointer", fontSize: 14, padding: "4px 8px", lineHeight: 1,
+                      color: C.textDim, cursor: "pointer", fontSize: 14, padding: "5px 8px", lineHeight: 1,
                     }}>{"\u2715"}</button>
                   </div>
-                  {/* Emoji grid */}
-                  {coopReactionTab === "emoji" && (
-                    <div style={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
-                      {COOP_REACTIONS_EMOJI.map((emoji) => (
-                        <button key={emoji} onClick={(e) => {
-                          e.stopPropagation();
-                          if (coopSessionId && firebaseUser) {
-                            sendCoopReaction(coopSessionId, firebaseUser.uid, emoji, username || "Player", "emoji").catch(() => {});
-                            addFloatingReaction(emoji, "You", COOP_MY_COLOR, "emoji");
-                          }
-                          setCoopReactionPickerOpen(false);
-                        }} style={{
-                          fontSize: 20, background: "none", border: "none",
-                          cursor: "pointer", padding: "4px 5px", borderRadius: 8,
-                          transition: "transform 0.15s, background-color 0.15s", lineHeight: 1,
-                        }}
-                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.3)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
-                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                        >{emoji}</button>
-                      ))}
+                  {/* Swipeable content area */}
+                  <div style={{ overflow: "hidden", width: "100%", touchAction: "pan-y" }}
+                    onTouchStart={(e) => handleSwipeStart(e.touches[0].clientX)}
+                    onTouchMove={(e) => handleSwipeMove(e.touches[0].clientX)}
+                    onTouchEnd={handleSwipeEnd}
+                    onMouseDown={(e) => { e.preventDefault(); handleSwipeStart(e.clientX); const onMove = (ev) => handleSwipeMove(ev.clientX); const onUp = () => { handleSwipeEnd(); window.removeEventListener("mousemove", onMove); window.removeEventListener("mouseup", onUp); }; window.addEventListener("mousemove", onMove); window.addEventListener("mouseup", onUp); }}
+                  >
+                    <div ref={coopReactionSwipeRef} style={{
+                      display: "flex", width: "300%",
+                      transform: `translateX(${-tabIndex * 100}%)`,
+                      transition: "transform 0.25s cubic-bezier(0.4,0,0.2,1)",
+                    }}>
+                      {/* Emoji panel */}
+                      <div style={{ width: "33.333%", display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap", padding: "0 2px" }}>
+                        {COOP_REACTIONS_EMOJI.map((emoji) => (
+                          <button key={emoji} onClick={(e) => { e.stopPropagation(); sendReaction(emoji, "emoji"); }} style={{
+                            fontSize: 26, background: "none", border: "none",
+                            cursor: "pointer", padding: "5px 6px", borderRadius: 10,
+                            transition: "transform 0.15s, background-color 0.15s", lineHeight: 1,
+                          }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.25)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                          >{emoji}</button>
+                        ))}
+                      </div>
+                      {/* Pattern panel */}
+                      <div style={{ width: "33.333%", display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap", padding: "0 2px" }}>
+                        {COOP_REACTIONS_PATTERN.map((sym) => (
+                          <button key={sym} onClick={(e) => { e.stopPropagation(); sendReaction(sym, "pattern"); }} style={{
+                            fontSize: 24, background: "none", border: "none",
+                            cursor: "pointer", padding: "5px 8px", borderRadius: 10,
+                            color: C.text, transition: "transform 0.15s, background-color 0.15s", lineHeight: 1,
+                          }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.25)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                          >{sym}</button>
+                        ))}
+                      </div>
+                      {/* Text panel — Elden Ring style single words */}
+                      <div style={{ width: "33.333%", display: "flex", gap: 5, justifyContent: "center", flexWrap: "wrap", alignContent: "flex-start", padding: "0 2px" }}>
+                        {COOP_REACTIONS_TEXT.map((word) => (
+                          <button key={word} onClick={(e) => { e.stopPropagation(); sendReaction(word, "text"); }} style={{
+                            fontSize: 12, fontWeight: 600, fontFamily: "'Inter', sans-serif",
+                            background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+                            cursor: "pointer", padding: "6px 10px", borderRadius: 8,
+                            color: C.text, transition: "transform 0.15s, background-color 0.15s, border-color 0.15s",
+                            letterSpacing: 0.3, lineHeight: 1.2,
+                          }}
+                            onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "#FFD700"; }}
+                            onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = C.border; }}
+                          >{word}</button>
+                        ))}
+                      </div>
                     </div>
-                  )}
-                  {/* Pattern grid */}
-                  {coopReactionTab === "pattern" && (
-                    <div style={{ display: "flex", gap: 2, justifyContent: "center", flexWrap: "wrap" }}>
-                      {COOP_REACTIONS_PATTERN.map((sym) => (
-                        <button key={sym} onClick={(e) => {
-                          e.stopPropagation();
-                          if (coopSessionId && firebaseUser) {
-                            sendCoopReaction(coopSessionId, firebaseUser.uid, sym, username || "Player", "pattern").catch(() => {});
-                            addFloatingReaction(sym, "You", COOP_MY_COLOR, "pattern");
-                          }
-                          setCoopReactionPickerOpen(false);
-                        }} style={{
-                          fontSize: 18, background: "none", border: "none",
-                          cursor: "pointer", padding: "4px 6px", borderRadius: 8,
-                          color: C.text, transition: "transform 0.15s, background-color 0.15s", lineHeight: 1,
-                        }}
-                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.3)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
-                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                        >{sym}</button>
-                      ))}
-                    </div>
-                  )}
-                  {/* Text grid — Elden Ring style single words */}
-                  {coopReactionTab === "text" && (
-                    <div style={{ display: "flex", gap: 4, justifyContent: "center", flexWrap: "wrap" }}>
-                      {COOP_REACTIONS_TEXT.map((word) => (
-                        <button key={word} onClick={(e) => {
-                          e.stopPropagation();
-                          if (coopSessionId && firebaseUser) {
-                            sendCoopReaction(coopSessionId, firebaseUser.uid, word, username || "Player", "text").catch(() => {});
-                            addFloatingReaction(word, "You", COOP_MY_COLOR, "text");
-                          }
-                          setCoopReactionPickerOpen(false);
-                        }} style={{
-                          fontSize: 10, fontWeight: 600, fontFamily: "'Inter', sans-serif",
-                          background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
-                          cursor: "pointer", padding: "4px 8px", borderRadius: 6,
-                          color: C.text, transition: "transform 0.15s, background-color 0.15s, border-color 0.15s",
-                          letterSpacing: 0.3, lineHeight: 1.2,
-                        }}
-                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "#FFD700"; }}
-                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = C.border; }}
-                        >{word}</button>
-                      ))}
-                    </div>
-                  )}
+                  </div>
                 </div>
-              )}
+                );
+              })()}
             </div>
           )}
 
