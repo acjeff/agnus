@@ -11247,7 +11247,7 @@ export default function Pattrn() {
           </div>
         )}
         {renderContextButton("custom-mosaic", [
-          ...(firebaseConfigured && firebaseUser && onlineFriendsCount > 0 ? [{ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => setFriendReactionPickerOpen(prev => !prev) }] : []),
+          ...(firebaseConfigured && firebaseUser && onlineFriendsCount > 0 ? [{ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => { setRadialMenuStack([]); setFriendReactionPickerOpen(prev => !prev); } }] : []),
         ])}
         {globalModalsEl}
       </div>
@@ -11872,7 +11872,7 @@ export default function Pattrn() {
 
       {renderContextButton("gallery", [
         { id: "create", icon: "plus", color: C.accent, onClick: () => setView("creator") },
-        ...(firebaseConfigured && firebaseUser && onlineFriendsCount > 0 ? [{ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => setFriendReactionPickerOpen(prev => !prev) }] : []),
+        ...(firebaseConfigured && firebaseUser && onlineFriendsCount > 0 ? [{ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => { setRadialMenuStack([]); setFriendReactionPickerOpen(prev => !prev); } }] : []),
       ])}
       {globalModalsEl}
       </div>
@@ -14468,7 +14468,7 @@ export default function Pattrn() {
           }
           if (onlineFriendsCount > 0) {
             menuPillButtons.push({ id: "friends-online", icon: "friends", color: "#22C55E", onClick: () => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); } });
-            menuPillButtons.push({ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => setFriendReactionPickerOpen(prev => !prev) });
+            menuPillButtons.push({ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => { setRadialMenuStack([]); setFriendReactionPickerOpen(prev => !prev); } });
           }
         }
         return renderContextButton("menu", menuPillButtons);
@@ -14562,6 +14562,7 @@ export default function Pattrn() {
     // Friend reaction button — send reactions to online friends from any play mode
     if (firebaseConfigured && firebaseUser && onlineFriendsCount > 0) {
       playPillButtons.push({ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
+        setRadialMenuStack([]);
         setFriendReactionPickerOpen(prev => !prev);
         setCoopPassMode(null); setCoopPassPlayerPicker(false);
         setCoopSuggestMode(null); setCoopSuggestPlayerPicker(false); setCoopSuggestCell(null);
