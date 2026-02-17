@@ -8812,6 +8812,46 @@ export default function Pattrn() {
         });
       }
 
+      // Lock cells of other players who have locked in correctly
+      // so all players see their resolved cells as non-editable
+      if (coopMyBlanks && puzzle) {
+        const allUids = Object.keys(players).sort();
+        if (allUids.length >= 2) {
+          const blanksMap = splitBlanksForNPlayers(puzzle.blanks, allUids);
+          // Apply cell overrides (same logic as the blank-splitting useEffect)
+          const overrides = data.cellOverrides || {};
+          for (const [cellKey, toUid] of Object.entries(overrides)) {
+            if (!puzzle.blanks.has(cellKey)) continue;
+            if (!blanksMap[toUid]) continue;
+            for (const uid of allUids) {
+              if (blanksMap[uid]?.has(cellKey)) {
+                blanksMap[uid].delete(cellKey);
+                break;
+              }
+            }
+            blanksMap[toUid].add(cellKey);
+          }
+          // Collect cells from other players who have locked in correctly
+          const partnerLockedCells = new Set();
+          for (const [uid, pData] of Object.entries(players)) {
+            if (uid !== myUid && pData.lockedIn && pData.correct && blanksMap[uid]) {
+              for (const k of blanksMap[uid]) partnerLockedCells.add(k);
+            }
+          }
+          // Add partner's locked cells to the visual locked set
+          if (partnerLockedCells.size > 0) {
+            setLockedCells(prev => {
+              const next = new Set(prev);
+              let changed = false;
+              for (const k of partnerLockedCells) {
+                if (!prev.has(k)) { next.add(k); changed = true; }
+              }
+              return changed ? next : prev;
+            });
+          }
+        }
+      }
+
       // Sync fills from Firebase
       const remoteFills = data.fills || {};
       if (coopMyBlanks) {
