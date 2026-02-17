@@ -91,6 +91,8 @@ import {
   addCoopInvitedUid,
   addCoopMosaicInvitedUid,
   generateCoopMosaicSessionId,
+  sendFriendReaction,
+  subscribeToFriendReactions,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -3087,6 +3089,11 @@ export default function Pattrn() {
   // --- Confirmation for friend removal (stores uid of friend being removed) ---
   const [removeFriendConfirm, setRemoveFriendConfirm] = useState(null); // uid or null
 
+  // --- Friend Reactions state ---
+  const [friendReactionTarget, setFriendReactionTarget] = useState(null); // { uid, username } — friend currently selected for reaction picker
+  const [friendFloatingReactions, setFriendFloatingReactions] = useState([]); // floating reaction animations: [{ id, emoji, fromName, fromColor, x, type }]
+  const friendSeenReactionsRef = useRef(new Set()); // track already-seen friend reaction keys
+
   // --- Admin Metrics state ---
   const [adminMetrics, setAdminMetrics] = useState(null); // computed metrics object
   const [adminMetricsLoading, setAdminMetricsLoading] = useState(false);
@@ -3334,6 +3341,37 @@ export default function Pattrn() {
       unsub();
       notifUnsubRef.current = null;
     };
+  }, [firebaseUser, firebaseConfigured]);
+
+  // Subscribe to incoming friend reactions in real-time
+  useEffect(() => {
+    if (!firebaseUser || !firebaseConfigured) return;
+    friendSeenReactionsRef.current = new Set();
+    let initialLoad = true;
+    const unsub = subscribeToFriendReactions(firebaseUser.uid, (reactions) => {
+      const keys = Object.keys(reactions);
+      if (initialLoad) {
+        friendSeenReactionsRef.current = new Set(keys);
+        initialLoad = false;
+        return;
+      }
+      for (const key of keys) {
+        if (!friendSeenReactionsRef.current.has(key)) {
+          const r = reactions[key];
+          if (r.fromUid !== firebaseUser.uid) {
+            const id = Date.now() + Math.random();
+            const x = 10 + Math.random() * 80;
+            const color = COOP_NEON_COLORS[Math.abs(r.fromUid.charCodeAt(0)) % COOP_NEON_COLORS.length];
+            setFriendFloatingReactions(prev => [...prev, { id, emoji: r.emoji, fromName: r.fromUsername || "Friend", fromColor: color, x, type: r.type || "emoji" }]);
+            setTimeout(() => {
+              setFriendFloatingReactions(prev => prev.filter(fr => fr.id !== id));
+            }, 3500);
+          }
+        }
+      }
+      friendSeenReactionsRef.current = new Set(keys);
+    });
+    return () => unsub();
   }, [firebaseUser, firebaseConfigured]);
 
   // Load active coop sessions (one-shot, used by callbacks)
@@ -6295,24 +6333,115 @@ export default function Pattrn() {
                                               border: "none", cursor: "pointer", textTransform: "uppercase",
                                             }}>Join</button>
                                           )}
-                                          <button
-                                            onClick={() => setRemoveFriendConfirm(friend.uid)}
-                                            title="Remove friend"
-                                            style={{
-                                              width: 24, height: 24, borderRadius: 6,
-                                              backgroundColor: "transparent",
-                                              border: `1px solid ${C.border}`,
-                                              color: C.textDim,
-                                              cursor: "pointer",
-                                              display: "flex", alignItems: "center", justifyContent: "center",
-                                              transition: "all 0.15s",
-                                              flexShrink: 0,
-                                            }}
-                                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; e.currentTarget.style.backgroundColor = C.incorrect + "11"; }}
-                                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; e.currentTarget.style.backgroundColor = "transparent"; }}
-                                          >
-                                            <X size={14} strokeWidth={2.5} />
-                                          </button>
+                                          <div style={{ display: "flex", gap: 4 }}>
+                                            {/* Send reaction button */}
+                                            {isOnline && (
+                                              <button
+                                                onClick={() => setFriendReactionTarget(prev => prev?.uid === friend.uid ? null : { uid: friend.uid, username: friend.username })}
+                                                title="Send reaction"
+                                                style={{
+                                                  width: 24, height: 24, borderRadius: 6,
+                                                  backgroundColor: friendReactionTarget?.uid === friend.uid ? "#FFD700" + "22" : "transparent",
+                                                  border: `1px solid ${friendReactionTarget?.uid === friend.uid ? "#FFD700" : C.border}`,
+                                                  color: friendReactionTarget?.uid === friend.uid ? "#FFD700" : C.textDim,
+                                                  cursor: "pointer",
+                                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                                  transition: "all 0.15s",
+                                                  flexShrink: 0,
+                                                }}
+                                                onMouseEnter={e => { if (friendReactionTarget?.uid !== friend.uid) { e.currentTarget.style.borderColor = "#FFD700"; e.currentTarget.style.color = "#FFD700"; e.currentTarget.style.backgroundColor = "#FFD700" + "11"; }}}
+                                                onMouseLeave={e => { if (friendReactionTarget?.uid !== friend.uid) { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; e.currentTarget.style.backgroundColor = "transparent"; }}}
+                                              >
+                                                <SmilePlus size={13} strokeWidth={2.5} />
+                                              </button>
+                                            )}
+                                            <button
+                                              onClick={() => setRemoveFriendConfirm(friend.uid)}
+                                              title="Remove friend"
+                                              style={{
+                                                width: 24, height: 24, borderRadius: 6,
+                                                backgroundColor: "transparent",
+                                                border: `1px solid ${C.border}`,
+                                                color: C.textDim,
+                                                cursor: "pointer",
+                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                transition: "all 0.15s",
+                                                flexShrink: 0,
+                                              }}
+                                              onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; e.currentTarget.style.backgroundColor = C.incorrect + "11"; }}
+                                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; e.currentTarget.style.backgroundColor = "transparent"; }}
+                                            >
+                                              <X size={14} strokeWidth={2.5} />
+                                            </button>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                    {/* Inline reaction picker for this friend */}
+                                    {friendReactionTarget?.uid === friend.uid && !showingConfirm && (
+                                      <div style={{
+                                        marginTop: 8, padding: "8px 6px", borderRadius: 10,
+                                        backgroundColor: C.bg + "cc", border: `1px solid ${C.border}`,
+                                        animation: "fadeUp 0.25s ease",
+                                      }}>
+                                        <div style={{
+                                          fontSize: 9, fontFamily: "'Inter', sans-serif", fontWeight: 600,
+                                          color: C.textDim, marginBottom: 6, textAlign: "center", letterSpacing: 0.5,
+                                          textTransform: "uppercase",
+                                        }}>
+                                          Send to {friend.username}
+                                        </div>
+                                        <div className="reaction-scroll-container" style={{
+                                          display: "flex", flexWrap: "wrap", gap: 3,
+                                          justifyContent: "center", alignContent: "flex-start",
+                                          overflowY: "auto", WebkitOverflowScrolling: "touch",
+                                          scrollbarWidth: "none", msOverflowStyle: "none",
+                                          maxHeight: 150, width: "100%", padding: "0 2px",
+                                          boxSizing: "border-box",
+                                        }}>
+                                          {COOP_REACTIONS.map((r) => (
+                                            r.type === "text" ? (
+                                              <button key={r.content} onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (firebaseUser) {
+                                                  sendFriendReaction(firebaseUser.uid, friend.uid, r.content, username || "Player", r.type).catch(() => {});
+                                                  // Show locally as confirmation
+                                                  const id = Date.now() + Math.random();
+                                                  const x = 10 + Math.random() * 80;
+                                                  setFriendFloatingReactions(prev => [...prev, { id, emoji: r.content, fromName: `You \u2192 ${friend.username}`, fromColor: COOP_MY_COLOR, x, type: r.type }]);
+                                                  setTimeout(() => setFriendFloatingReactions(prev => prev.filter(fr => fr.id !== id)), 3500);
+                                                }
+                                              }} style={{
+                                                fontSize: 11, fontWeight: 600, fontFamily: "'Inter', sans-serif",
+                                                background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+                                                cursor: "pointer", padding: "5px 9px", borderRadius: 7,
+                                                color: C.text, transition: "transform 0.12s, background-color 0.12s, border-color 0.12s",
+                                                letterSpacing: 0.3, lineHeight: 1.2,
+                                              }}
+                                                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "#FFD700"; }}
+                                                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = C.border; }}
+                                              >{r.content}</button>
+                                            ) : (
+                                              <button key={r.content} onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (firebaseUser) {
+                                                  sendFriendReaction(firebaseUser.uid, friend.uid, r.content, username || "Player", r.type).catch(() => {});
+                                                  const id = Date.now() + Math.random();
+                                                  const x = 10 + Math.random() * 80;
+                                                  setFriendFloatingReactions(prev => [...prev, { id, emoji: r.content, fromName: `You \u2192 ${friend.username}`, fromColor: COOP_MY_COLOR, x, type: r.type }]);
+                                                  setTimeout(() => setFriendFloatingReactions(prev => prev.filter(fr => fr.id !== id)), 3500);
+                                                }
+                                              }} style={{
+                                                fontSize: r.type === "emoji" ? 22 : 18, background: "none", border: "none",
+                                                cursor: "pointer", padding: "3px 4px", borderRadius: 8,
+                                                color: r.type === "pattern" ? C.text : undefined,
+                                                transition: "transform 0.12s, background-color 0.12s", lineHeight: 1,
+                                              }}
+                                                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.2)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
+                                                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                                              >{r.content}</button>
+                                            )
+                                          ))}
                                         </div>
                                       </div>
                                     )}
@@ -10617,6 +10746,47 @@ export default function Pattrn() {
     </div>
   );
 
+  // --- Floating friend reactions overlay (appears on any view) ---
+  const friendReactionsOverlayEl = friendFloatingReactions.length > 0 && (
+    <div style={{
+      position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9998,
+      overflow: "hidden",
+    }}>
+      {friendFloatingReactions.map(r => (
+        <div key={r.id} style={{
+          position: "absolute",
+          left: `${r.x}%`,
+          bottom: 60,
+          animation: "coopReactionFloat 3.5s ease-out forwards",
+          display: "flex", flexDirection: "column", alignItems: "center",
+          transform: "translateX(-50%)",
+        }}>
+          {r.type === "text" ? (
+            <span style={{
+              fontSize: 22, fontWeight: 800, fontFamily: "'Inter', sans-serif",
+              color: "#fff", lineHeight: 1,
+              textShadow: `0 0 14px ${r.fromColor}88, 0 2px 8px rgba(0,0,0,0.7)`,
+              letterSpacing: 1,
+            }}>{r.emoji}</span>
+          ) : r.type === "pattern" ? (
+            <span style={{
+              fontSize: 56, lineHeight: 1, color: r.fromColor,
+              filter: `drop-shadow(0 0 10px ${r.fromColor}88) drop-shadow(0 2px 6px rgba(0,0,0,0.5))`,
+            }}>{r.emoji}</span>
+          ) : (
+            <span style={{ fontSize: 48, lineHeight: 1, filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))" }}>{r.emoji}</span>
+          )}
+          <span style={{
+            fontSize: 10, fontWeight: 700, color: r.fromColor,
+            fontFamily: "'Inter', sans-serif",
+            textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+            whiteSpace: "nowrap", marginTop: 2,
+          }}>{r.fromName}</span>
+        </div>
+      ))}
+    </div>
+  );
+
   // --- Global modals element (included in every return) ---
   const globalModalsEl = (
     <>
@@ -10625,6 +10795,7 @@ export default function Pattrn() {
       {coopMosaicInviteEl}
       {coopInviteToastEl}
       {coopMosaicNavigateEl}
+      {friendReactionsOverlayEl}
     </>
   );
 
