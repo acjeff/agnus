@@ -8171,7 +8171,7 @@ export default function Pattrn() {
       return;
     }
     // Coop suggest mode: tapping a partner's cell selects it for token suggestion
-    if (coopSuggestMode && isCoop && coopMyBlanks && !coopMyBlanks.has(key) && !coopMyLockedIn && coopSessionId && firebaseUser) {
+    if (coopSuggestMode && isCoop && coopMyBlanks && !coopMyBlanks.has(key) && coopSessionId && firebaseUser) {
       // If this cell already has my suggestion, remove it
       const existingSug = coopAllSuggestions.find(s => s.cellKey === key && s.isMine);
       if (existingSug) {
@@ -8198,7 +8198,7 @@ export default function Pattrn() {
       return;
     }
     // Coop: tapping another player's blank cell auto-opens suggest for that cell
-    if (isCoop && coopMyBlanks && !coopMyBlanks.has(key) && !coopMyLockedIn && coopSessionId && firebaseUser) {
+    if (isCoop && coopMyBlanks && !coopMyBlanks.has(key) && coopSessionId && firebaseUser) {
       const ownerUid = coopCellOwnerMap[key];
       if (ownerUid && coopPlayers[ownerUid]) {
         const p = coopPlayers[ownerUid];
@@ -14117,7 +14117,7 @@ export default function Pattrn() {
       }
     }
     // Suggest button — suggest what a cell could be to another player
-    if (isCoop && !coopMyLockedIn && Object.keys(coopPlayers).length > 0) {
+    if (isCoop && Object.keys(coopPlayers).length > 0) {
       playPillButtons.push({ id: "suggest-cell", icon: "suggest", color: (coopSuggestMode || coopSuggestPlayerPicker || coopSuggestCell) ? "#E040FB" : "#fff", onClick: () => {
         if (coopSuggestMode) { setCoopSuggestMode(null); setCoopSuggestCell(null); return; }
         if (coopSuggestCell) { setCoopSuggestCell(null); return; }
