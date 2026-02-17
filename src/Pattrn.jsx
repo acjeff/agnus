@@ -5147,7 +5147,9 @@ export default function Pattrn() {
     const fabSize = 56;
     const hasPillButtons = pillButtons.length > 0;
     const closedWidth = hasPillButtons ? (pillButtons.length + 1) * fabSize : fabSize;
-    const panelWidth = isCustomPanel ? 300 : Math.max(200, closedWidth);
+    // Calculate panel width: when open, add space for close button (~50px) and back button if submenu (~70px)
+    const openExtraWidth = hasPillButtons ? (isSubMenu ? 120 : 50) : 0;
+    const panelWidth = isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth);
     const itemHeight = 44;
     const panelPad = 8;
     const dividerHeight = 13;
