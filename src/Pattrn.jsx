@@ -9600,6 +9600,7 @@ export default function Pattrn() {
           stopTimer();
         }
       } else {
+        setAttempts(attempts + 1);
         setGameState("won");
         stopTimer();
         const finalTime = timerStart.current ? Math.round((Date.now() - timerStart.current) / 1000) : elapsedTime;
