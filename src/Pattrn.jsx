@@ -10720,6 +10720,7 @@ export default function Pattrn() {
       position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9998,
       overflow: "hidden",
     }}>
+      <style>{`@keyframes coopReactionFloat { 0%{transform:translateY(0) scale(0.5);opacity:0} 8%{transform:translateY(-5vh) scale(1.1);opacity:1} 15%{transform:translateY(-10vh) scale(1)} 70%{opacity:1} 100%{transform:translateY(-85vh) scale(1.2);opacity:0} }`}</style>
       {friendFloatingReactions.map(r => (
         <div key={r.id} style={{
           position: "absolute",
