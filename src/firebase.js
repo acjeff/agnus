@@ -1365,13 +1365,21 @@ export async function loadAllPuzzleCompletionsForMode(mode) {
 
 // --- Coop Mosaic Mode (n-player) ---
 
-// Create a new coop mosaic session. Returns the session ID.
-export async function createCoopMosaicSession(uid, { mosaicId, mosaicTitle, mosaicGrid, hostTheme, hostUsername }) {
+// Pre-generate a coop mosaic session ID (synchronous) so the caller can
+// set isCoopMosaic = true *before* the async Firebase write completes.
+export function generateCoopMosaicSessionId() {
   if (!db) return null;
-  const sessionsRef = ref(db, "coopMosaicSessions");
-  const newRef = push(sessionsRef);
-  const id = newRef.key;
-  await set(newRef, {
+  return push(ref(db, "coopMosaicSessions")).key;
+}
+
+// Create a new coop mosaic session. Accepts an optional pre-generated
+// sessionId (from generateCoopMosaicSessionId) to avoid a race where the
+// host can interact with the mosaic grid before the session ID is set.
+export async function createCoopMosaicSession(uid, { mosaicId, mosaicTitle, mosaicGrid, hostTheme, hostUsername }, existingSessionId) {
+  if (!db) return null;
+  const id = existingSessionId || push(ref(db, "coopMosaicSessions")).key;
+  const sessionRef = ref(db, `coopMosaicSessions/${id}`);
+  await set(sessionRef, {
     id,
     hostUid: uid,
     mosaicId: mosaicId || null,

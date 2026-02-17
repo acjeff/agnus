@@ -90,6 +90,7 @@ import {
   sendCoopMosaicReaction,
   addCoopInvitedUid,
   addCoopMosaicInvitedUid,
+  generateCoopMosaicSessionId,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -3142,6 +3143,7 @@ export default function Pattrn() {
   const coopMosaicJoiningRef = useRef(false); // true while mosaic guest join is in-flight
   const coopMosaicPrevSolvedRef = useRef(new Set()); // tracks tiles already seen as solved to detect partner completions
   const coopMosaicSeenReactionsRef = useRef(new Set()); // tracks reaction keys already displayed
+  const coopMosaicCreatingRef = useRef(false); // true while createCoopMosaicSession is in-flight (guards subscription + tile solve)
   const isCoopMosaic = !!coopMosaicSessionId;
   const [coopMosaicInvitedUids, setCoopMosaicInvitedUids] = useState(new Set()); // UIDs invited to coop mosaic session
   // Derived: number of other connected players (currentTile != null means connected)
@@ -3594,6 +3596,7 @@ export default function Pattrn() {
       coopMosaicJoiningRef.current = false;
       coopMosaicPrevSolvedRef.current = new Set();
       coopMosaicSeenReactionsRef.current = new Set();
+      coopMosaicCreatingRef.current = false;
     }
     const puzzles = buildCustomMosaicPuzzles(mosaic.grid);
     customMosaicPuzzlesRef.current = puzzles;
@@ -9206,23 +9209,16 @@ export default function Pattrn() {
   const startCoopMosaicSession = useCallback(async ({ inviteFriendUids = [], mosaicOverride = null } = {}) => {
     const mosaic = mosaicOverride || customMosaicPlay;
     if (!firebaseUser || !mosaic) return;
-    // If mosaicOverride provided, set up the mosaic play state
-    if (mosaicOverride) {
-      const puzzles = buildCustomMosaicPuzzles(mosaicOverride.grid);
-      customMosaicPuzzlesRef.current = puzzles;
-      setCustomMosaicPlay(mosaicOverride);
-      setCustomMosaicProgress({});
-      setDifficulty("mosaic");
-      setView("custom-mosaic");
-    }
-    const sessionId = await createCoopMosaicSession(firebaseUser.uid, {
-      mosaicId: mosaic.id,
-      mosaicTitle: mosaic.title || "Untitled",
-      mosaicGrid: mosaic.grid,
-      hostTheme: activeThemeId,
-      hostUsername: username,
-    });
+
+    // Pre-generate the session ID synchronously so we can set
+    // coopMosaicSessionId (and thus isCoopMosaic) BEFORE the async
+    // Firebase write.  Without this, the user can interact with the
+    // mosaic grid while isCoopMosaic is still false, causing tile
+    // solves to save to personal progress instead of the coop session.
+    const sessionId = generateCoopMosaicSessionId();
     if (!sessionId) return;
+
+    // Set all coop state synchronously — isCoopMosaic becomes true immediately
     setCoopMosaicSessionId(sessionId);
     setCoopMosaicRole("host");
     setCoopMosaicStatus("waiting");
@@ -9234,8 +9230,22 @@ export default function Pattrn() {
     // (don't carry over the player's personal solo progress)
     setCustomMosaicProgress({});
     coopMosaicCurrentTileRef.current = -1;
-    coopMosaicJoinedRef.current = false;
+    coopMosaicJoinedRef.current = true;
     coopMosaicPrevSolvedRef.current = new Set();
+    coopMosaicCreatingRef.current = true;
+
+    // If mosaicOverride provided, set up the mosaic play state
+    if (mosaicOverride) {
+      const puzzles = buildCustomMosaicPuzzles(mosaicOverride.grid);
+      customMosaicPuzzlesRef.current = puzzles;
+      setCustomMosaicPlay(mosaicOverride);
+      setDifficulty("mosaic");
+      setView("custom-mosaic");
+    }
+
+    // Keep session ID in URL so page refresh rejoins the session
+    setCoopUrlParam("coopMosaic", sessionId);
+
     // Optimistically add the new session to activeCoopSessions so it appears
     // immediately on the menu, without waiting for async Firebase reads
     setActiveCoopSessions(prev => {
@@ -9258,9 +9268,29 @@ export default function Pattrn() {
         createdAt: Date.now(),
       }, ...prev];
     });
-    coopMosaicJoinedRef.current = true;
-    // Keep session ID in URL so page refresh rejoins the session
-    setCoopUrlParam("coopMosaic", sessionId);
+
+    // Write the session to Firebase (async) — the subscription may
+    // briefly see null data before this completes; the creating ref
+    // prevents the handler from tearing down the session.
+    try {
+      await createCoopMosaicSession(firebaseUser.uid, {
+        mosaicId: mosaic.id,
+        mosaicTitle: mosaic.title || "Untitled",
+        mosaicGrid: mosaic.grid,
+        hostTheme: activeThemeId,
+        hostUsername: username,
+      }, sessionId);
+    } catch (e) {
+      // If creation fails, tear down the coop state
+      coopMosaicCreatingRef.current = false;
+      setCoopMosaicSessionId(null);
+      setCoopMosaicRole(null);
+      setCoopMosaicStatus(null);
+      clearCoopUrlParam("coopMosaic");
+      return;
+    }
+    coopMosaicCreatingRef.current = false;
+
     // Ensure the session appears in the Active Co-op Sessions panel on the menu
     loadActiveCoopSessions();
     // If inviting friends, send notifications and track invited UIDs
@@ -9315,6 +9345,7 @@ export default function Pattrn() {
     coopMosaicJoiningRef.current = false;
     coopMosaicPrevSolvedRef.current = new Set();
     coopMosaicSeenReactionsRef.current = new Set();
+    coopMosaicCreatingRef.current = false;
   }, [coopMosaicSessionId, firebaseUser, coopMosaicRole]);
 
   // Rejoin an existing coop mosaic session from the active sessions panel
@@ -9395,6 +9426,9 @@ export default function Pattrn() {
 
     const unsub = subscribeToCoopMosaicSession(coopMosaicSessionId, (data) => {
       if (!data) {
+        // During session creation the Firebase write may not have completed
+        // yet, so the subscription briefly sees null.  Don't tear down.
+        if (coopMosaicCreatingRef.current) return;
         setRadialMenuStack([]);
         leaveCoopMosaicSession();
         return;
