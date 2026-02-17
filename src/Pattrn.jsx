@@ -8803,20 +8803,19 @@ export default function Pattrn() {
       const myPlayer = players[myUid];
       if (myPlayer?.lockedIn && myPlayer?.correct && coopMyBlanks) {
         setCoopMyLockedIn(true);
-        // Restore locked cells visually so my blanks are no longer editable
-        setLockedCells(prev => {
-          const next = new Set(prev);
-          let changed = false;
-          for (const k of coopMyBlanks) {
-            if (!prev.has(k)) { next.add(k); changed = true; }
-          }
-          return changed ? next : prev;
-        });
       }
 
-      // Lock cells of other players who have locked in correctly
-      // so all players see their resolved cells as non-editable
+      // Compute the correct set of locked cells from scratch based on current
+      // player data. This replaces (rather than adds to) the previous set so that
+      // stale locks are cleaned up — e.g., when coopMyBlanks was temporarily ALL
+      // blanks during rejoin before the partner list was populated.
       if (coopMyBlanks && puzzle) {
+        const correctLockedCells = new Set();
+        // My cells if I'm locked in correctly
+        if (myPlayer?.lockedIn && myPlayer?.correct) {
+          for (const k of coopMyBlanks) correctLockedCells.add(k);
+        }
+        // Other players' cells if they're locked in correctly
         const allUids = Object.keys(players).sort();
         if (allUids.length >= 2) {
           const blanksMap = splitBlanksForNPlayers(puzzle.blanks, allUids);
@@ -8833,25 +8832,17 @@ export default function Pattrn() {
             }
             blanksMap[toUid].add(cellKey);
           }
-          // Collect cells from other players who have locked in correctly
-          const partnerLockedCells = new Set();
           for (const [uid, pData] of Object.entries(players)) {
             if (uid !== myUid && pData.lockedIn && pData.correct && blanksMap[uid]) {
-              for (const k of blanksMap[uid]) partnerLockedCells.add(k);
+              for (const k of blanksMap[uid]) correctLockedCells.add(k);
             }
           }
-          // Add partner's locked cells to the visual locked set
-          if (partnerLockedCells.size > 0) {
-            setLockedCells(prev => {
-              const next = new Set(prev);
-              let changed = false;
-              for (const k of partnerLockedCells) {
-                if (!prev.has(k)) { next.add(k); changed = true; }
-              }
-              return changed ? next : prev;
-            });
-          }
         }
+        // Replace lockedCells with the correct set
+        setLockedCells(prev => {
+          if (prev.size === correctLockedCells.size && [...prev].every(k => correctLockedCells.has(k))) return prev;
+          return correctLockedCells;
+        });
       }
 
       // Sync fills from Firebase
