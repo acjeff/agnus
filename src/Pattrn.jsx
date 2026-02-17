@@ -9636,7 +9636,10 @@ export default function Pattrn() {
             saveTimes(newTimes);
           }
         } else {
-          const newDiffProgress = { ...diffProgress, [progressKey]: attempts };
+          // Store attempts + 1 so that first-try solves (attempts=0) are stored as 1,
+          // ensuring all >0 completion checks recognise the puzzle as solved (0 = failed).
+          const savedAttempts = attempts + 1;
+          const newDiffProgress = { ...diffProgress, [progressKey]: savedAttempts };
           const newProgress = { ...progress, [difficulty]: newDiffProgress };
           setProgress(newProgress);
           saveProgress(newProgress);
@@ -9650,7 +9653,7 @@ export default function Pattrn() {
           if (firebaseUser && progressKey != null) {
             const compKey = isDaily && currentDailyDate ? currentDailyDate : String(progressKey);
             savePuzzleCompletion(firebaseUser.uid, difficulty, compKey, {
-              attempts,
+              attempts: savedAttempts,
               time: finalTime,
               username: username || null,
             }).catch(() => {});
@@ -9829,7 +9832,7 @@ export default function Pattrn() {
     const finalTime = timerStart.current ? Math.round((Date.now() - timerStart.current) / 1000) : 0;
     const freshProgress = loadProgress();
     const coopProgress = freshProgress.coop || {};
-    const newCoopProgress = { ...coopProgress, [`${difficulty}_${progressKey}`]: attempts || 1 };
+    const newCoopProgress = { ...coopProgress, [`${difficulty}_${progressKey}`]: attempts + 1 };
     const newProgress = { ...freshProgress, coop: newCoopProgress };
     setProgress(newProgress);
     saveProgress(newProgress);
@@ -14775,7 +14778,7 @@ export default function Pattrn() {
             Puzzle Complete
           </div>
           <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.correct, animation: "fadeUp 0.5s 0.05s ease both" }}>
-            {isCoop ? "Co-op complete!" : isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : isSpin ? "Nailed it!" : isMosaic ? "Tile complete!" : (attempts === 1 ? "Perfect!" : attempts === 2 ? "Brilliant!" : attempts === 3 ? "Great!" : attempts === 4 ? "Not bad!" : "Solved!")}
+            {isCoop ? "Co-op complete!" : isCascade ? "Cascade complete!" : isBlind ? "Cracked it!" : isSpin ? "Nailed it!" : isMosaic ? "Tile complete!" : (attempts === 0 ? "Perfect!" : attempts === 1 ? "Brilliant!" : attempts === 2 ? "Great!" : attempts === 3 ? "Not bad!" : "Solved!")}
           </div>
           {isCoop && (
             <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 6, animation: "fadeUp 0.55s 0.1s ease both" }}>
