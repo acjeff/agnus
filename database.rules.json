@@ -15,6 +15,10 @@
         },
         "profilePicture": {
           ".read": "auth != null"
+        },
+        "emailNotifications": {
+          ".read": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid"
         }
       }
     },

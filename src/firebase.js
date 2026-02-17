@@ -11,6 +11,9 @@ import {
   EmailAuthProvider,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
+  sendEmailVerification,
+  applyActionCode,
+  checkActionCode,
 } from "firebase/auth";
 import {
   getDatabase,
@@ -69,6 +72,38 @@ export async function signUpWithEmail(email, password) {
   if (!auth) throw new Error("Firebase not configured");
   const cred = await createUserWithEmailAndPassword(auth, email, password);
   return cred.user;
+}
+
+export async function sendVerificationEmail(user) {
+  if (!auth) throw new Error("Firebase not configured");
+  if (!user) user = auth.currentUser;
+  if (!user) throw new Error("No authenticated user");
+
+  const actionCodeSettings = {
+    url: window.location.origin + '/?verified=true',
+    handleCodeInApp: true,
+  };
+
+  await sendEmailVerification(user, actionCodeSettings);
+}
+
+export async function verifyEmailCode(actionCode) {
+  if (!auth) throw new Error("Firebase not configured");
+  await applyActionCode(auth, actionCode);
+  // Reload the user to get updated emailVerified status
+  if (auth.currentUser) {
+    await auth.currentUser.reload();
+  }
+}
+
+export async function checkEmailActionCode(actionCode) {
+  if (!auth) throw new Error("Firebase not configured");
+  return await checkActionCode(auth, actionCode);
+}
+
+export function isEmailVerified() {
+  if (!auth || !auth.currentUser) return false;
+  return auth.currentUser.emailVerified;
 }
 
 export async function signInWithEmail(email, password) {
@@ -476,6 +511,28 @@ export async function saveUserEmail(uid, email) {
     update(ref(db, `users/${uid}`), { email }),
     set(ref(db, `emailIndex/${key}`), uid),
   ]);
+}
+
+// Email notification preferences
+export async function saveEmailNotificationPreferences(uid, preferences) {
+  if (!db) return;
+  await update(ref(db, `users/${uid}`), { emailNotifications: preferences });
+}
+
+export async function loadEmailNotificationPreferences(uid) {
+  if (!db) return null;
+  const snap = await get(ref(db, `users/${uid}/emailNotifications`));
+  if (!snap.exists()) {
+    // Default preferences: all enabled
+    return {
+      welcome: true,
+      achievements: true,
+      mosaicShared: true,
+      friendActivity: true,
+      digest: false,
+    };
+  }
+  return snap.val();
 }
 
 // --- Username & Profile ---

@@ -9,6 +9,12 @@ import {
   logOut,
   deleteAccount,
   reauthenticateUser,
+  sendVerificationEmail,
+  verifyEmailCode,
+  checkEmailActionCode,
+  isEmailVerified,
+  saveEmailNotificationPreferences,
+  loadEmailNotificationPreferences,
   loadCloudData,
   saveCloudData,
   mergeGameData,
@@ -2922,6 +2928,11 @@ export default function Pattrn() {
   // Sync choice prompt state (shown when both local + cloud data exist on login)
   const [syncChoiceData, setSyncChoiceData] = useState(null); // { uid, localData, cloudData, localSummary, cloudSummary }
 
+  // --- Email verification & notifications state ---
+  const [emailVerified, setEmailVerified] = useState(false);
+  const [emailNotificationPrefs, setEmailNotificationPrefs] = useState(null);
+  const [showVerificationReminder, setShowVerificationReminder] = useState(false);
+
   // --- Username & Profile state ---
   const [username, setUsername] = useState(null); // current user's username
   const [profilePicture, setProfilePicture] = useState(null); // base64 data URL
@@ -3168,7 +3179,49 @@ export default function Pattrn() {
     if (firebaseUser.email) {
       saveUserEmail(firebaseUser.uid, firebaseUser.email).catch(() => {});
     }
+    // Update email verification status
+    setEmailVerified(firebaseUser.emailVerified || false);
+    // Load email notification preferences
+    loadEmailNotificationPreferences(firebaseUser.uid).then(prefs => {
+      setEmailNotificationPrefs(prefs);
+    }).catch(() => {});
   }, [firebaseUser, firebaseConfigured]);
+
+  // Handle email verification action code from URL (when user clicks verification link)
+  useEffect(() => {
+    if (typeof window === "undefined" || !firebaseConfigured) return;
+    const params = new URLSearchParams(window.location.search);
+    const mode = params.get("mode");
+    const oobCode = params.get("oobCode");
+
+    if (mode === "verifyEmail" && oobCode) {
+      verifyEmailCode(oobCode)
+        .then(() => {
+          showToast("Email verified successfully!", 5000);
+          setEmailVerified(true);
+          // Clean up URL params
+          const newParams = new URLSearchParams(window.location.search);
+          newParams.delete("mode");
+          newParams.delete("oobCode");
+          const newUrl = newParams.toString() ? `${window.location.pathname}?${newParams}` : window.location.pathname;
+          window.history.replaceState({}, "", newUrl);
+        })
+        .catch((err) => {
+          console.error("Email verification failed:", err);
+          showToast("Email verification failed. The link may have expired.", 5000);
+        });
+    }
+  }, [firebaseConfigured]);
+
+  // Show verification reminder for unverified users (once per session)
+  useEffect(() => {
+    if (firebaseUser && !emailVerified && firebaseUser.email && !showVerificationReminder) {
+      const timer = setTimeout(() => {
+        setShowVerificationReminder(true);
+      }, 5000); // Show reminder 5 seconds after login
+      return () => clearTimeout(timer);
+    }
+  }, [firebaseUser, emailVerified, showVerificationReminder]);
 
   // Presence heartbeat: update online status every 60s while logged in
   useEffect(() => {
@@ -4013,6 +4066,16 @@ export default function Pattrn() {
     setAccountError("");
     try {
       const user = await signUpWithEmail(email, password);
+
+      // Send email verification
+      try {
+        await sendVerificationEmail(user);
+        showToast("Verification email sent! Please check your inbox.", 5000);
+      } catch (verifyError) {
+        console.warn("Failed to send verification email:", verifyError);
+        // Don't block sign-up if verification email fails
+      }
+
       // New account: push all local data to cloud
       const localData = gatherLocalData();
       await saveCloudData(user.uid, localData);
@@ -4944,6 +5007,7 @@ export default function Pattrn() {
     { id: "profile-share", icon: "share", label: "Share Stats", sub: "share-stats" },
     { id: "profile-username", icon: "edit", label: "Change Username", sub: "username-edit" },
     { id: "profile-birthday", icon: "cake", label: "Set Birthday", sub: "birthday-edit" },
+    ...(firebaseUser?.email ? [{ id: "profile-email-notifs", icon: "bell", label: "Email Notifications", sub: "email-notifications" }] : []),
     ...(progress && Object.keys(progress).length > 0 ? [{ id: "profile-clear", icon: "trash", label: "Clear All Data", sub: "clear-confirm" }] : []),
     { id: "profile-delete", icon: "trash", label: "Delete Account", sub: "delete-account" },
     { id: "profile-signout", icon: "logout", label: "Sign Out", action: () => { handleSignOut(); } },
@@ -5012,6 +5076,7 @@ export default function Pattrn() {
       "profile-view": [],
       "username-edit": [],
       "birthday-edit": [],
+      "email-notifications": [],
       "delete-account": [],
       "clear-confirm": [],
       "friends-view": [],
@@ -5116,6 +5181,7 @@ export default function Pattrn() {
     const isProfileView = currentMenuKey === "profile-view";
     const isUsernameEdit = currentMenuKey === "username-edit";
     const isBirthdayEdit = currentMenuKey === "birthday-edit";
+    const isEmailNotifications = currentMenuKey === "email-notifications";
     const isDeleteAccount = currentMenuKey === "delete-account";
     const isClearConfirm = currentMenuKey === "clear-confirm";
     const isThemeList = currentMenuKey === "theme-list";
@@ -5126,7 +5192,7 @@ export default function Pattrn() {
     const isNotificationsView = currentMenuKey === "notifications-view";
     const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu || isMosaicPreviewMenu ||
                           isAchievementsView || isFriendsView || isShareStats || isProfileView ||
-                          isUsernameEdit || isBirthdayEdit || isDeleteAccount || isClearConfirm ||
+                          isUsernameEdit || isBirthdayEdit || isEmailNotifications || isDeleteAccount || isClearConfirm ||
                           isThemeList || isSyncChoice || isCoopCreate || isCoopActive || isCoopCompleted || isNotificationsView;
     const contextualItems = isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
 
@@ -5311,6 +5377,18 @@ export default function Pattrn() {
       return h;
     })();
 
+    // Email notifications height — header + subtitle + verification banner (if needed) + toggle list
+    const emailNotificationsContentHeight = (() => {
+      if (!isEmailNotifications) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 4; // header + margin
+      h += 14 + 16; // subtitle + margin
+      if (!emailVerified && firebaseUser?.email) h += 70 + 16; // verification banner + margin
+      h += 5 * 70; // 5 toggle items (each ~70px with padding)
+      h += 12; // bottom padding
+      return h;
+    })();
+
     // Delete account height — header + warning + password + button
     const deleteAccountContentHeight = (() => {
       if (!isDeleteAccount) return 0;
@@ -5419,6 +5497,7 @@ export default function Pattrn() {
                           isProfileView ? profileViewContentHeight :
                           isUsernameEdit ? usernameEditContentHeight :
                           isBirthdayEdit ? birthdayEditContentHeight :
+                          isEmailNotifications ? emailNotificationsContentHeight :
                           isDeleteAccount ? deleteAccountContentHeight :
                           isClearConfirm ? clearConfirmContentHeight :
                           isThemeList ? themeListContentHeight :
@@ -6402,6 +6481,117 @@ export default function Pattrn() {
                         }}
                       >Remove Birthday</button>
                     )}
+                  </div>
+                </>
+              );
+            })() : currentMenuKey === "email-notifications" ? (() => {
+              const prefs = emailNotificationPrefs || {
+                welcome: true,
+                achievements: true,
+                mosaicShared: true,
+                friendActivity: true,
+                digest: false,
+              };
+              const togglePref = (key) => {
+                const newPrefs = { ...prefs, [key]: !prefs[key] };
+                setEmailNotificationPrefs(newPrefs);
+                if (firebaseUser) {
+                  saveEmailNotificationPreferences(firebaseUser.uid, newPrefs).catch(() => {});
+                }
+              };
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>Email Notifications</div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginBottom: 16 }}>
+                      Choose which emails you'd like to receive
+                    </div>
+
+                    {!emailVerified && firebaseUser?.email && (
+                      <div style={{
+                        fontSize: 11,
+                        color: C.accent,
+                        marginBottom: 16,
+                        padding: "10px 12px",
+                        backgroundColor: "rgba(255,255,255,0.06)",
+                        borderRadius: 8,
+                        border: "1px solid rgba(255,255,255,0.12)"
+                      }}>
+                        <div style={{ marginBottom: 8 }}>⚠️ Email not verified</div>
+                        <button
+                          onClick={() => {
+                            sendVerificationEmail(firebaseUser).then(() => {
+                              showToast("Verification email sent!", 3000);
+                            }).catch(() => {
+                              showToast("Failed to send verification email", 3000);
+                            });
+                          }}
+                          style={{
+                            padding: "6px 12px",
+                            borderRadius: 6,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            fontFamily: "'Inter', sans-serif",
+                            letterSpacing: 1,
+                            background: C.accent,
+                            color: C.bg,
+                            border: "none",
+                            cursor: "pointer",
+                            textTransform: "uppercase",
+                          }}
+                        >Resend Verification Email</button>
+                      </div>
+                    )}
+
+                    {[
+                      { key: "welcome", label: "Welcome emails", desc: "Get started guide after sign-up" },
+                      { key: "achievements", label: "Achievement updates", desc: "When you unlock new achievements" },
+                      { key: "mosaicShared", label: "Mosaic activity", desc: "When someone shares a mosaic with you" },
+                      { key: "friendActivity", label: "Friend activity", desc: "Updates from your friends" },
+                      { key: "digest", label: "Weekly digest", desc: "Summary of your weekly activity" },
+                    ].map(({ key, label, desc }) => (
+                      <div key={key} style={{
+                        marginBottom: 12,
+                        padding: "12px",
+                        borderRadius: 8,
+                        backgroundColor: "rgba(255,255,255,0.04)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        cursor: "pointer",
+                      }} onClick={() => togglePref(key)}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 2 }}>{label}</div>
+                            <div style={{ fontSize: 10, color: C.textDim }}>{desc}</div>
+                          </div>
+                          <div style={{
+                            width: 40,
+                            height: 22,
+                            borderRadius: 11,
+                            background: prefs[key] ? C.accent : "rgba(255,255,255,0.2)",
+                            position: "relative",
+                            transition: "background 0.2s",
+                          }}>
+                            <div style={{
+                              width: 18,
+                              height: 18,
+                              borderRadius: 9,
+                              background: "#fff",
+                              position: "absolute",
+                              top: 2,
+                              left: prefs[key] ? 20 : 2,
+                              transition: "left 0.2s",
+                            }} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </>
               );
