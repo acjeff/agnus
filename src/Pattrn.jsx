@@ -1783,11 +1783,12 @@ function loadTimes() {
       blind: base.blind ?? {},
       daily: migrateDailyData(base.daily ?? {}),
       cascade: base.cascade ?? {},
+      spin: base.spin ?? {},
       coop: base.coop ?? {},
       mosaicCompletionTimes: base.mosaicCompletionTimes ?? {},
     };
   } catch {
-    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, coop: {}, mosaicCompletionTimes: {} };
+    return { easy: {}, medium: {}, hard: {}, blind: {}, daily: {}, cascade: {}, spin: {}, coop: {}, mosaicCompletionTimes: {} };
   }
 }
 
@@ -14095,12 +14096,19 @@ export default function Pattrn() {
                   {i + 1}
                 </span>
                 {isCascade ? (
-                  cascadeSizeLabel ? <span style={{
-                    fontFamily: "'Inter', sans-serif", fontSize: 9, color: cascadeInProgress ? C.inProgress : C.textDim,
-                    lineHeight: 1.2,
-                  }}>
-                    {cascadeSizeLabel}
-                  </span> : null
+                  <>
+                    {cascadeSizeLabel ? <span style={{
+                      fontFamily: "'Inter', sans-serif", fontSize: 9, color: cascadeInProgress ? C.inProgress : C.textDim,
+                      lineHeight: 1.2,
+                    }}>
+                      {cascadeSizeLabel}
+                    </span> : null}
+                    {solved && time != null && (
+                      <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 8, color: C.textDim, lineHeight: 1 }}>
+                        {formatTime(time)}
+                      </span>
+                    )}
+                  </>
                 ) : (
                   <>
                     {result !== undefined && <ScoreBadge attempts={result} />}
