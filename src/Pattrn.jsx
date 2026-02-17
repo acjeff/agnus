@@ -3053,6 +3053,7 @@ export default function Pattrn() {
   const customMosaicPuzzlesRef = useRef(null); // array of 25 puzzle objects when playing custom mosaic
   const [creatorReturnView, setCreatorReturnView] = useState("menu"); // where to go when leaving creator
   // mosaic save now uses Liquid Glass menu ("mosaic-save" in radialMenuStack)
+  const [creatorConfirmAction, setCreatorConfirmAction] = useState(null); // null | { type: "clear" | "leave", action?: () => void }
   const creatorColorScrollRef = useRef(null); // color picker carousel scroll container
   const creatorColorDragRef = useRef({ active: false, startX: 0, scrollStart: 0, moved: false, lastX: 0, lastT: 0, velX: 0, rafId: 0 });
   const [friendsList, setFriendsList] = useState([]); // array of { uid, username, profilePicture }
@@ -5022,6 +5023,7 @@ export default function Pattrn() {
       "sign-in": [],
       "mosaic-save": [],
       "mosaic-preview": [],
+      "creator-confirm": [],
     };
 
     // Build root menu with global Profile and Co-op items
@@ -5124,10 +5126,12 @@ export default function Pattrn() {
     const isCoopActive = currentMenuKey === "coop-active";
     const isCoopCompleted = currentMenuKey === "coop-completed";
     const isNotificationsView = currentMenuKey === "notifications-view";
+    const isCreatorConfirm = currentMenuKey === "creator-confirm";
     const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu || isMosaicPreviewMenu ||
                           isAchievementsView || isFriendsView || isShareStats || isProfileView ||
                           isUsernameEdit || isBirthdayEdit || isDeleteAccount || isClearConfirm ||
-                          isThemeList || isSyncChoice || isCoopCreate || isCoopActive || isCoopCompleted || isNotificationsView;
+                          isThemeList || isSyncChoice || isCoopCreate || isCoopActive || isCoopCompleted ||
+                          isNotificationsView || isCreatorConfirm;
     const contextualItems = isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
@@ -5336,6 +5340,18 @@ export default function Pattrn() {
       return h;
     })();
 
+    // Creator confirm height — header + message + buttons
+    const creatorConfirmContentHeight = (() => {
+      if (!isCreatorConfirm) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 8; // header + margin
+      h += 60 + 16; // message + margin
+      h += 42 + 8; // confirm button + margin
+      h += 42; // cancel button
+      h += 12; // bottom padding
+      return h;
+    })();
+
     // Theme list height — header + theme list
     const themeListContentHeight = (() => {
       if (!isThemeList) return 0;
@@ -5421,6 +5437,7 @@ export default function Pattrn() {
                           isBirthdayEdit ? birthdayEditContentHeight :
                           isDeleteAccount ? deleteAccountContentHeight :
                           isClearConfirm ? clearConfirmContentHeight :
+                          isCreatorConfirm ? creatorConfirmContentHeight :
                           isThemeList ? themeListContentHeight :
                           isSyncChoice ? syncChoiceContentHeight :
                           isCoopCreate ? coopCreateContentHeight :
@@ -5459,7 +5476,15 @@ export default function Pattrn() {
           if (item.beforeSub && !item.beforeSub()) return; // guard check — return false to cancel
           setRadialMenuStack(prev => [...prev, item.sub]);
         }
-        else if (item.action) { item.action(); setRadialMenuStack([]); }
+        else if (item.action) {
+          // Guard navigation when in creator view with unsaved work
+          if (currentView === "creator" && creatorGrid.some(row => row.some(cell => cell !== null))) {
+            setCreatorConfirmAction({ type: "leave", action: () => { resetCreator(); item.action(); } });
+            setRadialMenuStack(["root", "creator-confirm"]);
+            return;
+          }
+          item.action(); setRadialMenuStack([]);
+        }
       };
       const staggerIn = 0.04 + animIndex * 0.03;
 
@@ -6487,6 +6512,55 @@ export default function Pattrn() {
                     >Clear Everything</button>
                     <button
                       onClick={() => setRadialMenuStack(prev => prev.slice(0, -1))}
+                      style={{
+                        width: "100%", padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: "rgba(255,255,255,0.08)", color: C.text, border: "1px solid rgba(255,255,255,0.08)",
+                        cursor: "pointer", textTransform: "uppercase",
+                      }}
+                    >Cancel</button>
+                  </div>
+                </>
+              );
+            })() : isCreatorConfirm ? (() => {
+              const isClear = creatorConfirmAction?.type === "clear";
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>
+                      {isClear ? "Clear Canvas" : "Leave Creator"}
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16, padding: "14px 16px", borderRadius: 8, backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", textAlign: "center", lineHeight: 1.5 }}>
+                      {isClear
+                        ? "This will clear your entire canvas. Any unsaved work will be lost."
+                        : "You have unsaved work on the canvas. Are you sure you want to leave?"}
+                    </div>
+                    <button
+                      onClick={() => {
+                        if (isClear) {
+                          resetCreator();
+                        } else if (creatorConfirmAction?.action) {
+                          creatorConfirmAction.action();
+                        }
+                        setCreatorConfirmAction(null);
+                        setRadialMenuStack([]);
+                      }}
+                      style={{
+                        width: "100%", padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: isClear ? C.incorrect : C.accent, color: "#fff", border: "none",
+                        cursor: "pointer", textTransform: "uppercase", marginBottom: 8,
+                      }}
+                    >{isClear ? "Clear Canvas" : "Leave"}</button>
+                    <button
+                      onClick={() => { setCreatorConfirmAction(null); setRadialMenuStack(prev => prev.slice(0, -1)); }}
                       style={{
                         width: "100%", padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
                         fontFamily: "'Inter', sans-serif", letterSpacing: 1,
@@ -10907,14 +10981,17 @@ export default function Pattrn() {
 
   // --- MOSAIC CREATOR VIEW ---
   if (view === "creator") {
-    const gridPx = Math.min(360, typeof window !== "undefined" ? window.innerWidth - 32 : 360);
+    const gridMaxW = typeof window !== "undefined" ? window.innerWidth - 32 : 360;
+    const gridMaxH = typeof window !== "undefined" ? window.innerHeight - 280 : 360;
+    const gridPx = Math.max(200, Math.min(gridMaxW, gridMaxH));
     const cellPx = gridPx / CREATOR_GRID_SIZE;
     return (
       <div style={{
-        minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+        height: "100dvh", backgroundColor: C.bg, color: C.text,
         fontFamily: "'Inter', sans-serif",
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 16, paddingRight: 16,
+        paddingLeft: 16, paddingRight: 16,
+        overflow: "hidden",
       }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } `}</style>
 
@@ -10932,64 +11009,70 @@ export default function Pattrn() {
           </h2>
         </div>
 
-        {/* 25x25 info */}
-        <div style={{ width: "100%", maxWidth: 400, marginBottom: 6, animation: "fadeUp 0.3s 0.05s ease both" }}>
-          <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, fontFamily: "'Inter', sans-serif", textAlign: "center" }}>
-            25x25 grid &middot; becomes 25 playable puzzle tiles
+        {/* Canvas area — flex grow to fill space between header and bottom controls */}
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "start", minHeight: 0, width: "100%" }}>
+          {/* 25x25 info */}
+          <div style={{ width: "100%", maxWidth: 400, marginBottom: 6, flexShrink: 0, animation: "fadeUp 0.3s 0.05s ease both" }}>
+            <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, fontFamily: "'Inter', sans-serif", textAlign: "center" }}>
+              25x25 grid &middot; becomes 25 playable puzzle tiles
+            </div>
           </div>
+
+          {/* Grid - uses pointer-move on container for smooth finger drag */}
+          <div
+            ref={creatorGridRef}
+            style={{
+              width: gridPx, height: gridPx, flexShrink: 0, animation: "fadeUp 0.3s 0.06s ease both",
+              borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}`,
+              touchAction: "none", userSelect: "none", position: "relative",
+              display: "grid", gridTemplateColumns: `repeat(25, 1fr)`, gridTemplateRows: `repeat(25, 1fr)`,
+            }}
+            onPointerDown={creatorPointerDown}
+            onPointerMove={creatorPointerMove}
+            onPointerUp={creatorPointerUp}
+            onPointerLeave={creatorPointerUp}
+            onPointerCancel={creatorPointerUp}
+          >
+            {creatorGrid.flat().map((color, i) => (
+              <div
+                key={i}
+                style={{
+                  backgroundColor: color || C.surface,
+                  outline: (i % 5 === 4 && (i % 25) < 24) || (Math.floor(i / 25) % 5 === 4 && Math.floor(i / 25) < 24) ? `0.5px solid ${C.border}88` : "none",
+                }}
+              />
+            ))}
+            {/* 5x5 tile grid lines overlay */}
+            <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
+              {[1,2,3,4].map(i => (
+                <div key={`v${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: `${i * 20}%`, width: 1, backgroundColor: C.accent + "44" }} />
+              ))}
+              {[1,2,3,4].map(i => (
+                <div key={`h${i}`} style={{ position: "absolute", left: 0, right: 0, top: `${i * 20}%`, height: 1, backgroundColor: C.accent + "44" }} />
+              ))}
+            </div>
+          </div>
+
+          {/* Status messages */}
+          {mosaicMsg && (
+            <div style={{
+              width: "100%", maxWidth: 400, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginTop: 8, flexShrink: 0,
+              backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
+              fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent, letterSpacing: 0.5,
+              animation: "fadeUp 0.3s 0.08s ease both",
+            }}>
+              {mosaicMsg}
+            </div>
+          )}
+          {!firebaseUser && firebaseConfigured && (
+            <div style={{ width: "100%", maxWidth: 400, textAlign: "center", fontSize: 11, color: C.textDim, marginTop: 8, flexShrink: 0, animation: "fadeUp 0.3s 0.08s ease both" }}>
+              Sign in from the menu to save your creations
+            </div>
+          )}
         </div>
 
-        {/* Grid - uses pointer-move on container for smooth finger drag */}
-        <div
-          ref={creatorGridRef}
-          style={{
-            width: gridPx, height: gridPx, marginBottom: 16, animation: "fadeUp 0.3s 0.06s ease both",
-            borderRadius: 8, overflow: "hidden", border: `1px solid ${C.border}`,
-            touchAction: "none", userSelect: "none", position: "relative",
-            display: "grid", gridTemplateColumns: `repeat(25, 1fr)`, gridTemplateRows: `repeat(25, 1fr)`,
-          }}
-          onPointerDown={creatorPointerDown}
-          onPointerMove={creatorPointerMove}
-          onPointerUp={creatorPointerUp}
-          onPointerLeave={creatorPointerUp}
-          onPointerCancel={creatorPointerUp}
-        >
-          {creatorGrid.flat().map((color, i) => (
-            <div
-              key={i}
-              style={{
-                backgroundColor: color || C.surface,
-                outline: (i % 5 === 4 && (i % 25) < 24) || (Math.floor(i / 25) % 5 === 4 && Math.floor(i / 25) < 24) ? `0.5px solid ${C.border}88` : "none",
-              }}
-            />
-          ))}
-          {/* 5x5 tile grid lines overlay */}
-          <div style={{ position: "absolute", inset: 0, pointerEvents: "none" }}>
-            {[1,2,3,4].map(i => (
-              <div key={`v${i}`} style={{ position: "absolute", top: 0, bottom: 0, left: `${i * 20}%`, width: 1, backgroundColor: C.accent + "44" }} />
-            ))}
-            {[1,2,3,4].map(i => (
-              <div key={`h${i}`} style={{ position: "absolute", left: 0, right: 0, top: `${i * 20}%`, height: 1, backgroundColor: C.accent + "44" }} />
-            ))}
-          </div>
-        </div>
-
-        {/* Status messages */}
-        {mosaicMsg && (
-          <div style={{
-            width: "100%", maxWidth: 400, textAlign: "center", padding: "8px 12px", borderRadius: 8,
-            backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-            fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent, letterSpacing: 0.5,
-            animation: "fadeUp 0.3s 0.08s ease both",
-          }}>
-            {mosaicMsg}
-          </div>
-        )}
-        {!firebaseUser && firebaseConfigured && (
-          <div style={{ width: "100%", maxWidth: 400, textAlign: "center", fontSize: 11, color: C.textDim, marginTop: 8, animation: "fadeUp 0.3s 0.08s ease both" }}>
-            Sign in from the menu to save your creations
-          </div>
-        )}
+        {/* Bottom spacer for fixed controls */}
+        <div style={{ flexShrink: 0, height: "calc(80px + env(safe-area-inset-bottom, 0px))" }} />
 
       {/* Tool toggle — bottom left Liquid Glass pill, offset right of back button */}
       <div style={{
@@ -11094,11 +11177,28 @@ export default function Pattrn() {
       </div>
 
       {renderBackButton(() => {
-        resetCreator(); setCreatorReturnView("menu");
-        setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine");
+        const hasWork = creatorGrid.some(row => row.some(cell => cell !== null));
+        if (hasWork) {
+          setCreatorConfirmAction({ type: "leave", action: () => {
+            resetCreator(); setCreatorReturnView("menu");
+            setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine");
+          }});
+          setRadialMenuStack(["root", "creator-confirm"]);
+        } else {
+          resetCreator(); setCreatorReturnView("menu");
+          setView("gallery"); loadMosaicData(mosaicGalleryTab || "mine");
+        }
       })}
       {renderContextButton("creator", [
-        { id: "clear", icon: "refresh", color: "#fff", onClick: () => resetCreator() },
+        { id: "clear", icon: "refresh", color: "#fff", onClick: () => {
+          const hasWork = creatorGrid.some(row => row.some(cell => cell !== null));
+          if (hasWork) {
+            setCreatorConfirmAction({ type: "clear" });
+            setRadialMenuStack(["root", "creator-confirm"]);
+          } else {
+            resetCreator();
+          }
+        }},
         { id: "save", icon: "upload", color: C.accent, onClick: handleSaveClick, disabled: mosaicLoading },
       ])}
 
