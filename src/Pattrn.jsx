@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Handshake, Clock, Bell, PaintBucket, Eraser, Settings, Cake, Trash2, Edit3, Award, X, Copy, Lightbulb, SmilePlus } from "lucide-react";
+import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Handshake, Clock, Bell, PaintBucket, Eraser, Settings, Cake, Trash2, Edit3, Award, X, Copy, Lightbulb, SmilePlus, Undo2, Redo2 } from "lucide-react";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -3054,6 +3054,10 @@ export default function Pattrn() {
   const [creatorReturnView, setCreatorReturnView] = useState("menu"); // where to go when leaving creator
   // mosaic save now uses Liquid Glass menu ("mosaic-save" in radialMenuStack)
   const [creatorConfirmAction, setCreatorConfirmAction] = useState(null); // null | { type: "clear" | "leave", action?: () => void }
+  const creatorUndoStack = useRef([]); // past grid states for undo
+  const creatorRedoStack = useRef([]); // future grid states for redo
+  const [creatorCanUndo, setCreatorCanUndo] = useState(false);
+  const [creatorCanRedo, setCreatorCanRedo] = useState(false);
   const creatorColorScrollRef = useRef(null); // color picker carousel scroll container
   const creatorColorDragRef = useRef({ active: false, startX: 0, scrollStart: 0, moved: false, lastX: 0, lastT: 0, velX: 0, rafId: 0 });
   const [friendsList, setFriendsList] = useState([]); // array of { uid, username, profilePicture }
@@ -3374,6 +3378,42 @@ export default function Pattrn() {
     setCreatorTitle("");
     setCreatorEditingId(null);
     setCreatorTool("draw");
+    creatorUndoStack.current = [];
+    creatorRedoStack.current = [];
+    setCreatorCanUndo(false);
+    setCreatorCanRedo(false);
+  }, []);
+
+  // Push a snapshot onto the undo stack before a grid mutation
+  const creatorPushUndo = useCallback((gridSnapshot) => {
+    creatorUndoStack.current = [...creatorUndoStack.current.slice(-49), gridSnapshot];
+    creatorRedoStack.current = [];
+    setCreatorCanUndo(true);
+    setCreatorCanRedo(false);
+  }, []);
+
+  const creatorUndo = useCallback(() => {
+    if (creatorUndoStack.current.length === 0) return;
+    setCreatorGrid(prev => {
+      creatorRedoStack.current = [...creatorRedoStack.current, prev];
+      setCreatorCanRedo(true);
+      const undone = creatorUndoStack.current[creatorUndoStack.current.length - 1];
+      creatorUndoStack.current = creatorUndoStack.current.slice(0, -1);
+      setCreatorCanUndo(creatorUndoStack.current.length > 0);
+      return undone;
+    });
+  }, []);
+
+  const creatorRedo = useCallback(() => {
+    if (creatorRedoStack.current.length === 0) return;
+    setCreatorGrid(prev => {
+      creatorUndoStack.current = [...creatorUndoStack.current, prev];
+      setCreatorCanUndo(true);
+      const redone = creatorRedoStack.current[creatorRedoStack.current.length - 1];
+      creatorRedoStack.current = creatorRedoStack.current.slice(0, -1);
+      setCreatorCanRedo(creatorRedoStack.current.length > 0);
+      return redone;
+    });
   }, []);
 
   // Color picker carousel — momentum drag (mirrors TokenPicker)
@@ -3460,16 +3500,17 @@ export default function Pattrn() {
     const cell = getCellFromPointer(e);
     if (!cell) return;
     if (creatorToolRef.current === "fill") {
-      setCreatorGrid(g => creatorFloodFill(g, cell.r, cell.c, creatorColorRef.current));
+      setCreatorGrid(g => { creatorPushUndo(g); return creatorFloodFill(g, cell.r, cell.c, creatorColorRef.current); });
       return;
     }
     creatorPaintingRef.current = true;
     setCreatorGrid(g => {
+      creatorPushUndo(g);
       const next = g.map(row => [...row]);
       next[cell.r][cell.c] = next[cell.r][cell.c] === creatorColorRef.current ? null : creatorColorRef.current;
       return next;
     });
-  }, [getCellFromPointer, creatorFloodFill]);
+  }, [getCellFromPointer, creatorFloodFill, creatorPushUndo]);
 
   const creatorPointerMove = useCallback((e) => {
     if (!creatorPaintingRef.current || creatorToolRef.current === "fill") return;
@@ -3588,15 +3629,18 @@ export default function Pattrn() {
         gridSize: 25,
         authorUsername: username || "",
       };
+      let savedId = creatorEditingId;
       if (creatorEditingId) {
         await updateMosaicDesign(firebaseUser.uid, creatorEditingId, mosaicData);
-        setMosaicMsg("Mosaic updated!");
       } else {
-        const id = await saveMosaicDesign(firebaseUser.uid, mosaicData);
-        setCreatorEditingId(id);
-        setMosaicMsg("Mosaic saved!");
+        savedId = await saveMosaicDesign(firebaseUser.uid, mosaicData);
+        setCreatorEditingId(savedId);
       }
       setCreatorTitle(title);
+      // Show post-save panel asking if user wants to publish
+      setMosaicLoading(false);
+      setRadialMenuStack(["root", "creator-post-save"]);
+      return;
     } catch (e) {
       console.error("Save mosaic failed:", e);
       const isPermErr = e?.message?.includes("PERMISSION_DENIED");
@@ -5024,6 +5068,7 @@ export default function Pattrn() {
       "mosaic-save": [],
       "mosaic-preview": [],
       "creator-confirm": [],
+      "creator-post-save": [],
     };
 
     // Build root menu with global Profile and Co-op items
@@ -5127,11 +5172,12 @@ export default function Pattrn() {
     const isCoopCompleted = currentMenuKey === "coop-completed";
     const isNotificationsView = currentMenuKey === "notifications-view";
     const isCreatorConfirm = currentMenuKey === "creator-confirm";
+    const isCreatorPostSave = currentMenuKey === "creator-post-save";
     const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu || isMosaicPreviewMenu ||
                           isAchievementsView || isFriendsView || isShareStats || isProfileView ||
                           isUsernameEdit || isBirthdayEdit || isDeleteAccount || isClearConfirm ||
                           isThemeList || isSyncChoice || isCoopCreate || isCoopActive || isCoopCompleted ||
-                          isNotificationsView || isCreatorConfirm;
+                          isNotificationsView || isCreatorConfirm || isCreatorPostSave;
     const contextualItems = isCustomPanel ? [] : (menuTree[currentMenuKey] || []);
 
     // Filter out the current page from nav
@@ -6568,6 +6614,60 @@ export default function Pattrn() {
                         cursor: "pointer", textTransform: "uppercase",
                       }}
                     >Cancel</button>
+                  </div>
+                </>
+              );
+            })() : isCreatorPostSave ? (() => {
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>
+                      Mosaic Saved!
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textDim, marginBottom: 16, padding: "14px 16px", borderRadius: 8, backgroundColor: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", textAlign: "center", lineHeight: 1.5 }}>
+                      Would you like to submit your mosaic for review to be published?
+                    </div>
+                    <button
+                      onClick={() => {
+                        const mosaic = myMosaics.find(m => m.id === creatorEditingId);
+                        if (mosaic) handleSubmitForReview(mosaic);
+                        setRadialMenuStack([]);
+                        resetCreator();
+                        setMosaicGalleryTab("mine");
+                        setView("gallery");
+                        loadMosaicData("mine");
+                      }}
+                      disabled={mosaicLoading}
+                      style={{
+                        width: "100%", padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: C.accent, color: "#fff", border: "none",
+                        cursor: mosaicLoading ? "default" : "pointer", textTransform: "uppercase", marginBottom: 8,
+                        opacity: mosaicLoading ? 0.5 : 1,
+                      }}
+                    >Submit for Review</button>
+                    <button
+                      onClick={() => {
+                        setRadialMenuStack([]);
+                        resetCreator();
+                        setMosaicGalleryTab("mine");
+                        setView("gallery");
+                        loadMosaicData("mine");
+                      }}
+                      style={{
+                        width: "100%", padding: "10px 0", borderRadius: 8, fontSize: 11, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: "rgba(255,255,255,0.08)", color: C.text, border: "1px solid rgba(255,255,255,0.08)",
+                        cursor: "pointer", textTransform: "uppercase",
+                      }}
+                    >Done</button>
                   </div>
                 </>
               );
@@ -11007,6 +11107,36 @@ export default function Pattrn() {
           <h2 style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 700, letterSpacing: 2, margin: 0, color: C.accent, flex: 1 }}>
             {creatorEditingId ? "Edit Mosaic" : "Create Mosaic"}
           </h2>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button onClick={creatorUndo} disabled={!creatorCanUndo} style={{
+              width: 36, height: 36, borderRadius: 10, border: "none", cursor: creatorCanUndo ? "pointer" : "default",
+              background: "rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center",
+              opacity: creatorCanUndo ? 1 : 0.3, transition: "opacity 0.15s",
+            }}>
+              <Undo2 size={16} color={C.text} strokeWidth={2} />
+            </button>
+            <button onClick={creatorRedo} disabled={!creatorCanRedo} style={{
+              width: 36, height: 36, borderRadius: 10, border: "none", cursor: creatorCanRedo ? "pointer" : "default",
+              background: "rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center",
+              opacity: creatorCanRedo ? 1 : 0.3, transition: "opacity 0.15s",
+            }}>
+              <Redo2 size={16} color={C.text} strokeWidth={2} />
+            </button>
+            <button onClick={() => {
+              const hasWork = creatorGrid.some(row => row.some(cell => cell !== null));
+              if (hasWork) {
+                setCreatorConfirmAction({ type: "clear" });
+                setRadialMenuStack(["root", "creator-confirm"]);
+              } else {
+                resetCreator();
+              }
+            }} style={{
+              width: 36, height: 36, borderRadius: 10, border: "none", cursor: "pointer",
+              background: "rgba(255,255,255,0.08)", display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <RotateCcw size={16} color={C.text} strokeWidth={2} />
+            </button>
+          </div>
         </div>
 
         {/* Canvas area — flex grow to fill space between header and bottom controls */}
@@ -11053,17 +11183,7 @@ export default function Pattrn() {
             </div>
           </div>
 
-          {/* Status messages */}
-          {mosaicMsg && (
-            <div style={{
-              width: "100%", maxWidth: 400, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginTop: 8, flexShrink: 0,
-              backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-              fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent, letterSpacing: 0.5,
-              animation: "fadeUp 0.3s 0.08s ease both",
-            }}>
-              {mosaicMsg}
-            </div>
-          )}
+          {/* Status messages — rendered as fixed centered toast */}
           {!firebaseUser && firebaseConfigured && (
             <div style={{ width: "100%", maxWidth: 400, textAlign: "center", fontSize: 11, color: C.textDim, marginTop: 8, flexShrink: 0, animation: "fadeUp 0.3s 0.08s ease both" }}>
               Sign in from the menu to save your creations
@@ -11190,17 +11310,23 @@ export default function Pattrn() {
         }
       })}
       {renderContextButton("creator", [
-        { id: "clear", icon: "refresh", color: "#fff", onClick: () => {
-          const hasWork = creatorGrid.some(row => row.some(cell => cell !== null));
-          if (hasWork) {
-            setCreatorConfirmAction({ type: "clear" });
-            setRadialMenuStack(["root", "creator-confirm"]);
-          } else {
-            resetCreator();
-          }
-        }},
         { id: "save", icon: "upload", color: C.accent, onClick: handleSaveClick, disabled: mosaicLoading },
       ])}
+
+      {/* Fixed centered toast for mosaic messages */}
+      {mosaicMsg && (
+        <div style={{
+          position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+          zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
+          backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
+          fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
+          boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
+          animation: "fadeUp 0.3s 0.08s ease both",
+          pointerEvents: "none",
+        }}>
+          {mosaicMsg}
+        </div>
+      )}
 
       {globalModalsEl}
       </div>
@@ -11261,11 +11387,16 @@ export default function Pattrn() {
           ))}
         </div>
 
+        {/* Fixed centered toast for mosaic messages */}
         {mosaicMsg && (
           <div style={{
-            width: "100%", maxWidth: 400, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-            fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent,
+            fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
+            animation: "fadeUp 0.3s 0.08s ease both",
+            pointerEvents: "none",
           }}>
             {mosaicMsg}
           </div>
@@ -11588,11 +11719,16 @@ export default function Pattrn() {
           </h2>
         </div>
 
+        {/* Fixed centered toast for mosaic messages */}
         {mosaicMsg && (
           <div style={{
-            width: "100%", maxWidth: 480, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-            fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent,
+            fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
+            animation: "fadeUp 0.3s 0.08s ease both",
+            pointerEvents: "none",
           }}>
             {mosaicMsg}
           </div>
@@ -11683,11 +11819,16 @@ export default function Pattrn() {
           </h2>
         </div>
 
+        {/* Fixed centered toast for mosaic messages */}
         {mosaicMsg && (
           <div style={{
-            width: "100%", maxWidth: 480, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-            fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent,
+            fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
+            animation: "fadeUp 0.3s 0.08s ease both",
+            pointerEvents: "none",
           }}>
             {mosaicMsg}
           </div>
