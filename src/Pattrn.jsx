@@ -11010,7 +11010,7 @@ export default function Pattrn() {
         </div>
 
         {/* Canvas area — flex grow to fill space between header and bottom controls */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", minHeight: 0, width: "100%" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "start", minHeight: 0, width: "100%" }}>
           {/* 25x25 info */}
           <div style={{ width: "100%", maxWidth: 400, marginBottom: 6, flexShrink: 0, animation: "fadeUp 0.3s 0.05s ease both" }}>
             <div style={{ fontSize: 10, color: C.textDim, letterSpacing: 1, fontFamily: "'Inter', sans-serif", textAlign: "center" }}>
