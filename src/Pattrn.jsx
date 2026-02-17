@@ -3090,7 +3090,8 @@ export default function Pattrn() {
   const [removeFriendConfirm, setRemoveFriendConfirm] = useState(null); // uid or null
 
   // --- Friend Reactions state ---
-  const [friendReactionTarget, setFriendReactionTarget] = useState(null); // { uid, username } — friend currently selected for reaction picker
+  const [friendReactionPickerOpen, setFriendReactionPickerOpen] = useState(false); // show friend reaction panel in Liquid Glass pill
+  const [friendReactionSelectedFriends, setFriendReactionSelectedFriends] = useState(new Set()); // multi-select: Set of friend uids to send reactions to
   const [friendFloatingReactions, setFriendFloatingReactions] = useState([]); // floating reaction animations: [{ id, emoji, fromName, fromColor, x, type }]
   const friendSeenReactionsRef = useRef(new Set()); // track already-seen friend reaction keys
 
@@ -4951,6 +4952,12 @@ export default function Pattrn() {
     ),
     suggest: (c) => <Lightbulb size={18} color={c} strokeWidth={2} />,
     reaction: (c) => <SmilePlus size={18} color={c} strokeWidth={2} />,
+    "friend-reaction": (c) => (
+      <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+        <SmilePlus size={18} color={c} strokeWidth={2} />
+        <Users size={9} color={c} strokeWidth={2.5} style={{ position: "absolute", bottom: -3, right: -5 }} />
+      </span>
+    ),
     "suggest-pending": (c) => (
       <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
         <Lightbulb size={18} color={c} strokeWidth={2} />
@@ -5260,12 +5267,16 @@ export default function Pattrn() {
     const showSuggestBanner = !!coopSuggestMode && !coopSuggestCell;
     const showSuggestTokenPick = !!coopSuggestCell && !!coopSuggestMode;
     // Reaction picker state
-    const showReactionPicker = coopReactionPickerOpen && !showPassPlayerPicker && !showPassBanner && !showPassPending && !showPassIncoming && !showSuggestPlayerPicker && !showSuggestBanner && !showSuggestTokenPick;
-    const hasPassUI = isCustomPanel ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming || showSuggestPlayerPicker || showSuggestBanner || showSuggestTokenPick || showReactionPicker);
+    const showReactionPicker = coopReactionPickerOpen && !friendReactionPickerOpen && !showPassPlayerPicker && !showPassBanner && !showPassPending && !showPassIncoming && !showSuggestPlayerPicker && !showSuggestBanner && !showSuggestTokenPick;
+    // Friend reaction picker state — shows friend checkboxes + reaction grid
+    const onlineFriendsList = friendsList.filter(f => { const p = friendPresence[f.uid]; return p && p.lastSeen && (Date.now() - p.lastSeen) < 120000; });
+    const showFriendReactionPicker = friendReactionPickerOpen && !showPassPlayerPicker && !showPassBanner && !showPassPending && !showPassIncoming && !showSuggestPlayerPicker && !showSuggestBanner && !showSuggestTokenPick;
+    const hasPassUI = isCustomPanel ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming || showSuggestPlayerPicker || showSuggestBanner || showSuggestTokenPick || showReactionPicker || showFriendReactionPicker);
     const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : (showSuggestPlayerPicker ? Object.keys(coopPlayers).length : 0);
     const suggestTokenCount = showSuggestTokenPick ? (puzzle?.usedTokens?.length || 0) : 0;
     const reactionPickerHeight = showReactionPicker ? 228 : 0;
-    const passRowHeight = (showPassPlayerPicker || showSuggestPlayerPicker) ? (passPlayerCount > 2 ? 88 : 56) : showSuggestTokenPick ? Math.max(56, 36 + Math.ceil(suggestTokenCount / 6) * 36) : showReactionPicker ? reactionPickerHeight : showPassIncoming ? 56 : 48;
+    const friendReactionPickerHeight = showFriendReactionPicker ? (Math.min(onlineFriendsList.length, 3) * 40 + 24 + 228) : 0; // friend rows + label + reaction grid
+    const passRowHeight = (showPassPlayerPicker || showSuggestPlayerPicker) ? (passPlayerCount > 2 ? 88 : 56) : showSuggestTokenPick ? Math.max(56, 36 + Math.ceil(suggestTokenCount / 6) * 36) : showFriendReactionPicker ? friendReactionPickerHeight : showReactionPicker ? reactionPickerHeight : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
 
     // Coop start menu height — back button + header + subtitle + mosaic card + friends list + action buttons
@@ -5550,7 +5561,7 @@ export default function Pattrn() {
     const handleToggle = () => {
       // Don't allow closing if username is required
       if (isOpen && !username && isUsernameEdit) return;
-      if (isOpen) setRadialMenuStack([]);
+      if (isOpen) { setRadialMenuStack([]); setFriendReactionPickerOpen(false); }
       else setRadialMenuStack(["root"]);
     };
 
@@ -5697,9 +5708,9 @@ export default function Pattrn() {
           />
         )}
         {/* Click-away layer for reaction picker when menu is closed */}
-        {!isOpen && showReactionPicker && (
+        {!isOpen && (showReactionPicker || showFriendReactionPicker) && (
           <div
-            onClick={() => setCoopReactionPickerOpen(false)}
+            onClick={() => { setCoopReactionPickerOpen(false); setFriendReactionPickerOpen(false); }}
             style={{ position: "fixed", inset: 0, zIndex: 84 }}
           />
         )}
@@ -6333,115 +6344,24 @@ export default function Pattrn() {
                                               border: "none", cursor: "pointer", textTransform: "uppercase",
                                             }}>Join</button>
                                           )}
-                                          <div style={{ display: "flex", gap: 4 }}>
-                                            {/* Send reaction button */}
-                                            {isOnline && (
-                                              <button
-                                                onClick={() => setFriendReactionTarget(prev => prev?.uid === friend.uid ? null : { uid: friend.uid, username: friend.username })}
-                                                title="Send reaction"
-                                                style={{
-                                                  width: 24, height: 24, borderRadius: 6,
-                                                  backgroundColor: friendReactionTarget?.uid === friend.uid ? "#FFD700" + "22" : "transparent",
-                                                  border: `1px solid ${friendReactionTarget?.uid === friend.uid ? "#FFD700" : C.border}`,
-                                                  color: friendReactionTarget?.uid === friend.uid ? "#FFD700" : C.textDim,
-                                                  cursor: "pointer",
-                                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                                  transition: "all 0.15s",
-                                                  flexShrink: 0,
-                                                }}
-                                                onMouseEnter={e => { if (friendReactionTarget?.uid !== friend.uid) { e.currentTarget.style.borderColor = "#FFD700"; e.currentTarget.style.color = "#FFD700"; e.currentTarget.style.backgroundColor = "#FFD700" + "11"; }}}
-                                                onMouseLeave={e => { if (friendReactionTarget?.uid !== friend.uid) { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; e.currentTarget.style.backgroundColor = "transparent"; }}}
-                                              >
-                                                <SmilePlus size={13} strokeWidth={2.5} />
-                                              </button>
-                                            )}
-                                            <button
-                                              onClick={() => setRemoveFriendConfirm(friend.uid)}
-                                              title="Remove friend"
-                                              style={{
-                                                width: 24, height: 24, borderRadius: 6,
-                                                backgroundColor: "transparent",
-                                                border: `1px solid ${C.border}`,
-                                                color: C.textDim,
-                                                cursor: "pointer",
-                                                display: "flex", alignItems: "center", justifyContent: "center",
-                                                transition: "all 0.15s",
-                                                flexShrink: 0,
-                                              }}
-                                              onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; e.currentTarget.style.backgroundColor = C.incorrect + "11"; }}
-                                              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; e.currentTarget.style.backgroundColor = "transparent"; }}
-                                            >
-                                              <X size={14} strokeWidth={2.5} />
-                                            </button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-                                    {/* Inline reaction picker for this friend */}
-                                    {friendReactionTarget?.uid === friend.uid && !showingConfirm && (
-                                      <div style={{
-                                        marginTop: 8, padding: "8px 6px", borderRadius: 10,
-                                        backgroundColor: C.bg + "cc", border: `1px solid ${C.border}`,
-                                        animation: "fadeUp 0.25s ease",
-                                      }}>
-                                        <div style={{
-                                          fontSize: 9, fontFamily: "'Inter', sans-serif", fontWeight: 600,
-                                          color: C.textDim, marginBottom: 6, textAlign: "center", letterSpacing: 0.5,
-                                          textTransform: "uppercase",
-                                        }}>
-                                          Send to {friend.username}
-                                        </div>
-                                        <div className="reaction-scroll-container" style={{
-                                          display: "flex", flexWrap: "wrap", gap: 3,
-                                          justifyContent: "center", alignContent: "flex-start",
-                                          overflowY: "auto", WebkitOverflowScrolling: "touch",
-                                          scrollbarWidth: "none", msOverflowStyle: "none",
-                                          maxHeight: 150, width: "100%", padding: "0 2px",
-                                          boxSizing: "border-box",
-                                        }}>
-                                          {COOP_REACTIONS.map((r) => (
-                                            r.type === "text" ? (
-                                              <button key={r.content} onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (firebaseUser) {
-                                                  sendFriendReaction(firebaseUser.uid, friend.uid, r.content, username || "Player", r.type).catch(() => {});
-                                                  // Show locally as confirmation
-                                                  const id = Date.now() + Math.random();
-                                                  const x = 10 + Math.random() * 80;
-                                                  setFriendFloatingReactions(prev => [...prev, { id, emoji: r.content, fromName: `You \u2192 ${friend.username}`, fromColor: COOP_MY_COLOR, x, type: r.type }]);
-                                                  setTimeout(() => setFriendFloatingReactions(prev => prev.filter(fr => fr.id !== id)), 3500);
-                                                }
-                                              }} style={{
-                                                fontSize: 11, fontWeight: 600, fontFamily: "'Inter', sans-serif",
-                                                background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
-                                                cursor: "pointer", padding: "5px 9px", borderRadius: 7,
-                                                color: C.text, transition: "transform 0.12s, background-color 0.12s, border-color 0.12s",
-                                                letterSpacing: 0.3, lineHeight: 1.2,
-                                              }}
-                                                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "#FFD700"; }}
-                                                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = C.border; }}
-                                              >{r.content}</button>
-                                            ) : (
-                                              <button key={r.content} onClick={(e) => {
-                                                e.stopPropagation();
-                                                if (firebaseUser) {
-                                                  sendFriendReaction(firebaseUser.uid, friend.uid, r.content, username || "Player", r.type).catch(() => {});
-                                                  const id = Date.now() + Math.random();
-                                                  const x = 10 + Math.random() * 80;
-                                                  setFriendFloatingReactions(prev => [...prev, { id, emoji: r.content, fromName: `You \u2192 ${friend.username}`, fromColor: COOP_MY_COLOR, x, type: r.type }]);
-                                                  setTimeout(() => setFriendFloatingReactions(prev => prev.filter(fr => fr.id !== id)), 3500);
-                                                }
-                                              }} style={{
-                                                fontSize: r.type === "emoji" ? 22 : 18, background: "none", border: "none",
-                                                cursor: "pointer", padding: "3px 4px", borderRadius: 8,
-                                                color: r.type === "pattern" ? C.text : undefined,
-                                                transition: "transform 0.12s, background-color 0.12s", lineHeight: 1,
-                                              }}
-                                                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.2)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
-                                                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                                              >{r.content}</button>
-                                            )
-                                          ))}
+                                          <button
+                                            onClick={() => setRemoveFriendConfirm(friend.uid)}
+                                            title="Remove friend"
+                                            style={{
+                                              width: 24, height: 24, borderRadius: 6,
+                                              backgroundColor: "transparent",
+                                              border: `1px solid ${C.border}`,
+                                              color: C.textDim,
+                                              cursor: "pointer",
+                                              display: "flex", alignItems: "center", justifyContent: "center",
+                                              transition: "all 0.15s",
+                                              flexShrink: 0,
+                                            }}
+                                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; e.currentTarget.style.backgroundColor = C.incorrect + "11"; }}
+                                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; e.currentTarget.style.backgroundColor = "transparent"; }}
+                                          >
+                                            <X size={14} strokeWidth={2.5} />
+                                          </button>
                                         </div>
                                       </div>
                                     )}
@@ -7806,6 +7726,120 @@ export default function Pattrn() {
                       >{r.content}</button>
                     )
                   ))}
+                </div>
+              )}
+              {/* Friend reaction picker — friend checkboxes + reaction grid */}
+              {showFriendReactionPicker && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+                  {/* Friend checkboxes */}
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", fontWeight: 600, textAlign: "center" }}>
+                    Send to {friendReactionSelectedFriends.size > 0 && `(${friendReactionSelectedFriends.size} selected)`}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: Math.min(onlineFriendsList.length, 3) * 40, overflowY: "auto", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+                    {onlineFriendsList.map(friend => {
+                      const isSelected = friendReactionSelectedFriends.has(friend.uid);
+                      return (
+                        <button key={friend.uid} onClick={(e) => {
+                          e.stopPropagation();
+                          setFriendReactionSelectedFriends(prev => {
+                            const next = new Set(prev);
+                            if (next.has(friend.uid)) next.delete(friend.uid); else next.add(friend.uid);
+                            return next;
+                          });
+                        }} style={{
+                          display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8,
+                          backgroundColor: isSelected ? "#FFD700" + "18" : "rgba(255,255,255,0.04)",
+                          border: `1px solid ${isSelected ? "#FFD700" : "rgba(255,255,255,0.08)"}`,
+                          cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                        }}>
+                          <div style={{
+                            width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                            border: `2px solid ${isSelected ? "#FFD700" : "rgba(255,255,255,0.15)"}`,
+                            backgroundColor: isSelected ? "#FFD700" : "transparent",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            transition: "all 0.15s",
+                          }}>
+                            {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </div>
+                          {friend.profilePicture ? (
+                            <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                          ) : (
+                            <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: "#FFD700" + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#FFD700", fontWeight: 700, flexShrink: 0 }}>
+                              {(friend.username || "?")[0].toUpperCase()}
+                            </div>
+                          )}
+                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 600, color: C.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{friend.username}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Reaction grid */}
+                  <div className="reaction-scroll-container" style={{
+                    display: "flex", flexWrap: "wrap", gap: 4,
+                    justifyContent: "center", alignContent: "flex-start",
+                    overflowY: "auto", WebkitOverflowScrolling: "touch",
+                    scrollbarWidth: "none", msOverflowStyle: "none",
+                    maxHeight: 220, width: "100%", padding: "0 2px",
+                    boxSizing: "border-box",
+                    opacity: friendReactionSelectedFriends.size > 0 ? 1 : 0.35,
+                    pointerEvents: friendReactionSelectedFriends.size > 0 ? "auto" : "none",
+                    transition: "opacity 0.2s",
+                  }}>
+                    {COOP_REACTIONS.map((r) => (
+                      r.type === "text" ? (
+                        <button key={r.content} onClick={(e) => {
+                          e.stopPropagation();
+                          if (firebaseUser && friendReactionSelectedFriends.size > 0) {
+                            const selectedNames = [];
+                            friendReactionSelectedFriends.forEach(uid => {
+                              sendFriendReaction(firebaseUser.uid, uid, r.content, username || "Player", r.type).catch(() => {});
+                              const f = friendsList.find(fr => fr.uid === uid);
+                              if (f) selectedNames.push(f.username);
+                            });
+                            const label = selectedNames.length === 1 ? `You \u2192 ${selectedNames[0]}` : `You \u2192 ${selectedNames.length} friends`;
+                            const id = Date.now() + Math.random();
+                            const x = 10 + Math.random() * 80;
+                            setFriendFloatingReactions(prev => [...prev, { id, emoji: r.content, fromName: label, fromColor: COOP_MY_COLOR, x, type: r.type }]);
+                            setTimeout(() => setFriendFloatingReactions(prev => prev.filter(fr => fr.id !== id)), 3500);
+                          }
+                        }} style={{
+                          fontSize: 13, fontWeight: 600, fontFamily: "'Inter', sans-serif",
+                          background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+                          cursor: "pointer", padding: "7px 12px", borderRadius: 8,
+                          color: C.text, transition: "transform 0.12s, background-color 0.12s, border-color 0.12s",
+                          letterSpacing: 0.3, lineHeight: 1.2,
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "#FFD700"; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = C.border; }}
+                        >{r.content}</button>
+                      ) : (
+                        <button key={r.content} onClick={(e) => {
+                          e.stopPropagation();
+                          if (firebaseUser && friendReactionSelectedFriends.size > 0) {
+                            const selectedNames = [];
+                            friendReactionSelectedFriends.forEach(uid => {
+                              sendFriendReaction(firebaseUser.uid, uid, r.content, username || "Player", r.type).catch(() => {});
+                              const f = friendsList.find(fr => fr.uid === uid);
+                              if (f) selectedNames.push(f.username);
+                            });
+                            const label = selectedNames.length === 1 ? `You \u2192 ${selectedNames[0]}` : `You \u2192 ${selectedNames.length} friends`;
+                            const id = Date.now() + Math.random();
+                            const x = 10 + Math.random() * 80;
+                            setFriendFloatingReactions(prev => [...prev, { id, emoji: r.content, fromName: label, fromColor: COOP_MY_COLOR, x, type: r.type }]);
+                            setTimeout(() => setFriendFloatingReactions(prev => prev.filter(fr => fr.id !== id)), 3500);
+                          }
+                        }} style={{
+                          fontSize: r.type === "emoji" ? 28 : 24, background: "none", border: "none",
+                          cursor: "pointer", padding: "5px 6px", borderRadius: 10,
+                          color: r.type === "pattern" ? C.text : undefined,
+                          transition: "transform 0.12s, background-color 0.12s", lineHeight: 1,
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.2)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                        >{r.content}</button>
+                      )
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -11277,9 +11311,10 @@ export default function Pattrn() {
             ))}
           </div>
         )}
-        {renderContextButton("custom-mosaic", isCoopMosaic && coopMosaicAnyConnected ? [
-          { id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => setCoopReactionPickerOpen(prev => !prev) },
-        ] : [])}
+        {renderContextButton("custom-mosaic", [
+          ...(isCoopMosaic && coopMosaicAnyConnected ? [{ id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => { setCoopReactionPickerOpen(prev => !prev); setFriendReactionPickerOpen(false); } }] : []),
+          ...(firebaseConfigured && firebaseUser && onlineFriendsCount > 0 ? [{ id: "friend-reaction", icon: "friend-reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => { setFriendReactionPickerOpen(prev => !prev); setCoopReactionPickerOpen(false); } }] : []),
+        ])}
         {globalModalsEl}
       </div>
     );
@@ -11901,7 +11936,10 @@ export default function Pattrn() {
           </div>
         )}
 
-      {renderContextButton("gallery", [{ id: "create", icon: "plus", color: C.accent, onClick: () => setView("creator") }])}
+      {renderContextButton("gallery", [
+        { id: "create", icon: "plus", color: C.accent, onClick: () => setView("creator") },
+        ...(firebaseConfigured && firebaseUser && onlineFriendsCount > 0 ? [{ id: "friend-reaction", icon: "friend-reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => { setFriendReactionPickerOpen(prev => !prev); } }] : []),
+      ])}
       {globalModalsEl}
       </div>
     );
@@ -14496,6 +14534,10 @@ export default function Pattrn() {
           }
           if (onlineFriendsCount > 0) {
             menuPillButtons.push({ id: "friends-online", icon: "friends", color: "#22C55E", onClick: () => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); } });
+            menuPillButtons.push({ id: "friend-reaction", icon: "friend-reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
+              setFriendReactionPickerOpen(prev => !prev);
+              setCoopReactionPickerOpen(false);
+            }});
           }
         }
         return renderContextButton("menu", menuPillButtons);
@@ -14590,6 +14632,7 @@ export default function Pattrn() {
     if (isCoop && Object.keys(coopPlayers).length > 0) {
       playPillButtons.push({ id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
         setCoopReactionPickerOpen(prev => !prev);
+        setFriendReactionPickerOpen(false);
         // Cancel any active pass/suggest modes
         setCoopPassMode(null); setCoopPassPlayerPicker(false);
         setCoopSuggestMode(null); setCoopSuggestPlayerPicker(false); setCoopSuggestCell(null);
@@ -14599,6 +14642,16 @@ export default function Pattrn() {
     if (isCoopMosaic && coopMosaicAnyConnected) {
       playPillButtons.push({ id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
         setCoopReactionPickerOpen(prev => !prev);
+        setFriendReactionPickerOpen(false);
+      }});
+    }
+    // Friend reaction button — send reactions to online friends from any play mode
+    if (firebaseConfigured && firebaseUser && onlineFriendsCount > 0) {
+      playPillButtons.push({ id: "friend-reaction", icon: "friend-reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
+        setFriendReactionPickerOpen(prev => !prev);
+        setCoopReactionPickerOpen(false);
+        setCoopPassMode(null); setCoopPassPlayerPicker(false);
+        setCoopSuggestMode(null); setCoopSuggestPlayerPicker(false); setCoopSuggestCell(null);
       }});
     }
     if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
