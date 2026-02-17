@@ -1554,3 +1554,27 @@ export async function addCoopMosaicInvitedUid(sessionId, uid) {
   if (!db) return;
   await set(ref(db, `coopMosaicSessions/${sessionId}/invitedUids/${uid}`), Date.now());
 }
+
+// --- Friend Reactions ---
+
+// Send a reaction to a friend (stored under their uid so they receive it)
+export async function sendFriendReaction(fromUid, toUid, emoji, fromUsername, type = "emoji") {
+  if (!db) return;
+  const reactionRef = push(ref(db, `friendReactions/${toUid}`));
+  await set(reactionRef, { fromUid, emoji, fromUsername, type, timestamp: Date.now() });
+  // Auto-cleanup after 6 seconds so reactions don't accumulate
+  setTimeout(() => {
+    remove(reactionRef).catch(() => {});
+  }, 6000);
+}
+
+// Subscribe to incoming friend reactions in real-time
+export function subscribeToFriendReactions(uid, callback) {
+  if (!db) return () => {};
+  const reactionsRef = ref(db, `friendReactions/${uid}`);
+  const handler = onValue(reactionsRef, (snap) => {
+    if (!snap.exists()) { callback({}); return; }
+    callback(snap.val());
+  });
+  return () => off(reactionsRef, "value", handler);
+}

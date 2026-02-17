@@ -32,7 +32,6 @@ import {
   cancelCoopPassRequest,
   sendCoopCellSuggestion,
   cancelCoopCellSuggestion,
-  sendCoopReaction,
   lockInCoopPlayer,
   unlockCoopPlayer,
   updateCoopAttempts,
@@ -87,10 +86,11 @@ import {
   closeCoopMosaicSession,
   loadCoopMosaicSession,
   updateCoopMosaicTileLockedCells,
-  sendCoopMosaicReaction,
   addCoopInvitedUid,
   addCoopMosaicInvitedUid,
   generateCoopMosaicSessionId,
+  sendFriendReaction,
+  subscribeToFriendReactions,
 } from "./firebase.js";
 
 // --- Theme ---
@@ -2979,7 +2979,6 @@ export default function Pattrn() {
   const [coopSuggestCell, setCoopSuggestCell] = useState(null); // cellKey selected for suggestion, waiting for token pick
   const [coopAllSuggestions, setCoopAllSuggestions] = useState([]); // all suggestions (incoming + outgoing) for grid display: [{ fromUid, fromName, fromColor, cellKey, suggestedToken, isMine }]
   // --- Coop reaction state ---
-  const [coopReactionPickerOpen, setCoopReactionPickerOpen] = useState(false); // show reaction picker
   const [coopFloatingReactions, setCoopFloatingReactions] = useState([]); // floating reaction animations: [{ id, emoji, fromName, fromColor, x, type }]
   const coopSeenReactionsRef = useRef(new Set()); // track already-seen reaction keys to detect new ones
   // All reactions in one flat list: emoji, then patterns, then text words
@@ -3086,6 +3085,12 @@ export default function Pattrn() {
 
   // --- Confirmation for friend removal (stores uid of friend being removed) ---
   const [removeFriendConfirm, setRemoveFriendConfirm] = useState(null); // uid or null
+
+  // --- Friend Reactions state ---
+  const [friendReactionPickerOpen, setFriendReactionPickerOpen] = useState(false); // show friend reaction panel in Liquid Glass pill
+  const [friendReactionSelectedFriends, setFriendReactionSelectedFriends] = useState(new Set()); // multi-select: Set of friend uids to send reactions to
+  const [friendFloatingReactions, setFriendFloatingReactions] = useState([]); // floating reaction animations: [{ id, emoji, fromName, fromColor, x, type }]
+  const friendSeenReactionsRef = useRef(new Set()); // track already-seen friend reaction keys
 
   // --- Admin Metrics state ---
   const [adminMetrics, setAdminMetrics] = useState(null); // computed metrics object
@@ -3334,6 +3339,37 @@ export default function Pattrn() {
       unsub();
       notifUnsubRef.current = null;
     };
+  }, [firebaseUser, firebaseConfigured]);
+
+  // Subscribe to incoming friend reactions in real-time
+  useEffect(() => {
+    if (!firebaseUser || !firebaseConfigured) return;
+    friendSeenReactionsRef.current = new Set();
+    let initialLoad = true;
+    const unsub = subscribeToFriendReactions(firebaseUser.uid, (reactions) => {
+      const keys = Object.keys(reactions);
+      if (initialLoad) {
+        friendSeenReactionsRef.current = new Set(keys);
+        initialLoad = false;
+        return;
+      }
+      for (const key of keys) {
+        if (!friendSeenReactionsRef.current.has(key)) {
+          const r = reactions[key];
+          if (r.fromUid !== firebaseUser.uid) {
+            const id = Date.now() + Math.random();
+            const x = 10 + Math.random() * 80;
+            const color = COOP_NEON_COLORS[Math.abs(r.fromUid.charCodeAt(0)) % COOP_NEON_COLORS.length];
+            setFriendFloatingReactions(prev => [...prev, { id, emoji: r.emoji, fromName: r.fromUsername || "Friend", fromColor: color, x, type: r.type || "emoji" }]);
+            setTimeout(() => {
+              setFriendFloatingReactions(prev => prev.filter(fr => fr.id !== id));
+            }, 3500);
+          }
+        }
+      }
+      friendSeenReactionsRef.current = new Set(keys);
+    });
+    return () => unsub();
   }, [firebaseUser, firebaseConfigured]);
 
   // Load active coop sessions (one-shot, used by callbacks)
@@ -5221,13 +5257,14 @@ export default function Pattrn() {
     const showSuggestPlayerPicker = coopSuggestPlayerPicker && !coopSuggestMode;
     const showSuggestBanner = !!coopSuggestMode && !coopSuggestCell;
     const showSuggestTokenPick = !!coopSuggestCell && !!coopSuggestMode;
-    // Reaction picker state
-    const showReactionPicker = coopReactionPickerOpen && !showPassPlayerPicker && !showPassBanner && !showPassPending && !showPassIncoming && !showSuggestPlayerPicker && !showSuggestBanner && !showSuggestTokenPick;
-    const hasPassUI = isCustomPanel ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming || showSuggestPlayerPicker || showSuggestBanner || showSuggestTokenPick || showReactionPicker);
+    // Friend reaction picker state — shows friend checkboxes + reaction grid
+    const onlineFriendsList = friendsList.filter(f => { const p = friendPresence[f.uid]; return p && p.lastSeen && (Date.now() - p.lastSeen) < 120000; });
+    const showFriendReactionPicker = friendReactionPickerOpen && !showPassPlayerPicker && !showPassBanner && !showPassPending && !showPassIncoming && !showSuggestPlayerPicker && !showSuggestBanner && !showSuggestTokenPick;
+    const hasPassUI = isCustomPanel ? false : (showPassPlayerPicker || showPassBanner || showPassPending || showPassIncoming || showSuggestPlayerPicker || showSuggestBanner || showSuggestTokenPick || showFriendReactionPicker);
     const passPlayerCount = showPassPlayerPicker ? Object.keys(coopPlayers).length : (showSuggestPlayerPicker ? Object.keys(coopPlayers).length : 0);
     const suggestTokenCount = showSuggestTokenPick ? (puzzle?.usedTokens?.length || 0) : 0;
-    const reactionPickerHeight = showReactionPicker ? 228 : 0;
-    const passRowHeight = (showPassPlayerPicker || showSuggestPlayerPicker) ? (passPlayerCount > 2 ? 88 : 56) : showSuggestTokenPick ? Math.max(56, 36 + Math.ceil(suggestTokenCount / 6) * 36) : showReactionPicker ? reactionPickerHeight : showPassIncoming ? 56 : 48;
+    const friendReactionPickerHeight = showFriendReactionPicker ? (Math.min(onlineFriendsList.length, 3) * 40 + 24 + 228) : 0; // friend rows + label + reaction grid
+    const passRowHeight = (showPassPlayerPicker || showSuggestPlayerPicker) ? (passPlayerCount > 2 ? 88 : 56) : showSuggestTokenPick ? Math.max(56, 36 + Math.ceil(suggestTokenCount / 6) * 36) : showFriendReactionPicker ? friendReactionPickerHeight : showPassIncoming ? 56 : 48;
     const passUIHeight = hasPassUI ? passRowHeight + 17 : 0; // +16px padding + 1px divider
 
     // Coop start menu height — back button + header + subtitle + mosaic card + friends list + action buttons
@@ -5512,7 +5549,7 @@ export default function Pattrn() {
     const handleToggle = () => {
       // Don't allow closing if username is required
       if (isOpen && !username && isUsernameEdit) return;
-      if (isOpen) setRadialMenuStack([]);
+      if (isOpen) { setRadialMenuStack([]); setFriendReactionPickerOpen(false); }
       else setRadialMenuStack(["root"]);
     };
 
@@ -5652,16 +5689,16 @@ export default function Pattrn() {
               // Don't allow closing modal if username is required
               if (!username && isUsernameEdit) return;
               setRadialMenuStack([]);
-              setCoopReactionPickerOpen(false);
+              setFriendReactionPickerOpen(false);
             }}
             onTouchMove={e => e.preventDefault()}
             style={{ position: "fixed", inset: 0, zIndex: 84, touchAction: "none", overscrollBehavior: "none" }}
           />
         )}
         {/* Click-away layer for reaction picker when menu is closed */}
-        {!isOpen && showReactionPicker && (
+        {!isOpen && showFriendReactionPicker && (
           <div
-            onClick={() => setCoopReactionPickerOpen(false)}
+            onClick={() => setFriendReactionPickerOpen(false)}
             style={{ position: "fixed", inset: 0, zIndex: 84 }}
           />
         )}
@@ -7625,58 +7662,118 @@ export default function Pattrn() {
                   </div>
                 </div>
               )}
-              {/* Reaction picker — single scrollable grid */}
-              {showReactionPicker && (
-                <div className="reaction-scroll-container" style={{
-                  display: "flex", flexWrap: "wrap", gap: 4,
-                  justifyContent: "center", alignContent: "flex-start",
-                  overflowY: "auto", WebkitOverflowScrolling: "touch",
-                  scrollbarWidth: "none", msOverflowStyle: "none",
-                  maxHeight: 220, width: "100%", padding: "0 2px",
-                  boxSizing: "border-box",
-                }}>
-                  {COOP_REACTIONS.map((r) => (
-                    r.type === "text" ? (
-                      <button key={r.content} onClick={(e) => {
-                        e.stopPropagation();
-                        if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
-                          sendCoopMosaicReaction(coopMosaicSessionId, firebaseUser.uid, r.content, username || "Player", r.type).catch(() => {});
-                          addFloatingReaction(r.content, "You", COOP_MY_COLOR, r.type);
-                        } else if (coopSessionId && firebaseUser) {
-                          sendCoopReaction(coopSessionId, firebaseUser.uid, r.content, username || "Player", r.type).catch(() => {});
-                          addFloatingReaction(r.content, "You", COOP_MY_COLOR, r.type);
-                        }
-                      }} style={{
-                        fontSize: 13, fontWeight: 600, fontFamily: "'Inter', sans-serif",
-                        background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
-                        cursor: "pointer", padding: "7px 12px", borderRadius: 8,
-                        color: C.text, transition: "transform 0.12s, background-color 0.12s, border-color 0.12s",
-                        letterSpacing: 0.3, lineHeight: 1.2,
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "#FFD700"; }}
-                        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = C.border; }}
-                      >{r.content}</button>
-                    ) : (
-                      <button key={r.content} onClick={(e) => {
-                        e.stopPropagation();
-                        if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
-                          sendCoopMosaicReaction(coopMosaicSessionId, firebaseUser.uid, r.content, username || "Player", r.type).catch(() => {});
-                          addFloatingReaction(r.content, "You", COOP_MY_COLOR, r.type);
-                        } else if (coopSessionId && firebaseUser) {
-                          sendCoopReaction(coopSessionId, firebaseUser.uid, r.content, username || "Player", r.type).catch(() => {});
-                          addFloatingReaction(r.content, "You", COOP_MY_COLOR, r.type);
-                        }
-                      }} style={{
-                        fontSize: r.type === "emoji" ? 28 : 24, background: "none", border: "none",
-                        cursor: "pointer", padding: "5px 6px", borderRadius: 10,
-                        color: r.type === "pattern" ? C.text : undefined,
-                        transition: "transform 0.12s, background-color 0.12s", lineHeight: 1,
-                      }}
-                        onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.2)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
-                      >{r.content}</button>
-                    )
-                  ))}
+              {/* Friend reaction picker — friend checkboxes + reaction grid */}
+              {showFriendReactionPicker && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+                  {/* Friend checkboxes */}
+                  <div style={{ fontSize: 9, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", fontWeight: 600, textAlign: "center" }}>
+                    Send to {friendReactionSelectedFriends.size > 0 && `(${friendReactionSelectedFriends.size} selected)`}
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4, maxHeight: Math.min(onlineFriendsList.length, 3) * 40, overflowY: "auto", scrollbarWidth: "none", msOverflowStyle: "none" }}>
+                    {onlineFriendsList.map(friend => {
+                      const isSelected = friendReactionSelectedFriends.has(friend.uid);
+                      return (
+                        <button key={friend.uid} onClick={(e) => {
+                          e.stopPropagation();
+                          setFriendReactionSelectedFriends(prev => {
+                            const next = new Set(prev);
+                            if (next.has(friend.uid)) next.delete(friend.uid); else next.add(friend.uid);
+                            return next;
+                          });
+                        }} style={{
+                          display: "flex", alignItems: "center", gap: 8, padding: "6px 10px", borderRadius: 8,
+                          backgroundColor: isSelected ? "#FFD700" + "18" : "rgba(255,255,255,0.04)",
+                          border: `1px solid ${isSelected ? "#FFD700" : "rgba(255,255,255,0.08)"}`,
+                          cursor: "pointer", transition: "all 0.15s", width: "100%", textAlign: "left",
+                        }}>
+                          <div style={{
+                            width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                            border: `2px solid ${isSelected ? "#FFD700" : "rgba(255,255,255,0.15)"}`,
+                            backgroundColor: isSelected ? "#FFD700" : "transparent",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            transition: "all 0.15s",
+                          }}>
+                            {isSelected && <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#000" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>}
+                          </div>
+                          {friend.profilePicture ? (
+                            <img src={friend.profilePicture} alt="" style={{ width: 22, height: 22, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
+                          ) : (
+                            <div style={{ width: 22, height: 22, borderRadius: "50%", backgroundColor: "#FFD700" + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: "#FFD700", fontWeight: 700, flexShrink: 0 }}>
+                              {(friend.username || "?")[0].toUpperCase()}
+                            </div>
+                          )}
+                          <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 600, color: C.text, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{friend.username}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Reaction grid */}
+                  <div className="reaction-scroll-container" style={{
+                    display: "flex", flexWrap: "wrap", gap: 4,
+                    justifyContent: "center", alignContent: "flex-start",
+                    overflowY: "auto", WebkitOverflowScrolling: "touch",
+                    scrollbarWidth: "none", msOverflowStyle: "none",
+                    maxHeight: 220, width: "100%", padding: "0 2px",
+                    boxSizing: "border-box",
+                    opacity: friendReactionSelectedFriends.size > 0 ? 1 : 0.35,
+                    pointerEvents: friendReactionSelectedFriends.size > 0 ? "auto" : "none",
+                    transition: "opacity 0.2s",
+                  }}>
+                    {COOP_REACTIONS.map((r) => (
+                      r.type === "text" ? (
+                        <button key={r.content} onClick={(e) => {
+                          e.stopPropagation();
+                          if (firebaseUser && friendReactionSelectedFriends.size > 0) {
+                            const selectedNames = [];
+                            friendReactionSelectedFriends.forEach(uid => {
+                              sendFriendReaction(firebaseUser.uid, uid, r.content, username || "Player", r.type).catch(() => {});
+                              const f = friendsList.find(fr => fr.uid === uid);
+                              if (f) selectedNames.push(f.username);
+                            });
+                            const label = selectedNames.length === 1 ? `You \u2192 ${selectedNames[0]}` : `You \u2192 ${selectedNames.length} friends`;
+                            const id = Date.now() + Math.random();
+                            const x = 10 + Math.random() * 80;
+                            setFriendFloatingReactions(prev => [...prev, { id, emoji: r.content, fromName: label, fromColor: COOP_MY_COLOR, x, type: r.type }]);
+                            setTimeout(() => setFriendFloatingReactions(prev => prev.filter(fr => fr.id !== id)), 3500);
+                          }
+                        }} style={{
+                          fontSize: 13, fontWeight: 600, fontFamily: "'Inter', sans-serif",
+                          background: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`,
+                          cursor: "pointer", padding: "7px 12px", borderRadius: 8,
+                          color: C.text, transition: "transform 0.12s, background-color 0.12s, border-color 0.12s",
+                          letterSpacing: 0.3, lineHeight: 1.2,
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; e.currentTarget.style.borderColor = "#FFD700"; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; e.currentTarget.style.borderColor = C.border; }}
+                        >{r.content}</button>
+                      ) : (
+                        <button key={r.content} onClick={(e) => {
+                          e.stopPropagation();
+                          if (firebaseUser && friendReactionSelectedFriends.size > 0) {
+                            const selectedNames = [];
+                            friendReactionSelectedFriends.forEach(uid => {
+                              sendFriendReaction(firebaseUser.uid, uid, r.content, username || "Player", r.type).catch(() => {});
+                              const f = friendsList.find(fr => fr.uid === uid);
+                              if (f) selectedNames.push(f.username);
+                            });
+                            const label = selectedNames.length === 1 ? `You \u2192 ${selectedNames[0]}` : `You \u2192 ${selectedNames.length} friends`;
+                            const id = Date.now() + Math.random();
+                            const x = 10 + Math.random() * 80;
+                            setFriendFloatingReactions(prev => [...prev, { id, emoji: r.content, fromName: label, fromColor: COOP_MY_COLOR, x, type: r.type }]);
+                            setTimeout(() => setFriendFloatingReactions(prev => prev.filter(fr => fr.id !== id)), 3500);
+                          }
+                        }} style={{
+                          fontSize: r.type === "emoji" ? 28 : 24, background: "none", border: "none",
+                          cursor: "pointer", padding: "5px 6px", borderRadius: 10,
+                          color: r.type === "pattern" ? C.text : undefined,
+                          transition: "transform 0.12s, background-color 0.12s", lineHeight: 1,
+                        }}
+                          onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.2)"; e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.1)"; }}
+                          onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.backgroundColor = "transparent"; }}
+                        >{r.content}</button>
+                      )
+                    ))}
+                  </div>
                 </div>
               )}
             </div>
@@ -8656,7 +8753,7 @@ export default function Pattrn() {
     setCoopSuggestPlayerPicker(false);
     setCoopSuggestCell(null);
     setCoopAllSuggestions([]);
-    setCoopReactionPickerOpen(false);
+    setFriendReactionPickerOpen(false);
     setCoopFloatingReactions([]);
     coopSeenReactionsRef.current = new Set();
     coopPlayerUidsRef.current = "";
@@ -10617,6 +10714,48 @@ export default function Pattrn() {
     </div>
   );
 
+  // --- Floating friend reactions overlay (appears on any view) ---
+  const friendReactionsOverlayEl = friendFloatingReactions.length > 0 && (
+    <div style={{
+      position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9998,
+      overflow: "hidden",
+    }}>
+      <style>{`@keyframes coopReactionFloat { 0%{transform:translateY(0) scale(0.5);opacity:0} 8%{transform:translateY(-5vh) scale(1.1);opacity:1} 15%{transform:translateY(-10vh) scale(1)} 70%{opacity:1} 100%{transform:translateY(-85vh) scale(1.2);opacity:0} }`}</style>
+      {friendFloatingReactions.map(r => (
+        <div key={r.id} style={{
+          position: "absolute",
+          left: `${r.x}%`,
+          bottom: 60,
+          animation: "coopReactionFloat 3.5s ease-out forwards",
+          display: "flex", flexDirection: "column", alignItems: "center",
+          transform: "translateX(-50%)",
+        }}>
+          {r.type === "text" ? (
+            <span style={{
+              fontSize: 22, fontWeight: 800, fontFamily: "'Inter', sans-serif",
+              color: "#fff", lineHeight: 1,
+              textShadow: `0 0 14px ${r.fromColor}88, 0 2px 8px rgba(0,0,0,0.7)`,
+              letterSpacing: 1,
+            }}>{r.emoji}</span>
+          ) : r.type === "pattern" ? (
+            <span style={{
+              fontSize: 56, lineHeight: 1, color: r.fromColor,
+              filter: `drop-shadow(0 0 10px ${r.fromColor}88) drop-shadow(0 2px 6px rgba(0,0,0,0.5))`,
+            }}>{r.emoji}</span>
+          ) : (
+            <span style={{ fontSize: 48, lineHeight: 1, filter: "drop-shadow(0 2px 8px rgba(0,0,0,0.5))" }}>{r.emoji}</span>
+          )}
+          <span style={{
+            fontSize: 10, fontWeight: 700, color: r.fromColor,
+            fontFamily: "'Inter', sans-serif",
+            textShadow: "0 1px 4px rgba(0,0,0,0.8)",
+            whiteSpace: "nowrap", marginTop: 2,
+          }}>{r.fromName}</span>
+        </div>
+      ))}
+    </div>
+  );
+
   // --- Global modals element (included in every return) ---
   const globalModalsEl = (
     <>
@@ -10625,6 +10764,7 @@ export default function Pattrn() {
       {coopMosaicInviteEl}
       {coopInviteToastEl}
       {coopMosaicNavigateEl}
+      {friendReactionsOverlayEl}
     </>
   );
 
@@ -11106,9 +11246,9 @@ export default function Pattrn() {
             ))}
           </div>
         )}
-        {renderContextButton("custom-mosaic", isCoopMosaic && coopMosaicAnyConnected ? [
-          { id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => setCoopReactionPickerOpen(prev => !prev) },
-        ] : [])}
+        {renderContextButton("custom-mosaic", [
+          ...(firebaseConfigured && firebaseUser && onlineFriendsCount > 0 ? [{ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => setFriendReactionPickerOpen(prev => !prev) }] : []),
+        ])}
         {globalModalsEl}
       </div>
     );
@@ -11730,7 +11870,10 @@ export default function Pattrn() {
           </div>
         )}
 
-      {renderContextButton("gallery", [{ id: "create", icon: "plus", color: C.accent, onClick: () => setView("creator") }])}
+      {renderContextButton("gallery", [
+        { id: "create", icon: "plus", color: C.accent, onClick: () => setView("creator") },
+        ...(firebaseConfigured && firebaseUser && onlineFriendsCount > 0 ? [{ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => setFriendReactionPickerOpen(prev => !prev) }] : []),
+      ])}
       {globalModalsEl}
       </div>
     );
@@ -14325,6 +14468,7 @@ export default function Pattrn() {
           }
           if (onlineFriendsCount > 0) {
             menuPillButtons.push({ id: "friends-online", icon: "friends", color: "#22C55E", onClick: () => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); } });
+            menuPillButtons.push({ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => setFriendReactionPickerOpen(prev => !prev) });
           }
         }
         return renderContextButton("menu", menuPillButtons);
@@ -14350,7 +14494,7 @@ export default function Pattrn() {
       setProgress(nextProgress); saveProgress(nextProgress);
     }
     stopTimer(); setRadialMenuStack(prev => prev.includes("mosaic-preview") ? [] : prev);
-    setCoopReactionPickerOpen(false);
+    setFriendReactionPickerOpen(false);
     if (customMosaicPuzzlesRef.current && isMosaic) {
       if (isCoopMosaic && coopMosaicSessionId && firebaseUser) {
         coopMosaicCurrentTileRef.current = -1;
@@ -14390,7 +14534,7 @@ export default function Pattrn() {
           setSelectedToken(null); setSelectedCell(null);
           // Cancel any active suggest mode and reaction picker
           setCoopSuggestMode(null); setCoopSuggestPlayerPicker(false); setCoopSuggestCell(null);
-          setCoopReactionPickerOpen(false);
+          setFriendReactionPickerOpen(false);
           const entries = Object.entries(coopPlayers);
           if (entries.length === 1) {
             const [uid, p] = entries[0];
@@ -14407,7 +14551,7 @@ export default function Pattrn() {
         setSelectedToken(null); setSelectedCell(null);
         // Cancel any active pass mode and reaction picker
         setCoopPassMode(null); setCoopPassPlayerPicker(false);
-        setCoopReactionPickerOpen(false);
+        setFriendReactionPickerOpen(false);
         const entries = Object.entries(coopPlayers);
         if (entries.length === 1) {
           const [uid, p] = entries[0];
@@ -14415,19 +14559,12 @@ export default function Pattrn() {
         } else { setCoopSuggestPlayerPicker(prev => !prev); }
       }});
     }
-    // Reaction button — send emoji reactions to all players
-    if (isCoop && Object.keys(coopPlayers).length > 0) {
-      playPillButtons.push({ id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
-        setCoopReactionPickerOpen(prev => !prev);
-        // Cancel any active pass/suggest modes
+    // Friend reaction button — send reactions to online friends from any play mode
+    if (firebaseConfigured && firebaseUser && onlineFriendsCount > 0) {
+      playPillButtons.push({ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
+        setFriendReactionPickerOpen(prev => !prev);
         setCoopPassMode(null); setCoopPassPlayerPicker(false);
         setCoopSuggestMode(null); setCoopSuggestPlayerPicker(false); setCoopSuggestCell(null);
-      }});
-    }
-    // Mosaic coop: reaction button (visible on tile views when any player is connected)
-    if (isCoopMosaic && coopMosaicAnyConnected) {
-      playPillButtons.push({ id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
-        setCoopReactionPickerOpen(prev => !prev);
       }});
     }
     if (customMosaicPuzzlesRef.current && isMosaic && customMosaicPlay) {
@@ -14465,12 +14602,6 @@ export default function Pattrn() {
       playPillButtons.push({ id: "done", icon: "home", color: "#54A0FF", onClick: () => { leaveCoopSession(); setView("menu"); } });
     } else if (currentPuzzle < totalPuzzles - 1) {
       playPillButtons.push({ id: "next", icon: "forward", color: C.accent, onClick: () => startPuzzle(currentPuzzle + 1) });
-    }
-    // Mosaic coop: reaction button in won state too
-    if (isCoopMosaic && coopMosaicAnyConnected) {
-      playPillButtons.push({ id: "reaction", icon: "reaction", color: coopReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
-        setCoopReactionPickerOpen(prev => !prev);
-      }});
     }
   } else if (gameState === "lost") {
     // Share (cascade only)
