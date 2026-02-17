@@ -8983,7 +8983,21 @@ export default function Pattrn() {
       for (const k of blanks) ownerMap[k] = uid;
     }
     setCoopCellOwnerMap(ownerMap);
-    setCoopMyBlanks(blanksMap[myUid] || new Set());
+    const myNewBlanks = blanksMap[myUid] || new Set();
+    setCoopMyBlanks(myNewBlanks);
+    // Clean up local fills for cells no longer assigned to this player
+    // (e.g., player filled cells before partner joined and blanks were re-split)
+    setFills(prev => {
+      const next = { ...prev };
+      let changed = false;
+      for (const key of Object.keys(next)) {
+        if (!myNewBlanks.has(key)) {
+          delete next[key];
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
     const otherBlanks = new Set();
     for (const [uid, blanks] of Object.entries(blanksMap)) {
       if (uid !== myUid) {
