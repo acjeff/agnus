@@ -14773,7 +14773,9 @@ export default function Pattrn() {
           animation: "fadeUp 0.5s ease both",
           pointerEvents: "none",
         }}>
-          <div style={{ fontSize: 48, marginBottom: 8, animation: "fadeUp 0.4s ease" }}>🎉</div>
+          <div style={{ fontSize: 48, marginBottom: 8, animation: "fadeUp 0.4s ease" }}>
+            {isCoop ? "🎉" : isCascade ? "🎉" : isBlind ? "🎉" : isSpin ? "🎉" : isMosaic ? "🎉" : (attempts === 0 ? "⭐" : attempts === 1 ? "🌟" : attempts === 2 ? "✨" : attempts === 3 ? "👍" : "✅")}
+          </div>
           <div style={{ fontSize: 11, fontWeight: 600, fontFamily: "'Inter', sans-serif", color: C.textDim, textTransform: "uppercase", letterSpacing: 2, marginBottom: 6, animation: "fadeUp 0.45s ease both" }}>
             Puzzle Complete
           </div>
@@ -14851,23 +14853,41 @@ export default function Pattrn() {
           )}
         </div>
       )}
+
+      {/* Puzzle failed overlay — blurry area on top of failed grid */}
+      {gameState === "lost" && (
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          backgroundColor: (C.surface || C.bg) + "BB",
+          zIndex: 5,
+          animation: "fadeUp 0.5s ease both",
+          pointerEvents: "none",
+        }}>
+          <div style={{ fontSize: 48, marginBottom: 8, animation: "fadeUp 0.4s ease" }}>❌</div>
+          <div style={{ fontSize: 11, fontWeight: 600, fontFamily: "'Inter', sans-serif", color: C.textDim, textTransform: "uppercase", letterSpacing: 2, marginBottom: 6, animation: "fadeUp 0.45s ease both" }}>
+            Puzzle Failed
+          </div>
+          <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.incorrect, animation: "fadeUp 0.5s 0.05s ease both" }}>
+            {isCoop ? "Co-op failed" : isCascade ? "Run over" : "Not this time"}
+          </div>
+          {(isCoop || isCascade || !isCoop) && (
+            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 6, animation: "fadeUp 0.55s 0.1s ease both" }}>
+              {isCoop ? "Out of attempts" : isCascade ? `Reached ${puzzle?.gridSize ?? 0}×${puzzle?.gridSize ?? 0}` : "Better luck next time"}
+            </div>
+          )}
+        </div>
+      )}
       </div>
 
       {/* Fixed bottom bar: coop UI + game state info */}
       <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: activeTheme.gridBg || C.surface, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-
-        {gameState === "lost" && (
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontSize: 18, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.incorrect, marginBottom: 4, animation: "fadeUp 0.4s ease" }}>
-              {isCoop ? "Co-op failed" : isCascade ? "Run over" : "Not this time"}
-            </div>
-            <div style={{ fontSize: 12, color: C.textDim }}>
-              {isCoop ? "Out of attempts" : isCascade ? (
-                <div>Reached {puzzle?.gridSize ?? 0}×{puzzle?.gridSize ?? 0}</div>
-              ) : "Better luck next time"}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Token picker — Liquid Glass pill above the menu pill */}
