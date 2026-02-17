@@ -3597,6 +3597,15 @@ export default function Pattrn() {
         setMosaicMsg("Mosaic saved!");
       }
       setCreatorTitle(title);
+      // Navigate to My Mosaics after brief toast display
+      setTimeout(() => {
+        setMosaicMsg("");
+        resetCreator();
+        setMosaicGalleryTab("mine");
+        setView("gallery");
+        loadMosaicData("mine");
+      }, 1500);
+      return; // skip the finally timeout
     } catch (e) {
       console.error("Save mosaic failed:", e);
       const isPermErr = e?.message?.includes("PERMISSION_DENIED");
@@ -3605,7 +3614,7 @@ export default function Pattrn() {
       setMosaicLoading(false);
       setTimeout(() => setMosaicMsg(""), 4000);
     }
-  }, [firebaseUser, creatorGrid, creatorEditingId]);
+  }, [firebaseUser, creatorGrid, creatorEditingId, resetCreator]);
 
   const handleDeleteMosaic = useCallback(async (mosaicId) => {
     if (!firebaseUser) return;
@@ -11053,17 +11062,7 @@ export default function Pattrn() {
             </div>
           </div>
 
-          {/* Status messages */}
-          {mosaicMsg && (
-            <div style={{
-              width: "100%", maxWidth: 400, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginTop: 8, flexShrink: 0,
-              backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-              fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent, letterSpacing: 0.5,
-              animation: "fadeUp 0.3s 0.08s ease both",
-            }}>
-              {mosaicMsg}
-            </div>
-          )}
+          {/* Status messages — rendered as fixed centered toast */}
           {!firebaseUser && firebaseConfigured && (
             <div style={{ width: "100%", maxWidth: 400, textAlign: "center", fontSize: 11, color: C.textDim, marginTop: 8, flexShrink: 0, animation: "fadeUp 0.3s 0.08s ease both" }}>
               Sign in from the menu to save your creations
@@ -11202,6 +11201,21 @@ export default function Pattrn() {
         { id: "save", icon: "upload", color: C.accent, onClick: handleSaveClick, disabled: mosaicLoading },
       ])}
 
+      {/* Fixed centered toast for mosaic messages */}
+      {mosaicMsg && (
+        <div style={{
+          position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+          zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
+          backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
+          fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
+          boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
+          animation: "fadeUp 0.3s 0.08s ease both",
+          pointerEvents: "none",
+        }}>
+          {mosaicMsg}
+        </div>
+      )}
+
       {globalModalsEl}
       </div>
     );
@@ -11261,11 +11275,16 @@ export default function Pattrn() {
           ))}
         </div>
 
+        {/* Fixed centered toast for mosaic messages */}
         {mosaicMsg && (
           <div style={{
-            width: "100%", maxWidth: 400, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-            fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent,
+            fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
+            animation: "fadeUp 0.3s 0.08s ease both",
+            pointerEvents: "none",
           }}>
             {mosaicMsg}
           </div>
@@ -11588,11 +11607,16 @@ export default function Pattrn() {
           </h2>
         </div>
 
+        {/* Fixed centered toast for mosaic messages */}
         {mosaicMsg && (
           <div style={{
-            width: "100%", maxWidth: 480, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-            fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent,
+            fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
+            animation: "fadeUp 0.3s 0.08s ease both",
+            pointerEvents: "none",
           }}>
             {mosaicMsg}
           </div>
@@ -11683,11 +11707,16 @@ export default function Pattrn() {
           </h2>
         </div>
 
+        {/* Fixed centered toast for mosaic messages */}
         {mosaicMsg && (
           <div style={{
-            width: "100%", maxWidth: 480, textAlign: "center", padding: "8px 12px", borderRadius: 8, marginBottom: 12,
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
+            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
-            fontFamily: "'Inter', sans-serif", fontSize: 11, color: C.accent,
+            fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
+            boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
+            animation: "fadeUp 0.3s 0.08s ease both",
+            pointerEvents: "none",
           }}>
             {mosaicMsg}
           </div>
