@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ChevronLeft } from "lucide-react";
-import VaultLock, { TokenTile, parseToken } from "./VaultLock.jsx";
+import VaultLock, { TokenTile, parseToken, LOCK_SHAPES } from "./VaultLock.jsx";
 import { buildVaultPuzzles, computeUnlockedTiles, getMastermindFeedback, VAULT_DIFFICULTIES } from "./VaultGenerator.js";
 import {
   subscribeToVaultSession,
@@ -626,11 +626,15 @@ export default function VaultMode({
                   {puzzle.solution.map((row, ri) => (
                     <div key={ri} style={{ display: "flex", gap: 0.5 }}>
                       {row.map((token, ci) => {
-                        const { color } = parseToken(token);
+                        const { color, shapeIndex } = parseToken(token);
                         return <div key={ci} style={{
                           width: miniCellSz, height: miniCellSz,
                           borderRadius: 1, backgroundColor: color,
-                        }} />;
+                          position: "relative",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          {LOCK_SHAPES[shapeIndex % LOCK_SHAPES.length]?.(miniCellSz * 0.7, "rgba(255,255,255,0.55)")}
+                        </div>;
                       })}
                     </div>
                   ))}
