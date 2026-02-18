@@ -2743,11 +2743,15 @@ const DIFFICULTIES = [
   { key: "daily", label: "Daily", desc: "1 a day", cat: "special", icon: "calendar" },
   { key: "cascade", label: "Cascade", desc: "Keep on", cat: "special", icon: "layers" },
   { key: "spin", label: "Spin", desc: "7\u00D77 \u2022 Dizzy", cat: "special", icon: "shuffle" },
-  { key: "mosaic", label: "Mosaic", desc: "5\u00D75 \u2022 Big picture", cat: "special", icon: "gallery" },
 ];
 
-const MODE_CATEGORIES = ["classic", "special"];
-const CATEGORY_ICONS = { classic: "compass", special: "star" };
+const COOP_MODES = [
+  { key: "mosaic", label: "Mosaic", desc: "5\u00D75 \u2022 Big picture", cat: "coop", icon: "gallery" },
+  { key: "vault", label: "Vault", desc: "Co-op \u2022 Crack it", cat: "coop", icon: "lock" },
+];
+
+const MODE_CATEGORIES = ["classic", "special", "coop"];
+const CATEGORY_ICONS = { classic: "compass", special: "star", coop: "users" };
 const VALID_MODES = new Set(["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"]);
 
 const VALID_VIEWS = new Set(["gallery", "creator", "custom-mosaic", "coop", "profile"]);
@@ -14244,7 +14248,9 @@ export default function Pattrn() {
           width: "100%",
           display: "flex", flexDirection: "column", gap: 14,
         }}>
-          {MODE_CATEGORIES.map((cat) => (
+          {MODE_CATEGORIES.map((cat) => {
+            const entries = cat === "coop" ? COOP_MODES : DIFFICULTIES.filter((d) => d.cat === cat);
+            return (
             <div key={cat}>
               <div style={{
                 fontSize: 9, color: C.textDim, textTransform: "uppercase",
@@ -14260,18 +14266,22 @@ export default function Pattrn() {
                 gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
                 gap: 8,
               }}>
-                {DIFFICULTIES.filter((d) => d.cat === cat).map((d) => {
-                  const active = difficulty === d.key;
-                  const dp = progress[d.key] || {};
+                {entries.map((d) => {
+                  const isVaultEntry = d.key === "vault";
+                  const active = isVaultEntry ? false : difficulty === d.key;
+                  const dp = isVaultEntry ? {} : (progress[d.key] || {});
                   const solved = d.key === "cascade"
                     ? Object.keys(dp).filter((k) => /^\d+$/.test(k) && dp[k] === CASCADE_LEVELS.length).length
                     : Object.keys(dp).filter((k) => dp[k] > 0).length;
                   const modeTotal = d.key === "mosaic" ? 25 : 50;
-                  const isCleared = d.key !== "daily" && solved >= modeTotal;
+                  const isCleared = !isVaultEntry && d.key !== "daily" && solved >= modeTotal;
                   return (
                     <button
                       key={d.key}
-                      onClick={() => setDifficulty(d.key)}
+                      onClick={() => {
+                        if (isVaultEntry) { setView("coop"); }
+                        else { setDifficulty(d.key); }
+                      }}
                       style={{
                         padding: "12px 8px",
                         background: active ? (isCleared ? C.gold : d.key === "blind" ? "#e06040" : C.accent) : C.surface,
@@ -14298,13 +14308,14 @@ export default function Pattrn() {
                         fontSize: 8,
                         color: active ? (d.key === "blind" && !isCleared ? "#fff9" : C.bg + "aa") : isCleared ? C.gold + "cc" : C.textDim,
                       }}>{d.desc}</span>
-                      <span style={{ fontSize: 8, color: active ? (d.key === "blind" && !isCleared ? "#fff7" : C.bg + "88") : isCleared ? C.gold + "bb" : C.textDim }}>{d.key === "daily" ? `${solved} solved` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}{isCleared ? " \u2713" : ""}</span>
+                      {!isVaultEntry && <span style={{ fontSize: 8, color: active ? (d.key === "blind" && !isCleared ? "#fff7" : C.bg + "88") : isCleared ? C.gold + "bb" : C.textDim }}>{d.key === "daily" ? `${solved} solved` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}{isCleared ? " \u2713" : ""}</span>}
                     </button>
                   );
                 })}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
 
 
