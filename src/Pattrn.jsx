@@ -10287,40 +10287,6 @@ export default function Pattrn() {
       // Wrong guess but still have attempts - increment
       setAttempts(attempts + 1);
       setWrongCells(wrong);
-      // Vault: wrong answer but still has attempts — advance turn, return to vault
-      if (isVault && vaultSolvingTile !== null && vaultSessionId) {
-        const tileIdx = vaultSolvingTile;
-        // Save partial fills to Firebase so next player picks up where they left off
-        const vaultFills = {};
-        for (const k of Object.keys(fills)) {
-          if (!wrong.has(k)) vaultFills[k] = fills[k];
-        }
-        // Write surviving fills
-        for (const [k, v] of Object.entries(vaultFills)) {
-          updateVaultFill(vaultSessionId, `${tileIdx}_${k}`, v).catch(() => {});
-        }
-        // Clear wrong fills from Firebase
-        for (const k of wrong) {
-          updateVaultFill(vaultSessionId, `${tileIdx}_${k}`, null).catch(() => {});
-        }
-        loadVaultSession(vaultSessionId).then((vSnap) => {
-          if (vSnap) {
-            const vPlayers = vSnap.players || {};
-            const playerUids = Object.keys(vPlayers).sort();
-            const myIdx = playerUids.indexOf(firebaseUser?.uid);
-            const nextUid = playerUids[(myIdx + 1) % playerUids.length];
-            if (nextUid && nextUid !== firebaseUser?.uid) {
-              advanceVaultTurn(vaultSessionId, nextUid).catch(() => {});
-            }
-          }
-          updateVaultCurrentTile(vaultSessionId, firebaseUser?.uid, -1).catch(() => {});
-        }).catch(() => {});
-        setTimeout(() => {
-          setVaultSolvingTile(null);
-          setView("vault");
-        }, 1500);
-        return; // Skip the normal wrong-cell animation / clear flow
-      }
       if (isBlind || isCoopMosaic) {
         setLockedCells(newLocked);
       }

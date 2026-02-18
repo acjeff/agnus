@@ -371,31 +371,29 @@ export default function VaultMode({
         )}
       </div>
 
-      {/* Strikes indicator */}
-      {strikes > 0 && (
-        <div style={{
-          display: "flex", alignItems: "center", gap: 6,
-          padding: "6px 12px", borderRadius: 8,
-          backgroundColor: strikes >= 3 ? "#FF6B6B22" : "#FF6B6B11",
-          border: `1px solid ${strikes >= 3 ? "#FF6B6B44" : "#FF6B6B22"}`,
-        }}>
-          <div style={{ display: "flex", gap: 3 }}>
-            {[0, 1, 2].map(i => (
-              <span key={i} style={{
-                fontSize: 14,
-                opacity: i < strikes ? 1 : 0.2,
-                filter: i < strikes ? "none" : "grayscale(1)",
-              }}>{"\u2716"}</span>
-            ))}
-          </div>
-          <span style={{
-            fontSize: 10, fontWeight: 600, color: strikes >= 3 ? "#FF6B6B" : C.textDim,
-            fontFamily: "'Inter', sans-serif",
-          }}>
-            {strikes >= 3 ? "Vault Failed" : `${strikes}/3 strikes`}
-          </span>
+      {/* Strikes indicator — always visible */}
+      <div style={{
+        display: "flex", alignItems: "center", gap: 6,
+        padding: "6px 12px", borderRadius: 8,
+        backgroundColor: strikes >= 3 ? "#FF6B6B22" : strikes > 0 ? "#FF6B6B11" : C.surface,
+        border: `1px solid ${strikes >= 3 ? "#FF6B6B44" : strikes > 0 ? "#FF6B6B22" : C.border}`,
+      }}>
+        <div style={{ display: "flex", gap: 3 }}>
+          {[0, 1, 2].map(i => (
+            <span key={i} style={{
+              fontSize: 14,
+              opacity: i < strikes ? 1 : 0.2,
+              filter: i < strikes ? "none" : "grayscale(1)",
+            }}>{"\u2716"}</span>
+          ))}
         </div>
-      )}
+        <span style={{
+          fontSize: 10, fontWeight: 600, color: strikes >= 3 ? "#FF6B6B" : C.textDim,
+          fontFamily: "'Inter', sans-serif",
+        }}>
+          {strikes >= 3 ? "Vault Failed" : `${strikes}/3 strikes`}
+        </span>
+      </div>
 
       {/* Vault Failed overlay */}
       {isFailed && (
