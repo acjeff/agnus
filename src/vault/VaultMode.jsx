@@ -50,7 +50,7 @@ export default function VaultMode({
   // --- Session state from Firebase ---
   const [sessionData, setSessionData] = useState(null);
   const [vaultPuzzles, setVaultPuzzles] = useState(null);
-  const [vaultMeta, setVaultMeta] = useState(null); // { combination, clueTiles, decoyTiles, config }
+  const [vaultMeta, setVaultMeta] = useState(null); // { combination, clueTiles, config }
   const currentTileRef = useRef(-1);
   const prevSolvedRef = useRef(new Set());
   const unsubRef = useRef(null);
@@ -105,7 +105,6 @@ export default function VaultMode({
     setVaultMeta({
       combination: result.combination,
       clueTiles: result.clueTiles,
-      decoyTiles: result.decoyTiles,
       startingUnlocked: result.startingUnlocked,
       config: result.config,
     });
@@ -274,16 +273,36 @@ export default function VaultMode({
   }, [sessionId, pins, myUid]);
 
   // --- Clue tile detection ---
-  // Identify which unsolved tiles are clue tiles (tiles that contain silhouette clues)
   const clueTileSet = useMemo(() => {
     if (!vaultMeta?.clueTiles) return new Set();
     return new Set(vaultMeta.clueTiles);
   }, [vaultMeta]);
 
-  const decoyTileSet = useMemo(() => {
-    if (!vaultMeta?.decoyTiles) return new Set();
-    return new Set(vaultMeta.decoyTiles);
-  }, [vaultMeta]);
+  // Compute arrow direction from a solved clue tile to the nearest other clue tile
+  const getClueArrow = useCallback((tileIdx) => {
+    if (!vaultMeta?.clueTiles) return null;
+    const myRow = Math.floor(tileIdx / gridLayout);
+    const myCol = tileIdx % gridLayout;
+    let nearestDist = Infinity;
+    let nearestDir = null;
+    for (const otherIdx of vaultMeta.clueTiles) {
+      if (otherIdx === tileIdx) continue;
+      const otherRow = Math.floor(otherIdx / gridLayout);
+      const otherCol = otherIdx % gridLayout;
+      const dist = Math.abs(otherRow - myRow) + Math.abs(otherCol - myCol);
+      if (dist < nearestDist) {
+        nearestDist = dist;
+        const dr = otherRow - myRow;
+        const dc = otherCol - myCol;
+        if (dr === 0) nearestDir = dc > 0 ? "\u2192" : "\u2190";
+        else if (dc === 0) nearestDir = dr > 0 ? "\u2193" : "\u2191";
+        else if (Math.abs(dr) > Math.abs(dc)) nearestDir = dr > 0 ? "\u2193" : "\u2191";
+        else if (Math.abs(dc) > Math.abs(dr)) nearestDir = dc > 0 ? "\u2192" : "\u2190";
+        else nearestDir = dr > 0 ? (dc > 0 ? "\u2198" : "\u2199") : (dc > 0 ? "\u2197" : "\u2196");
+      }
+    }
+    return nearestDir;
+  }, [vaultMeta, gridLayout]);
 
   // --- Tile sizing ---
   const tileSz = Math.min(60, Math.floor((280 - gridLayout * 4) / gridLayout));
@@ -547,7 +566,6 @@ export default function VaultMode({
           const isUnlocked = effectiveUnlocked[i];
           const isPinned = !!pins[i];
           const isClue = clueTileSet.has(i);
-          const isDecoy = decoyTileSet.has(i);
           const puzzle = vaultPuzzles[i];
           const canInteract = isUnlocked || isSolved;
 
@@ -613,36 +631,23 @@ export default function VaultMode({
                 </span>
               )}
 
-              {/* Clue indicator — gold star badge, visible on solved tiles too */}
-              {isClue && (isUnlocked || isSolved) && (
-                <div style={{
-                  position: "absolute", bottom: 1, right: 1,
-                  width: isSolved ? 14 : 6, height: isSolved ? 14 : 6,
-                  borderRadius: isSolved ? 3 : 3,
-                  backgroundColor: (C.gold || "#FFD700") + (isSolved ? "DD" : "FF"),
-                  boxShadow: `0 0 ${isSolved ? 6 : 4}px ${C.gold || "#FFD700"}88`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 8, fontWeight: 900, color: "#000",
-                  lineHeight: 1,
-                }}>
-                  {isSolved ? "\u2605" : ""}
-                </div>
-              )}
-
-              {/* Decoy indicator — dim X badge on solved tiles */}
-              {isDecoy && (isUnlocked || isSolved) && (
-                <div style={{
-                  position: "absolute", bottom: 1, right: 1,
-                  width: isSolved ? 14 : 5, height: isSolved ? 14 : 5,
-                  borderRadius: isSolved ? 3 : 3,
-                  backgroundColor: C.textDim + (isSolved ? "44" : "55"),
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 8, fontWeight: 900, color: C.textDim,
-                  lineHeight: 1,
-                }}>
-                  {isSolved ? "\u2717" : ""}
-                </div>
-              )}
+              {/* Arrow to nearest clue — shown on solved clue tiles */}
+              {isClue && isSolved && (() => {
+                const arrow = getClueArrow(i);
+                if (!arrow) return null;
+                return (
+                  <div style={{
+                    position: "absolute", bottom: 1, right: 1,
+                    width: 14, height: 14, borderRadius: 3,
+                    backgroundColor: C.textDim + "33",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 9, fontWeight: 700, color: C.text,
+                    lineHeight: 1,
+                  }}>
+                    {arrow}
+                  </div>
+                );
+              })()}
 
               {/* Pin indicator */}
               {isPinned && (
@@ -670,33 +675,6 @@ export default function VaultMode({
           );
         })}
       </div>
-
-      {/* Legend for tile indicators */}
-      {solvedCount > 0 && (
-        <div style={{
-          display: "flex", gap: 12, alignItems: "center",
-          fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif",
-        }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{
-              width: 14, height: 14, borderRadius: 3,
-              backgroundColor: (C.gold || "#FFD700") + "DD",
-              display: "inline-flex", alignItems: "center", justifyContent: "center",
-              fontSize: 8, fontWeight: 900, color: "#000",
-            }}>{"\u2605"}</span>
-            Clue tile
-          </span>
-          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
-            <span style={{
-              width: 14, height: 14, borderRadius: 3,
-              backgroundColor: C.textDim + "44",
-              display: "inline-flex", alignItems: "center", justifyContent: "center",
-              fontSize: 8, fontWeight: 900, color: C.textDim,
-            }}>{"\u2717"}</span>
-            Decoy
-          </span>
-        </div>
-      )}
 
       {/* Back to Menu */}
       <button

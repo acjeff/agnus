@@ -31,7 +31,7 @@ export function generateVaultSessionId() {
 // Session CRUD
 // ============================================================
 export async function createVaultSession(uid, {
-  difficulty, puzzleSeed, combination, clueTiles, decoyTiles, startingUnlocked, gridLayout, maxAttempts,
+  difficulty, puzzleSeed, combination, clueTiles, startingUnlocked, gridLayout, maxAttempts,
   hostUsername, hostTheme,
 }, existingSessionId) {
   const db = getDb();
@@ -45,7 +45,6 @@ export async function createVaultSession(uid, {
     puzzleSeed,
     combination,
     clueTiles,
-    decoyTiles,
     gridLayout: gridLayout || 4,
     maxAttempts: maxAttempts || 4,
     status: "waiting",
