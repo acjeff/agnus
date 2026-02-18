@@ -38,11 +38,6 @@ const LOCK_SHAPES = [
       <polygon points="12,3 14.5,9.5 21,10 16,14.5 17.5,21 12,17.5 6.5,21 8,14.5 3,10 9.5,9.5" fill="none" stroke={stroke || "#fff"} strokeWidth="2"/>
     </svg>
   ),
-  (s, stroke) => (
-    <svg viewBox="0 0 24 24" width={s} height={s} style={shapeStyle}>
-      <polygon points="12,3 18,21 3,9 21,9 6,21" fill="none" stroke={stroke || "#fff"} strokeWidth="2"/>
-    </svg>
-  ),
 ];
 
 function parseToken(token) {
