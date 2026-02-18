@@ -321,7 +321,7 @@ export function buildVaultPuzzles(seed, difficulty = "silver") {
     for (let row = 0; row < gridSize; row++) for (let col = 0; col < gridSize; col++) allCells.push(`${row}-${col}`);
     const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
 
-    const usedTokens = [...new Set(solution.flat())];
+    const usedTokens = [...new Set([...blanks].map(k => { const [r2, c2] = k.split("-").map(Number); return solution[r2][c2]; }).filter(Boolean))];
     puzzles.push({ id: i, solution, blanks, usedTokens, gridSize, mode: "vault" });
   }
 
