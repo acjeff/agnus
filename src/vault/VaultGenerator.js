@@ -233,10 +233,10 @@ function combinedGridPos(cellRow, cellCol, posInQuad, gridSize) {
 // Difficulty Configurations
 // ============================================================
 export const VAULT_DIFFICULTIES = {
-  bronze:   { gridLayout: 3, gridSize: 5, totalPuzzles: 9,  maxAttempts: 4, label: "Bronze Vault" },
-  silver:   { gridLayout: 4, gridSize: 5, totalPuzzles: 16, maxAttempts: 4, label: "Silver Vault" },
-  gold:     { gridLayout: 4, gridSize: 7, totalPuzzles: 16, maxAttempts: 4, label: "Gold Vault" },
-  obsidian: { gridLayout: 5, gridSize: 7, totalPuzzles: 25, maxAttempts: 4, label: "Obsidian Vault" },
+  bronze:   { gridLayout: 3, gridSize: 5, totalPuzzles: 9,  maxAttempts: 2, maxLockAttempts: 4, label: "Bronze Vault" },
+  silver:   { gridLayout: 4, gridSize: 5, totalPuzzles: 16, maxAttempts: 2, maxLockAttempts: 4, label: "Silver Vault" },
+  gold:     { gridLayout: 4, gridSize: 7, totalPuzzles: 16, maxAttempts: 2, maxLockAttempts: 4, label: "Gold Vault" },
+  obsidian: { gridLayout: 5, gridSize: 7, totalPuzzles: 25, maxAttempts: 2, maxLockAttempts: 4, label: "Obsidian Vault" },
 };
 
 // ============================================================
