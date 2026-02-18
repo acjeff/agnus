@@ -2834,6 +2834,7 @@ export default function Pattrn() {
   const [fills, setFills] = useState({});
   const [selectedCell, setSelectedCell] = useState(null);
   const [selectedToken, setSelectedToken] = useState(null);
+  const manualTokenSelectRef = useRef(false); // true when user explicitly picked a token in the picker
   const [attempts, setAttempts] = useState(0);
   const [gameState, setGameState] = useState("playing");
   const [wrongCells, setWrongCells] = useState(new Set());
@@ -8193,9 +8194,15 @@ export default function Pattrn() {
   }, [view, puzzle, selectedToken]);
 
   // Auto-advance to next available token when current selection is exhausted
+  // (only when it was depleted by placing, not when user manually picked it)
   useEffect(() => {
     if (!puzzle || puzzle.mode === "hard" || !selectedToken) return;
     if ((tokenRemaining[selectedToken] ?? 0) > 0) return;
+    // If user explicitly selected this token from the picker, don't auto-advance
+    if (manualTokenSelectRef.current) {
+      manualTokenSelectRef.current = false;
+      return;
+    }
     const tokens = puzzle.usedTokens;
     const currentIdx = tokens.indexOf(selectedToken);
     if (currentIdx === -1) return;
@@ -10022,6 +10029,7 @@ export default function Pattrn() {
   }, []);
 
   const handleTokenSelect = useCallback((token) => {
+    manualTokenSelectRef.current = true;
     setSelectedToken(token);
     // Cancel pass mode when a regular token is selected
     if (coopPassMode) { setCoopPassMode(null); setCoopPassPlayerPicker(false); }
