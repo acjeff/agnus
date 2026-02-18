@@ -1717,7 +1717,68 @@ const TIMES_KEY = "pattrn-times-v1";
 const BIRTHDAY_KEY = "pattrn-birthday-v1";
 const THEME_KEY = "pattrn-theme-v1";
 const ACHIEV_KEY = "pattrn-achievements-v1";
+const COSMETIC_KEY = "pattrn-cosmetics-v1";
+const ACTIVE_COSMETIC_KEY = "pattrn-active-cosmetic-v1";
 const CHEAT_BIRTHDAY = "23-06-1912";
+
+// --- Vault Cosmetic Items ---
+// Silly characters / objects earned from completing vaults.
+// Each has an id, label, emoji/SVG, and which vault difficulty tier unlocks it.
+const VAULT_COSMETICS = [
+  // Bronze tier
+  { id: "rubber_duck", label: "Rubber Duck", emoji: "\uD83E\uDD86", tier: "bronze", desc: "A trusty debugging companion" },
+  { id: "baby_chick", label: "Baby Chick", emoji: "\uD83D\uDC25", tier: "bronze", desc: "Freshly hatched from the vault" },
+  { id: "mushroom", label: "Mushroom", emoji: "\uD83C\uDF44", tier: "bronze", desc: "A fun little guy" },
+  { id: "snail", label: "Snail", emoji: "\uD83D\uDC0C", tier: "bronze", desc: "Slow and steady wins the race" },
+  // Silver tier
+  { id: "octopus", label: "Octopus", emoji: "\uD83D\uDC19", tier: "silver", desc: "Eight arms, zero problems" },
+  { id: "ghost", label: "Ghost", emoji: "\uD83D\uDC7B", tier: "silver", desc: "Boo! A friendly haunt" },
+  { id: "alien", label: "Alien", emoji: "\uD83D\uDC7D", tier: "silver", desc: "Greetings, earthling" },
+  { id: "robot", label: "Robot", emoji: "\uD83E\uDD16", tier: "silver", desc: "Beep boop, vault cracked" },
+  { id: "crystal_ball", label: "Crystal Ball", emoji: "\uD83D\uDD2E", tier: "silver", desc: "Sees all combinations" },
+  // Gold tier
+  { id: "dragon", label: "Dragon", emoji: "\uD83D\uDC09", tier: "gold", desc: "Guardian of the vault" },
+  { id: "unicorn", label: "Unicorn", emoji: "\uD83E\uDD84", tier: "gold", desc: "Rare and majestic" },
+  { id: "phoenix", label: "Phoenix", emoji: "\uD83D\uDD25", tier: "gold", desc: "Reborn from the ashes" },
+  { id: "rainbow", label: "Rainbow", emoji: "\uD83C\uDF08", tier: "gold", desc: "Shiny and glorious" },
+  // Obsidian tier
+  { id: "skull", label: "Obsidian Skull", emoji: "\uD83D\uDC80", tier: "obsidian", desc: "Forged in darkness" },
+  { id: "gem", label: "Obsidian Gem", emoji: "\uD83D\uDC8E", tier: "obsidian", desc: "A priceless treasure" },
+  { id: "crown", label: "Obsidian Crown", emoji: "\uD83D\uDC51", tier: "obsidian", desc: "Ruler of the vault" },
+  { id: "eye", label: "All-Seeing Eye", emoji: "\uD83D\uDC41\uFE0F", tier: "obsidian", desc: "Nothing escapes its gaze" },
+];
+
+function loadUnlockedCosmetics() {
+  try {
+    const raw = localStorage.getItem(COSMETIC_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch { return []; }
+}
+function saveUnlockedCosmetics(ids) {
+  try { localStorage.setItem(COSMETIC_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
+}
+function loadActiveCosmetic() {
+  try { return localStorage.getItem(ACTIVE_COSMETIC_KEY) || null; } catch { return null; }
+}
+function saveActiveCosmetic(id) {
+  try {
+    if (id) localStorage.setItem(ACTIVE_COSMETIC_KEY, id);
+    else localStorage.removeItem(ACTIVE_COSMETIC_KEY);
+  } catch { /* ignore */ }
+}
+
+// Pick a random cosmetic from the eligible pool for a difficulty tier
+function pickVaultCosmeticReward(difficulty, alreadyUnlocked) {
+  const tierOrder = ["bronze", "silver", "gold", "obsidian"];
+  const diffIdx = tierOrder.indexOf(difficulty);
+  // Eligible: items at or below the vault difficulty tier
+  const eligible = VAULT_COSMETICS.filter(c => {
+    const cIdx = tierOrder.indexOf(c.tier);
+    return cIdx <= diffIdx && !alreadyUnlocked.includes(c.id);
+  });
+  if (eligible.length === 0) return null; // All unlocked!
+  return eligible[Math.floor(Math.random() * eligible.length)];
+}
 
 function loadTheme() {
   try {
@@ -2838,6 +2899,87 @@ function friendlyAuthError(code) {
   }
 }
 
+// --- Floating Cosmetic Companion ---
+// A draggable, floating character/object that bobs around on screen.
+function FloatingCosmetic({ emoji, label }) {
+  const [pos, setPos] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pattrn-cosmetic-pos");
+      if (saved) return JSON.parse(saved);
+    } catch { /* ignore */ }
+    return { x: 30, y: 120 };
+  });
+  const [dragging, setDragging] = useState(false);
+  const dragOffset = useRef({ x: 0, y: 0 });
+  const posRef = useRef(pos);
+  posRef.current = pos;
+
+  const onPointerDown = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragging(true);
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    dragOffset.current = { x: clientX - posRef.current.x, y: clientY - posRef.current.y };
+  }, []);
+
+  useEffect(() => {
+    if (!dragging) return;
+    const onMove = (e) => {
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      const nx = Math.max(0, Math.min(window.innerWidth - 48, clientX - dragOffset.current.x));
+      const ny = Math.max(0, Math.min(window.innerHeight - 48, clientY - dragOffset.current.y));
+      setPos({ x: nx, y: ny });
+    };
+    const onUp = () => {
+      setDragging(false);
+      try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(posRef.current)); } catch { /* ignore */ }
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("touchmove", onMove, { passive: false });
+    window.addEventListener("touchend", onUp);
+    return () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("touchmove", onMove);
+      window.removeEventListener("touchend", onUp);
+    };
+  }, [dragging]);
+
+  return (
+    <div
+      onPointerDown={onPointerDown}
+      onTouchStart={onPointerDown}
+      style={{
+        position: "fixed",
+        left: pos.x,
+        top: pos.y,
+        zIndex: 90,
+        width: 48,
+        height: 48,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 32,
+        cursor: dragging ? "grabbing" : "grab",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        touchAction: "none",
+        filter: dragging ? "drop-shadow(0 4px 12px rgba(0,0,0,0.4))" : "drop-shadow(0 2px 6px rgba(0,0,0,0.2))",
+        animation: dragging ? "none" : "companionFloat 3s ease-in-out infinite",
+        transition: dragging ? "none" : "filter 0.2s",
+        pointerEvents: "auto",
+      }}
+      title={label}
+    >
+      <style>{`@keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }`}</style>
+      {emoji}
+    </div>
+  );
+}
+
 export default function Pattrn() {
   const [view, setView] = useState("menu");
   const [difficulty, setDifficulty] = useState("easy");
@@ -3217,6 +3359,13 @@ export default function Pattrn() {
   const [vaultInvitedUids, setVaultInvitedUids] = useState(new Set()); // UIDs invited to vault session
   const vaultAutoInviteShownRef = useRef(null); // tracks session ID for which auto-invite was shown
   const isVault = !!vaultSessionId;
+
+  // --- Cosmetic companion state ---
+  const [unlockedCosmetics, setUnlockedCosmetics] = useState(() => loadUnlockedCosmetics());
+  const [activeCosmetic, setActiveCosmetic] = useState(() => loadActiveCosmetic());
+  const [cosmeticRewardToast, setCosmeticRewardToast] = useState(null); // { id, label, emoji, desc }
+  const cosmeticRewardToastTimer = useRef(null);
+  const vaultRewardGrantedRef = useRef(new Set()); // session IDs already rewarded
 
   // --- Staff Pick & Admin Manage state ---
   const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
@@ -5163,6 +5312,7 @@ export default function Pattrn() {
   const profileSubMenu = [
     { id: "profile-view-item", icon: "profile", label: "View Profile", sub: "profile-view" },
     { id: "profile-achievements", icon: "trophy", label: "Achievements", sub: "achievements-view" },
+    { id: "profile-cosmetics", icon: "star", label: `Companions${unlockedCosmetics.length > 0 ? ` (${unlockedCosmetics.length})` : ""}`, sub: "cosmetics-view" },
     { id: "profile-share", icon: "share", label: "Share Stats", sub: "share-stats" },
     { id: "profile-username", icon: "edit", label: "Change Username", sub: "username-edit" },
     { id: "profile-birthday", icon: "cake", label: "Set Birthday", sub: "birthday-edit" },
@@ -5230,6 +5380,7 @@ export default function Pattrn() {
       "coop-active": [],
       "coop-completed": [],
       "achievements-view": [],
+      "cosmetics-view": [],
       "share-stats": [],
       "profile-view": [],
       "username-edit": [],
@@ -5344,6 +5495,7 @@ export default function Pattrn() {
     const isSignInMenu = currentMenuKey === "sign-in";
     const isMosaicPreviewMenu = currentMenuKey === "mosaic-preview";
     const isAchievementsView = currentMenuKey === "achievements-view";
+    const isCosmeticsView = currentMenuKey === "cosmetics-view";
     const isFriendsView = currentMenuKey === "friends-view";
     const isShareStats = currentMenuKey === "share-stats";
     const isProfileView = currentMenuKey === "profile-view";
@@ -5361,7 +5513,7 @@ export default function Pattrn() {
     const isCreatorPostSave = currentMenuKey === "creator-post-save";
     const isVaultChat = currentMenuKey === "vault-chat";
     const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu || isMosaicPreviewMenu ||
-                          isAchievementsView || isFriendsView || isShareStats || isProfileView ||
+                          isAchievementsView || isCosmeticsView || isFriendsView || isShareStats || isProfileView ||
                           isUsernameEdit || isBirthdayEdit || isDeleteAccount || isClearConfirm ||
                           isThemeList || isSyncChoice || isCoopCreate || isCoopActive || isCoopCompleted ||
                           isNotificationsView || isCreatorConfirm || isCreatorPostSave || isVaultChat;
@@ -5490,6 +5642,20 @@ export default function Pattrn() {
       h += 20 + 4; // header + margin
       h += 12 + 16; // subtitle + margin
       h += Math.min(achList.length, 6) * 58; // achievement items (cap at 6, rest scrolls)
+      h += 12; // bottom padding
+      return h;
+    })();
+
+    // Cosmetics view height — header + subtitle + items grid + remove button
+    const cosmeticsContentHeight = (() => {
+      if (!isCosmeticsView) return 0;
+      let h = panelPad + fabSize; // padding + bottom bar
+      h += 20 + 4; // header + margin
+      h += 12 + 16; // subtitle + margin
+      const totalItems = VAULT_COSMETICS.length;
+      const rows = Math.ceil(totalItems / 4);
+      h += Math.min(rows, 5) * 64; // item grid (cap at 5 rows, rest scrolls)
+      if (activeCosmetic) h += 44 + 8; // remove button + margin
       h += 12; // bottom padding
       return h;
     })();
@@ -5676,6 +5842,7 @@ export default function Pattrn() {
     })();
 
     const contentHeight = isAchievementsView ? achievementsContentHeight :
+                          isCosmeticsView ? cosmeticsContentHeight :
                           isFriendsView ? friendsContentHeight :
                           isShareStats ? shareStatsContentHeight :
                           isProfileView ? profileViewContentHeight :
@@ -6193,6 +6360,111 @@ export default function Pattrn() {
                         );
                       })}
                     </div>
+                  </div>
+                </>
+              );
+            })() : isCosmeticsView ? (() => {
+              const tierOrder = ["bronze", "silver", "gold", "obsidian"];
+              const tierLabels = { bronze: "Bronze", silver: "Silver", gold: "Gold", obsidian: "Obsidian" };
+              const tierColors = { bronze: C.bronze || "#CD7F32", silver: C.silver || "#C0C0C0", gold: C.gold || "#FFD700", obsidian: "#8B5CF6" };
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, marginBottom: 4, textAlign: "center", letterSpacing: 2 }}>
+                      Companions
+                    </div>
+                    <div style={{ fontSize: 10, color: C.textDim, marginBottom: 12, textAlign: "center", letterSpacing: 1 }}>
+                      {unlockedCosmetics.length}/{VAULT_COSMETICS.length} unlocked {"\u00B7"} Complete vaults to earn more
+                    </div>
+                    {/* Cosmetic items grouped by tier */}
+                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                      {tierOrder.map(tier => {
+                        const items = VAULT_COSMETICS.filter(c => c.tier === tier);
+                        return (
+                          <div key={tier}>
+                            <div style={{
+                              fontSize: 9, fontWeight: 700, color: tierColors[tier],
+                              fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                              textTransform: "uppercase", marginBottom: 6,
+                            }}>
+                              {tierLabels[tier]} Vault
+                            </div>
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
+                              {items.map(c => {
+                                const isUnlocked = unlockedCosmetics.includes(c.id);
+                                const isActive = activeCosmetic === c.id;
+                                return (
+                                  <div
+                                    key={c.id}
+                                    onClick={() => {
+                                      if (!isUnlocked) return;
+                                      if (isActive) {
+                                        setActiveCosmetic(null);
+                                        saveActiveCosmetic(null);
+                                      } else {
+                                        setActiveCosmetic(c.id);
+                                        saveActiveCosmetic(c.id);
+                                      }
+                                    }}
+                                    style={{
+                                      display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                                      padding: "8px 4px", borderRadius: 10,
+                                      backgroundColor: isActive ? tierColors[tier] + "22" : isUnlocked ? C.surface : C.bg,
+                                      border: `1.5px solid ${isActive ? tierColors[tier] : isUnlocked ? C.border : C.textDim + "22"}`,
+                                      cursor: isUnlocked ? "pointer" : "default",
+                                      opacity: isUnlocked ? 1 : 0.35,
+                                      transition: "all 0.15s",
+                                      position: "relative",
+                                    }}
+                                    title={isUnlocked ? `${c.label}: ${c.desc}` : `Locked — complete a ${tierLabels[tier]} vault`}
+                                  >
+                                    <span style={{ fontSize: 22 }}>{isUnlocked ? c.emoji : "\uD83D\uDD12"}</span>
+                                    <span style={{
+                                      fontSize: 8, fontWeight: 600, color: isActive ? tierColors[tier] : C.textDim,
+                                      fontFamily: "'Inter', sans-serif", textAlign: "center",
+                                      lineHeight: 1.1, maxWidth: 54, overflow: "hidden",
+                                      textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                    }}>
+                                      {isUnlocked ? c.label : "???"}
+                                    </span>
+                                    {isActive && (
+                                      <div style={{
+                                        position: "absolute", top: 2, right: 2,
+                                        width: 10, height: 10, borderRadius: 5,
+                                        backgroundColor: tierColors[tier],
+                                        display: "flex", alignItems: "center", justifyContent: "center",
+                                        fontSize: 7, color: "#fff", fontWeight: 700,
+                                      }}>{"\u2713"}</div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    {/* Remove active companion button */}
+                    {activeCosmetic && (
+                      <button
+                        onClick={() => { setActiveCosmetic(null); saveActiveCosmetic(null); }}
+                        style={{
+                          marginTop: 12, width: "100%", padding: "8px 0", borderRadius: 8,
+                          backgroundColor: "transparent", border: `1px solid ${C.border}`,
+                          color: C.textDim, fontSize: 11, fontWeight: 600,
+                          cursor: "pointer", fontFamily: "'Inter', sans-serif",
+                        }}
+                      >
+                        Remove Companion
+                      </button>
+                    )}
                   </div>
                 </>
               );
@@ -10283,7 +10555,7 @@ export default function Pattrn() {
   }, [view, gameState, puzzle, selectedToken, handleTokenSelect]);
 
   const vaultConfig = isVault && vaultSessionDataRef.current?.difficulty ? (VAULT_DIFFICULTIES[vaultSessionDataRef.current.difficulty] || VAULT_DIFFICULTIES.silver) : null;
-  const maxAttempts = isVault ? (vaultConfig?.maxAttempts ?? 2) : isCoopMosaic ? Infinity : isCascade ? 5 : isBlind ? 6 : 5;
+  const maxAttempts = isVault ? (vaultConfig?.maxAttempts ?? 4) : isCoopMosaic ? Infinity : isCascade ? 5 : isBlind ? 6 : 5;
 
   const checkSolution = () => {
     if (!puzzle) return;
@@ -11298,6 +11570,40 @@ export default function Pattrn() {
   );
 
   // --- Global modals element (included in every return) ---
+  // --- Floating Cosmetic Companion ---
+  const floatingCosmeticEl = (() => {
+    if (!activeCosmetic) return null;
+    const cosmetic = VAULT_COSMETICS.find(c => c.id === activeCosmetic);
+    if (!cosmetic) return null;
+    return <FloatingCosmetic emoji={cosmetic.emoji} label={cosmetic.label} />;
+  })();
+
+  // --- Cosmetic Reward Toast ---
+  const cosmeticRewardToastEl = cosmeticRewardToast ? (
+    <div style={{
+      position: "fixed", top: 80, left: "50%", transform: "translateX(-50%)",
+      zIndex: 2000, pointerEvents: "none",
+      animation: "cosmeticToastIn 0.5s cubic-bezier(0.32, 0.72, 0, 1) both",
+    }}>
+      <style>{`@keyframes cosmeticToastIn { from { opacity:0; transform:translateX(-50%) translateY(-20px) scale(0.9); } to { opacity:1; transform:translateX(-50%) translateY(0) scale(1); } }
+@keyframes cosmeticBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }`}</style>
+      <div style={{
+        padding: "12px 20px", borderRadius: 16,
+        backgroundColor: C.surface, border: `1px solid ${C.gold || "#FFD700"}44`,
+        boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px ${C.gold || "#FFD700"}22`,
+        display: "flex", alignItems: "center", gap: 12,
+        fontFamily: "'Inter', sans-serif",
+      }}>
+        <span style={{ fontSize: 32, animation: "cosmeticBounce 1s ease infinite" }}>{cosmeticRewardToast.emoji}</span>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: C.gold || "#FFD700", textTransform: "uppercase", letterSpacing: 1 }}>New Companion!</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{cosmeticRewardToast.label}</div>
+          <div style={{ fontSize: 10, color: C.textDim }}>{cosmeticRewardToast.desc}</div>
+        </div>
+      </div>
+    </div>
+  ) : null;
+
   const globalModalsEl = (
     <>
       {coopInviteEl}
@@ -11307,6 +11613,8 @@ export default function Pattrn() {
       {friendChatToastEl}
       {coopMosaicNavigateEl}
       {friendReactionsOverlayEl}
+      {floatingCosmeticEl}
+      {cosmeticRewardToastEl}
     </>
   );
 
@@ -11523,6 +11831,24 @@ export default function Pattrn() {
             vaultSessionDataRef.current = data;
             const invited = data?.invitedUids ? new Set(Object.keys(data.invitedUids)) : new Set();
             setVaultInvitedUids(invited);
+            // --- Cosmetic reward on vault completion ---
+            if (data?.status === "complete" && data?.id && !vaultRewardGrantedRef.current.has(data.id)) {
+              vaultRewardGrantedRef.current.add(data.id);
+              const reward = pickVaultCosmeticReward(data.difficulty || "silver", unlockedCosmetics);
+              if (reward) {
+                const newUnlocked = [...unlockedCosmetics, reward.id];
+                setUnlockedCosmetics(newUnlocked);
+                saveUnlockedCosmetics(newUnlocked);
+                // Auto-equip if no active cosmetic
+                if (!activeCosmetic) {
+                  setActiveCosmetic(reward.id);
+                  saveActiveCosmetic(reward.id);
+                }
+                setCosmeticRewardToast(reward);
+                if (cosmeticRewardToastTimer.current) clearTimeout(cosmeticRewardToastTimer.current);
+                cosmeticRewardToastTimer.current = setTimeout(() => setCosmeticRewardToast(null), 5000);
+              }
+            }
           }}
         />
         {renderContextButton("vault", isVault ? [
