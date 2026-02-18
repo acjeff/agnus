@@ -68,6 +68,12 @@
         ".write": "auth != null"
       }
     },
+    "coopVaultSessions": {
+      "$sessionId": {
+        ".read": "auth != null",
+        ".write": "auth != null"
+      }
+    },
     "adminIndex": {
       ".read": "auth != null",
       "$uid": {

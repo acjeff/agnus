@@ -1161,7 +1161,8 @@ export async function loadUserCoopSessions(uid) {
     sessionIds.map(async (sid) => {
       const entry = indexEntries[sid];
       const isMosaic = entry && entry.type === "mosaic";
-      const path = isMosaic ? `coopMosaicSessions/${sid}` : `coopSessions/${sid}`;
+      const isVault = entry && entry.type === "vault";
+      const path = isVault ? `coopVaultSessions/${sid}` : isMosaic ? `coopMosaicSessions/${sid}` : `coopSessions/${sid}`;
       const snap = await get(ref(db, path));
       if (!snap.exists()) {
         // Session may have been deleted — only clean up stale entries older than 30s
@@ -1173,8 +1174,9 @@ export async function loadUserCoopSessions(uid) {
         return null;
       }
       const data = snap.val();
-      // Tag mosaic sessions so the UI can distinguish them
+      // Tag sessions so the UI can distinguish them
       if (isMosaic) data._type = "mosaic";
+      if (isVault) data._type = "vault";
       return data;
     })
   );
