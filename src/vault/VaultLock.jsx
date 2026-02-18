@@ -327,4 +327,128 @@ export default function VaultLock({
   );
 }
 
-export { TokenTile, parseToken, LOCK_SHAPES };
+// --- Color + Shape Picker ---
+// Two-step inline picker: select a color, then a shape, to build a token guess.
+function ColorShapePicker({ palette, onPick, onCancel, currentToken, C }) {
+  const [step, setStep] = useState("color"); // "color" | "shape"
+  const [selectedColor, setSelectedColor] = useState(null);
+
+  // If there's already a token, pre-parse it
+  const existing = currentToken ? parseToken(currentToken) : null;
+
+  const handleColorPick = (color) => {
+    setSelectedColor(color);
+    setStep("shape");
+  };
+
+  const handleShapePick = (shapeIndex) => {
+    const token = `${selectedColor}|${shapeIndex}`;
+    onPick(token);
+  };
+
+  const handleBack = () => {
+    if (step === "shape") {
+      setStep("color");
+      setSelectedColor(null);
+    } else {
+      onCancel?.();
+    }
+  };
+
+  return (
+    <div style={{
+      padding: 12, borderRadius: 12,
+      backgroundColor: C.surface,
+      border: `1px solid ${C.border}`,
+      width: "100%",
+      animation: "fadeUp 0.2s ease both",
+    }}>
+      {step === "color" ? (
+        <>
+          <div style={{
+            fontSize: 12, color: C.textDim, fontWeight: 600,
+            fontFamily: "'Inter', sans-serif", marginBottom: 10,
+          }}>
+            Pick a colour:
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            {palette.map((color, i) => {
+              const isSelected = existing?.color === color;
+              return (
+                <div
+                  key={i}
+                  onClick={() => handleColorPick(color)}
+                  style={{
+                    width: 44, height: 44, borderRadius: 10,
+                    backgroundColor: color,
+                    cursor: "pointer",
+                    border: isSelected ? `2.5px solid #fff` : "2.5px solid transparent",
+                    boxShadow: isSelected ? `0 0 10px ${color}66` : "none",
+                    transition: "all 0.15s",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.12)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+                />
+              );
+            })}
+          </div>
+        </>
+      ) : (
+        <>
+          <div style={{
+            fontSize: 12, color: C.textDim, fontWeight: 600,
+            fontFamily: "'Inter', sans-serif", marginBottom: 10,
+            display: "flex", alignItems: "center", gap: 8,
+          }}>
+            <div style={{
+              width: 18, height: 18, borderRadius: 4,
+              backgroundColor: selectedColor,
+            }} />
+            Pick a shape:
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
+            {LOCK_SHAPES.map((shapeFn, i) => {
+              const isSelected = existing?.color === selectedColor && existing?.shapeIndex === i;
+              return (
+                <div
+                  key={i}
+                  onClick={() => handleShapePick(i)}
+                  style={{
+                    width: 44, height: 44, borderRadius: 10,
+                    backgroundColor: selectedColor,
+                    cursor: "pointer",
+                    border: isSelected ? `2.5px solid #fff` : "2.5px solid transparent",
+                    boxShadow: isSelected ? `0 0 10px ${selectedColor}66` : "none",
+                    transition: "all 0.15s",
+                    position: "relative",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.12)"; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+                >
+                  {shapeFn(26, "rgba(255,255,255,0.85)")}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+      <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+        <button
+          onClick={handleBack}
+          style={{
+            padding: "5px 12px", borderRadius: 6,
+            border: `1px solid ${C.border}`, backgroundColor: "transparent",
+            color: C.textDim, fontSize: 11, cursor: "pointer",
+            fontFamily: "'Inter', sans-serif", fontWeight: 600,
+          }}
+        >
+          {step === "shape" ? "Back" : "Cancel"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+export { TokenTile, parseToken, LOCK_SHAPES, ColorShapePicker };
