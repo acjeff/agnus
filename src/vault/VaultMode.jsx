@@ -43,6 +43,7 @@ export default function VaultMode({
   onTileSolved,         // (tileIdx, attempts, time) => void — callback when tile solving finishes
   gameState,            // "playing" | "won" — from parent
   setView,              // (view) => void
+  onSessionData,        // (data) => void — callback with latest session data for parent
 }) {
   // --- Session state from Firebase ---
   const [sessionData, setSessionData] = useState(null);
@@ -105,6 +106,7 @@ export default function VaultMode({
     const unsub = subscribeToVaultSession(sessionId, (data) => {
       if (!data) return;
       setSessionData(data);
+      onSessionData?.(data);
     });
     unsubRef.current = unsub;
     return () => { unsub(); unsubRef.current = null; };

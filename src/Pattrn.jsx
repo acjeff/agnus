@@ -3187,6 +3187,7 @@ export default function Pattrn() {
   const [vaultChatLastRead, setVaultChatLastRead] = useState(0); // timestamp for unread tracking
   const vaultPuzzlesRef = useRef(null); // generated vault puzzles cache
   const vaultSessionDataRef = useRef(null); // latest session data for chat access
+  const [vaultInvitedUids, setVaultInvitedUids] = useState(new Set()); // UIDs invited to vault session
   const isVault = !!vaultSessionId;
 
   // --- Staff Pick & Admin Manage state ---
@@ -5094,7 +5095,11 @@ export default function Pattrn() {
           setVaultSessionId(id);
           setVaultRole("host");
           setView("vault");
-          setRadialMenuStack([]);
+          // Open invite panel so host can share link / invite friends
+          setCoopSelectedFriends(new Set());
+          setCoopInviteUsernameInput("");
+          setCoopInviteUsernameMsg("");
+          setRadialMenuStack(["root", "coop-start"]);
         }
       }).catch(() => {});
     }},
@@ -5257,6 +5262,7 @@ export default function Pattrn() {
       },
       vault: {
         root: buildRootWithProfile([
+          ...(isVault ? [{ id: "vault-invite-item", icon: "user-plus", label: "Invite", sub: "coop-start", beforeSub: () => { setCoopSelectedFriends(new Set()); setCoopInviteUsernameInput(""); setCoopInviteUsernameMsg(""); return true; } }] : []),
           ...(isVault ? [{ id: "vault-chat-item", icon: "message-square", label: "Chat", sub: "vault-chat" }] : []),
           { id: "theme", icon: "palette", label: "Theme", sub: "theme" },
         ]),
@@ -5320,8 +5326,9 @@ export default function Pattrn() {
     const renderIcon = (key, color) => radialIcons[key] ? radialIcons[key](color) : null;
 
     // Coop start menu state
-    const isCoopFromMosaic = isCoopStartMenu && currentView === "custom-mosaic" && !!customMosaicPlay;
-    const coopPickerColor = isCoopFromMosaic ? C.coop : "#54A0FF";
+    const isCoopFromVault = isCoopStartMenu && isVault && !!vaultSessionId;
+    const isCoopFromMosaic = isCoopStartMenu && !isCoopFromVault && currentView === "custom-mosaic" && !!customMosaicPlay;
+    const coopPickerColor = isCoopFromVault ? "#C8F03E" : isCoopFromMosaic ? C.coop : "#54A0FF";
 
     // Panel sizing
     const fabSize = 56;
@@ -5359,6 +5366,7 @@ export default function Pattrn() {
 
     // Coop start menu height — back button + header + subtitle + mosaic card + friends list + action buttons
     const coopHasActiveSession = isCoopStartMenu && (
+      isCoopFromVault ? !!vaultSessionId :
       (isCoopFromMosaic || (isCoopMosaic && !!coopMosaicSessionId)) ? !!coopMosaicSessionId : !!coopSessionId
     );
     const coopStartContentHeight = (() => {
@@ -5380,7 +5388,7 @@ export default function Pattrn() {
       }
       h += 18 + 6 + 36 + 12; // invite by username: label + margin + input row + bottom margin
       if (!coopHasActiveSession) h += 48; // action buttons
-      if (coopHasActiveSession && !((isCoopFromMosaic || isCoopMosaic) ? false : coopPartnerConnected)) h += 30; // waiting text
+      if (coopHasActiveSession && !(isCoopFromVault ? (vaultSessionDataRef.current?.players && Object.keys(vaultSessionDataRef.current.players).length >= 2) : (isCoopFromMosaic || isCoopMosaic) ? false : coopPartnerConnected)) h += 30; // waiting text
       return h;
     })();
 
@@ -7370,15 +7378,19 @@ export default function Pattrn() {
                 </>
               );
             })() : isCoopStartMenu ? (() => {
-              const isMosaicSession = isCoopFromMosaic || (isCoopMosaic && !!coopMosaicSessionId);
-              const activeSessionId = isMosaicSession ? coopMosaicSessionId : coopSessionId;
+              const isVaultSession = isCoopFromVault;
+              const isMosaicSession = !isVaultSession && (isCoopFromMosaic || (isCoopMosaic && !!coopMosaicSessionId));
+              const activeSessionId = isVaultSession ? vaultSessionId : isMosaicSession ? coopMosaicSessionId : coopSessionId;
               const hasSession = !!activeSessionId;
-              const inviteUrl = hasSession ? (isMosaicSession
-                ? `${typeof window !== "undefined" ? window.location.origin + window.location.pathname : ""}?coopMosaic=${activeSessionId}`
-                : `${typeof window !== "undefined" ? window.location.origin + window.location.pathname : ""}?mode=${difficulty}&level=${currentPuzzle}&coop=${activeSessionId}`
+              const baseUrl = typeof window !== "undefined" ? window.location.origin + window.location.pathname : "";
+              const inviteUrl = hasSession ? (isVaultSession
+                ? `${baseUrl}?vault=${activeSessionId}`
+                : isMosaicSession
+                ? `${baseUrl}?coopMosaic=${activeSessionId}`
+                : `${baseUrl}?mode=${difficulty}&level=${currentPuzzle}&coop=${activeSessionId}`
               ) : "";
-              const activePlayers = isMosaicSession ? coopMosaicPlayers : coopPlayers;
-              const invitedUids = isMosaicSession ? coopMosaicInvitedUids : coopInvitedUids;
+              const activePlayers = isVaultSession ? (vaultSessionDataRef.current?.players || {}) : isMosaicSession ? coopMosaicPlayers : coopPlayers;
+              const invitedUids = isVaultSession ? vaultInvitedUids : isMosaicSession ? coopMosaicInvitedUids : coopInvitedUids;
               return (
                 <>
                   {/* Coop friend picker / invite content */}
@@ -7390,7 +7402,7 @@ export default function Pattrn() {
                       ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
                   }}>
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>{hasSession ? "Co-op Session" : "Start Co-op"}</div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 4 }}>{hasSession ? (isVaultSession ? "Vault Session" : "Co-op Session") : "Start Co-op"}</div>
                     <div style={{ fontSize: 11, color: C.textDim, marginBottom: hasSession ? 12 : 16, fontFamily: "'Inter', sans-serif" }}>
                       {hasSession ? "Share a link or invite more friends" : (isCoopFromMosaic ? "Play this mosaic together" : "Select friends to invite or share a link")}
                     </div>
@@ -7402,7 +7414,7 @@ export default function Pattrn() {
                           {inviteUrl}
                         </div>
                         <button onClick={async () => {
-                          const result = await tryNativeShare(isMosaicSession ? { text: `Join me on this mosaic puzzle!\n${inviteUrl}` } : { title: "Agnus Co-op", text: "Join me for a co-op puzzle!", url: inviteUrl });
+                          const result = await tryNativeShare(isVaultSession ? { text: `Join me in this vault challenge!\n${inviteUrl}` } : isMosaicSession ? { text: `Join me on this mosaic puzzle!\n${inviteUrl}` } : { title: "Agnus Co-op", text: "Join me for a co-op puzzle!", url: inviteUrl });
                           if (result === "shared" || result === "cancelled") return;
                           try { await navigator.clipboard.writeText(inviteUrl); } catch {}
                         }} style={{
@@ -7525,7 +7537,10 @@ export default function Pattrn() {
                     {/* Send additional invites when session is active and new friends selected */}
                     {hasSession && coopSelectedFriends.size > 0 && (
                       <button onClick={async () => {
-                        if (isMosaicSession && coopMosaicSessionId) {
+                        if (isVaultSession && vaultSessionId) {
+                          const vaultUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?vault=${vaultSessionId}` : "";
+                          await Promise.all([...coopSelectedFriends].map(uid => Promise.all([ sendNotification(uid, { type: "vault_invite", fromUid: firebaseUser.uid, fromUsername: username || firebaseUser.email, data: { sessionId: vaultSessionId, difficulty: vaultSessionDataRef.current?.difficulty || "silver", url: vaultUrl } }).catch(() => {}), addVaultInvitedUid(vaultSessionId, uid).catch(() => {}) ])));
+                        } else if (isMosaicSession && coopMosaicSessionId) {
                           const coopUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?coopMosaic=${coopMosaicSessionId}` : "";
                           await Promise.all([...coopSelectedFriends].map(uid => Promise.all([ sendNotification(uid, { type: "coop_mosaic_invite", fromUid: firebaseUser.uid, fromUsername: username || firebaseUser.email, data: { sessionId: coopMosaicSessionId, mosaicTitle: customMosaicPlay?.title || "Untitled", url: coopUrl } }).catch(() => {}), addCoopMosaicInvitedUid(coopMosaicSessionId, uid).catch(() => {}) ])));
                         } else if (coopSessionId) {
@@ -7540,7 +7555,7 @@ export default function Pattrn() {
                       }}>{`Send ${coopSelectedFriends.size} Invite${coopSelectedFriends.size > 1 ? "s" : ""}`}</button>
                     )}
                     {/* Waiting indicator */}
-                    {hasSession && !isMosaicSession && !coopPartnerConnected && (
+                    {hasSession && (isVaultSession ? !(vaultSessionDataRef.current?.players && Object.keys(vaultSessionDataRef.current.players).length >= 2) : (!isMosaicSession && !coopPartnerConnected)) && (
                       <div style={{ marginTop: 10, textAlign: "center", fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", animation: "pulse 2s infinite" }}>Waiting for partner to join...</div>
                     )}
                   </div>
@@ -11065,8 +11080,14 @@ export default function Pattrn() {
           }}
           gameState={gameState}
           setView={setView}
+          onSessionData={(data) => {
+            vaultSessionDataRef.current = data;
+            const invited = data?.invitedUids ? new Set(Object.keys(data.invitedUids)) : new Set();
+            setVaultInvitedUids(invited);
+          }}
         />
         {renderContextButton("vault", isVault ? [
+          { id: "vault-invite-pill", icon: "user-plus", color: "#54A0FF", onClick: () => { setCoopSelectedFriends(new Set()); setCoopInviteUsernameInput(""); setCoopInviteUsernameMsg(""); setRadialMenuStack(["root", "coop-start"]); } },
           { id: "vault-chat-pill", icon: "message-square", color: "#54A0FF", onClick: () => { setVaultChatLastRead(Date.now()); setRadialMenuStack(["root", "vault-chat"]); } },
         ] : [])}
       </div>
