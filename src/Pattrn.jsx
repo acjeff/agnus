@@ -3190,6 +3190,7 @@ export default function Pattrn() {
   const vaultPuzzlesRef = useRef(null); // generated vault puzzles cache
   const vaultSessionDataRef = useRef(null); // latest session data for chat access
   const [vaultInvitedUids, setVaultInvitedUids] = useState(new Set()); // UIDs invited to vault session
+  const vaultAutoInviteShownRef = useRef(null); // tracks session ID for which auto-invite was shown
   const isVault = !!vaultSessionId;
 
   // --- Staff Pick & Admin Manage state ---
@@ -11050,6 +11051,27 @@ export default function Pattrn() {
       setView("menu");
     });
   }, [vaultRole, firebaseUser, vaultSessionId, view, username]);
+
+  // --- Auto-open invite panel for vault host when no one has been invited yet ---
+  useEffect(() => {
+    if (view !== "vault") {
+      vaultAutoInviteShownRef.current = null;
+      return;
+    }
+    if (vaultRole !== "host" || !vaultSessionId) return;
+    if (vaultAutoInviteShownRef.current === vaultSessionId) return;
+    const sessionData = vaultSessionDataRef.current;
+    if (!sessionData) return; // wait for session data to load
+    const players = sessionData.players || {};
+    const playerCount = Object.keys(players).length;
+    if (vaultInvitedUids.size === 0 && playerCount <= 1) {
+      vaultAutoInviteShownRef.current = vaultSessionId;
+      setCoopSelectedFriends(new Set());
+      setCoopInviteUsernameInput("");
+      setCoopInviteUsernameMsg("");
+      setRadialMenuStack(["root", "coop-start"]);
+    }
+  }, [view, vaultRole, vaultSessionId, vaultInvitedUids]);
 
   // --- Coop Mosaic joining overlay (shown while waiting for auth + session load) ---
   // Must be before all view checks so it takes priority when accepting an invite
