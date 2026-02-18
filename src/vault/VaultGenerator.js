@@ -275,10 +275,8 @@ export function buildVaultPuzzles(seed, difficulty = "silver") {
     }
   }
 
-  // 5. Compute starting unlocked tiles (corners of the grid)
-  const startingUnlocked = {};
-  const corners = [0, gridLayout - 1, totalPuzzles - gridLayout, totalPuzzles - 1];
-  corners.forEach(idx => { if (idx < totalPuzzles) startingUnlocked[idx] = true; });
+  // 5. Only puzzle 1 (index 0) is unlocked at the start
+  const startingUnlocked = { 0: true };
 
   // 6. Generate all puzzles
   const puzzles = [];
@@ -350,18 +348,28 @@ export function getAdjacentTiles(tileIdx, gridLayout) {
 }
 
 // Compute which tiles should be unlocked given current solved tiles + starting unlocked
+// Does NOT auto-expand to all neighbors — neighbors are unlocked one at a time via pickOneAdjacentUnlock
 export function computeUnlockedTiles(solvedTiles, startingUnlocked, gridLayout) {
   const unlocked = { ...startingUnlocked };
   for (const tileIdx of Object.keys(solvedTiles)) {
     const idx = Number(tileIdx);
     if (solvedTiles[tileIdx] > 0) {
       unlocked[idx] = true;
-      for (const neighbor of getAdjacentTiles(idx, gridLayout)) {
-        unlocked[neighbor] = true;
-      }
     }
   }
   return unlocked;
+}
+
+// Pick one adjacent tile to unlock after solving a tile.
+// Prefers the lowest-index neighbor (reading order: left-to-right, top-to-bottom).
+export function pickOneAdjacentUnlock(tileIdx, currentUnlocked, solvedTiles, gridLayout) {
+  const neighbors = getAdjacentTiles(tileIdx, gridLayout).sort((a, b) => a - b);
+  for (const neighbor of neighbors) {
+    if (!currentUnlocked[neighbor] && !(solvedTiles[neighbor] > 0)) {
+      return neighbor;
+    }
+  }
+  return null;
 }
 
 // ============================================================
