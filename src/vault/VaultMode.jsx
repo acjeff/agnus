@@ -69,7 +69,9 @@ export default function VaultMode({
   const currentTurnUid = sessionData?.currentTurn;
   const isMyTurn = currentTurnUid === myUid;
   const isComplete = sessionData?.status === "complete";
+  const isFailed = sessionData?.status === "failed";
   const isWaiting = sessionData?.status === "waiting";
+  const strikes = sessionData?.strikes || 0;
   const tileProgress = sessionData?.tileProgress || {};
   const tileUnlocked = sessionData?.tileUnlocked || {};
   const lock = sessionData?.lock || { 0: null, 1: null, 2: null, 3: null };
@@ -137,7 +139,7 @@ export default function VaultMode({
 
   // --- Handle tile selection ---
   const handleTileClick = useCallback((tileIdx) => {
-    if (!vaultPuzzles || !sessionId) return;
+    if (!vaultPuzzles || !sessionId || isFailed) return;
     const isSolved = (tileProgress[tileIdx] || 0) > 0;
     const isUnlocked = effectiveUnlocked[tileIdx];
 
@@ -154,7 +156,7 @@ export default function VaultMode({
       onStartPuzzle?.(tileIdx, vaultPuzzles[tileIdx], true);
     }
     // If not my turn and not solved, just view (read-only)
-  }, [vaultPuzzles, sessionId, tileProgress, effectiveUnlocked, isMyTurn, myUid, onStartPuzzle]);
+  }, [vaultPuzzles, sessionId, tileProgress, effectiveUnlocked, isMyTurn, isFailed, myUid, onStartPuzzle]);
 
   // --- Handle tile solved callback ---
   const handleTileSolved = useCallback(async (tileIdx, attempts, time) => {
@@ -360,7 +362,7 @@ export default function VaultMode({
             );
           })}
         </div>
-        {!isComplete && (
+        {!isComplete && !isFailed && (
           <div style={{
             fontSize: 9, color: C.textDim + "88", fontFamily: "'Inter', sans-serif",
           }}>
@@ -368,6 +370,53 @@ export default function VaultMode({
           </div>
         )}
       </div>
+
+      {/* Strikes indicator */}
+      {strikes > 0 && (
+        <div style={{
+          display: "flex", alignItems: "center", gap: 6,
+          padding: "6px 12px", borderRadius: 8,
+          backgroundColor: strikes >= 3 ? "#FF6B6B22" : "#FF6B6B11",
+          border: `1px solid ${strikes >= 3 ? "#FF6B6B44" : "#FF6B6B22"}`,
+        }}>
+          <div style={{ display: "flex", gap: 3 }}>
+            {[0, 1, 2].map(i => (
+              <span key={i} style={{
+                fontSize: 14,
+                opacity: i < strikes ? 1 : 0.2,
+                filter: i < strikes ? "none" : "grayscale(1)",
+              }}>{"\u2716"}</span>
+            ))}
+          </div>
+          <span style={{
+            fontSize: 10, fontWeight: 600, color: strikes >= 3 ? "#FF6B6B" : C.textDim,
+            fontFamily: "'Inter', sans-serif",
+          }}>
+            {strikes >= 3 ? "Vault Failed" : `${strikes}/3 strikes`}
+          </span>
+        </div>
+      )}
+
+      {/* Vault Failed overlay */}
+      {isFailed && (
+        <div style={{
+          padding: 16, borderRadius: 12,
+          backgroundColor: "#FF6B6B11", border: `1px solid #FF6B6B33`,
+          textAlign: "center", width: "100%",
+        }}>
+          <div style={{
+            fontSize: 14, fontWeight: 700, color: "#FF6B6B",
+            fontFamily: "'Inter', sans-serif", marginBottom: 6,
+          }}>
+            Vault Breached
+          </div>
+          <div style={{
+            fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif",
+          }}>
+            3 puzzles failed. The vault has locked you out.
+          </div>
+        </div>
+      )}
 
       {/* Lock Interface */}
       <VaultLock

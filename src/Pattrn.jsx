@@ -112,6 +112,7 @@ import {
   closeVaultSession,
   playerLeaveVaultSession,
   addVaultInvitedUid,
+  addVaultStrike,
 } from "./vault/VaultFirebase.js";
 
 // --- Theme ---
@@ -10052,7 +10053,8 @@ export default function Pattrn() {
     return () => window.removeEventListener("keydown", handler);
   }, [view, gameState, puzzle, selectedToken, handleTokenSelect]);
 
-  const maxAttempts = isCoopMosaic ? Infinity : isCascade ? 5 : isBlind ? 6 : 5;
+  const vaultConfig = isVault && vaultSessionDataRef.current?.difficulty ? (VAULT_DIFFICULTIES[vaultSessionDataRef.current.difficulty] || VAULT_DIFFICULTIES.silver) : null;
+  const maxAttempts = isVault ? (vaultConfig?.maxAttempts ?? 5) : isCoopMosaic ? Infinity : isCascade ? 5 : isBlind ? 6 : 5;
 
   const checkSolution = () => {
     if (!puzzle) return;
@@ -10225,7 +10227,31 @@ export default function Pattrn() {
     } else if (attempts + 1 >= maxAttempts) {
       // Failed - increment attempts
       setAttempts(attempts + 1);
-      if (isCascade) {
+      if (isVault && vaultSolvingTile !== null && vaultSessionId) {
+        // Vault: fully failed puzzle — record strike, advance turn, return to vault
+        setGameState("lost");
+        stopTimer();
+        setWrongCells(wrong);
+        const tileIdx = vaultSolvingTile;
+        addVaultStrike(vaultSessionId, firebaseUser?.uid, tileIdx).catch(() => {});
+        clearVaultTileFills(vaultSessionId, tileIdx).catch(() => {});
+        loadVaultSession(vaultSessionId).then((vSnap) => {
+          if (vSnap) {
+            const vPlayers = vSnap.players || {};
+            const playerUids = Object.keys(vPlayers).sort();
+            const myIdx = playerUids.indexOf(firebaseUser?.uid);
+            const nextUid = playerUids[(myIdx + 1) % playerUids.length];
+            if (nextUid && nextUid !== firebaseUser?.uid) {
+              advanceVaultTurn(vaultSessionId, nextUid).catch(() => {});
+            }
+          }
+          updateVaultCurrentTile(vaultSessionId, firebaseUser?.uid, -1).catch(() => {});
+        }).catch(() => {});
+        setTimeout(() => {
+          setVaultSolvingTile(null);
+          setView("vault");
+        }, 2000);
+      } else if (isCascade) {
         const levelsReached = cascadeLevel;
         const prevBest = (progress.cascade || {})[cascadeRunIndex] ?? 0;
         const newBest = Math.max(prevBest, levelsReached);
@@ -10253,6 +10279,40 @@ export default function Pattrn() {
       // Wrong guess but still have attempts - increment
       setAttempts(attempts + 1);
       setWrongCells(wrong);
+      // Vault: wrong answer but still has attempts — advance turn, return to vault
+      if (isVault && vaultSolvingTile !== null && vaultSessionId) {
+        const tileIdx = vaultSolvingTile;
+        // Save partial fills to Firebase so next player picks up where they left off
+        const vaultFills = {};
+        for (const k of Object.keys(fills)) {
+          if (!wrong.has(k)) vaultFills[k] = fills[k];
+        }
+        // Write surviving fills
+        for (const [k, v] of Object.entries(vaultFills)) {
+          updateVaultFill(vaultSessionId, `${tileIdx}_${k}`, v).catch(() => {});
+        }
+        // Clear wrong fills from Firebase
+        for (const k of wrong) {
+          updateVaultFill(vaultSessionId, `${tileIdx}_${k}`, null).catch(() => {});
+        }
+        loadVaultSession(vaultSessionId).then((vSnap) => {
+          if (vSnap) {
+            const vPlayers = vSnap.players || {};
+            const playerUids = Object.keys(vPlayers).sort();
+            const myIdx = playerUids.indexOf(firebaseUser?.uid);
+            const nextUid = playerUids[(myIdx + 1) % playerUids.length];
+            if (nextUid && nextUid !== firebaseUser?.uid) {
+              advanceVaultTurn(vaultSessionId, nextUid).catch(() => {});
+            }
+          }
+          updateVaultCurrentTile(vaultSessionId, firebaseUser?.uid, -1).catch(() => {});
+        }).catch(() => {});
+        setTimeout(() => {
+          setVaultSolvingTile(null);
+          setView("vault");
+        }, 1500);
+        return; // Skip the normal wrong-cell animation / clear flow
+      }
       if (isBlind || isCoopMosaic) {
         setLockedCells(newLocked);
       }
@@ -15012,8 +15072,15 @@ export default function Pattrn() {
         setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
       }});
     }
-    // Retry
-    if (isCoop) {
+    // Retry / Back
+    if (isVault && vaultSessionId) {
+      // Vault: return to vault (auto-handled by timeout, but show button too)
+      playPillButtons.push({ id: "done", icon: "back", color: "#54A0FF", onClick: () => {
+        setVaultSolvingTile(null);
+        if (firebaseUser) updateVaultCurrentTile(vaultSessionId, firebaseUser.uid, -1).catch(() => {});
+        setView("vault");
+      }});
+    } else if (isCoop) {
       playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: retryCoop });
       playPillButtons.push({ id: "done", icon: "home", color: "#54A0FF", onClick: () => { leaveCoopSession(); setView("menu"); } });
     } else if (isCascade) {

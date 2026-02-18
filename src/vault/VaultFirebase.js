@@ -316,6 +316,23 @@ export async function clearVaultGuess(sessionId, uid, position) {
   await remove(ref(db, `coopVaultSessions/${sessionId}/lockGuesses/${position}/${uid}`));
 }
 
+// Record a puzzle strike (failed puzzle) — returns new strike count
+export async function addVaultStrike(sessionId, uid, tileIdx) {
+  const db = getDb();
+  if (!db) return 0;
+  const snap = await get(ref(db, `coopVaultSessions/${sessionId}/strikes`));
+  const strikes = snap.exists() ? (typeof snap.val() === "number" ? snap.val() : 0) : 0;
+  const newStrikes = strikes + 1;
+  await update(ref(db, `coopVaultSessions/${sessionId}`), {
+    strikes: newStrikes,
+    lastStrike: { uid, tileIdx, timestamp: Date.now() },
+  });
+  if (newStrikes >= 3) {
+    await update(ref(db, `coopVaultSessions/${sessionId}`), { status: "failed" });
+  }
+  return newStrikes;
+}
+
 // Kick a player from the vault session
 export async function kickVaultPlayer(sessionId, uid) {
   const db = getDb();
