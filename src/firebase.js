@@ -1580,3 +1580,89 @@ export function subscribeToFriendReactions(uid, callback) {
   });
   return () => off(reactionsRef, "value", handler);
 }
+
+// --- Friend Chat (Direct Messages) ---
+
+// Generate a deterministic chat ID for two users (alphabetically sorted so both get the same key)
+export function getFriendChatId(uid1, uid2) {
+  return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+}
+
+// Send a direct message to a friend
+export async function sendFriendChatMessage(myUid, friendUid, username, text) {
+  if (!db) return;
+  const chatId = getFriendChatId(myUid, friendUid);
+  const msgRef = push(ref(db, `friendChats/${chatId}/messages`));
+  await set(msgRef, {
+    uid: myUid,
+    username: username || "Player",
+    text,
+    timestamp: Date.now(),
+  });
+  // Update last message metadata for both users so they can see preview / sort by recent
+  const meta = { lastMessage: text, lastMessageAt: Date.now(), lastMessageBy: myUid };
+  await update(ref(db, `friendChats/${chatId}/meta`), meta);
+}
+
+// Subscribe to friend chat messages in real-time
+export function subscribeToFriendChat(myUid, friendUid, callback) {
+  if (!db) return () => {};
+  const chatId = getFriendChatId(myUid, friendUid);
+  const messagesRef = ref(db, `friendChats/${chatId}/messages`);
+  const handler = onValue(messagesRef, (snap) => {
+    callback(snap.exists() ? snap.val() : {});
+  });
+  return () => off(messagesRef, "value", handler);
+}
+
+// Subscribe to friend chat metadata (last message info) for unread tracking
+export function subscribeToFriendChatMeta(myUid, friendUid, callback) {
+  if (!db) return () => {};
+  const chatId = getFriendChatId(myUid, friendUid);
+  const metaRef = ref(db, `friendChats/${chatId}/meta`);
+  const handler = onValue(metaRef, (snap) => {
+    callback(snap.exists() ? snap.val() : null);
+  });
+  return () => off(metaRef, "value", handler);
+}
+
+// Save the last-read timestamp for a user in a friend chat
+export async function updateFriendChatLastRead(myUid, friendUid) {
+  if (!db) return;
+  const chatId = getFriendChatId(myUid, friendUid);
+  await set(ref(db, `friendChatLastRead/${myUid}/${chatId}`), Date.now());
+}
+
+// Load all last-read timestamps for a user (one-time)
+export async function loadFriendChatLastReads(myUid) {
+  if (!db) return {};
+  const snap = await get(ref(db, `friendChatLastRead/${myUid}`));
+  return snap.exists() ? snap.val() : {};
+}
+
+// Subscribe to all last-read timestamps for a user
+export function subscribeToFriendChatLastReads(myUid, callback) {
+  if (!db) return () => {};
+  const lastReadRef = ref(db, `friendChatLastRead/${myUid}`);
+  const handler = onValue(lastReadRef, (snap) => {
+    callback(snap.exists() ? snap.val() : {});
+  });
+  return () => off(lastReadRef, "value", handler);
+}
+
+// Subscribe to all friend chat metas for a user's friends (for unread badges)
+export function subscribeToAllFriendChatMetas(myUid, friendUids, callback) {
+  if (!db || !friendUids.length) { callback({}); return () => {}; }
+  const unsubs = [];
+  const metas = {};
+  for (const fUid of friendUids) {
+    const chatId = getFriendChatId(myUid, fUid);
+    const metaRef = ref(db, `friendChats/${chatId}/meta`);
+    const handler = onValue(metaRef, (snap) => {
+      metas[chatId] = snap.exists() ? snap.val() : null;
+      callback({ ...metas });
+    });
+    unsubs.push(() => off(metaRef, "value", handler));
+  }
+  return () => unsubs.forEach(u => u());
+}
