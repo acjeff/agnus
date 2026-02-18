@@ -1,7 +1,8 @@
 // --- Vault Mode Puzzle Generator ---
-// Generates a grid of puzzles with colour-reveal and symbol-reveal clue tiles.
-// Colour-reveal tiles use a uniform colour with varied symbols; symbol-reveal tiles
-// use a uniform symbol with varied colours. Together they encode a 4-position lock.
+// Generates a grid of puzzles with quadrant-based shape outlines.
+// Each 2x2 quadrant of tiles draws a 1-cell-thick outline of one combination shape
+// in its combination colour across the combined puzzle area. Non-outline cells are dark grey.
+// Players deduce the combination (colour + shape per quadrant) from the outlines.
 
 // --- Seeded RNG (same as Pattrn.jsx) ---
 function rng(seed) {
@@ -83,6 +84,173 @@ function weightedGenIndex(r) {
 }
 
 // ============================================================
+// Quadrant Outline Generators
+// ============================================================
+// Each function returns a Set of "row-col" strings forming a 1-cell-thick outline
+// on an NxN combined grid (N = gridSize * 2, e.g. 10 for silver, 14 for gold).
+
+const OUTLINE_GREY = "#2a2a2a";
+
+// Bresenham line rasterizer — returns array of [row, col]
+function rasterLine(r0, c0, r1, c1) {
+  const pts = [];
+  let dr = Math.abs(r1 - r0), dc = Math.abs(c1 - c0);
+  let sr = r0 < r1 ? 1 : -1, sc = c0 < c1 ? 1 : -1;
+  let err = dr - dc;
+  let r = r0, c = c0;
+  while (true) {
+    pts.push([r, c]);
+    if (r === r1 && c === c1) break;
+    const e2 = 2 * err;
+    if (e2 > -dc) { err -= dc; r += sr; }
+    if (e2 < dr) { err += dr; c += sc; }
+  }
+  return pts;
+}
+
+// 0: Circle — midpoint circle algorithm
+function outlineCircle(N) {
+  const s = new Set();
+  const cx = (N - 1) / 2, cy = (N - 1) / 2;
+  const radius = Math.floor(N / 2) - 1;
+  let x = radius, y = 0, d = 1 - radius;
+  const plot = (px, py) => {
+    const rr = Math.round(cy + py), cc = Math.round(cx + px);
+    if (rr >= 0 && rr < N && cc >= 0 && cc < N) s.add(`${rr}-${cc}`);
+  };
+  while (x >= y) {
+    plot(x, y); plot(-x, y); plot(x, -y); plot(-x, -y);
+    plot(y, x); plot(-y, x); plot(y, -x); plot(-y, -x);
+    y++;
+    if (d <= 0) { d += 2 * y + 1; }
+    else { x--; d += 2 * (y - x) + 1; }
+  }
+  return s;
+}
+
+// 1: Diamond — four diagonal lines connecting edge midpoints
+function outlineDiamond(N) {
+  const s = new Set();
+  const mid = Math.floor((N - 1) / 2);
+  const top = [0, mid], right = [mid, N - 1], bottom = [N - 1, mid], left = [mid, 0];
+  for (const [r, c] of rasterLine(...top, ...right)) s.add(`${r}-${c}`);
+  for (const [r, c] of rasterLine(...right, ...bottom)) s.add(`${r}-${c}`);
+  for (const [r, c] of rasterLine(...bottom, ...left)) s.add(`${r}-${c}`);
+  for (const [r, c] of rasterLine(...left, ...top)) s.add(`${r}-${c}`);
+  return s;
+}
+
+// 2: Triangle — equilateral-ish, apex at top-center, base at bottom
+function outlineTriangle(N) {
+  const s = new Set();
+  const apex = [0, Math.floor((N - 1) / 2)];
+  const bl = [N - 1, 0], br = [N - 1, N - 1];
+  for (const [r, c] of rasterLine(...apex, ...bl)) s.add(`${r}-${c}`);
+  for (const [r, c] of rasterLine(...apex, ...br)) s.add(`${r}-${c}`);
+  for (const [r, c] of rasterLine(...bl, ...br)) s.add(`${r}-${c}`);
+  return s;
+}
+
+// 3: Plus/Cross — vertical + horizontal lines through center
+function outlinePlus(N) {
+  const s = new Set();
+  const mid = Math.floor((N - 1) / 2);
+  const arm = Math.floor(N * 0.3); // arm width from center
+  // Vertical bar
+  for (let r = 0; r < N; r++) {
+    for (let c = mid - arm; c <= mid + arm; c++) {
+      if (c >= 0 && c < N) {
+        if (r === 0 || r === N - 1 || c === mid - arm || c === mid + arm) s.add(`${r}-${c}`);
+      }
+    }
+  }
+  // Horizontal bar
+  for (let c = 0; c < N; c++) {
+    for (let r = mid - arm; r <= mid + arm; r++) {
+      if (r >= 0 && r < N) {
+        if (c === 0 || c === N - 1 || r === mid - arm || r === mid + arm) s.add(`${r}-${c}`);
+      }
+    }
+  }
+  return s;
+}
+
+// 4: Square — rectangular border with margin
+function outlineSquare(N) {
+  const s = new Set();
+  const margin = Math.max(1, Math.floor(N * 0.1));
+  const lo = margin, hi = N - 1 - margin;
+  for (let c = lo; c <= hi; c++) { s.add(`${lo}-${c}`); s.add(`${hi}-${c}`); }
+  for (let r = lo; r <= hi; r++) { s.add(`${r}-${lo}`); s.add(`${r}-${hi}`); }
+  return s;
+}
+
+// 5: Star — 5-pointed star outline
+function outlineStar(N) {
+  const s = new Set();
+  const cx = (N - 1) / 2, cy = (N - 1) / 2;
+  const outerR = Math.floor(N / 2) - 0.5;
+  const innerR = outerR * 0.38;
+  const pts = [];
+  for (let i = 0; i < 5; i++) {
+    const outerAngle = -Math.PI / 2 + (2 * Math.PI * i) / 5;
+    const innerAngle = outerAngle + Math.PI / 5;
+    pts.push([Math.round(cy + outerR * Math.sin(outerAngle)), Math.round(cx + outerR * Math.cos(outerAngle))]);
+    pts.push([Math.round(cy + innerR * Math.sin(innerAngle)), Math.round(cx + innerR * Math.cos(innerAngle))]);
+  }
+  for (let i = 0; i < pts.length; i++) {
+    const [r0, c0] = pts[i];
+    const [r1, c1] = pts[(i + 1) % pts.length];
+    for (const [r, c] of rasterLine(r0, c0, r1, c1)) {
+      if (r >= 0 && r < N && c >= 0 && c < N) s.add(`${r}-${c}`);
+    }
+  }
+  return s;
+}
+
+// 6: Pentagram — 5-pointed star with crossing internal lines
+function outlinePentagram(N) {
+  const s = new Set();
+  const cx = (N - 1) / 2, cy = (N - 1) / 2;
+  const R = Math.floor(N / 2) - 0.5;
+  const outerPts = [];
+  for (let i = 0; i < 5; i++) {
+    const angle = -Math.PI / 2 + (2 * Math.PI * i) / 5;
+    outerPts.push([Math.round(cy + R * Math.sin(angle)), Math.round(cx + R * Math.cos(angle))]);
+  }
+  // Draw lines connecting every other point (the star pattern)
+  for (let i = 0; i < 5; i++) {
+    const [r0, c0] = outerPts[i];
+    const [r1, c1] = outerPts[(i + 2) % 5];
+    for (const [r, c] of rasterLine(r0, c0, r1, c1)) {
+      if (r >= 0 && r < N && c >= 0 && c < N) s.add(`${r}-${c}`);
+    }
+  }
+  return s;
+}
+
+const OUTLINE_GENERATORS = [outlineCircle, outlineDiamond, outlineTriangle, outlinePlus, outlineSquare, outlineStar, outlinePentagram];
+
+// Map tile index to quadrant (0-3) and position within quadrant for a 4x4 grid layout
+function getQuadrantInfo(tileIdx, gridLayout) {
+  if (gridLayout !== 4) return null; // Only works for 4x4 grids
+  const row = Math.floor(tileIdx / gridLayout);
+  const col = tileIdx % gridLayout;
+  const qRow = Math.floor(row / 2); // 0 or 1
+  const qCol = Math.floor(col / 2); // 0 or 1
+  const quadrant = qRow * 2 + qCol; // 0=TL, 1=TR, 2=BL, 3=BR
+  const posInQuad = (row % 2) * 2 + (col % 2); // 0=TL, 1=TR, 2=BL, 3=BR within quadrant
+  return { quadrant, posInQuad };
+}
+
+// Compute the combined-grid (row, col) for a cell within a tile, given its position in the quadrant
+function combinedGridPos(cellRow, cellCol, posInQuad, gridSize) {
+  const offsetRow = Math.floor(posInQuad / 2) * gridSize; // 0 for top, gridSize for bottom
+  const offsetCol = (posInQuad % 2) * gridSize; // 0 for left, gridSize for right
+  return [offsetRow + cellRow, offsetCol + cellCol];
+}
+
+// ============================================================
 // Difficulty Configurations
 // ============================================================
 export const VAULT_DIFFICULTIES = {
@@ -112,25 +280,21 @@ export function buildVaultPuzzles(seed, difficulty = "silver") {
   // 3. Assign quadrant positions (0-3) — this is the lock order
   const quadrantOrder = shuffle([0, 1, 2, 3], masterRng);
 
-  // 4. Pick which puzzle indices contain clues (8 of totalPuzzles)
-  //    4 "colour-reveal" puzzles: uniform colour, varied symbols — reveals a combination colour
-  //    4 "symbol-reveal" puzzles: uniform symbol, varied colours — reveals a combination symbol
-  const allIndices = Array.from({ length: totalPuzzles }, (_, i) => i);
-  const shuffledIndices = shuffle(allIndices, masterRng);
-  const colourClueTiles = shuffledIndices.slice(0, 4);
-  const symbolClueTiles = shuffledIndices.slice(4, 8);
-  const clueTiles = [...colourClueTiles, ...symbolClueTiles].sort((a, b) => a - b);
-  const clueMap = {}; // tileIdx -> { token, quadrant, shapeIdx, color, type }
-  colourClueTiles.forEach((tileIdx, i) => {
-    const token = combination[i];
-    const [color, shapeIdx] = [token.slice(0, token.lastIndexOf("|")), parseInt(token.slice(token.lastIndexOf("|") + 1), 10)];
-    clueMap[tileIdx] = { token, quadrant: quadrantOrder[i], shapeIdx, color, type: "colour" };
-  });
-  symbolClueTiles.forEach((tileIdx, i) => {
-    const token = combination[i];
-    const [color, shapeIdx] = [token.slice(0, token.lastIndexOf("|")), parseInt(token.slice(token.lastIndexOf("|") + 1), 10)];
-    clueMap[tileIdx] = { token, quadrant: quadrantOrder[i], shapeIdx, color, type: "symbol" };
-  });
+  // 4. For 4x4 grids: precompute outline sets for each quadrant
+  const combinedSize = gridSize * 2;
+  const quadrantOutlines = {}; // quadrant -> Set of "row-col" in combined grid
+  const quadrantCombo = {};    // quadrant -> { color, shapeIndex, token }
+  if (gridLayout === 4) {
+    for (let q = 0; q < 4; q++) {
+      const comboIdx = quadrantOrder[q];
+      const token = combination[comboIdx];
+      const sepIdx = token.lastIndexOf("|");
+      const color = token.slice(0, sepIdx);
+      const shapeIndex = parseInt(token.slice(sepIdx + 1), 10);
+      quadrantCombo[q] = { color, shapeIndex, token, comboIdx };
+      quadrantOutlines[q] = OUTLINE_GENERATORS[shapeIndex % OUTLINE_GENERATORS.length](combinedSize);
+    }
+  }
 
   // 5. Compute starting unlocked tiles (corners of the grid)
   const startingUnlocked = {};
@@ -142,38 +306,32 @@ export function buildVaultPuzzles(seed, difficulty = "silver") {
   for (let i = 0; i < totalPuzzles; i++) {
     const puzzleSeed = seed * 31 + i * 6151 + 101;
     const r = rng(puzzleSeed);
-    const palIdx = Math.floor(r() * PALETTES.length);
-    const pal = shuffle(PALETTES[palIdx], r);
     const genIdx = weightedGenIndex(r);
     const numShapes = TWO_COLOR_GENS.has(genIdx) ? 2
       : genIdx === FOUR_COLOR_GEN ? 4
       : 2 + Math.floor(r() * 2);
     const shapeIndices = Array.from({ length: numShapes }, (_, k) => k);
     const grid = generators[genIdx](shapeIndices, numShapes);
-    const solution = grid.map(row => row.map(si => `${pal[si % pal.length]}|${si}`));
 
-    // Apply clue overrides for colour-reveal and symbol-reveal puzzles
-    if (clueMap[i]) {
-      const { shapeIdx, color, type } = clueMap[i];
-      if (type === "colour") {
-        // Colour-reveal: uniform colour, varied symbols (symbols form the pattern to solve)
-        for (let ri = 0; ri < gridSize; ri++) {
-          for (let ci = 0; ci < gridSize; ci++) {
-            const existingToken = solution[ri][ci];
-            const existingShape = parseInt(existingToken.slice(existingToken.lastIndexOf("|") + 1), 10);
-            solution[ri][ci] = `${color}|${existingShape}`;
-          }
-        }
-      } else {
-        // Symbol-reveal: uniform symbol, varied colours (colours form the pattern to solve)
-        for (let ri = 0; ri < gridSize; ri++) {
-          for (let ci = 0; ci < gridSize; ci++) {
-            const existingToken = solution[ri][ci];
-            const existingColor = existingToken.slice(0, existingToken.lastIndexOf("|"));
-            solution[ri][ci] = `${existingColor}|${shapeIdx}`;
-          }
-        }
-      }
+    // Determine quadrant info for this tile (4x4 grids only)
+    const qInfo = getQuadrantInfo(i, gridLayout);
+
+    // Build solution: shapes from pattern algo, colours from outline membership
+    let solution;
+    if (qInfo && quadrantOutlines[qInfo.quadrant]) {
+      const outlineSet = quadrantOutlines[qInfo.quadrant];
+      const comboColor = quadrantCombo[qInfo.quadrant].color;
+      solution = grid.map((row, ri) => row.map((si, ci) => {
+        const [combR, combC] = combinedGridPos(ri, ci, qInfo.posInQuad, gridSize);
+        const isOnOutline = outlineSet.has(`${combR}-${combC}`);
+        const cellColor = isOnOutline ? comboColor : OUTLINE_GREY;
+        return `${cellColor}|${si}`;
+      }));
+    } else {
+      // Fallback for non-4x4 grids: normal coloured puzzles
+      const palIdx = Math.floor(r() * PALETTES.length);
+      const pal = shuffle(PALETTES[palIdx], r);
+      solution = grid.map(row => row.map(si => `${pal[si % pal.length]}|${si}`));
     }
 
     // Generate blanks
@@ -191,7 +349,8 @@ export function buildVaultPuzzles(seed, difficulty = "silver") {
   return {
     puzzles,
     combination,
-    clueTiles,
+    palette: comboPal,
+    quadrantOrder,
     startingUnlocked,
     config,
   };
@@ -260,4 +419,4 @@ export function getMastermindFeedback(guess, answer) {
   return { gold: gold.length, white: white.length, goldPositions: gold, whitePositions: white };
 }
 
-export { rng, shuffle, PALETTES };
+export { rng, shuffle, PALETTES, OUTLINE_GREY };

@@ -4,8 +4,8 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ChevronLeft } from "lucide-react";
-import VaultLock, { TokenTile, parseToken, LOCK_SHAPES } from "./VaultLock.jsx";
-import { buildVaultPuzzles, computeUnlockedTiles, getMastermindFeedback, VAULT_DIFFICULTIES } from "./VaultGenerator.js";
+import VaultLock, { TokenTile, parseToken, LOCK_SHAPES, ColorShapePicker } from "./VaultLock.jsx";
+import { buildVaultPuzzles, computeUnlockedTiles, getMastermindFeedback, VAULT_DIFFICULTIES, OUTLINE_GREY } from "./VaultGenerator.js";
 import {
   subscribeToVaultSession,
   updateVaultFill,
@@ -51,7 +51,7 @@ export default function VaultMode({
   // --- Session state from Firebase ---
   const [sessionData, setSessionData] = useState(null);
   const [vaultPuzzles, setVaultPuzzles] = useState(null);
-  const [vaultMeta, setVaultMeta] = useState(null); // { combination, clueTiles, config }
+  const [vaultMeta, setVaultMeta] = useState(null); // { combination, palette, quadrantOrder, config }
   const currentTileRef = useRef(-1);
   const prevSolvedRef = useRef(new Set());
   const unsubRef = useRef(null);
@@ -115,7 +115,8 @@ export default function VaultMode({
     setVaultPuzzles(result.puzzles);
     setVaultMeta({
       combination: result.combination,
-      clueTiles: result.clueTiles,
+      palette: result.palette,
+      quadrantOrder: result.quadrantOrder,
       startingUnlocked: result.startingUnlocked,
       config: result.config,
     });
@@ -198,24 +199,6 @@ export default function VaultMode({
   // --- Lock guess handlers (new system: per-player guesses) ---
   const [pickerPosition, setPickerPosition] = useState(null); // which slot is being picked
 
-  // Gather all unique tokens from solved puzzles for the token picker, sorted by shape then color
-  const availableTokens = useMemo(() => {
-    if (!vaultPuzzles) return [];
-    const tokenSet = new Set();
-    for (const [idx, attempts] of Object.entries(tileProgress)) {
-      if (attempts > 0 && vaultPuzzles[idx]) {
-        for (const token of vaultPuzzles[idx].usedTokens) {
-          tokenSet.add(token);
-        }
-      }
-    }
-    return [...tokenSet].sort((a, b) => {
-      const pa = parseToken(a);
-      const pb = parseToken(b);
-      if (pa.shapeIndex !== pb.shapeIndex) return pa.shapeIndex - pb.shapeIndex;
-      return pa.color.localeCompare(pb.color);
-    });
-  }, [vaultPuzzles, tileProgress]);
 
   const handleSlotClick = useCallback((position) => {
     // Don't open picker for hard-locked (gold-confirmed) positions
@@ -229,11 +212,7 @@ export default function VaultMode({
     setPickerPosition(null);
   }, [pickerPosition, sessionId, myUid]);
 
-  const handleClearMyGuess = useCallback(async () => {
-    if (pickerPosition === null || !sessionId || !myUid) return;
-    await clearVaultGuess(sessionId, myUid, pickerPosition);
-    setPickerPosition(null);
-  }, [pickerPosition, sessionId, myUid]);
+
 
   // Submit lock: use consensus guesses or hard-locked positions
   // After feedback, hard-lock gold positions and clear guesses for non-gold positions
@@ -283,37 +262,6 @@ export default function VaultMode({
     }
   }, [sessionId, pins, myUid]);
 
-  // --- Clue tile detection ---
-  const clueTileSet = useMemo(() => {
-    if (!vaultMeta?.clueTiles) return new Set();
-    return new Set(vaultMeta.clueTiles);
-  }, [vaultMeta]);
-
-  // Compute arrow direction from a solved clue tile to the nearest other clue tile
-  const getClueArrow = useCallback((tileIdx) => {
-    if (!vaultMeta?.clueTiles) return null;
-    const myRow = Math.floor(tileIdx / gridLayout);
-    const myCol = tileIdx % gridLayout;
-    let nearestDist = Infinity;
-    let nearestDir = null;
-    for (const otherIdx of vaultMeta.clueTiles) {
-      if (otherIdx === tileIdx) continue;
-      const otherRow = Math.floor(otherIdx / gridLayout);
-      const otherCol = otherIdx % gridLayout;
-      const dist = Math.abs(otherRow - myRow) + Math.abs(otherCol - myCol);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        const dr = otherRow - myRow;
-        const dc = otherCol - myCol;
-        if (dr === 0) nearestDir = dc > 0 ? "\u2192" : "\u2190";
-        else if (dc === 0) nearestDir = dr > 0 ? "\u2193" : "\u2191";
-        else if (Math.abs(dr) > Math.abs(dc)) nearestDir = dr > 0 ? "\u2193" : "\u2191";
-        else if (Math.abs(dc) > Math.abs(dr)) nearestDir = dc > 0 ? "\u2192" : "\u2190";
-        else nearestDir = dr > 0 ? (dc > 0 ? "\u2198" : "\u2199") : (dc > 0 ? "\u2197" : "\u2196");
-      }
-    }
-    return nearestDir;
-  }, [vaultMeta, gridLayout]);
 
   // --- Tile sizing ---
   const tileSz = Math.min(60, Math.floor((280 - gridLayout * 4) / gridLayout));
@@ -498,72 +446,23 @@ export default function VaultMode({
         C={C}
       />
 
-      {/* Token Picker — inline below lock, appears when a slot is tapped */}
-      {pickerPosition !== null && (
-        <div style={{
-          padding: 12, borderRadius: 12,
-          backgroundColor: C.surface,
-          border: `1px solid ${C.border}`,
-          width: "100%",
-          animation: "fadeUp 0.2s ease both",
-        }}>
+      {/* Color + Shape Picker — inline below lock, appears when a slot is tapped */}
+      {pickerPosition !== null && vaultMeta?.palette && (
+        <div>
           <div style={{
             fontSize: 12, color: C.textDim, fontWeight: 600,
-            fontFamily: "'Inter', sans-serif", marginBottom: 8,
+            fontFamily: "'Inter', sans-serif", marginBottom: 6,
+            textAlign: "center",
           }}>
             Your guess for position {pickerPosition + 1}:
           </div>
-          {availableTokens.length === 0 ? (
-            <div style={{ fontSize: 11, color: C.textDim + "88", fontFamily: "'Inter', sans-serif" }}>
-              Solve puzzles to discover tokens for the lock.
-            </div>
-          ) : (
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-              {availableTokens.map((token, i) => {
-                const isSelected = lockGuesses?.[pickerPosition]?.[myUid] === token;
-                return (
-                  <div key={i} style={{ position: "relative" }}>
-                    <TokenTile
-                      token={token}
-                      size={36}
-                      onClick={() => handlePickToken(token)}
-                      style={{
-                        cursor: "pointer",
-                        border: isSelected ? `2px solid ${C.correct}` : "2px solid transparent",
-                        boxShadow: isSelected ? `0 0 8px ${C.correct}44` : "none",
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
-          <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-            {lockGuesses?.[pickerPosition]?.[myUid] && (
-              <button
-                onClick={handleClearMyGuess}
-                style={{
-                  padding: "5px 12px", borderRadius: 6,
-                  border: `1px solid ${C.border}`, backgroundColor: "transparent",
-                  color: C.textDim, fontSize: 11, cursor: "pointer",
-                  fontFamily: "'Inter', sans-serif", fontWeight: 600,
-                }}
-              >
-                Clear
-              </button>
-            )}
-            <button
-              onClick={() => setPickerPosition(null)}
-              style={{
-                padding: "5px 12px", borderRadius: 6,
-                border: `1px solid ${C.border}`, backgroundColor: "transparent",
-                color: C.textDim, fontSize: 11, cursor: "pointer",
-                fontFamily: "'Inter', sans-serif", fontWeight: 600,
-              }}
-            >
-              Done
-            </button>
-          </div>
+          <ColorShapePicker
+            palette={vaultMeta.palette}
+            currentToken={lockGuesses?.[pickerPosition]?.[myUid] || null}
+            onPick={handlePickToken}
+            onCancel={() => setPickerPosition(null)}
+            C={C}
+          />
         </div>
       )}
 
@@ -575,21 +474,35 @@ export default function VaultMode({
         {solvedCount} / {totalPuzzles} puzzles solved
       </div>
 
-      {/* Puzzle Grid */}
+      {/* Puzzle Grid — with quadrant grouping gaps for 4x4 */}
       <div style={{
         display: "grid",
-        gridTemplateColumns: `repeat(${gridLayout}, 1fr)`,
+        gridTemplateColumns: gridLayout === 4
+          ? `repeat(2, ${tileSz}px) 6px repeat(2, ${tileSz}px)`
+          : `repeat(${gridLayout}, 1fr)`,
+        gridTemplateRows: gridLayout === 4
+          ? `repeat(2, ${tileSz}px) 6px repeat(2, ${tileSz}px)`
+          : undefined,
         gap: 4,
         padding: 8,
         borderRadius: 12,
         backgroundColor: C.surface,
         border: `1px solid ${C.border}`,
       }}>
-        {Array.from({ length: totalPuzzles }, (_, i) => {
+        {gridLayout === 4 ? (
+          /* 4x4 grid with quadrant separator gaps */
+          Array.from({ length: totalPuzzles }, (_, i) => {
+            const gridRow = Math.floor(i / gridLayout);
+            const gridCol = i % gridLayout;
+            // CSS grid row/col (1-indexed), accounting for the gap row/col at position 3
+            const cssRow = gridRow < 2 ? gridRow + 1 : gridRow + 2;
+            const cssCol = gridCol < 2 ? gridCol + 1 : gridCol + 2;
+            return { i, cssRow, cssCol };
+          })
+        ).map(({ i, cssRow, cssCol }) => {
           const isSolved = (tileProgress[i] || 0) > 0;
           const isUnlocked = effectiveUnlocked[i];
           const isPinned = !!pins[i];
-          const isClue = clueTileSet.has(i);
           const puzzle = vaultPuzzles[i];
           const canInteract = isUnlocked || isSolved;
 
@@ -601,6 +514,7 @@ export default function VaultMode({
               key={i}
               onClick={() => canInteract ? handleTileClick(i) : null}
               style={{
+                gridRow: cssRow, gridColumn: cssCol,
                 width: tileSz, height: tileSz,
                 borderRadius: 6,
                 border: `1.5px solid ${
@@ -659,24 +573,6 @@ export default function VaultMode({
                 </span>
               )}
 
-              {/* Arrow to nearest clue — shown on solved clue tiles */}
-              {isClue && isSolved && (() => {
-                const arrow = getClueArrow(i);
-                if (!arrow) return null;
-                return (
-                  <div style={{
-                    position: "absolute", bottom: 1, right: 1,
-                    width: 14, height: 14, borderRadius: 3,
-                    backgroundColor: C.textDim + "33",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 9, fontWeight: 700, color: C.text,
-                    lineHeight: 1,
-                  }}>
-                    {arrow}
-                  </div>
-                );
-              })()}
-
               {/* Pin indicator */}
               {isPinned && (
                 <div style={{
@@ -701,7 +597,50 @@ export default function VaultMode({
               ))}
             </button>
           );
-        })}
+        })
+        : (
+          /* Non-4x4 fallback: standard grid without quadrant gaps */
+          Array.from({ length: totalPuzzles }, (_, i) => {
+            const isSolved = (tileProgress[i] || 0) > 0;
+            const isUnlocked = effectiveUnlocked[i];
+            const isPinned = !!pins[i];
+            const puzzle = vaultPuzzles[i];
+            const canInteract = isUnlocked || isSolved;
+            const playersHere = playerUids.filter(uid => uid !== myUid && players[uid]?.currentTile === i);
+            return (
+              <button
+                key={i}
+                onClick={() => canInteract ? handleTileClick(i) : null}
+                style={{
+                  width: tileSz, height: tileSz, borderRadius: 6,
+                  border: `1.5px solid ${isSolved ? C.correct + "66" : isUnlocked ? C.border : C.textDim + "22"}`,
+                  backgroundColor: isSolved ? C.correct + "10" : isUnlocked ? C.surface : C.bg,
+                  cursor: canInteract ? "pointer" : "default",
+                  padding: 2, position: "relative",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  opacity: isUnlocked || isSolved ? 1 : 0.35,
+                }}
+              >
+                {isSolved && puzzle ? (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
+                    {puzzle.solution.map((row, ri) => (
+                      <div key={ri} style={{ display: "flex", gap: 0.5 }}>
+                        {row.map((token, ci) => {
+                          const { color } = parseToken(token);
+                          return <div key={ci} style={{ width: miniCellSz, height: miniCellSz, borderRadius: 1, backgroundColor: color }} />;
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{ fontSize: isUnlocked ? 13 : 10, fontWeight: 700, color: C.textDim }}>
+                    {isUnlocked ? i + 1 : "\uD83D\uDD12"}
+                  </span>
+                )}
+              </button>
+            );
+          })
+        )}
       </div>
 
       {/* How to Play button */}
@@ -808,6 +747,8 @@ export default function VaultMode({
           </div>
         );
 
+        const greyCol = "#2a2a2a";
+
         const pages = [
           // --- PAGE 0: The Goal ---
           <div key="p0" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
@@ -830,7 +771,7 @@ export default function VaultMode({
               </div>
               <div style={{ fontSize: 11, color: dim, lineHeight: 1.5 }}>
                 The vault is locked with a secret 4-slot code.
-                Each slot is a <span style={{ color: accent }}>colour</span> + <span style={{ color: accent }}>symbol</span> pair.
+                Each slot is a <span style={{ color: accent }}>colour</span> + <span style={{ color: accent }}>shape</span> pair.
               </div>
             </div>
             {/* Visual: what a filled lock looks like */}
@@ -840,98 +781,74 @@ export default function VaultMode({
               ))}
             </div>
             <div style={{ fontSize: 10, color: dim + "aa", textAlign: "center", lineHeight: 1.4 }}>
-              Solve puzzles in the grid to discover these tokens
+              Each quadrant of the grid hides one combination piece
             </div>
           </div>,
 
-          // --- PAGE 1: Clue Tiles - Colours & Symbols ---
+          // --- PAGE 1: Quadrant Outlines ---
           <div key="p1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: text, textAlign: "center" }}>
-              Puzzles reveal clues
+              Shape outlines hide the code
             </div>
-            {/* Colour clue demo */}
+            {/* Quadrant demo: 2x2 mini grids with shape outline in colour */}
             <div style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: "10px 14px", borderRadius: 10,
+              padding: "12px 14px", borderRadius: 10,
               backgroundColor: bg, border: `1px solid ${border}`,
               width: "100%",
             }}>
-              {/* Mini 3x3 grid: same colour, different shapes */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
-                {[[0,1,2],[3,4,5],[1,0,3]].map((row, ri) => (
-                  <div key={ri} style={{ display: "flex", gap: 2 }}>
-                    {row.map((sh, ci) => (
-                      <div key={ci} style={{
-                        width: 20, height: 20, borderRadius: 3,
-                        backgroundColor: "#FF6B6B",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        {miniShape(sh, 12, "rgba(255,255,255,0.7)")}
-                      </div>
-                    ))}
+              <div style={{ fontSize: 10, color: dim, marginBottom: 10, lineHeight: 1.4, textAlign: "center" }}>
+                The 4x4 grid is split into four 2x2 quadrants. Each quadrant draws a
+                <span style={{ color: accent, fontWeight: 700 }}> shape outline </span>
+                in its combination
+                <span style={{ color: accent, fontWeight: 700 }}> colour</span>.
+              </div>
+              {/* Mini 4x4 demo showing 2 quadrants with coloured outlines */}
+              <div style={{ display: "flex", justifyContent: "center", gap: 12 }}>
+                {/* Quadrant with circle outline in red */}
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, marginBottom: 4 }}>
+                    {Array.from({ length: 16 }, (_, ci) => {
+                      const r = Math.floor(ci / 4), c = ci % 4;
+                      const cx = 1.5, cy = 1.5;
+                      const dist = Math.sqrt((r - cy) ** 2 + (c - cx) ** 2);
+                      const isOutline = dist >= 1.0 && dist <= 1.8;
+                      return (
+                        <div key={ci} style={{
+                          width: 12, height: 12, borderRadius: 2,
+                          backgroundColor: isOutline ? "#FF6B6B" : greyCol,
+                        }} />
+                      );
+                    })}
                   </div>
-                ))}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#FF6B6B", marginBottom: 2 }}>
-                  Colour clue
-                </div>
-                <div style={{ fontSize: 10, color: dim, lineHeight: 1.4 }}>
-                  All one colour, mixed symbols
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
-                  <span style={{ fontSize: 9, color: dim }}>Reveals:</span>
-                  <div style={{
-                    width: 18, height: 18, borderRadius: 4,
-                    backgroundColor: "#FF6B6B", opacity: 0.9,
-                  }} />
-                </div>
-              </div>
-            </div>
-            {/* Symbol clue demo */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: "10px 14px", borderRadius: 10,
-              backgroundColor: bg, border: `1px solid ${border}`,
-              width: "100%",
-            }}>
-              {/* Mini 3x3 grid: same shape, different colours */}
-              <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
-                {[["#FF6B6B","#4ECDC4","#FFE66D"],["#6C5CE7","#FF6B6B","#4ECDC4"],["#FFE66D","#6C5CE7","#FF6B6B"]].map((row, ri) => (
-                  <div key={ri} style={{ display: "flex", gap: 2 }}>
-                    {row.map((col, ci) => (
-                      <div key={ci} style={{
-                        width: 20, height: 20, borderRadius: 3,
-                        backgroundColor: col,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                      }}>
-                        {miniShape(1, 12, "rgba(255,255,255,0.7)")}
-                      </div>
-                    ))}
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#FF6B6B" }} />
+                    {miniShape(0, 10, "rgba(255,255,255,0.85)")}
                   </div>
-                ))}
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 11, fontWeight: 700, color: "#4ECDC4", marginBottom: 2 }}>
-                  Symbol clue
                 </div>
-                <div style={{ fontSize: 10, color: dim, lineHeight: 1.4 }}>
-                  All one symbol, mixed colours
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
-                  <span style={{ fontSize: 9, color: dim }}>Reveals:</span>
-                  <div style={{
-                    width: 18, height: 18, borderRadius: 4,
-                    backgroundColor: dim + "33",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    {miniShape(1, 12, "rgba(255,255,255,0.85)")}
+                {/* Quadrant with diamond outline in teal */}
+                <div style={{ textAlign: "center" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 1, marginBottom: 4 }}>
+                    {Array.from({ length: 16 }, (_, ci) => {
+                      const r = Math.floor(ci / 4), c = ci % 4;
+                      const manhattan = Math.abs(r - 1.5) + Math.abs(c - 1.5);
+                      const isOutline = manhattan >= 1.3 && manhattan <= 2.0;
+                      return (
+                        <div key={ci} style={{
+                          width: 12, height: 12, borderRadius: 2,
+                          backgroundColor: isOutline ? "#4ECDC4" : greyCol,
+                        }} />
+                      );
+                    })}
+                  </div>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 3 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#4ECDC4" }} />
+                    {miniShape(1, 10, "rgba(255,255,255,0.85)")}
                   </div>
                 </div>
               </div>
             </div>
             <div style={{ fontSize: 10, color: dim + "aa", textAlign: "center", lineHeight: 1.4 }}>
-              Arrows on solved clue tiles point to the next clue {"\u2192"}
+              Solve puzzles to see the outlines. Deduce the colour + shape for each quadrant.
             </div>
           </div>,
 
@@ -967,83 +884,72 @@ export default function VaultMode({
                 );
               })}
             </div>
-            {/* Mini grid visual */}
+            {/* Mini 4x4 grid with quadrant gaps */}
             <div style={{
-              display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3,
+              display: "grid", gridTemplateColumns: "repeat(2, 34px) 6px repeat(2, 34px)", gap: 3,
               padding: 6, borderRadius: 8, backgroundColor: bg, border: `1px solid ${border}`,
             }}>
-              {[
-                { solved: true, clue: true },
-                { unlocked: true },
-                { solved: true },
-                { unlocked: true },
-                { locked: true },
-                { locked: true },
-                { solved: true, clue: true },
-                { locked: true },
-                { unlocked: true },
-              ].map((tile, i) => (
-                <div key={i} style={{
-                  width: 36, height: 36, borderRadius: 4,
-                  border: `1.5px solid ${tile.solved ? green + "66" : tile.unlocked ? border : dim + "22"}`,
-                  backgroundColor: tile.solved ? green + "10" : tile.unlocked ? surface : bg,
-                  opacity: tile.locked ? 0.35 : 1,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  position: "relative",
-                  fontSize: 10, fontWeight: 700, color: dim,
-                  fontFamily: font,
-                }}>
-                  {tile.solved ? (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
-                      {[[0,1],[2,0]].map((row, ri) => (
-                        <div key={ri} style={{ display: "flex", gap: 1 }}>
-                          {row.map((_, ci) => (
-                            <div key={ci} style={{
-                              width: 6, height: 6, borderRadius: 1,
-                              backgroundColor: demoPalette[(ri * 2 + ci) % 4],
-                            }} />
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  ) : tile.locked ? (
-                    <span style={{ fontSize: 8 }}>{"\uD83D\uDD12"}</span>
-                  ) : (
-                    <span>{i + 1}</span>
-                  )}
-                  {tile.clue && (
-                    <div style={{
-                      position: "absolute", bottom: 1, right: 1,
-                      width: 10, height: 10, borderRadius: 2,
-                      backgroundColor: dim + "33",
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      fontSize: 7, fontWeight: 700, color: text, lineHeight: 1,
-                    }}>
-                      {i === 0 ? "\u2193" : "\u2191"}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {Array.from({ length: 16 }, (_, i) => {
+                const row = Math.floor(i / 4), col = i % 4;
+                const cssRow = row < 2 ? row + 1 : row + 2;
+                const cssCol = col < 2 ? col + 1 : col + 2;
+                const isSolvedDemo = [0, 1, 4, 5, 10].includes(i);
+                const isUnlockedDemo = [2, 6, 8, 9].includes(i);
+                return (
+                  <div key={i} style={{
+                    gridRow: cssRow, gridColumn: cssCol,
+                    width: 34, height: 34, borderRadius: 4,
+                    border: `1.5px solid ${isSolvedDemo ? green + "66" : isUnlockedDemo ? border : dim + "22"}`,
+                    backgroundColor: isSolvedDemo ? green + "10" : isUnlockedDemo ? surface : bg,
+                    opacity: !isSolvedDemo && !isUnlockedDemo ? 0.35 : 1,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 10, fontWeight: 700, color: dim,
+                    fontFamily: font,
+                  }}>
+                    {isSolvedDemo ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                        {[[0,1],[2,0]].map((r, ri) => (
+                          <div key={ri} style={{ display: "flex", gap: 1 }}>
+                            {r.map((_, ci) => {
+                              const isOutlineCell = (ri + ci) % 2 === 0;
+                              return (
+                                <div key={ci} style={{
+                                  width: 6, height: 6, borderRadius: 1,
+                                  backgroundColor: isOutlineCell ? demoPalette[Math.floor(i / 4)] : greyCol,
+                                }} />
+                              );
+                            })}
+                          </div>
+                        ))}
+                      </div>
+                    ) : isUnlockedDemo ? (
+                      <span>{i + 1}</span>
+                    ) : (
+                      <span style={{ fontSize: 8 }}>{"\uD83D\uDD12"}</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
             <div style={{ fontSize: 10, color: dim + "aa", textAlign: "center", lineHeight: 1.5 }}>
               Solving a puzzle unlocks adjacent tiles.<br />
-              Arrows on clue tiles guide you to the next clue.
+              The grid is split into 4 quadrants — each hides one lock piece.
             </div>
           </div>,
 
-          // --- PAGE 3: Lock Attempts & Strikes ---
+          // --- PAGE 3: Lock Guessing & Feedback ---
           <div key="p3" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: text, textAlign: "center" }}>
               Guess the combination
             </div>
-            {/* Consensus visual */}
+            {/* Picker explanation */}
             <div style={{
               padding: "10px 14px", borderRadius: 10,
               backgroundColor: bg, border: `1px solid ${border}`,
               width: "100%", textAlign: "center",
             }}>
               <div style={{ fontSize: 10, color: dim, marginBottom: 8, lineHeight: 1.4 }}>
-                Everyone picks tokens for each slot — when all agree, you can submit
+                Pick a <span style={{ color: accent, fontWeight: 600 }}>colour</span> then a <span style={{ color: accent, fontWeight: 600 }}>shape</span> for each lock slot. When all players agree, submit your guess.
               </div>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
                 {demoPalette.map((col, i) => (

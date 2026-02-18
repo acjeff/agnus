@@ -7079,7 +7079,7 @@ export default function Pattrn() {
                           difficulty: diff,
                           puzzleSeed: seed,
                           combination: result.combination,
-                          clueTiles: result.clueTiles,
+                          palette: result.palette,
                           startingUnlocked: result.startingUnlocked,
                           gridLayout: config.gridLayout,
                           maxAttempts: config.maxAttempts,
