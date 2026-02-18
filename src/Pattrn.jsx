@@ -11118,6 +11118,12 @@ export default function Pattrn() {
               // Set difficulty to "vault" so the puzzle derivation picks up from vaultPuzzlesRef
               setDifficulty("vault");
               setVaultSolvingTile(tileIdx);
+              // Find first blank cell for auto-selection
+              const firstBlank = [...puzzle.blanks].sort((a, b) => {
+                const [ar, ac] = a.split("-").map(Number);
+                const [br, bc] = b.split("-").map(Number);
+                return ar !== br ? ar - br : ac - bc;
+              })[0] || null;
               // If tile is already solved or can't solve (not my turn), show completed state
               if (!canSolve) {
                 const solFills = {};
@@ -11127,15 +11133,24 @@ export default function Pattrn() {
                 }
                 setFills(solFills);
                 setLockedCells(new Set(puzzle.blanks));
+                setSelectedCell(null);
+                setSelectedToken(null);
                 setGameState("won");
                 setView("play");
               } else {
-                // Start solving
+                // Start solving — reset all play state
                 setFills({});
                 setLockedCells(new Set());
                 setWrongCells(new Set());
+                setClearedBlanks(new Set());
+                setJustPlacedCells(new Set());
+                setRemovingCells({});
+                setShowParticles(false);
+                setSelectedCell(firstBlank);
+                setSelectedToken(null);
                 setGameState("playing");
                 setAttempts(0);
+                setGridEpoch(e => e + 1);
                 setView("play");
               }
             }
