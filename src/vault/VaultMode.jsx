@@ -55,8 +55,16 @@ export default function VaultMode({
   const currentTileRef = useRef(-1);
   const prevSolvedRef = useRef(new Set());
   const unsubRef = useRef(null);
-  const [showRules, setShowRules] = useState(true);
+  const [showRules, setShowRules] = useState(() => {
+    try { return !localStorage.getItem("vault-rules-seen"); } catch { return true; }
+  });
   const [rulesPage, setRulesPage] = useState(0);
+
+  const dismissRules = useCallback(() => {
+    setShowRules(false);
+    setRulesPage(0);
+    try { localStorage.setItem("vault-rules-seen", "1"); } catch { /* ignore */ }
+  }, []);
 
   // --- Derived state ---
   const players = sessionData?.players || {};
@@ -696,6 +704,21 @@ export default function VaultMode({
         })}
       </div>
 
+      {/* How to Play button */}
+      <button
+        onClick={() => { setShowRules(true); setRulesPage(0); }}
+        style={{
+          padding: "6px 14px", borderRadius: 8,
+          backgroundColor: "transparent",
+          border: `1px solid ${C.border}`,
+          color: C.textDim, fontSize: 11, fontWeight: 600,
+          cursor: "pointer", fontFamily: "'Inter', sans-serif",
+          display: "flex", alignItems: "center", gap: 5,
+        }}
+      >
+        <span style={{ fontSize: 13 }}>{"\uD83D\uDD10"}</span> How to Play
+      </button>
+
       </div>
 
       {/* Back button — fixed bottom-left, matches standard app pattern */}
@@ -1102,7 +1125,7 @@ export default function VaultMode({
 @keyframes rulesSlideUp { from { opacity:0; transform:translateY(16px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }`}</style>
             {/* Backdrop */}
             <div
-              onClick={() => { setShowRules(false); setRulesPage(0); }}
+              onClick={dismissRules}
               style={{
                 position: "absolute", inset: 0,
                 backgroundColor: "rgba(0,0,0,0.7)",
@@ -1193,7 +1216,7 @@ export default function VaultMode({
                   </button>
                 ) : (
                   <button
-                    onClick={() => { setShowRules(false); setRulesPage(0); }}
+                    onClick={dismissRules}
                     style={{
                       padding: "8px 20px", borderRadius: 8,
                       backgroundColor: accent,
