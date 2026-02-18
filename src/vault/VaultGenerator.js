@@ -208,28 +208,7 @@ function outlineStar(N) {
   return s;
 }
 
-// 6: Pentagram — 5-pointed star with crossing internal lines
-function outlinePentagram(N) {
-  const s = new Set();
-  const cx = (N - 1) / 2, cy = (N - 1) / 2;
-  const R = Math.floor(N / 2) - 0.5;
-  const outerPts = [];
-  for (let i = 0; i < 5; i++) {
-    const angle = -Math.PI / 2 + (2 * Math.PI * i) / 5;
-    outerPts.push([Math.round(cy + R * Math.sin(angle)), Math.round(cx + R * Math.cos(angle))]);
-  }
-  // Draw lines connecting every other point (the star pattern)
-  for (let i = 0; i < 5; i++) {
-    const [r0, c0] = outerPts[i];
-    const [r1, c1] = outerPts[(i + 2) % 5];
-    for (const [r, c] of rasterLine(r0, c0, r1, c1)) {
-      if (r >= 0 && r < N && c >= 0 && c < N) s.add(`${r}-${c}`);
-    }
-  }
-  return s;
-}
-
-const OUTLINE_GENERATORS = [outlineCircle, outlineDiamond, outlineTriangle, outlinePlus, outlineSquare, outlineStar, outlinePentagram];
+const OUTLINE_GENERATORS = [outlineCircle, outlineDiamond, outlineTriangle, outlinePlus, outlineSquare, outlineStar];
 
 // Map tile index to quadrant (0-3) and position within quadrant for a 4x4 grid layout
 function getQuadrantInfo(tileIdx, gridLayout) {
@@ -274,7 +253,7 @@ export function buildVaultPuzzles(seed, difficulty = "silver") {
   const comboPal = shuffle(PALETTES[comboPalIdx], masterRng);
 
   // 2. Generate the 4-tile combination (unique color+shape pairs)
-  const comboShapes = shuffle([0, 1, 2, 3, 4, 5, 6], masterRng).slice(0, 4);
+  const comboShapes = shuffle([0, 1, 2, 3, 4, 5], masterRng).slice(0, 4);
   const combination = comboShapes.map((shapeIdx, i) => `${comboPal[i % comboPal.length]}|${shapeIdx}`);
 
   // 3. Assign quadrant positions (0-3) — this is the lock order
