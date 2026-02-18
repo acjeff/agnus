@@ -4,7 +4,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ChevronLeft } from "lucide-react";
-import VaultLock, { TokenTile, parseToken } from "./VaultLock.jsx";
+import VaultLock, { TokenTile, parseToken, LOCK_SHAPES } from "./VaultLock.jsx";
 import { buildVaultPuzzles, computeUnlockedTiles, getMastermindFeedback, VAULT_DIFFICULTIES } from "./VaultGenerator.js";
 import {
   subscribeToVaultSession,
@@ -55,6 +55,8 @@ export default function VaultMode({
   const currentTileRef = useRef(-1);
   const prevSolvedRef = useRef(new Set());
   const unsubRef = useRef(null);
+  const [showRules, setShowRules] = useState(true);
+  const [rulesPage, setRulesPage] = useState(0);
 
   // --- Derived state ---
   const players = sessionData?.players || {};
@@ -342,11 +344,23 @@ export default function VaultMode({
         display: "flex", flexDirection: "column", gap: 6,
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{
-            fontSize: 10, fontWeight: 700, color: C.textDim,
-            fontFamily: "'Inter', sans-serif", letterSpacing: 1, textTransform: "uppercase",
-          }}>
-            Players
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{
+              fontSize: 10, fontWeight: 700, color: C.textDim,
+              fontFamily: "'Inter', sans-serif", letterSpacing: 1, textTransform: "uppercase",
+            }}>
+              Players
+            </div>
+            <div
+              onClick={() => { setShowRules(true); setRulesPage(0); }}
+              style={{
+                width: 16, height: 16, borderRadius: 8,
+                backgroundColor: C.textDim + "22",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 9, fontWeight: 700, color: C.textDim,
+                cursor: "pointer", fontFamily: "'Inter', sans-serif",
+              }}
+            >?</div>
           </div>
           {isWaiting && (
             <div style={{
@@ -612,11 +626,15 @@ export default function VaultMode({
                   {puzzle.solution.map((row, ri) => (
                     <div key={ri} style={{ display: "flex", gap: 0.5 }}>
                       {row.map((token, ci) => {
-                        const { color } = parseToken(token);
+                        const { color, shapeIndex } = parseToken(token);
                         return <div key={ci} style={{
                           width: miniCellSz, height: miniCellSz,
                           borderRadius: 1, backgroundColor: color,
-                        }} />;
+                          position: "relative",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          {LOCK_SHAPES[shapeIndex % LOCK_SHAPES.length]?.(miniCellSz * 0.7, "rgba(255,255,255,0.55)")}
+                        </div>;
                       })}
                     </div>
                   ))}
@@ -723,6 +741,472 @@ export default function VaultMode({
               }} />
             </div>
             <ChevronLeft size={22} color={strokeColor} strokeWidth={2.5} />
+          </div>
+        );
+      })()}
+
+      {/* --- Vault Rules Overlay --- */}
+      {showRules && (() => {
+        const TOTAL_PAGES = 4;
+        const accent = C.accent || "#c8f03e";
+        const gold = C.gold || "#FFD700";
+        const red = "#FF6B6B";
+        const green = C.correct || "#4ade80";
+        const dim = C.textDim || "#6b6b7b";
+        const surface = C.surface || "#14141f";
+        const bg = C.bg || "#0a0a0f";
+        const border = C.border || "#2a2a3a";
+        const text = C.text || "#e8e8ef";
+        const font = "'Inter', sans-serif";
+
+        const demoPalette = ["#FF6B6B", "#4ECDC4", "#FFE66D", "#6C5CE7"];
+
+        // Mini shape renderers for inline visuals
+        const miniShape = (shapeIdx, size, stroke) => {
+          const shapes = [
+            <circle cx="12" cy="12" r="5.5" fill="none" stroke={stroke} strokeWidth="2.5"/>,
+            <polygon points="12,4 20,12 12,20 4,12" fill="none" stroke={stroke} strokeWidth="2.5"/>,
+            <polygon points="12,5 20,19 4,19" fill="none" stroke={stroke} strokeWidth="2.5"/>,
+            <><line x1="12" y1="5" x2="12" y2="19" stroke={stroke} strokeWidth="2.5" strokeLinecap="round"/><line x1="5" y1="12" x2="19" y2="12" stroke={stroke} strokeWidth="2.5" strokeLinecap="round"/></>,
+            <rect x="6" y="6" width="12" height="12" fill="none" stroke={stroke} strokeWidth="2.5"/>,
+            <polygon points="12,3 14.5,9.5 21,10 16,14.5 17.5,21 12,17.5 6.5,21 8,14.5 3,10 9.5,9.5" fill="none" stroke={stroke} strokeWidth="2"/>,
+          ];
+          return <svg viewBox="0 0 24 24" width={size} height={size}>{shapes[shapeIdx % shapes.length]}</svg>;
+        };
+
+        // Token tile helper
+        const demoToken = (color, shapeIdx, size = 32) => (
+          <div style={{
+            width: size, height: size, borderRadius: Math.max(3, size / 5),
+            backgroundColor: color, position: "relative",
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+          }}>
+            {miniShape(shapeIdx, size * 0.6, "rgba(255,255,255,0.85)")}
+          </div>
+        );
+
+        const pages = [
+          // --- PAGE 0: The Goal ---
+          <div key="p0" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+            {/* Visual: lock with 4 question mark slots */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 4 }}>
+              {[0, 1, 2, 3].map(i => (
+                <div key={i} style={{
+                  width: 44, height: 44, borderRadius: 8,
+                  border: `2px dashed ${dim}66`,
+                  backgroundColor: bg,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <span style={{ fontSize: 18, color: dim + "55", fontWeight: 700 }}>?</span>
+                </div>
+              ))}
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: text, marginBottom: 6 }}>
+                Crack the combination
+              </div>
+              <div style={{ fontSize: 11, color: dim, lineHeight: 1.5 }}>
+                The vault is locked with a secret 4-slot code.
+                Each slot is a <span style={{ color: accent }}>colour</span> + <span style={{ color: accent }}>symbol</span> pair.
+              </div>
+            </div>
+            {/* Visual: what a filled lock looks like */}
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              {demoPalette.map((col, i) => (
+                <div key={i}>{demoToken(col, i, 44)}</div>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: dim + "aa", textAlign: "center", lineHeight: 1.4 }}>
+              Solve puzzles in the grid to discover these tokens
+            </div>
+          </div>,
+
+          // --- PAGE 1: Clue Tiles - Colours & Symbols ---
+          <div key="p1" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: text, textAlign: "center" }}>
+              Puzzles reveal clues
+            </div>
+            {/* Colour clue demo */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "10px 14px", borderRadius: 10,
+              backgroundColor: bg, border: `1px solid ${border}`,
+              width: "100%",
+            }}>
+              {/* Mini 3x3 grid: same colour, different shapes */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
+                {[[0,1,2],[3,4,5],[1,0,3]].map((row, ri) => (
+                  <div key={ri} style={{ display: "flex", gap: 2 }}>
+                    {row.map((sh, ci) => (
+                      <div key={ci} style={{
+                        width: 20, height: 20, borderRadius: 3,
+                        backgroundColor: "#FF6B6B",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {miniShape(sh, 12, "rgba(255,255,255,0.7)")}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#FF6B6B", marginBottom: 2 }}>
+                  Colour clue
+                </div>
+                <div style={{ fontSize: 10, color: dim, lineHeight: 1.4 }}>
+                  All one colour, mixed symbols
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+                  <span style={{ fontSize: 9, color: dim }}>Reveals:</span>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: 4,
+                    backgroundColor: "#FF6B6B", opacity: 0.9,
+                  }} />
+                </div>
+              </div>
+            </div>
+            {/* Symbol clue demo */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 12,
+              padding: "10px 14px", borderRadius: 10,
+              backgroundColor: bg, border: `1px solid ${border}`,
+              width: "100%",
+            }}>
+              {/* Mini 3x3 grid: same shape, different colours */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 2, flexShrink: 0 }}>
+                {[["#FF6B6B","#4ECDC4","#FFE66D"],["#6C5CE7","#FF6B6B","#4ECDC4"],["#FFE66D","#6C5CE7","#FF6B6B"]].map((row, ri) => (
+                  <div key={ri} style={{ display: "flex", gap: 2 }}>
+                    {row.map((col, ci) => (
+                      <div key={ci} style={{
+                        width: 20, height: 20, borderRadius: 3,
+                        backgroundColor: col,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        {miniShape(1, 12, "rgba(255,255,255,0.7)")}
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, color: "#4ECDC4", marginBottom: 2 }}>
+                  Symbol clue
+                </div>
+                <div style={{ fontSize: 10, color: dim, lineHeight: 1.4 }}>
+                  All one symbol, mixed colours
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4, marginTop: 4 }}>
+                  <span style={{ fontSize: 9, color: dim }}>Reveals:</span>
+                  <div style={{
+                    width: 18, height: 18, borderRadius: 4,
+                    backgroundColor: dim + "33",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    {miniShape(1, 12, "rgba(255,255,255,0.85)")}
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div style={{ fontSize: 10, color: dim + "aa", textAlign: "center", lineHeight: 1.4 }}>
+              Arrows on solved clue tiles point to the next clue {"\u2192"}
+            </div>
+          </div>,
+
+          // --- PAGE 2: Turns & Grid ---
+          <div key="p2" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: text, textAlign: "center" }}>
+              Take turns
+            </div>
+            {/* Turn order visual */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 4,
+              padding: "6px 12px", borderRadius: 8,
+              backgroundColor: bg, border: `1px solid ${border}`,
+            }}>
+              {["You", "P2", "P3"].map((name, i) => {
+                const colors = ["#54A0FF", "#FF6B6B", "#4ECB71"];
+                const active = i === 0;
+                return (
+                  <div key={i} style={{ display: "flex", alignItems: "center", gap: 3 }}>
+                    {i > 0 && <span style={{ fontSize: 10, color: dim + "66", margin: "0 2px" }}>{"\u2192"}</span>}
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 3,
+                      padding: "3px 6px", borderRadius: 6,
+                      border: `1.5px solid ${active ? colors[i] : "transparent"}`,
+                      backgroundColor: active ? colors[i] + "18" : "transparent",
+                    }}>
+                      <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors[i] }} />
+                      <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, color: active ? text : dim, fontFamily: font }}>
+                        {name}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            {/* Mini grid visual */}
+            <div style={{
+              display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 3,
+              padding: 6, borderRadius: 8, backgroundColor: bg, border: `1px solid ${border}`,
+            }}>
+              {[
+                { solved: true, clue: true },
+                { unlocked: true },
+                { solved: true },
+                { unlocked: true },
+                { locked: true },
+                { locked: true },
+                { solved: true, clue: true },
+                { locked: true },
+                { unlocked: true },
+              ].map((tile, i) => (
+                <div key={i} style={{
+                  width: 36, height: 36, borderRadius: 4,
+                  border: `1.5px solid ${tile.solved ? green + "66" : tile.unlocked ? border : dim + "22"}`,
+                  backgroundColor: tile.solved ? green + "10" : tile.unlocked ? surface : bg,
+                  opacity: tile.locked ? 0.35 : 1,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  position: "relative",
+                  fontSize: 10, fontWeight: 700, color: dim,
+                  fontFamily: font,
+                }}>
+                  {tile.solved ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 1 }}>
+                      {[[0,1],[2,0]].map((row, ri) => (
+                        <div key={ri} style={{ display: "flex", gap: 1 }}>
+                          {row.map((_, ci) => (
+                            <div key={ci} style={{
+                              width: 6, height: 6, borderRadius: 1,
+                              backgroundColor: demoPalette[(ri * 2 + ci) % 4],
+                            }} />
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                  ) : tile.locked ? (
+                    <span style={{ fontSize: 8 }}>{"\uD83D\uDD12"}</span>
+                  ) : (
+                    <span>{i + 1}</span>
+                  )}
+                  {tile.clue && (
+                    <div style={{
+                      position: "absolute", bottom: 1, right: 1,
+                      width: 10, height: 10, borderRadius: 2,
+                      backgroundColor: dim + "33",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 7, fontWeight: 700, color: text, lineHeight: 1,
+                    }}>
+                      {i === 0 ? "\u2193" : "\u2191"}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div style={{ fontSize: 10, color: dim + "aa", textAlign: "center", lineHeight: 1.5 }}>
+              Solving a puzzle unlocks adjacent tiles.<br />
+              Arrows on clue tiles guide you to the next clue.
+            </div>
+          </div>,
+
+          // --- PAGE 3: Lock Attempts & Strikes ---
+          <div key="p3" style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: text, textAlign: "center" }}>
+              Guess the combination
+            </div>
+            {/* Consensus visual */}
+            <div style={{
+              padding: "10px 14px", borderRadius: 10,
+              backgroundColor: bg, border: `1px solid ${border}`,
+              width: "100%", textAlign: "center",
+            }}>
+              <div style={{ fontSize: 10, color: dim, marginBottom: 8, lineHeight: 1.4 }}>
+                Everyone picks tokens for each slot — when all agree, you can submit
+              </div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+                {demoPalette.map((col, i) => (
+                  <div key={i} style={{
+                    width: 36, height: 36, borderRadius: 6,
+                    border: `2px solid ${green}88`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    {demoToken(col, i, 30)}
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Feedback pips visual */}
+            <div style={{
+              padding: "10px 14px", borderRadius: 10,
+              backgroundColor: bg, border: `1px solid ${border}`,
+              width: "100%",
+            }}>
+              <div style={{ fontSize: 10, color: dim, marginBottom: 8, textAlign: "center" }}>After each guess you get feedback</div>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: gold }} />
+                  <span style={{ fontSize: 10, color: dim }}>= right spot</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <div style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: "#fff", border: "1px solid #999" }} />
+                  <span style={{ fontSize: 10, color: dim }}>= wrong spot</span>
+                </div>
+              </div>
+            </div>
+            {/* Limits visual */}
+            <div style={{
+              display: "flex", gap: 16, justifyContent: "center", width: "100%",
+            }}>
+              <div style={{
+                flex: 1, padding: "8px 10px", borderRadius: 8,
+                backgroundColor: bg, border: `1px solid ${border}`,
+                textAlign: "center",
+              }}>
+                <div style={{ display: "flex", gap: 3, justifyContent: "center", marginBottom: 4 }}>
+                  {[0,1,2,3].map(i => (
+                    <div key={i} style={{
+                      width: 16, height: 16, borderRadius: 4,
+                      border: `1.5px solid ${i < 1 ? red : dim + "33"}`,
+                      backgroundColor: i < 1 ? red + "22" : "transparent",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: 8, fontWeight: 700, color: i < 1 ? red : dim + "44",
+                    }}>
+                      {"\u2716"}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 9, color: dim, fontWeight: 600 }}>{maxAttempts} lock attempts</div>
+              </div>
+              <div style={{
+                flex: 1, padding: "8px 10px", borderRadius: 8,
+                backgroundColor: bg, border: `1px solid ${border}`,
+                textAlign: "center",
+              }}>
+                <div style={{ display: "flex", gap: 3, justifyContent: "center", marginBottom: 4 }}>
+                  {[0,1,2].map(i => (
+                    <span key={i} style={{ fontSize: 14, opacity: i < 1 ? 1 : 0.2, filter: i < 1 ? "none" : "grayscale(1)" }}>{"\u2716"}</span>
+                  ))}
+                </div>
+                <div style={{ fontSize: 9, color: dim, fontWeight: 600 }}>3 puzzle fails = game over</div>
+              </div>
+            </div>
+          </div>,
+        ];
+
+        return (
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 1200,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20,
+          }}>
+            <style>{`@keyframes rulesOverlayFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes rulesSlideUp { from { opacity:0; transform:translateY(16px) scale(0.97); } to { opacity:1; transform:translateY(0) scale(1); } }`}</style>
+            {/* Backdrop */}
+            <div
+              onClick={() => { setShowRules(false); setRulesPage(0); }}
+              style={{
+                position: "absolute", inset: 0,
+                backgroundColor: "rgba(0,0,0,0.7)",
+                animation: "rulesOverlayFade 0.25s ease both",
+              }}
+            />
+            {/* Card */}
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                position: "relative",
+                backgroundColor: surface,
+                borderRadius: 20,
+                border: `1px solid ${border}`,
+                boxShadow: `0 12px 48px rgba(0,0,0,0.5), 0 0 0 1px ${accent}11`,
+                maxWidth: 340, width: "100%",
+                padding: "20px 20px 16px",
+                animation: "rulesSlideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1) both",
+                display: "flex", flexDirection: "column", gap: 0,
+                fontFamily: font,
+                maxHeight: "85vh",
+                overflowY: "auto",
+              }}
+            >
+              {/* Header */}
+              <div style={{ textAlign: "center", marginBottom: 16 }}>
+                <div style={{ fontSize: 22, marginBottom: 6 }}>{"\uD83D\uDD10"}</div>
+                <div style={{
+                  fontSize: 15, fontWeight: 800, color: text,
+                  letterSpacing: 0.5,
+                }}>
+                  How to Play
+                </div>
+                {/* Page dots */}
+                <div style={{ display: "flex", gap: 6, justifyContent: "center", marginTop: 10 }}>
+                  {Array.from({ length: TOTAL_PAGES }).map((_, i) => (
+                    <div
+                      key={i}
+                      onClick={() => setRulesPage(i)}
+                      style={{
+                        width: i === rulesPage ? 18 : 6, height: 6,
+                        borderRadius: 3,
+                        backgroundColor: i === rulesPage ? accent : dim + "44",
+                        transition: "all 0.25s ease",
+                        cursor: "pointer",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {/* Page content */}
+              <div style={{ minHeight: 220 }}>
+                {pages[rulesPage]}
+              </div>
+
+              {/* Navigation */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                marginTop: 16, gap: 8,
+              }}>
+                {rulesPage > 0 ? (
+                  <button
+                    onClick={() => setRulesPage(p => p - 1)}
+                    style={{
+                      padding: "8px 16px", borderRadius: 8,
+                      backgroundColor: "transparent",
+                      border: `1px solid ${border}`,
+                      color: dim, fontSize: 12, fontWeight: 600,
+                      cursor: "pointer", fontFamily: font,
+                    }}
+                  >
+                    Back
+                  </button>
+                ) : <div />}
+                {rulesPage < TOTAL_PAGES - 1 ? (
+                  <button
+                    onClick={() => setRulesPage(p => p + 1)}
+                    style={{
+                      padding: "8px 20px", borderRadius: 8,
+                      backgroundColor: accent,
+                      border: "none",
+                      color: bg, fontSize: 12, fontWeight: 700,
+                      cursor: "pointer", fontFamily: font,
+                    }}
+                  >
+                    Next
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { setShowRules(false); setRulesPage(0); }}
+                    style={{
+                      padding: "8px 20px", borderRadius: 8,
+                      backgroundColor: accent,
+                      border: "none",
+                      color: bg, fontSize: 12, fontWeight: 700,
+                      cursor: "pointer", fontFamily: font,
+                    }}
+                  >
+                    Got it
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
         );
       })()}

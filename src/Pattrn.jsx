@@ -3190,6 +3190,7 @@ export default function Pattrn() {
   const vaultPuzzlesRef = useRef(null); // generated vault puzzles cache
   const vaultSessionDataRef = useRef(null); // latest session data for chat access
   const [vaultInvitedUids, setVaultInvitedUids] = useState(new Set()); // UIDs invited to vault session
+  const vaultAutoInviteShownRef = useRef(null); // tracks session ID for which auto-invite was shown
   const isVault = !!vaultSessionId;
 
   // --- Staff Pick & Admin Manage state ---
@@ -5073,37 +5074,6 @@ export default function Pattrn() {
   // Co-op submenu — global co-op menu
   const coopSubMenu = [
     { id: "coop-create", icon: "play", label: "Create Session", sub: "coop-create" },
-    { id: "coop-vault", icon: "lock", label: "Vault", action: () => {
-      if (!firebaseUser) { setRadialMenuStack(["root", "sign-in"]); return; }
-      // Create a new vault session
-      const seed = Math.floor(Math.random() * 2147483647);
-      const diff = "silver"; // default difficulty
-      const config = VAULT_DIFFICULTIES[diff];
-      const result = buildVaultPuzzles(seed, diff);
-      const existingId = generateVaultSessionId();
-      createVaultSession(firebaseUser.uid, {
-        difficulty: diff,
-        puzzleSeed: seed,
-        combination: result.combination,
-        clueTiles: result.clueTiles,
-        startingUnlocked: result.startingUnlocked,
-        gridLayout: config.gridLayout,
-        maxAttempts: config.maxAttempts,
-        hostUsername: username || firebaseUser.email,
-        hostTheme: activeTheme?.name || "classic",
-      }, existingId).then((id) => {
-        if (id) {
-          setVaultSessionId(id);
-          setVaultRole("host");
-          setView("vault");
-          // Open invite panel so host can share link / invite friends
-          setCoopSelectedFriends(new Set());
-          setCoopInviteUsernameInput("");
-          setCoopInviteUsernameMsg("");
-          setRadialMenuStack(["root", "coop-start"]);
-        }
-      }).catch(() => {});
-    }},
     { id: "coop-active", icon: "handshake", label: "Active Sessions", sub: "coop-active" },
     { id: "coop-completed", icon: "check", label: "Completed", sub: "coop-completed" },
     { id: "coop-friends", icon: "users", label: "Friends", sub: "friends-view" },
@@ -5562,7 +5532,7 @@ export default function Pattrn() {
       return h;
     })();
 
-    // Co-op create session height — header + mode selection + puzzle selection + start button
+    // Co-op create session height — header + mode selection + puzzle selection + start button + vault
     const coopCreateContentHeight = (() => {
       if (!isCoopCreate) return 0;
       let h = panelPad + fabSize; // padding + bottom bar
@@ -5571,6 +5541,8 @@ export default function Pattrn() {
       h += 70 + 12; // mode selection + margin
       h += 80 + 16; // puzzle/mosaic selection + margin
       h += 48; // start button
+      h += 40; // vault divider (16px top margin + 12px bottom margin + 12px content)
+      h += 48; // vault button
       h += 12; // bottom padding
       return h;
     })();
@@ -7081,6 +7053,56 @@ export default function Pattrn() {
                         opacity: coopSetupStarting ? 0.6 : 1, transition: "all 0.15s",
                       }}>
                       {coopSetupStarting ? "Starting..." : "Start & Invite"}
+                    </button>
+
+                    {/* Vault divider */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "16px 0 12px" }}>
+                      <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+                      <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Inter', sans-serif" }}>or</div>
+                      <div style={{ flex: 1, height: 1, background: "rgba(255,255,255,0.08)" }} />
+                    </div>
+
+                    {/* Vault button */}
+                    <button
+                      onClick={() => {
+                        if (!firebaseUser) { setRadialMenuStack(["root", "sign-in"]); return; }
+                        const seed = Math.floor(Math.random() * 2147483647);
+                        const diff = "silver";
+                        const config = VAULT_DIFFICULTIES[diff];
+                        const result = buildVaultPuzzles(seed, diff);
+                        const existingId = generateVaultSessionId();
+                        createVaultSession(firebaseUser.uid, {
+                          difficulty: diff,
+                          puzzleSeed: seed,
+                          combination: result.combination,
+                          clueTiles: result.clueTiles,
+                          startingUnlocked: result.startingUnlocked,
+                          gridLayout: config.gridLayout,
+                          maxAttempts: config.maxAttempts,
+                          hostUsername: username || firebaseUser.email,
+                          hostTheme: activeTheme?.name || "classic",
+                        }, existingId).then((id) => {
+                          if (id) {
+                            setVaultSessionId(id);
+                            setVaultRole("host");
+                            setView("vault");
+                            setCoopSelectedFriends(new Set());
+                            setCoopInviteUsernameInput("");
+                            setCoopInviteUsernameMsg("");
+                            setRadialMenuStack(["root", "coop-start"]);
+                          }
+                        }).catch(() => {});
+                      }}
+                      style={{
+                        width: "100%", padding: "14px 0", borderRadius: 12, fontSize: 13, fontWeight: 700,
+                        fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                        background: "#C8F03E", color: "#1a1a2e",
+                        border: "none", cursor: "pointer",
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        transition: "all 0.15s",
+                      }}>
+                      {radialIcons["lock"] && radialIcons["lock"]("#1a1a2e")}
+                      Create Vault
                     </button>
                   </div>
                 </>
@@ -11029,6 +11051,27 @@ export default function Pattrn() {
       setView("menu");
     });
   }, [vaultRole, firebaseUser, vaultSessionId, view, username]);
+
+  // --- Auto-open invite panel for vault host when no one has been invited yet ---
+  useEffect(() => {
+    if (view !== "vault") {
+      vaultAutoInviteShownRef.current = null;
+      return;
+    }
+    if (vaultRole !== "host" || !vaultSessionId) return;
+    if (vaultAutoInviteShownRef.current === vaultSessionId) return;
+    const sessionData = vaultSessionDataRef.current;
+    if (!sessionData) return; // wait for session data to load
+    const players = sessionData.players || {};
+    const playerCount = Object.keys(players).length;
+    if (vaultInvitedUids.size === 0 && playerCount <= 1) {
+      vaultAutoInviteShownRef.current = vaultSessionId;
+      setCoopSelectedFriends(new Set());
+      setCoopInviteUsernameInput("");
+      setCoopInviteUsernameMsg("");
+      setRadialMenuStack(["root", "coop-start"]);
+    }
+  }, [view, vaultRole, vaultSessionId, vaultInvitedUids]);
 
   // --- Coop Mosaic joining overlay (shown while waiting for auth + session load) ---
   // Must be before all view checks so it takes priority when accepting an invite
