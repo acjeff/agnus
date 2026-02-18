@@ -101,7 +101,7 @@ import {
 import VaultMode, { getVaultSummary } from "./vault/VaultMode.jsx";
 import VaultChat, { getUnreadCount } from "./vault/VaultChat.jsx";
 import FriendChat from "./FriendChat.jsx";
-import { buildVaultPuzzles, VAULT_DIFFICULTIES, computeUnlockedTiles, getMastermindFeedback } from "./vault/VaultGenerator.js";
+import { buildVaultPuzzles, VAULT_DIFFICULTIES, computeUnlockedTiles, pickOneAdjacentUnlock, getMastermindFeedback } from "./vault/VaultGenerator.js";
 import {
   generateVaultSessionId,
   createVaultSession,
@@ -10656,7 +10656,11 @@ export default function Pattrn() {
               if (otherUid) {
                 advanceVaultTurn(vaultSessionId, otherUid).catch(() => {});
               }
-              const newUnlocked = computeUnlockedTiles({ ...vSnap.tileProgress, [tileIdx]: vaultAttempts }, vSnap.tileUnlocked, vSnap.gridLayout);
+              const currentUnlocked = vSnap.tileUnlocked || {};
+              const updatedProgress = { ...vSnap.tileProgress, [tileIdx]: vaultAttempts };
+              const neighborToUnlock = pickOneAdjacentUnlock(tileIdx, currentUnlocked, updatedProgress, vSnap.gridLayout);
+              const newUnlocked = { ...currentUnlocked, [tileIdx]: true };
+              if (neighborToUnlock !== null) newUnlocked[neighborToUnlock] = true;
               updateVaultTileUnlocked(vaultSessionId, newUnlocked).catch(() => {});
             }
             updateVaultCurrentTile(vaultSessionId, firebaseUser.uid, -1).catch(() => {});

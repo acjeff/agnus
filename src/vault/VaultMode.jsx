@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ChevronLeft } from "lucide-react";
 import VaultLock, { TokenTile, parseToken, LOCK_SHAPES, ColorShapePicker } from "./VaultLock.jsx";
-import { buildVaultPuzzles, computeUnlockedTiles, getMastermindFeedback, VAULT_DIFFICULTIES, OUTLINE_GREY } from "./VaultGenerator.js";
+import { buildVaultPuzzles, computeUnlockedTiles, pickOneAdjacentUnlock, getMastermindFeedback, VAULT_DIFFICULTIES, OUTLINE_GREY } from "./VaultGenerator.js";
 import {
   subscribeToVaultSession,
   updateVaultFill,
@@ -98,12 +98,12 @@ export default function VaultMode({
   const gridLayout = config.gridLayout;
   const totalPuzzles = config.totalPuzzles;
 
-  // Compute effective unlocked map (starting + adjacency from solved)
+  // Compute effective unlocked map: Firebase tileUnlocked (starting + explicitly unlocked) + solved tiles
   const effectiveUnlocked = useMemo(() => {
     if (!vaultMeta) return tileUnlocked;
-    return computeUnlockedTiles(tileProgress, vaultMeta.config.totalPuzzles === 9
-      ? { 0: true, 2: true, 6: true, 8: true }
-      : vaultMeta.startingUnlocked, gridLayout);
+    // Merge starting unlocked with Firebase tileUnlocked (which tracks explicit neighbor unlocks)
+    const base = { ...(vaultMeta.startingUnlocked || {}), ...tileUnlocked };
+    return computeUnlockedTiles(tileProgress, base, gridLayout);
   }, [tileProgress, vaultMeta, tileUnlocked, gridLayout]);
 
   const solvedCount = Object.values(tileProgress).filter(v => v > 0).length;
@@ -135,20 +135,19 @@ export default function VaultMode({
     return () => { unsub(); unsubRef.current = null; };
   }, [sessionId]);
 
-  // --- Sync unlocked tiles to Firebase when we solve a puzzle ---
+  // --- Ensure starting unlocked tiles are in Firebase ---
   useEffect(() => {
     if (!sessionId || !vaultMeta) return;
-    const newUnlocked = computeUnlockedTiles(tileProgress, vaultMeta.startingUnlocked, gridLayout);
-    // Only write if there are new unlocks
     const current = sessionData?.tileUnlocked || {};
+    const startingUnlocked = vaultMeta.startingUnlocked || {};
     let hasNew = false;
-    for (const k of Object.keys(newUnlocked)) {
+    for (const k of Object.keys(startingUnlocked)) {
       if (!current[k]) { hasNew = true; break; }
     }
     if (hasNew) {
-      updateVaultTileUnlocked(sessionId, newUnlocked).catch(() => {});
+      updateVaultTileUnlocked(sessionId, startingUnlocked).catch(() => {});
     }
-  }, [tileProgress, sessionId, vaultMeta, gridLayout]);
+  }, [sessionId, vaultMeta]);
 
   // --- Handle tile selection ---
   const handleTileClick = useCallback((tileIdx) => {
