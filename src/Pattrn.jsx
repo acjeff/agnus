@@ -8406,12 +8406,13 @@ export default function Pattrn() {
     return remaining;
   }, [puzzle, fills, lockedCells, isCoop, coopPartnerFills, isCoopMosaic, coopMosaicOtherFills]);
 
-  // Default to first tile when game loads with no selection
+  // Default to first available tile when game loads with no selection
   useEffect(() => {
     if (view === "play" && puzzle?.usedTokens?.length && selectedToken === null) {
-      setSelectedToken(puzzle.usedTokens[0]);
+      const firstAvailable = puzzle.usedTokens.find(t => (tokenRemaining[t] ?? 0) > 0);
+      setSelectedToken(firstAvailable ?? puzzle.usedTokens[0]);
     }
-  }, [view, puzzle, selectedToken]);
+  }, [view, puzzle, selectedToken, tokenRemaining]);
 
   // Auto-advance to next available token when current selection is exhausted
   // (only when it was depleted by placing, not when user manually picked it)
@@ -10282,7 +10283,7 @@ export default function Pattrn() {
   }, [view, gameState, puzzle, selectedToken, handleTokenSelect]);
 
   const vaultConfig = isVault && vaultSessionDataRef.current?.difficulty ? (VAULT_DIFFICULTIES[vaultSessionDataRef.current.difficulty] || VAULT_DIFFICULTIES.silver) : null;
-  const maxAttempts = isVault ? (vaultConfig?.maxAttempts ?? 5) : isCoopMosaic ? Infinity : isCascade ? 5 : isBlind ? 6 : 5;
+  const maxAttempts = isVault ? (vaultConfig?.maxAttempts ?? 2) : isCoopMosaic ? Infinity : isCascade ? 5 : isBlind ? 6 : 5;
 
   const checkSolution = () => {
     if (!puzzle) return;

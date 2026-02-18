@@ -233,10 +233,10 @@ function combinedGridPos(cellRow, cellCol, posInQuad, gridSize) {
 // Difficulty Configurations
 // ============================================================
 export const VAULT_DIFFICULTIES = {
-  bronze:   { gridLayout: 3, gridSize: 5, totalPuzzles: 9,  maxAttempts: 5, label: "Bronze Vault" },
-  silver:   { gridLayout: 4, gridSize: 5, totalPuzzles: 16, maxAttempts: 4, label: "Silver Vault" },
-  gold:     { gridLayout: 4, gridSize: 7, totalPuzzles: 16, maxAttempts: 3, label: "Gold Vault" },
-  obsidian: { gridLayout: 5, gridSize: 7, totalPuzzles: 25, maxAttempts: 3, label: "Obsidian Vault" },
+  bronze:   { gridLayout: 3, gridSize: 5, totalPuzzles: 9,  maxAttempts: 2, label: "Bronze Vault" },
+  silver:   { gridLayout: 4, gridSize: 5, totalPuzzles: 16, maxAttempts: 2, label: "Silver Vault" },
+  gold:     { gridLayout: 4, gridSize: 7, totalPuzzles: 16, maxAttempts: 2, label: "Gold Vault" },
+  obsidian: { gridLayout: 5, gridSize: 7, totalPuzzles: 25, maxAttempts: 2, label: "Obsidian Vault" },
 };
 
 // ============================================================
@@ -321,7 +321,7 @@ export function buildVaultPuzzles(seed, difficulty = "silver") {
     for (let row = 0; row < gridSize; row++) for (let col = 0; col < gridSize; col++) allCells.push(`${row}-${col}`);
     const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
 
-    const usedTokens = [...new Set(solution.flat())];
+    const usedTokens = [...new Set([...blanks].map(k => { const [r2, c2] = k.split("-").map(Number); return solution[r2][c2]; }).filter(Boolean))];
     puzzles.push({ id: i, solution, blanks, usedTokens, gridSize, mode: "vault" });
   }
 
