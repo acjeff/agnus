@@ -523,8 +523,8 @@ export default function VaultMode({
           const isSolved = (tileProgress[i] || 0) > 0;
           const isUnlocked = effectiveUnlocked[i];
           const isPinned = !!pins[i];
-          const isClue = clueTileSet.has(i) && !isSolved;
-          const isDecoy = decoyTileSet.has(i) && !isSolved;
+          const isClue = clueTileSet.has(i);
+          const isDecoy = decoyTileSet.has(i);
           const puzzle = vaultPuzzles[i];
           const canInteract = isUnlocked || isSolved;
 
@@ -590,23 +590,35 @@ export default function VaultMode({
                 </span>
               )}
 
-              {/* Clue indicator — subtle sparkle dot for clue tiles */}
-              {isClue && isUnlocked && (
+              {/* Clue indicator — gold star badge, visible on solved tiles too */}
+              {isClue && (isUnlocked || isSolved) && (
                 <div style={{
-                  position: "absolute", bottom: 2, right: 2,
-                  width: 6, height: 6, borderRadius: 3,
-                  backgroundColor: C.gold || "#FFD700",
-                  boxShadow: `0 0 4px ${C.gold || "#FFD700"}88`,
-                }} />
+                  position: "absolute", bottom: 1, right: 1,
+                  width: isSolved ? 14 : 6, height: isSolved ? 14 : 6,
+                  borderRadius: isSolved ? 3 : 3,
+                  backgroundColor: (C.gold || "#FFD700") + (isSolved ? "DD" : "FF"),
+                  boxShadow: `0 0 ${isSolved ? 6 : 4}px ${C.gold || "#FFD700"}88`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 8, fontWeight: 900, color: "#000",
+                  lineHeight: 1,
+                }}>
+                  {isSolved ? "\u2605" : ""}
+                </div>
               )}
 
-              {/* Decoy indicator — dimmer dot */}
-              {isDecoy && isUnlocked && (
+              {/* Decoy indicator — dim X badge on solved tiles */}
+              {isDecoy && (isUnlocked || isSolved) && (
                 <div style={{
-                  position: "absolute", bottom: 2, right: 2,
-                  width: 5, height: 5, borderRadius: 3,
-                  backgroundColor: C.textDim + "55",
-                }} />
+                  position: "absolute", bottom: 1, right: 1,
+                  width: isSolved ? 14 : 5, height: isSolved ? 14 : 5,
+                  borderRadius: isSolved ? 3 : 3,
+                  backgroundColor: C.textDim + (isSolved ? "44" : "55"),
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  fontSize: 8, fontWeight: 900, color: C.textDim,
+                  lineHeight: 1,
+                }}>
+                  {isSolved ? "\u2717" : ""}
+                </div>
               )}
 
               {/* Pin indicator */}
@@ -639,15 +651,25 @@ export default function VaultMode({
       {/* Legend for tile indicators */}
       {solvedCount > 0 && (
         <div style={{
-          display: "flex", gap: 10, alignItems: "center",
-          fontSize: 9, color: C.textDim + "88", fontFamily: "'Inter', sans-serif",
+          display: "flex", gap: 12, alignItems: "center",
+          fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif",
         }}>
-          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-            <span style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.gold || "#FFD700", display: "inline-block" }} />
-            Clue
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{
+              width: 14, height: 14, borderRadius: 3,
+              backgroundColor: (C.gold || "#FFD700") + "DD",
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              fontSize: 8, fontWeight: 900, color: "#000",
+            }}>{"\u2605"}</span>
+            Clue tile
           </span>
-          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
-            <span style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.textDim + "55", display: "inline-block" }} />
+          <span style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <span style={{
+              width: 14, height: 14, borderRadius: 3,
+              backgroundColor: C.textDim + "44",
+              display: "inline-flex", alignItems: "center", justifyContent: "center",
+              fontSize: 8, fontWeight: 900, color: C.textDim,
+            }}>{"\u2717"}</span>
             Decoy
           </span>
         </div>
