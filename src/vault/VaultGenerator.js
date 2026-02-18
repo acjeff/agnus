@@ -1,6 +1,7 @@
 // --- Vault Mode Puzzle Generator ---
-// Generates a grid of puzzles with 4 hidden shape silhouettes embedded in solutions.
-// Each silhouette encodes one tile of a 4-position combination lock.
+// Generates a grid of puzzles with colour-reveal and symbol-reveal clue tiles.
+// Colour-reveal tiles use a uniform colour with varied symbols; symbol-reveal tiles
+// use a uniform symbol with varied colours. Together they encode a 4-position lock.
 
 // --- Seeded RNG (same as Pattrn.jsx) ---
 function rng(seed) {
@@ -82,99 +83,13 @@ function weightedGenIndex(r) {
 }
 
 // ============================================================
-// Shape Silhouette Masks
-// ============================================================
-// Each shape has a pixel-art mask for 5x5 and 7x7 grids.
-// The mask is an array of "row-col" strings indicating which cells
-// form the silhouette. Shapes match the SHAPES array indices:
-// 0: Circle, 1: Diamond, 2: Triangle, 3: Plus/Cross, 4: Square, 5: Star, 6: Pentagon
-
-const SILHOUETTES_5 = {
-  // Circle (shape 0) — approximated as a filled circle
-  0: ["0-1","0-2","0-3", "1-0","1-1","1-2","1-3","1-4", "2-0","2-1","2-2","2-3","2-4", "3-0","3-1","3-2","3-3","3-4", "4-1","4-2","4-3"],
-  // Diamond (shape 1)
-  1: ["0-2", "1-1","1-2","1-3", "2-0","2-1","2-2","2-3","2-4", "3-1","3-2","3-3", "4-2"],
-  // Triangle (shape 2)
-  2: ["0-2", "1-1","1-2","1-3", "2-1","2-2","2-3", "3-0","3-1","3-2","3-3","3-4", "4-0","4-1","4-2","4-3","4-4"],
-  // Plus/Cross (shape 3)
-  3: ["0-2", "1-2", "2-0","2-1","2-2","2-3","2-4", "3-2", "4-2"],
-  // Square (shape 4)
-  4: ["0-0","0-1","0-2","0-3","0-4", "1-0","1-4", "2-0","2-4", "3-0","3-4", "4-0","4-1","4-2","4-3","4-4"],
-  // Star (shape 5)
-  5: ["0-2", "1-0","1-1","1-2","1-3","1-4", "2-1","2-2","2-3", "3-0","3-1","3-3","3-4", "4-0","4-4"],
-  // Pentagon (shape 6)
-  6: ["0-2", "1-1","1-3", "2-0","2-4", "3-0","3-1","3-2","3-3","3-4", "4-0","4-1","4-2","4-3","4-4"],
-};
-
-const SILHOUETTES_7 = {
-  // Circle (shape 0)
-  0: ["0-2","0-3","0-4", "1-1","1-2","1-3","1-4","1-5", "2-0","2-1","2-2","2-3","2-4","2-5","2-6", "3-0","3-1","3-2","3-3","3-4","3-5","3-6", "4-0","4-1","4-2","4-3","4-4","4-5","4-6", "5-1","5-2","5-3","5-4","5-5", "6-2","6-3","6-4"],
-  // Diamond (shape 1)
-  1: ["0-3", "1-2","1-3","1-4", "2-1","2-2","2-3","2-4","2-5", "3-0","3-1","3-2","3-3","3-4","3-5","3-6", "4-1","4-2","4-3","4-4","4-5", "5-2","5-3","5-4", "6-3"],
-  // Triangle (shape 2)
-  2: ["0-3", "1-2","1-3","1-4", "2-2","2-3","2-4", "3-1","3-2","3-3","3-4","3-5", "4-1","4-2","4-3","4-4","4-5", "5-0","5-1","5-2","5-3","5-4","5-5","5-6", "6-0","6-1","6-2","6-3","6-4","6-5","6-6"],
-  // Plus/Cross (shape 3)
-  3: ["0-3", "1-3", "2-3", "3-0","3-1","3-2","3-3","3-4","3-5","3-6", "4-3", "5-3", "6-3"],
-  // Square (shape 4)
-  4: ["0-0","0-1","0-2","0-3","0-4","0-5","0-6", "1-0","1-6", "2-0","2-6", "3-0","3-6", "4-0","4-6", "5-0","5-6", "6-0","6-1","6-2","6-3","6-4","6-5","6-6"],
-  // Star (shape 5)
-  5: ["0-3", "1-2","1-3","1-4", "2-0","2-1","2-2","2-3","2-4","2-5","2-6", "3-1","3-2","3-3","3-4","3-5", "4-0","4-1","4-2","4-4","4-5","4-6", "5-0","5-1","5-5","5-6", "6-0","6-6"],
-  // Pentagon (shape 6)
-  6: ["0-3", "1-1","1-2","1-4","1-5", "2-0","2-6", "3-0","3-6", "4-0","4-1","4-5","4-6", "5-1","5-2","5-3","5-4","5-5", "6-1","6-2","6-3","6-4","6-5"],
-};
-
-// Offset a silhouette mask into a specific quadrant of the grid.
-// quadrant: 0=TL, 1=TR, 2=BL, 3=BR
-// For a 5x5 grid the silhouette is already full-size, so we just return it centered.
-// For larger grids we could offset, but for vault puzzles the silhouette fills most of the grid
-// and the quadrant is encoded by shifting the shape slightly toward a corner.
-function offsetSilhouette(mask, gridSize, quadrant) {
-  if (gridSize <= 5) {
-    // For 5x5, the shape already fills the grid. Apply a 1-cell nudge toward the quadrant corner.
-    const dr = quadrant < 2 ? -1 : 1; // top vs bottom
-    const dc = quadrant % 2 === 0 ? -1 : 1; // left vs right
-    const shifted = [];
-    for (const key of mask) {
-      const [r, c] = key.split("-").map(Number);
-      const nr = r + dr;
-      const nc = c + dc;
-      if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
-        shifted.push(`${nr}-${nc}`);
-      }
-    }
-    // Only use shifted if we kept enough cells (>60% of original)
-    return shifted.length >= mask.length * 0.6 ? shifted : mask;
-  }
-  // For 7x7, apply a 1-cell nudge
-  const dr = quadrant < 2 ? -1 : 1;
-  const dc = quadrant % 2 === 0 ? -1 : 1;
-  const shifted = [];
-  for (const key of mask) {
-    const [r, c] = key.split("-").map(Number);
-    const nr = r + dr;
-    const nc = c + dc;
-    if (nr >= 0 && nr < gridSize && nc >= 0 && nc < gridSize) {
-      shifted.push(`${nr}-${nc}`);
-    }
-  }
-  return shifted.length >= mask.length * 0.6 ? shifted : mask;
-}
-
-// Create a partial (decoy) silhouette — remove 20-35% of cells randomly
-function makeDecoyMask(mask, r) {
-  const removeCount = Math.max(2, Math.floor(mask.length * (0.2 + r() * 0.15)));
-  const shuffled = shuffle([...mask], r);
-  return shuffled.slice(removeCount);
-}
-
-// ============================================================
 // Difficulty Configurations
 // ============================================================
 export const VAULT_DIFFICULTIES = {
-  bronze:   { gridLayout: 3, gridSize: 5, totalPuzzles: 9,  maxAttempts: 5, decoyCount: 1, label: "Bronze Vault" },
-  silver:   { gridLayout: 4, gridSize: 5, totalPuzzles: 16, maxAttempts: 4, decoyCount: 2, label: "Silver Vault" },
-  gold:     { gridLayout: 4, gridSize: 7, totalPuzzles: 16, maxAttempts: 3, decoyCount: 3, label: "Gold Vault" },
-  obsidian: { gridLayout: 5, gridSize: 7, totalPuzzles: 25, maxAttempts: 3, decoyCount: 4, label: "Obsidian Vault" },
+  bronze:   { gridLayout: 3, gridSize: 5, totalPuzzles: 9,  maxAttempts: 5, label: "Bronze Vault" },
+  silver:   { gridLayout: 4, gridSize: 5, totalPuzzles: 16, maxAttempts: 4, label: "Silver Vault" },
+  gold:     { gridLayout: 4, gridSize: 7, totalPuzzles: 16, maxAttempts: 3, label: "Gold Vault" },
+  obsidian: { gridLayout: 5, gridSize: 7, totalPuzzles: 25, maxAttempts: 3, label: "Obsidian Vault" },
 };
 
 // ============================================================
@@ -182,10 +97,9 @@ export const VAULT_DIFFICULTIES = {
 // ============================================================
 export function buildVaultPuzzles(seed, difficulty = "silver") {
   const config = VAULT_DIFFICULTIES[difficulty] || VAULT_DIFFICULTIES.silver;
-  const { gridLayout, gridSize, totalPuzzles, decoyCount } = config;
+  const { gridLayout, gridSize, totalPuzzles } = config;
   const masterRng = rng(seed);
   const generators = gridSize === 5 ? GENERATORS_5 : GENERATORS_7;
-  const silhouettes = gridSize === 5 ? SILHOUETTES_5 : SILHOUETTES_7;
 
   // 1. Pick a palette for the combination
   const comboPalIdx = Math.floor(masterRng() * PALETTES.length);
@@ -198,35 +112,32 @@ export function buildVaultPuzzles(seed, difficulty = "silver") {
   // 3. Assign quadrant positions (0-3) — this is the lock order
   const quadrantOrder = shuffle([0, 1, 2, 3], masterRng);
 
-  // 4. Pick which puzzle indices contain clues (4 of totalPuzzles)
+  // 4. Pick which puzzle indices contain clues (8 of totalPuzzles)
+  //    4 "colour-reveal" puzzles: uniform colour, varied symbols — reveals a combination colour
+  //    4 "symbol-reveal" puzzles: uniform symbol, varied colours — reveals a combination symbol
   const allIndices = Array.from({ length: totalPuzzles }, (_, i) => i);
   const shuffledIndices = shuffle(allIndices, masterRng);
-  const clueTiles = shuffledIndices.slice(0, 4).sort((a, b) => a - b);
-  const clueMap = {}; // tileIdx -> { token, quadrant, shapeIdx }
-  clueTiles.forEach((tileIdx, i) => {
+  const colourClueTiles = shuffledIndices.slice(0, 4);
+  const symbolClueTiles = shuffledIndices.slice(4, 8);
+  const clueTiles = [...colourClueTiles, ...symbolClueTiles].sort((a, b) => a - b);
+  const clueMap = {}; // tileIdx -> { token, quadrant, shapeIdx, color, type }
+  colourClueTiles.forEach((tileIdx, i) => {
     const token = combination[i];
     const [color, shapeIdx] = [token.slice(0, token.lastIndexOf("|")), parseInt(token.slice(token.lastIndexOf("|") + 1), 10)];
-    clueMap[tileIdx] = { token, quadrant: quadrantOrder[i], shapeIdx, color };
+    clueMap[tileIdx] = { token, quadrant: quadrantOrder[i], shapeIdx, color, type: "colour" };
+  });
+  symbolClueTiles.forEach((tileIdx, i) => {
+    const token = combination[i];
+    const [color, shapeIdx] = [token.slice(0, token.lastIndexOf("|")), parseInt(token.slice(token.lastIndexOf("|") + 1), 10)];
+    clueMap[tileIdx] = { token, quadrant: quadrantOrder[i], shapeIdx, color, type: "symbol" };
   });
 
-  // 5. Pick decoy tiles (avoid clue tiles)
-  const nonClueTiles = shuffledIndices.filter(i => !clueTiles.includes(i));
-  const decoyTiles = nonClueTiles.slice(0, decoyCount);
-  const decoyMap = {}; // tileIdx -> { shapeIdx, color }
-  decoyTiles.forEach((tileIdx, i) => {
-    // Pick a shape and color NOT in the combination to avoid confusion
-    const unusedShapes = [0, 1, 2, 3, 4, 5, 6].filter(s => !comboShapes.includes(s));
-    const decoyShape = unusedShapes.length > 0 ? unusedShapes[i % unusedShapes.length] : comboShapes[i % 4];
-    const decoyPal = shuffle(PALETTES[(comboPalIdx + i + 1) % PALETTES.length], masterRng);
-    decoyMap[tileIdx] = { shapeIdx: decoyShape, color: decoyPal[0] };
-  });
-
-  // 6. Compute starting unlocked tiles (corners of the grid)
+  // 5. Compute starting unlocked tiles (corners of the grid)
   const startingUnlocked = {};
   const corners = [0, gridLayout - 1, totalPuzzles - gridLayout, totalPuzzles - 1];
   corners.forEach(idx => { if (idx < totalPuzzles) startingUnlocked[idx] = true; });
 
-  // 7. Generate all puzzles
+  // 6. Generate all puzzles
   const puzzles = [];
   for (let i = 0; i < totalPuzzles; i++) {
     const puzzleSeed = seed * 31 + i * 6151 + 101;
@@ -241,37 +152,25 @@ export function buildVaultPuzzles(seed, difficulty = "silver") {
     const grid = generators[genIdx](shapeIndices, numShapes);
     const solution = grid.map(row => row.map(si => `${pal[si % pal.length]}|${si}`));
 
-    // Embed silhouette for clue tiles
+    // Apply clue overrides for colour-reveal and symbol-reveal puzzles
     if (clueMap[i]) {
-      const { shapeIdx, color, quadrant } = clueMap[i];
-      const baseMask = silhouettes[shapeIdx] || silhouettes[0];
-      const mask = offsetSilhouette(baseMask, gridSize, quadrant);
-      const maskSet = new Set(mask);
-      // Override masked cells to use both the clue color AND the clue shape,
-      // so the silhouette stands out as a clear block of identical color+shape tokens
-      for (let r = 0; r < gridSize; r++) {
-        for (let c = 0; c < gridSize; c++) {
-          const key = `${r}-${c}`;
-          if (maskSet.has(key)) {
-            solution[r][c] = `${color}|${shapeIdx}`;
+      const { shapeIdx, color, type } = clueMap[i];
+      if (type === "colour") {
+        // Colour-reveal: uniform colour, varied symbols (symbols form the pattern to solve)
+        for (let ri = 0; ri < gridSize; ri++) {
+          for (let ci = 0; ci < gridSize; ci++) {
+            const existingToken = solution[ri][ci];
+            const existingShape = parseInt(existingToken.slice(existingToken.lastIndexOf("|") + 1), 10);
+            solution[ri][ci] = `${color}|${existingShape}`;
           }
         }
-      }
-    }
-
-    // Embed partial silhouette for decoy tiles
-    if (decoyMap[i]) {
-      const { shapeIdx, color } = decoyMap[i];
-      const baseMask = silhouettes[shapeIdx] || silhouettes[0];
-      const decoyMask = makeDecoyMask(baseMask, r);
-      const maskSet = new Set(decoyMask);
-      for (let ri = 0; ri < gridSize; ri++) {
-        for (let ci = 0; ci < gridSize; ci++) {
-          const key = `${ri}-${ci}`;
-          if (maskSet.has(key)) {
+      } else {
+        // Symbol-reveal: uniform symbol, varied colours (colours form the pattern to solve)
+        for (let ri = 0; ri < gridSize; ri++) {
+          for (let ci = 0; ci < gridSize; ci++) {
             const existingToken = solution[ri][ci];
-            const existingShapeIdx = parseInt(existingToken.slice(existingToken.lastIndexOf("|") + 1), 10);
-            solution[ri][ci] = `${color}|${existingShapeIdx}`;
+            const existingColor = existingToken.slice(0, existingToken.lastIndexOf("|"));
+            solution[ri][ci] = `${existingColor}|${shapeIdx}`;
           }
         }
       }
@@ -293,7 +192,6 @@ export function buildVaultPuzzles(seed, difficulty = "silver") {
     puzzles,
     combination,
     clueTiles,
-    decoyTiles,
     startingUnlocked,
     config,
   };

@@ -5086,7 +5086,6 @@ export default function Pattrn() {
         puzzleSeed: seed,
         combination: result.combination,
         clueTiles: result.clueTiles,
-        decoyTiles: result.decoyTiles,
         startingUnlocked: result.startingUnlocked,
         gridLayout: config.gridLayout,
         maxAttempts: config.maxAttempts,
