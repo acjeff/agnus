@@ -91,9 +91,16 @@ import {
   generateCoopMosaicSessionId,
   sendFriendReaction,
   subscribeToFriendReactions,
+  getFriendChatId,
+  sendFriendChatMessage,
+  subscribeToFriendChat,
+  updateFriendChatLastRead,
+  subscribeToFriendChatLastReads,
+  subscribeToAllFriendChatMetas,
 } from "./firebase.js";
 import VaultMode, { getVaultSummary } from "./vault/VaultMode.jsx";
 import VaultChat, { getUnreadCount } from "./vault/VaultChat.jsx";
+import FriendChat from "./FriendChat.jsx";
 import { buildVaultPuzzles, VAULT_DIFFICULTIES, computeUnlockedTiles, getMastermindFeedback } from "./vault/VaultGenerator.js";
 import {
   generateVaultSessionId,
@@ -3117,6 +3124,15 @@ export default function Pattrn() {
   // --- Confirmation for friend removal (stores uid of friend being removed) ---
   const [removeFriendConfirm, setRemoveFriendConfirm] = useState(null); // uid or null
 
+  // --- Friend Chat (DM) state ---
+  const [friendChatOpen, setFriendChatOpen] = useState(null); // uid of friend being chatted with, or null
+  const [friendChatMessages, setFriendChatMessages] = useState({}); // messages for currently open chat
+  const friendChatUnsubRef = useRef(null); // unsubscribe for current chat subscription
+  const [friendChatMetas, setFriendChatMetas] = useState({}); // { chatId: { lastMessage, lastMessageAt, lastMessageBy } }
+  const [friendChatLastReads, setFriendChatLastReads] = useState({}); // { chatId: timestamp }
+  const friendChatMetasUnsubRef = useRef(null); // unsubscribe for all chat metas
+  const friendChatLastReadsUnsubRef = useRef(null); // unsubscribe for last reads
+
   // --- Friend Reactions state ---
   const [friendReactionPickerOpen, setFriendReactionPickerOpen] = useState(false); // show friend reaction panel in Liquid Glass pill
   const [friendReactionSelectedFriends, setFriendReactionSelectedFriends] = useState(new Set()); // multi-select: Set of friend uids to send reactions to
@@ -3160,6 +3176,11 @@ export default function Pattrn() {
   const coopInviteToastTimer = useRef(null);
   const seenNotifIdsRef = useRef(new Set()); // track previously seen notification IDs
   const notifInitialLoadRef = useRef(true); // skip toasting on initial load
+
+  // --- Friend chat message toast ---
+  const [friendChatToast, setFriendChatToast] = useState(null); // { fromUsername, message }
+  const friendChatToastTimer = useRef(null);
+  const friendChatMetasPrevRef = useRef({}); // previous metas for detecting new messages
 
   // --- Coop Mosaic state (n-player) ---
   const [coopMosaicSessionId, setCoopMosaicSessionId] = useState(null);
@@ -3306,6 +3327,38 @@ export default function Pattrn() {
     fetchStats();
   }, [firebaseConfigured, friendsList]);
 
+  // Subscribe to friend chat metas (for unread badges) and last-read timestamps
+  useEffect(() => {
+    if (friendChatMetasUnsubRef.current) friendChatMetasUnsubRef.current();
+    if (friendChatLastReadsUnsubRef.current) friendChatLastReadsUnsubRef.current();
+    if (!firebaseUser || !firebaseConfigured || friendsList.length === 0) return;
+    const friendUids = friendsList.map(f => f.uid);
+    friendChatMetasUnsubRef.current = subscribeToAllFriendChatMetas(firebaseUser.uid, friendUids, (metas) => {
+      setFriendChatMetas(metas);
+    });
+    friendChatLastReadsUnsubRef.current = subscribeToFriendChatLastReads(firebaseUser.uid, (reads) => {
+      setFriendChatLastReads(reads);
+    });
+    return () => {
+      if (friendChatMetasUnsubRef.current) friendChatMetasUnsubRef.current();
+      if (friendChatLastReadsUnsubRef.current) friendChatLastReadsUnsubRef.current();
+    };
+  }, [firebaseUser, firebaseConfigured, friendsList]);
+
+  // Compute total unread friend chat count
+  const totalFriendChatUnread = useMemo(() => {
+    if (!firebaseUser || friendsList.length === 0) return 0;
+    let total = 0;
+    for (const friend of friendsList) {
+      const chatId = getFriendChatId(firebaseUser.uid, friend.uid);
+      const meta = friendChatMetas[chatId];
+      if (!meta || !meta.lastMessageAt || meta.lastMessageBy === firebaseUser.uid) continue;
+      const lastRead = friendChatLastReads[chatId] || 0;
+      if (meta.lastMessageAt > lastRead) total++;
+    }
+    return total;
+  }, [firebaseUser, friendsList, friendChatMetas, friendChatLastReads]);
+
   // Compute online friends count from real-time presence data
   const onlineFriendsCount = useMemo(() => {
     if (friendsList.length === 0) return 0;
@@ -3382,6 +3435,29 @@ export default function Pattrn() {
       notifUnsubRef.current = null;
     };
   }, [firebaseUser, firebaseConfigured]);
+
+  // Detect new incoming friend chat messages and show toast
+  useEffect(() => {
+    if (!firebaseUser) return;
+    const prevMetas = friendChatMetasPrevRef.current;
+    for (const [chatId, meta] of Object.entries(friendChatMetas)) {
+      if (!meta || !meta.lastMessageAt || meta.lastMessageBy === firebaseUser.uid) continue;
+      const prevMeta = prevMetas[chatId];
+      const prevTime = prevMeta?.lastMessageAt || 0;
+      if (meta.lastMessageAt > prevTime) {
+        // New message from someone else — show toast if not currently viewing that chat
+        const friendUid = chatId.replace(firebaseUser.uid, "").replace("_", "");
+        if (friendChatOpen !== friendUid) {
+          const friend = friendsList.find(f => f.uid === friendUid);
+          setFriendChatToast({ fromUsername: friend?.username || "Friend", message: meta.lastMessage });
+          if (friendChatToastTimer.current) clearTimeout(friendChatToastTimer.current);
+          friendChatToastTimer.current = setTimeout(() => { setFriendChatToast(null); friendChatToastTimer.current = null; }, 5000);
+        }
+        break; // One toast at a time
+      }
+    }
+    friendChatMetasPrevRef.current = { ...friendChatMetas };
+  }, [friendChatMetas, firebaseUser, friendChatOpen, friendsList]);
 
   // Subscribe to incoming friend reactions in real-time
   useEffect(() => {
@@ -5080,7 +5156,7 @@ export default function Pattrn() {
     { id: "coop-create", icon: "play", label: "Create Session", sub: "coop-create" },
     { id: "coop-active", icon: "handshake", label: "Active Sessions", sub: "coop-active" },
     { id: "coop-completed", icon: "check", label: "Completed", sub: "coop-completed" },
-    { id: "coop-friends", icon: "users", label: "Friends", sub: "friends-view" },
+    { id: "coop-friends", icon: "users", label: totalFriendChatUnread > 0 ? `Friends (${totalFriendChatUnread > 99 ? "99+" : totalFriendChatUnread})` : "Friends", sub: "friends-view", beforeSub: () => { setFriendChatOpen(null); if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; } setFriendChatMessages({}); return true; } },
   ];
 
   // Profile submenu — now global, includes account items + admin
@@ -5422,10 +5498,18 @@ export default function Pattrn() {
     const friendsContentHeight = (() => {
       if (!isFriendsView) return 0;
       let h = panelPad + fabSize; // padding + bottom bar
-      h += 20 + 8; // header + margin
-      h += 36 + 8; // add friend input + margin
-      h += Math.min(friendsList.length, 5) * 46 + 16; // friend list items (cap at 5, rest scrolls)
-      h += 12; // bottom padding
+      if (friendChatOpen) {
+        // Chat view: header + messages area + input
+        h += 40 + 8; // header with back button + gap
+        h += 220 + 8; // messages area + gap
+        h += 36; // input row
+        h += 12; // bottom padding
+      } else {
+        h += 20 + 8; // header + margin
+        h += 36 + 8; // add friend input + margin
+        h += Math.min(friendsList.length, 5) * 46 + 16; // friend list items (cap at 5, rest scrolls)
+        h += 12; // bottom padding
+      }
       return h;
     })();
 
@@ -6113,7 +6197,42 @@ export default function Pattrn() {
                 </>
               );
             })() : isFriendsView ? (() => {
-              // Friends modal
+              // Friends modal — either showing chat with a friend or the friends list
+              if (friendChatOpen) {
+                const chatFriend = friendsList.find(f => f.uid === friendChatOpen);
+                const chatFriendPresence = friendPresence[friendChatOpen];
+                const chatFriendOnline = chatFriendPresence && chatFriendPresence.lastSeen && (Date.now() - chatFriendPresence.lastSeen) < 120000;
+                return (
+                  <div style={{
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    <FriendChat
+                      friendName={chatFriend?.username || "Friend"}
+                      friendPicture={chatFriend?.profilePicture}
+                      messages={friendChatMessages}
+                      myUid={firebaseUser?.uid}
+                      onSend={(text) => {
+                        if (firebaseUser && friendChatOpen) {
+                          sendFriendChatMessage(firebaseUser.uid, friendChatOpen, username || firebaseUser.email, text).catch(() => {});
+                          updateFriendChatLastRead(firebaseUser.uid, friendChatOpen).catch(() => {});
+                        }
+                      }}
+                      onBack={() => {
+                        // Unsubscribe from current chat and go back to friends list
+                        if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; }
+                        setFriendChatOpen(null);
+                        setFriendChatMessages({});
+                      }}
+                      C={C}
+                      isOnline={chatFriendOnline}
+                    />
+                  </div>
+                );
+              }
               return (
                 <>
                   <div style={{
@@ -6124,7 +6243,18 @@ export default function Pattrn() {
                       ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
                   }}>
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 12 }}>Friends</div>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text }}>Friends</div>
+                      {totalFriendChatUnread > 0 && (
+                        <span style={{
+                          fontSize: 10, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                          color: "#fff", backgroundColor: C.accent,
+                          padding: "2px 7px", borderRadius: 10, minWidth: 16, textAlign: "center",
+                        }}>
+                          {totalFriendChatUnread > 99 ? "99+" : totalFriendChatUnread}
+                        </span>
+                      )}
+                    </div>
                         {/* Add friend input */}
                         <div style={{ display: "flex", gap: 6, marginBottom: addFriendMsg ? 4 : 12 }}>
                           <input
@@ -6166,12 +6296,23 @@ export default function Pattrn() {
                             <div style={{ textAlign: "center", padding: "20px 0", color: C.textDim, fontSize: 11 }}>No friends yet. Add one above!</div>
                           ) : (
                             (() => {
-                              // Sort friends: online first, then offline
+                              // Sort friends: unread messages first, then online, then offline
                               const sortedFriends = [...friendsList].sort((a, b) => {
                                 const aPresence = friendPresence[a.uid];
                                 const bPresence = friendPresence[b.uid];
                                 const aOnline = aPresence && aPresence.lastSeen && (Date.now() - aPresence.lastSeen) < 120000;
                                 const bOnline = bPresence && bPresence.lastSeen && (Date.now() - bPresence.lastSeen) < 120000;
+                                // Check unread status
+                                const aChatId = firebaseUser ? getFriendChatId(firebaseUser.uid, a.uid) : "";
+                                const bChatId = firebaseUser ? getFriendChatId(firebaseUser.uid, b.uid) : "";
+                                const aMeta = friendChatMetas[aChatId];
+                                const bMeta = friendChatMetas[bChatId];
+                                const aLastRead = friendChatLastReads[aChatId] || 0;
+                                const bLastRead = friendChatLastReads[bChatId] || 0;
+                                const aUnread = aMeta && aMeta.lastMessageAt && aMeta.lastMessageBy !== firebaseUser?.uid && aMeta.lastMessageAt > aLastRead;
+                                const bUnread = bMeta && bMeta.lastMessageAt && bMeta.lastMessageBy !== firebaseUser?.uid && bMeta.lastMessageAt > bLastRead;
+                                if (aUnread && !bUnread) return -1;
+                                if (!aUnread && bUnread) return 1;
                                 if (aOnline && !bOnline) return -1;
                                 if (!aOnline && bOnline) return 1;
                                 return 0;
@@ -6184,6 +6325,12 @@ export default function Pattrn() {
                                 const isPlaying = isOnline && presence.status === "playing" && presence.currentMode;
                                 const currentSession = presence?.currentCoopSessionId;
                                 const showingConfirm = removeFriendConfirm === friend.uid;
+
+                                // Unread message check
+                                const chatId = firebaseUser ? getFriendChatId(firebaseUser.uid, friend.uid) : "";
+                                const chatMeta = friendChatMetas[chatId];
+                                const lastRead = friendChatLastReads[chatId] || 0;
+                                const hasUnread = chatMeta && chatMeta.lastMessageAt && chatMeta.lastMessageBy !== firebaseUser?.uid && chatMeta.lastMessageAt > lastRead;
 
                                 // Format activity text
                                 let activityText = "";
@@ -6219,7 +6366,7 @@ export default function Pattrn() {
                                 return (
                                   <div key={friend.uid} style={{
                                     padding: "12px 14px", borderRadius: 12,
-                                    backgroundColor: C.surface, border: `1px solid ${showingConfirm ? C.incorrect : (isOnline ? C.correct + "44" : C.border)}`,
+                                    backgroundColor: C.surface, border: `1px solid ${showingConfirm ? C.incorrect : (hasUnread ? C.accent + "66" : (isOnline ? C.correct + "44" : C.border))}`,
                                     transition: "all 0.2s",
                                   }}>
                                     {showingConfirm ? (
@@ -6330,9 +6477,21 @@ export default function Pattrn() {
                                               </span>
                                             )}
                                           </div>
-                                          <div style={{ fontSize: 10, color: activityColor, fontFamily: "'Inter', sans-serif", marginBottom: 3 }}>
-                                            {activityText}
-                                          </div>
+                                          {/* Last message preview or activity */}
+                                          {chatMeta && chatMeta.lastMessage ? (
+                                            <div style={{
+                                              fontSize: 10, color: hasUnread ? C.text : C.textDim,
+                                              fontFamily: "'Inter', sans-serif", marginBottom: 3,
+                                              fontWeight: hasUnread ? 600 : 400,
+                                              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                            }}>
+                                              {chatMeta.lastMessageBy === firebaseUser?.uid ? "You: " : ""}{chatMeta.lastMessage.length > 30 ? chatMeta.lastMessage.slice(0, 30) + "..." : chatMeta.lastMessage}
+                                            </div>
+                                          ) : (
+                                            <div style={{ fontSize: 10, color: activityColor, fontFamily: "'Inter', sans-serif", marginBottom: 3 }}>
+                                              {activityText}
+                                            </div>
+                                          )}
                                           {/* Stats row */}
                                           {stats && (
                                             <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
@@ -6370,6 +6529,42 @@ export default function Pattrn() {
 
                                         {/* Action buttons */}
                                         <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
+                                          {/* Chat button with unread badge */}
+                                          <button
+                                            onClick={() => {
+                                              // Open chat with this friend
+                                              if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; }
+                                              setFriendChatMessages({});
+                                              setFriendChatOpen(friend.uid);
+                                              // Subscribe to this friend's chat messages
+                                              friendChatUnsubRef.current = subscribeToFriendChat(firebaseUser.uid, friend.uid, (msgs) => {
+                                                setFriendChatMessages(msgs);
+                                              });
+                                              // Mark as read
+                                              updateFriendChatLastRead(firebaseUser.uid, friend.uid).catch(() => {});
+                                            }}
+                                            title="Chat"
+                                            style={{
+                                              position: "relative",
+                                              padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
+                                              fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                              background: hasUnread ? C.accent + "22" : C.surfaceLight,
+                                              color: hasUnread ? C.accent : C.textDim,
+                                              border: hasUnread ? `1px solid ${C.accent}44` : `1px solid ${C.border}`,
+                                              cursor: "pointer", textTransform: "uppercase",
+                                              transition: "all 0.15s",
+                                            }}
+                                          >
+                                            Chat
+                                            {hasUnread && (
+                                              <span style={{
+                                                position: "absolute", top: -4, right: -4,
+                                                width: 8, height: 8, borderRadius: "50%",
+                                                backgroundColor: C.accent,
+                                                border: `2px solid ${C.surface}`,
+                                              }} />
+                                            )}
+                                          </button>
                                           {currentSession && (
                                             <button onClick={async () => {
                                               // Join friend's coop session
@@ -10764,6 +10959,80 @@ export default function Pattrn() {
     );
   })();
 
+  // Friend chat message toast
+  const friendChatToastEl = friendChatToast && (
+    <div style={{
+      position: "fixed",
+      top: coopInviteToast ? "calc(80px + env(safe-area-inset-top, 0px))" : "calc(16px + env(safe-area-inset-top, 0px))",
+      left: "50%", transform: "translateX(-50%)",
+      zIndex: 1049,
+      maxWidth: "calc(100vw - 32px)", width: 320, boxSizing: "border-box",
+      animation: "fadeUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both",
+      pointerEvents: "auto",
+    }}>
+      <div
+        onClick={() => {
+          // Clicking toast opens the friends view and chat
+          const friend = friendsList.find(f => f.username === friendChatToast.fromUsername);
+          if (friend && firebaseUser) {
+            setFriendChatOpen(null);
+            if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; }
+            setFriendChatMessages({});
+            setFriendChatOpen(friend.uid);
+            friendChatUnsubRef.current = subscribeToFriendChat(firebaseUser.uid, friend.uid, (msgs) => {
+              setFriendChatMessages(msgs);
+            });
+            updateFriendChatLastRead(firebaseUser.uid, friend.uid).catch(() => {});
+            setRadialMenuStack(["root", "friends-view"]);
+          }
+          setFriendChatToast(null);
+          if (friendChatToastTimer.current) { clearTimeout(friendChatToastTimer.current); friendChatToastTimer.current = null; }
+        }}
+        style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "10px 14px", borderRadius: 14,
+          backgroundColor: C.surface, border: `1.5px solid ${C.accent}`,
+          boxShadow: `0 8px 32px rgba(0,0,0,0.5), 0 0 20px ${C.accent}33`,
+          cursor: "pointer",
+        }}
+      >
+        <div style={{
+          width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+          backgroundColor: C.accent + "22", display: "flex", alignItems: "center", justifyContent: "center",
+          border: `2px solid ${C.accent}44`,
+        }}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+          </svg>
+        </div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, color: C.text }}>
+            {friendChatToast.fromUsername}
+          </div>
+          <div style={{
+            fontFamily: "'Inter', sans-serif", fontSize: 10, color: C.textDim, marginTop: 1,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {friendChatToast.message}
+          </div>
+        </div>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setFriendChatToast(null);
+            if (friendChatToastTimer.current) { clearTimeout(friendChatToastTimer.current); friendChatToastTimer.current = null; }
+          }}
+          style={{
+            background: "none", border: `1px solid ${C.border}`, borderRadius: 8,
+            padding: "4px 6px", color: C.textDim, cursor: "pointer", fontSize: 10,
+            flexShrink: 0,
+          }}
+          title="Dismiss"
+        >{"\u2715"}</button>
+      </div>
+    </div>
+  );
+
   // Friend activity is handled by real-time subscriptions (subscribeToFriendPresence)
 
   // --- Load Admin Metrics ---
@@ -11034,6 +11303,7 @@ export default function Pattrn() {
       {coopFriendPickerEl}
       {coopMosaicInviteEl}
       {coopInviteToastEl}
+      {friendChatToastEl}
       {coopMosaicNavigateEl}
       {friendReactionsOverlayEl}
     </>
@@ -12178,10 +12448,15 @@ export default function Pattrn() {
                   <div style={{ fontSize: 10, color: C.textDim, textTransform: "uppercase", letterSpacing: 1, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
                     Your Friends ({friendsList.length})
                   </div>
-                  {friendsList.map(friend => (
+                  {friendsList.map(friend => {
+                    const chatId = firebaseUser ? getFriendChatId(firebaseUser.uid, friend.uid) : "";
+                    const chatMeta = friendChatMetas[chatId];
+                    const lastRead = friendChatLastReads[chatId] || 0;
+                    const hasUnread = chatMeta && chatMeta.lastMessageAt && chatMeta.lastMessageBy !== firebaseUser?.uid && chatMeta.lastMessageAt > lastRead;
+                    return (
                     <div key={friend.uid} style={{
                       display: "flex", alignItems: "center", gap: 12, padding: "10px 14px",
-                      borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                      borderRadius: 12, backgroundColor: C.surface, border: `1px solid ${hasUnread ? C.accent + "66" : C.border}`,
                     }}>
                       {friend.profilePicture ? (
                         <img src={friend.profilePicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover", flexShrink: 0 }} />
@@ -12194,7 +12469,48 @@ export default function Pattrn() {
                         <div style={{ fontSize: 14, fontFamily: "'Inter', sans-serif", fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                           {friend.username}
                         </div>
+                        {chatMeta && chatMeta.lastMessage && (
+                          <div style={{
+                            fontSize: 11, color: hasUnread ? C.text : C.textDim,
+                            fontFamily: "'Inter', sans-serif", marginTop: 2,
+                            fontWeight: hasUnread ? 600 : 400,
+                            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                          }}>
+                            {chatMeta.lastMessageBy === firebaseUser?.uid ? "You: " : ""}{chatMeta.lastMessage.length > 40 ? chatMeta.lastMessage.slice(0, 40) + "..." : chatMeta.lastMessage}
+                          </div>
+                        )}
                       </div>
+                      <button
+                        onClick={() => {
+                          // Open chat in friends view via radial menu
+                          if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; }
+                          setFriendChatMessages({});
+                          setFriendChatOpen(friend.uid);
+                          friendChatUnsubRef.current = subscribeToFriendChat(firebaseUser.uid, friend.uid, (msgs) => {
+                            setFriendChatMessages(msgs);
+                          });
+                          updateFriendChatLastRead(firebaseUser.uid, friend.uid).catch(() => {});
+                          setRadialMenuStack(["root", "friends-view"]);
+                        }}
+                        title="Chat"
+                        style={{
+                          position: "relative",
+                          background: hasUnread ? C.accent + "22" : "none",
+                          border: `1px solid ${hasUnread ? C.accent + "44" : C.border}`, borderRadius: 6,
+                          padding: "4px 10px", color: hasUnread ? C.accent : C.textDim, cursor: "pointer", fontSize: 10,
+                          fontFamily: "'Inter', sans-serif", transition: "all 0.15s", flexShrink: 0, fontWeight: 700,
+                        }}
+                      >
+                        Chat
+                        {hasUnread && (
+                          <span style={{
+                            position: "absolute", top: -4, right: -4,
+                            width: 8, height: 8, borderRadius: "50%",
+                            backgroundColor: C.accent,
+                            border: `2px solid ${C.surface}`,
+                          }} />
+                        )}
+                      </button>
                       <button
                         onClick={() => handleRemoveFriend(friend.uid)}
                         title="Remove friend"
@@ -12209,7 +12525,8 @@ export default function Pattrn() {
                         Remove
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -14934,7 +15251,7 @@ export default function Pattrn() {
             menuPillButtons.push({ id: "coop-active", icon: "handshake", color: "#A855F7", onClick: () => { loadActiveCoopSessions(); setRadialMenuStack(["root", "coop", "coop-active"]); } });
           }
           if (onlineFriendsCount > 0) {
-            menuPillButtons.push({ id: "friends-online", icon: "friends", color: "#22C55E", onClick: () => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); } });
+            menuPillButtons.push({ id: "friends-online", icon: "friends", color: "#22C55E", onClick: () => { setRadialMenuStack(["root", "friends-view"]); setFriendsModalTab("list"); setFriendChatOpen(null); if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; } setFriendChatMessages({}); } });
             menuPillButtons.push({ id: "friend-reaction", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => { setRadialMenuStack([]); setFriendReactionPickerOpen(prev => !prev); } });
           }
         }

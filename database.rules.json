@@ -112,6 +112,18 @@
         }
       }
     },
+    "friendChats": {
+      "$chatId": {
+        ".read": "auth != null && ($chatId.contains(auth.uid))",
+        ".write": "auth != null && ($chatId.contains(auth.uid))"
+      }
+    },
+    "friendChatLastRead": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid"
+      }
+    },
     "mosaics": {
       "pending": {
         ".read": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true",
