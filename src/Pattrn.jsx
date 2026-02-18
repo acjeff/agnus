@@ -14279,7 +14279,35 @@ export default function Pattrn() {
                     <button
                       key={d.key}
                       onClick={() => {
-                        if (isVaultEntry) { setView("coop"); }
+                        if (isVaultEntry) {
+                          if (!firebaseUser) { setView("coop"); return; }
+                          const seed = Math.floor(Math.random() * 2147483647);
+                          const diff = "silver";
+                          const config = VAULT_DIFFICULTIES[diff];
+                          const result = buildVaultPuzzles(seed, diff);
+                          const existingId = generateVaultSessionId();
+                          createVaultSession(firebaseUser.uid, {
+                            difficulty: diff,
+                            puzzleSeed: seed,
+                            combination: result.combination,
+                            palette: result.palette,
+                            startingUnlocked: result.startingUnlocked,
+                            gridLayout: config.gridLayout,
+                            maxAttempts: config.maxAttempts,
+                            hostUsername: username || firebaseUser.email,
+                            hostTheme: activeTheme?.name || "classic",
+                          }, existingId).then((id) => {
+                            if (id) {
+                              setVaultSessionId(id);
+                              setVaultRole("host");
+                              setView("vault");
+                              setCoopSelectedFriends(new Set());
+                              setCoopInviteUsernameInput("");
+                              setCoopInviteUsernameMsg("");
+                              setRadialMenuStack(["root", "coop-start"]);
+                            }
+                          }).catch(() => {});
+                        }
                         else { setDifficulty(d.key); }
                       }}
                       style={{
