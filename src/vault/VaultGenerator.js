@@ -247,15 +247,13 @@ export function buildVaultPuzzles(seed, difficulty = "silver") {
       const baseMask = silhouettes[shapeIdx] || silhouettes[0];
       const mask = offsetSilhouette(baseMask, gridSize, quadrant);
       const maskSet = new Set(mask);
-      // Override masked cells to use the clue color (keep existing shape for non-masked cells)
+      // Override masked cells to use both the clue color AND the clue shape,
+      // so the silhouette stands out as a clear block of identical color+shape tokens
       for (let r = 0; r < gridSize; r++) {
         for (let c = 0; c < gridSize; c++) {
           const key = `${r}-${c}`;
           if (maskSet.has(key)) {
-            // Use the clue color with the cell's existing shape index to blend in
-            const existingToken = solution[r][c];
-            const existingShapeIdx = parseInt(existingToken.slice(existingToken.lastIndexOf("|") + 1), 10);
-            solution[r][c] = `${color}|${existingShapeIdx}`;
+            solution[r][c] = `${color}|${shapeIdx}`;
           }
         }
       }

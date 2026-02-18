@@ -17,6 +17,8 @@ import {
   submitVaultGuess,
   clearVaultGuess,
   clearLockPosition,
+  lockVaultPosition,
+  clearAllGuessesForPosition,
   kickVaultPlayer,
   sendVaultChatMessage,
   sendVaultPin,
@@ -186,7 +188,7 @@ export default function VaultMode({
   // --- Lock guess handlers (new system: per-player guesses) ---
   const [pickerPosition, setPickerPosition] = useState(null); // which slot is being picked
 
-  // Gather all unique tokens from solved puzzles for the token picker
+  // Gather all unique tokens from solved puzzles for the token picker, sorted by shape then color
   const availableTokens = useMemo(() => {
     if (!vaultPuzzles) return [];
     const tokenSet = new Set();
@@ -197,12 +199,19 @@ export default function VaultMode({
         }
       }
     }
-    return [...tokenSet];
+    return [...tokenSet].sort((a, b) => {
+      const pa = parseToken(a);
+      const pb = parseToken(b);
+      if (pa.shapeIndex !== pb.shapeIndex) return pa.shapeIndex - pb.shapeIndex;
+      return pa.color.localeCompare(pb.color);
+    });
   }, [vaultPuzzles, tileProgress]);
 
   const handleSlotClick = useCallback((position) => {
+    // Don't open picker for hard-locked (gold-confirmed) positions
+    if (lock[position]?.token) return;
     setPickerPosition(position);
-  }, []);
+  }, [lock]);
 
   const handlePickToken = useCallback(async (token) => {
     if (pickerPosition === null || !sessionId || !myUid) return;
@@ -217,6 +226,7 @@ export default function VaultMode({
   }, [pickerPosition, sessionId, myUid]);
 
   // Submit lock: use consensus guesses or hard-locked positions
+  // After feedback, hard-lock gold positions and clear guesses for non-gold positions
   const handleSubmitLock = useCallback(async () => {
     if (!sessionId || !vaultMeta) return;
     const guess = [0, 1, 2, 3].map(pos => {
@@ -231,6 +241,19 @@ export default function VaultMode({
     await submitVaultLock(sessionId, guess, feedback);
     if (feedback.gold === 4) {
       await completeVaultSession(sessionId);
+    } else {
+      // Hard-lock gold positions (correct token in correct place) so they stay
+      for (const pos of feedback.goldPositions) {
+        await lockVaultPosition(sessionId, pos, guess[pos]);
+        await clearAllGuessesForPosition(sessionId, pos);
+      }
+      // Clear guesses for non-gold positions so players re-evaluate
+      const goldSet = new Set(feedback.goldPositions);
+      for (let pos = 0; pos < 4; pos++) {
+        if (!goldSet.has(pos) && !lock[pos]?.token) {
+          await clearAllGuessesForPosition(sessionId, pos);
+        }
+      }
     }
   }, [sessionId, lock, lockGuesses, vaultMeta]);
 

@@ -302,6 +302,20 @@ export async function clearLockPosition(sessionId, position) {
   await set(ref(db, `coopVaultSessions/${sessionId}/lock/${position}`), null);
 }
 
+// Hard-lock a position (confirmed correct via gold pip)
+export async function lockVaultPosition(sessionId, position, token) {
+  const db = getDb();
+  if (!db) return;
+  await set(ref(db, `coopVaultSessions/${sessionId}/lock/${position}`), { token, confirmedBy: "mastermind" });
+}
+
+// Clear all player guesses for a position
+export async function clearAllGuessesForPosition(sessionId, position) {
+  const db = getDb();
+  if (!db) return;
+  await set(ref(db, `coopVaultSessions/${sessionId}/lockGuesses/${position}`), null);
+}
+
 // Submit a per-player guess for a lock position
 export async function submitVaultGuess(sessionId, uid, position, token) {
   const db = getDb();

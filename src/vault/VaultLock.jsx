@@ -172,26 +172,29 @@ export default function VaultLock({
 
           return (
             <div key={pos} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-              <div style={{ fontSize: 9, color: C.textDim, fontWeight: 600, fontFamily: "'Inter', sans-serif" }}>
-                {pos + 1}
+              <div style={{ fontSize: 9, color: hardLocked ? (C.gold || "#FFD700") : C.textDim, fontWeight: 600, fontFamily: "'Inter', sans-serif" }}>
+                {hardLocked ? "\u2713" : pos + 1}
               </div>
               <div
                 onClick={() => {
-                  if (isComplete) return;
+                  if (isComplete || hardLocked) return;
                   onSlotClick?.(pos);
                 }}
                 style={{
                   width: 56, height: 56,
                   borderRadius: 10,
-                  border: effectiveToken
-                    ? `2px solid ${hasConsensus ? C.correct + "88" : C.accent + "66"}`
-                    : `2px dashed ${C.textDim}44`,
-                  backgroundColor: effectiveToken ? "transparent" : C.surfaceLight || C.bg,
+                  border: hardLocked
+                    ? `2px solid ${C.gold || "#FFD700"}`
+                    : effectiveToken
+                      ? `2px solid ${hasConsensus ? C.correct + "88" : C.accent + "66"}`
+                      : `2px dashed ${C.textDim}44`,
+                  backgroundColor: hardLocked ? (C.gold || "#FFD700") + "11" : effectiveToken ? "transparent" : C.surfaceLight || C.bg,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  cursor: isComplete ? "default" : "pointer",
+                  cursor: isComplete || hardLocked ? "default" : "pointer",
                   transition: "all 0.2s",
                   position: "relative",
                   overflow: "hidden",
+                  boxShadow: hardLocked ? `0 0 8px ${C.gold || "#FFD700"}44` : "none",
                 }}
               >
                 {/* If everyone agrees or it's hard-locked: show full token */}
