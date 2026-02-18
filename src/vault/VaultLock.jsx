@@ -1,7 +1,8 @@
 // --- VaultLock Component ---
-// Renders the 4-position combination lock, Mastermind feedback, and proposal/approval UI.
+// Renders the 4-position combination lock with per-player mini guess tiles in each slot.
+// Each player's guess appears as a small icon within the slot, arranged in quadrants.
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 
 // Shape renderers (same as Pattrn.jsx SHAPES but as filled shapes for lock display)
 const shapeStyle = { position: "absolute", inset: 0, margin: "auto" };
@@ -57,7 +58,7 @@ function TokenTile({ token, size = 44, dimmed = false, onClick, style: extraStyl
     <div
       onClick={onClick}
       style={{
-        width: size, height: size, borderRadius: 8,
+        width: size, height: size, borderRadius: Math.max(2, size / 6),
         backgroundColor: color,
         position: "relative",
         display: "flex", alignItems: "center", justifyContent: "center",
@@ -72,21 +73,73 @@ function TokenTile({ token, size = 44, dimmed = false, onClick, style: extraStyl
   );
 }
 
+// Mini token for showing a player's guess inside a slot quadrant
+function MiniToken({ token, size = 20 }) {
+  const { color, shapeIndex } = parseToken(token);
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: Math.max(2, size / 5),
+      backgroundColor: color, position: "relative",
+      display: "flex", alignItems: "center", justifyContent: "center",
+    }}>
+      {LOCK_SHAPES[shapeIndex % LOCK_SHAPES.length]?.(size * 0.55, "rgba(255,255,255,0.8)")}
+    </div>
+  );
+}
+
+// Quadrant layout positions for 1-4 players
+// Each entry: { top, left } as fractions of slot size
+function getQuadrantPositions(count) {
+  if (count === 1) return [{ top: "50%", left: "50%" }];
+  if (count === 2) return [
+    { top: "50%", left: "28%" },
+    { top: "50%", left: "72%" },
+  ];
+  if (count === 3) return [
+    { top: "30%", left: "50%" },
+    { top: "70%", left: "28%" },
+    { top: "70%", left: "72%" },
+  ];
+  return [
+    { top: "30%", left: "30%" },
+    { top: "30%", left: "70%" },
+    { top: "70%", left: "30%" },
+    { top: "70%", left: "70%" },
+  ];
+}
+
 export default function VaultLock({
-  lock,             // { 0: { token, confirmedBy } | null, 1: ..., 2: ..., 3: ... }
+  lock,             // { 0: { token, confirmedBy } | null, ... } — consensus-locked tokens
+  lockGuesses,      // { 0: { uid: token, ... }, 1: ..., ... } — per-player guesses
   lockAttempts,
   maxAttempts,
   lockFeedback,     // [{ guess, gold, white, goldPositions, whitePositions }]
-  proposals,        // { id: proposal } — active lock proposals
+  playerUids,       // [uid, ...] — all player UIDs in stable order
+  playerNames,      // { uid: name } — display names
   myUid,
-  onPropose,        // (position) => void — open token picker for this position
+  onSlotClick,      // (position) => void — open token picker for this position
   onSubmitLock,     // () => void — submit the full lock
-  onClearPosition,  // (position) => void
   isComplete,
   C,                // color constants
 }) {
-  const allFilled = lock && lock[0] && lock[1] && lock[2] && lock[3];
   const attemptsRemaining = maxAttempts - (lockAttempts || 0);
+
+  // Check if all positions have consensus (all players agree)
+  const consensus = [0, 1, 2, 3].map(pos => {
+    const guesses = lockGuesses?.[pos] || {};
+    const tokens = Object.values(guesses);
+    if (tokens.length === 0 || tokens.length < playerUids.length) return null;
+    const first = tokens[0];
+    return tokens.every(t => t === first) ? first : null;
+  });
+  const allConsensus = consensus.every(t => t !== null);
+
+  // Also check the hard-locked positions (from previous proposal system — backwards compat)
+  const effectiveLock = [0, 1, 2, 3].map(pos => {
+    if (lock?.[pos]?.token) return lock[pos].token;
+    return consensus[pos];
+  });
+  const allFilled = effectiveLock.every(t => t !== null);
 
   return (
     <div style={{
@@ -95,6 +148,7 @@ export default function VaultLock({
       backgroundColor: C.surface,
       border: `1px solid ${C.border}`,
       display: "flex", flexDirection: "column", alignItems: "center", gap: 10,
+      width: "100%",
     }}>
       {/* Lock Title */}
       <div style={{
@@ -108,8 +162,14 @@ export default function VaultLock({
       {/* 4 Lock Slots */}
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
         {[0, 1, 2, 3].map(pos => {
-          const slot = lock?.[pos];
-          const hasToken = slot && slot.token;
+          const hardLocked = lock?.[pos]?.token;
+          const posGuesses = lockGuesses?.[pos] || {};
+          const guessEntries = playerUids
+            .filter(uid => posGuesses[uid])
+            .map(uid => ({ uid, token: posGuesses[uid] }));
+          const hasConsensus = consensus[pos] !== null;
+          const effectiveToken = hardLocked || consensus[pos];
+
           return (
             <div key={pos} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
               <div style={{ fontSize: 9, color: C.textDim, fontWeight: 600, fontFamily: "'Inter', sans-serif" }}>
@@ -118,19 +178,15 @@ export default function VaultLock({
               <div
                 onClick={() => {
                   if (isComplete) return;
-                  if (hasToken) {
-                    onClearPosition?.(pos);
-                  } else {
-                    onPropose?.(pos);
-                  }
+                  onSlotClick?.(pos);
                 }}
                 style={{
-                  width: 52, height: 52,
+                  width: 56, height: 56,
                   borderRadius: 10,
-                  border: hasToken
-                    ? `2px solid ${C.correct}88`
+                  border: effectiveToken
+                    ? `2px solid ${hasConsensus ? C.correct + "88" : C.accent + "66"}`
                     : `2px dashed ${C.textDim}44`,
-                  backgroundColor: hasToken ? "transparent" : C.surfaceLight,
+                  backgroundColor: effectiveToken ? "transparent" : C.surfaceLight || C.bg,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   cursor: isComplete ? "default" : "pointer",
                   transition: "all 0.2s",
@@ -138,12 +194,51 @@ export default function VaultLock({
                   overflow: "hidden",
                 }}
               >
-                {hasToken ? (
-                  <TokenTile token={slot.token} size={46} />
+                {/* If everyone agrees or it's hard-locked: show full token */}
+                {effectiveToken ? (
+                  <TokenTile token={effectiveToken} size={50} />
+                ) : guessEntries.length > 0 ? (
+                  /* Show mini guess tiles in quadrant layout */
+                  <div style={{ position: "relative", width: "100%", height: "100%" }}>
+                    {(() => {
+                      const positions = getQuadrantPositions(guessEntries.length);
+                      const miniSize = guessEntries.length === 1 ? 28 : guessEntries.length <= 2 ? 22 : 18;
+                      return guessEntries.map((entry, gi) => (
+                        <div key={entry.uid} style={{
+                          position: "absolute",
+                          top: positions[gi].top,
+                          left: positions[gi].left,
+                          transform: "translate(-50%, -50%)",
+                        }}>
+                          <MiniToken token={entry.token} size={miniSize} />
+                        </div>
+                      ));
+                    })()}
+                  </div>
                 ) : (
                   <span style={{ fontSize: 20, color: C.textDim + "44", fontWeight: 700 }}>?</span>
                 )}
               </div>
+              {/* Show who guessed what below the slot (initials) */}
+              {guessEntries.length > 0 && !effectiveToken && (
+                <div style={{ display: "flex", gap: 2, justifyContent: "center" }}>
+                  {guessEntries.map(entry => {
+                    const name = playerNames?.[entry.uid] || "?";
+                    const isMe = entry.uid === myUid;
+                    return (
+                      <div key={entry.uid} style={{
+                        width: 12, height: 12, borderRadius: 6,
+                        backgroundColor: isMe ? "#54A0FF33" : "#FF6B6B33",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        fontSize: 7, fontWeight: 700, color: isMe ? "#54A0FF" : "#FF6B6B",
+                        fontFamily: "'Inter', sans-serif",
+                      }}>
+                        {name[0]?.toUpperCase()}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           );
         })}
@@ -156,6 +251,16 @@ export default function VaultLock({
       }}>
         {isComplete ? "Cracked!" : `${attemptsRemaining} attempt${attemptsRemaining !== 1 ? "s" : ""} remaining`}
       </div>
+
+      {/* Consensus hint */}
+      {!isComplete && !allFilled && playerUids.length > 1 && (
+        <div style={{
+          fontSize: 10, color: C.textDim + "88", fontFamily: "'Inter', sans-serif",
+          textAlign: "center",
+        }}>
+          All players must agree on each position to lock it in
+        </div>
+      )}
 
       {/* Mastermind Feedback Pips */}
       {lockFeedback && lockFeedback.length > 0 && (
@@ -197,7 +302,7 @@ export default function VaultLock({
         </div>
       )}
 
-      {/* Submit Button */}
+      {/* Submit Button — shows when all positions have consensus */}
       {allFilled && !isComplete && attemptsRemaining > 0 && (
         <button
           onClick={onSubmitLock}
@@ -215,139 +320,6 @@ export default function VaultLock({
           Submit Combination
         </button>
       )}
-    </div>
-  );
-}
-
-// ============================================================
-// Proposal Card — shown when a player proposes a tile for a lock position
-// ============================================================
-export function ProposalCard({
-  proposal,
-  myUid,
-  onApprove,
-  onCounter,
-  onReact,
-  allTokens,    // available tokens for counter-picking
-  C,
-}) {
-  const [showCounterPicker, setShowCounterPicker] = useState(false);
-  const isFromMe = proposal.fromUid === myUid;
-  const isCountered = proposal.status === "countered";
-  const isPending = proposal.status === "pending";
-  const counterIsFromMe = proposal.counterByUid === myUid;
-
-  // Quick emoji reactions
-  const quickEmojis = ["👍", "👎", "🤔", "❓", "💡", "🔥"];
-
-  if (proposal.status === "approved" || proposal.status === "rejected") return null;
-
-  return (
-    <div style={{
-      padding: 12, borderRadius: 12,
-      backgroundColor: C.surface,
-      border: `1px solid ${C.border}`,
-      display: "flex", flexDirection: "column", gap: 8,
-    }}>
-      {/* Header */}
-      <div style={{ fontSize: 12, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
-        <strong style={{ color: C.text }}>{isFromMe ? "You" : (proposal.fromUsername || "Partner")}</strong>
-        {" think position "}
-        <strong style={{ color: C.accent }}>{proposal.position + 1}</strong>
-        {" is:"}
-      </div>
-
-      {/* Proposed token */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        <TokenTile token={proposal.token} size={36} />
-        {isCountered && (
-          <>
-            <span style={{ color: C.textDim, fontSize: 16 }}>→</span>
-            <TokenTile token={proposal.counterToken} size={36} />
-            <span style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
-              ({counterIsFromMe ? "You" : (proposal.counterByUsername || "Partner")})
-            </span>
-          </>
-        )}
-      </div>
-
-      {/* Action buttons — only for the other player */}
-      {isPending && !isFromMe && (
-        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          <button onClick={() => onApprove(proposal.id)} style={{
-            padding: "5px 12px", borderRadius: 6, border: "none",
-            backgroundColor: C.correct + "33", color: C.correct,
-            fontSize: 12, fontWeight: 600, cursor: "pointer",
-            fontFamily: "'Inter', sans-serif",
-          }}>Agree</button>
-          <button onClick={() => setShowCounterPicker(!showCounterPicker)} style={{
-            padding: "5px 12px", borderRadius: 6, border: "none",
-            backgroundColor: C.accent + "22", color: C.accent,
-            fontSize: 12, fontWeight: 600, cursor: "pointer",
-            fontFamily: "'Inter', sans-serif",
-          }}>Counter</button>
-        </div>
-      )}
-
-      {/* Counter from me — waiting for partner to approve */}
-      {isCountered && counterIsFromMe && (
-        <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
-          Waiting for {proposal.fromUsername || "partner"} to respond...
-        </div>
-      )}
-
-      {/* Counter from partner — I can approve */}
-      {isCountered && !counterIsFromMe && isFromMe && (
-        <div style={{ display: "flex", gap: 6 }}>
-          <button onClick={() => onApprove(proposal.id)} style={{
-            padding: "5px 12px", borderRadius: 6, border: "none",
-            backgroundColor: C.correct + "33", color: C.correct,
-            fontSize: 12, fontWeight: 600, cursor: "pointer",
-            fontFamily: "'Inter', sans-serif",
-          }}>Accept Counter</button>
-        </div>
-      )}
-
-      {/* Counter token picker */}
-      {showCounterPicker && (
-        <div style={{
-          display: "flex", gap: 4, flexWrap: "wrap",
-          padding: 6, borderRadius: 8,
-          backgroundColor: C.bg,
-        }}>
-          {allTokens?.map((token, i) => (
-            <TokenTile
-              key={i}
-              token={token}
-              size={30}
-              onClick={() => {
-                onCounter(proposal.id, token);
-                setShowCounterPicker(false);
-              }}
-              style={{ cursor: "pointer" }}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Emoji reactions */}
-      <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-        {quickEmojis.map(emoji => (
-          <button key={emoji} onClick={() => onReact(proposal.id, emoji)} style={{
-            width: 26, height: 26, borderRadius: 13,
-            border: "none", cursor: "pointer",
-            backgroundColor: proposal.reactions?.[myUid] === emoji ? C.accent + "33" : "transparent",
-            fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "background 0.15s",
-          }}>
-            {emoji}
-          </button>
-        ))}
-        {/* Show partner's reaction */}
-        {Object.entries(proposal.reactions || {}).filter(([uid]) => uid !== myUid).map(([uid, emoji]) => (
-          <span key={uid} style={{ fontSize: 14, marginLeft: 4 }}>{emoji}</span>
-        ))}
-      </div>
     </div>
   );
 }

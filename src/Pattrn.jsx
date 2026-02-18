@@ -3355,7 +3355,7 @@ export default function Pattrn() {
       } else {
         // Find new co-op invites that weren't in the previous set
         for (const notif of notifs) {
-          if ((notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") && !seenNotifIdsRef.current.has(notif.id)) {
+          if ((notif.type === "coop_invite" || notif.type === "coop_mosaic_invite" || notif.type === "vault_invite") && !seenNotifIdsRef.current.has(notif.id)) {
             // Show toast for this new co-op invite
             setCoopInviteToast(notif);
             if (coopInviteToastTimer.current) clearTimeout(coopInviteToastTimer.current);
@@ -7237,17 +7237,19 @@ export default function Pattrn() {
                         }}>
                           <div style={{
                             width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-                            backgroundColor: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "22" : notif.type === "mosaic_pending_review" ? "#FFE66D22" : "#54A0FF22",
+                            backgroundColor: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite" || notif.type === "vault_invite") ? C.coop + "22" : notif.type === "mosaic_pending_review" ? "#FFE66D22" : "#54A0FF22",
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            border: `1.5px solid ${(notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "44" : notif.type === "mosaic_pending_review" ? "#FFE66D44" : "#54A0FF44"}`,
+                            border: `1.5px solid ${(notif.type === "coop_invite" || notif.type === "coop_mosaic_invite" || notif.type === "vault_invite") ? C.coop + "44" : notif.type === "mosaic_pending_review" ? "#FFE66D44" : "#54A0FF44"}`,
                           }}>
-                            <span style={{ fontSize: 12, color: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop : notif.type === "mosaic_pending_review" ? "#FFE66D" : "#54A0FF" }}>
-                              {notif.type === "coop_invite" ? "⚔" : notif.type === "coop_mosaic_invite" ? "◦" : notif.type === "mosaic_pending_review" ? "🚩" : "◦"}
+                            <span style={{ fontSize: 12, color: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite" || notif.type === "vault_invite") ? C.coop : notif.type === "mosaic_pending_review" ? "#FFE66D" : "#54A0FF" }}>
+                              {notif.type === "vault_invite" ? "\uD83D\uDD12" : notif.type === "coop_invite" ? "\u2694" : notif.type === "coop_mosaic_invite" ? "\u25A6" : notif.type === "mosaic_pending_review" ? "\uD83D\uDEA9" : "\u25A6"}
                             </span>
                           </div>
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 11, fontFamily: "'Inter', sans-serif", fontWeight: 600, color: C.text, lineHeight: 1.3 }}>
-                              {notif.type === "coop_invite"
+                              {notif.type === "vault_invite"
+                                ? `${notif.fromUsername || "Someone"} invited you to a vault`
+                                : notif.type === "coop_invite"
                                 ? `${notif.fromUsername || "Someone"} invited you to co-op`
                                 : notif.type === "coop_mosaic_invite"
                                 ? `${notif.fromUsername || "Someone"} invited you to mosaic`
@@ -7256,6 +7258,11 @@ export default function Pattrn() {
                                 : `${notif.fromUsername || "Someone"} shared`
                               }
                             </div>
+                            {notif.type === "vault_invite" && notif.data?.difficulty && (
+                              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
+                                {(VAULT_DIFFICULTIES[notif.data.difficulty] || {}).label || notif.data.difficulty}
+                              </div>
+                            )}
                             {notif.type === "coop_invite" && notif.data?.mode && (
                               <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
                                 {notif.data.mode} #{(notif.data.level ?? 0) + 1}
@@ -7273,6 +7280,25 @@ export default function Pattrn() {
                             )}
                           </div>
                           <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                            {notif.type === "vault_invite" && notif.data?.sessionId && (
+                              <button
+                                onClick={() => {
+                                  setVaultSessionId(notif.data.sessionId);
+                                  setVaultRole("guest");
+                                  setView("vault");
+                                  setRadialMenuStack([]);
+                                  dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
+                                  setMenuOpen(false);
+                                }}
+                                style={{
+                                  background: C.coop, border: "none", borderRadius: 6,
+                                  padding: "4px 8px", color: "#fff", cursor: "pointer", fontSize: 9,
+                                  fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                                }}
+                              >
+                                Join
+                              </button>
+                            )}
                             {notif.type === "coop_invite" && notif.data?.sessionId && (
                               <button
                                 onClick={async () => {
@@ -10561,6 +10587,7 @@ export default function Pattrn() {
   // --- Global co-op invite toast (appears on any view) ---
   const coopInviteToastEl = coopInviteToast && firebaseUser && (() => {
     const isMosaicInvite = coopInviteToast.type === "coop_mosaic_invite";
+    const isVaultInvite = coopInviteToast.type === "vault_invite";
     return (
     <div style={{
       position: "fixed",
@@ -10582,16 +10609,22 @@ export default function Pattrn() {
           backgroundColor: C.coop + "22", display: "flex", alignItems: "center", justifyContent: "center",
           border: `2px solid ${C.coop}44`,
         }}>
-          <span style={{ fontSize: 16, color: C.coop }}>{isMosaicInvite ? "\u25A6" : "\u2694"}</span>
+          <span style={{ fontSize: 16, color: C.coop }}>{isVaultInvite ? "\uD83D\uDD12" : isMosaicInvite ? "\u25A6" : "\u2694"}</span>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
             fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700,
             color: C.text, lineHeight: 1.3,
           }}>
-            {coopInviteToast.fromUsername || "Someone"} invited you to {isMosaicInvite ? "co-op mosaic!" : "co-op!"}
+            {coopInviteToast.fromUsername || "Someone"} invited you to {isVaultInvite ? "a vault!" : isMosaicInvite ? "co-op mosaic!" : "co-op!"}
           </div>
-          {isMosaicInvite ? (
+          {isVaultInvite ? (
+            coopInviteToast.data?.difficulty && (
+              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, fontFamily: "'Inter', sans-serif" }}>
+                {(VAULT_DIFFICULTIES[coopInviteToast.data.difficulty] || {}).label || coopInviteToast.data.difficulty}
+              </div>
+            )
+          ) : isMosaicInvite ? (
             coopInviteToast.data?.mosaicTitle && (
               <div style={{ fontSize: 9, color: C.textDim, marginTop: 2, fontFamily: "'Inter', sans-serif" }}>
                 {coopInviteToast.data.mosaicTitle}
@@ -10609,7 +10642,13 @@ export default function Pattrn() {
           {coopInviteToast.data?.sessionId && (
             <button
               onClick={async () => {
-                if (isMosaicInvite) {
+                if (isVaultInvite) {
+                  // Join vault session
+                  setVaultSessionId(coopInviteToast.data.sessionId);
+                  setVaultRole("guest");
+                  setView("vault");
+                  setRadialMenuStack([]);
+                } else if (isMosaicInvite) {
                   // Join coop mosaic session
                   setCoopMosaicSessionId(coopInviteToast.data.sessionId);
                   setCoopMosaicRole("guest");
@@ -11025,6 +11064,39 @@ export default function Pattrn() {
 
   // --- VAULT MODE VIEW ---
   if (view === "vault" && vaultSessionId) {
+    // Guard: require login for vault mode
+    if (!firebaseUser) {
+      return (
+        <div style={{
+          minHeight: "100vh", backgroundColor: C.bg, color: C.text,
+          fontFamily: "'Inter', sans-serif",
+          display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+          paddingTop: "calc(16px + env(safe-area-inset-top, 0px))", paddingBottom: 100,
+        }}>
+          {firebaseConfigured ? (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.text, marginBottom: 12 }}>Sign in to join the Vault</div>
+              <div style={{ fontSize: 12, color: C.textDim, marginBottom: 20 }}>You need an account to play vault mode.</div>
+              <button onClick={() => { setRadialMenuStack(["root", "sign-in"]); setAccountTab("login"); setAccountError(""); }} style={{
+                padding: "10px 24px", borderRadius: 8, backgroundColor: C.accent, color: C.bg,
+                fontWeight: 700, fontSize: 13, border: "none", cursor: "pointer",
+                fontFamily: "'Inter', sans-serif",
+              }}>Sign In</button>
+              <div style={{ marginTop: 12 }}>
+                <button onClick={() => { setVaultSessionId(null); setVaultRole(null); setView("menu"); }} style={{
+                  padding: "6px 16px", borderRadius: 6, backgroundColor: "transparent",
+                  border: `1px solid ${C.border}`, color: C.textDim, fontSize: 11, cursor: "pointer",
+                  fontFamily: "'Inter', sans-serif",
+                }}>Back to Menu</button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: 12, color: C.textDim }}>Loading...</div>
+          )}
+          {globalModalsEl}
+        </div>
+      );
+    }
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
@@ -11090,6 +11162,10 @@ export default function Pattrn() {
         {renderContextButton("vault", isVault ? [
           { id: "vault-invite-pill", icon: "user-plus", color: "#54A0FF", onClick: () => { setCoopSelectedFriends(new Set()); setCoopInviteUsernameInput(""); setCoopInviteUsernameMsg(""); setRadialMenuStack(["root", "coop-start"]); } },
           { id: "vault-chat-pill", icon: "message-square", color: "#54A0FF", onClick: () => { setVaultChatLastRead(Date.now()); setRadialMenuStack(["root", "vault-chat"]); } },
+          ...(firebaseConfigured && firebaseUser && onlineFriendsCount > 0 ? [{ id: "vault-reaction-pill", icon: "reaction", color: friendReactionPickerOpen ? "#FFD700" : "#fff", onClick: () => {
+            setRadialMenuStack([]);
+            setFriendReactionPickerOpen(prev => !prev);
+          }}] : []),
         ] : [])}
       </div>
     );
@@ -13904,17 +13980,19 @@ export default function Pattrn() {
                 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: 7, flexShrink: 0,
-                    backgroundColor: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "22" : notif.type === "mosaic_pending_review" ? "#FFE66D22" : C.accent + "22",
+                    backgroundColor: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite" || notif.type === "vault_invite") ? C.coop + "22" : notif.type === "mosaic_pending_review" ? "#FFE66D22" : C.accent + "22",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    border: `1.5px solid ${(notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop + "44" : notif.type === "mosaic_pending_review" ? "#FFE66D44" : C.accent + "44"}`,
+                    border: `1.5px solid ${(notif.type === "coop_invite" || notif.type === "coop_mosaic_invite" || notif.type === "vault_invite") ? C.coop + "44" : notif.type === "mosaic_pending_review" ? "#FFE66D44" : C.accent + "44"}`,
                   }}>
-                    <span style={{ fontSize: 12, color: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite") ? C.coop : notif.type === "mosaic_pending_review" ? "#FFE66D" : C.accent }}>
-                      {notif.type === "coop_invite" ? "\u2694" : notif.type === "coop_mosaic_invite" ? "\u25A6" : notif.type === "mosaic_pending_review" ? "\u2691" : "\u25A6"}
+                    <span style={{ fontSize: 12, color: (notif.type === "coop_invite" || notif.type === "coop_mosaic_invite" || notif.type === "vault_invite") ? C.coop : notif.type === "mosaic_pending_review" ? "#FFE66D" : C.accent }}>
+                      {notif.type === "vault_invite" ? "\uD83D\uDD12" : notif.type === "coop_invite" ? "\u2694" : notif.type === "coop_mosaic_invite" ? "\u25A6" : notif.type === "mosaic_pending_review" ? "\u2691" : "\u25A6"}
                     </span>
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 11, fontFamily: "'Inter', sans-serif", fontWeight: 600, color: C.text, lineHeight: 1.3 }}>
-                      {notif.type === "coop_invite"
+                      {notif.type === "vault_invite"
+                        ? `${notif.fromUsername || "Someone"} invited you to a vault`
+                        : notif.type === "coop_invite"
                         ? `${notif.fromUsername || "Someone"} invited you to co-op`
                         : notif.type === "coop_mosaic_invite"
                         ? `${notif.fromUsername || "Someone"} invited you to co-op mosaic`
@@ -13923,6 +14001,11 @@ export default function Pattrn() {
                         : `${notif.fromUsername || "Someone"} shared a mosaic`
                       }
                     </div>
+                    {notif.type === "vault_invite" && notif.data?.difficulty && (
+                      <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
+                        {(VAULT_DIFFICULTIES[notif.data.difficulty] || {}).label || notif.data.difficulty}
+                      </div>
+                    )}
                     {notif.type === "coop_invite" && notif.data?.mode && (
                       <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
                         {notif.data.mode} #{(notif.data.level ?? 0) + 1}
@@ -13940,6 +14023,25 @@ export default function Pattrn() {
                     )}
                   </div>
                   <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+                    {notif.type === "vault_invite" && notif.data?.sessionId && (
+                      <button
+                        onClick={() => {
+                          setVaultSessionId(notif.data.sessionId);
+                          setVaultRole("guest");
+                          setView("vault");
+                          setRadialMenuStack([]);
+                          dismissNotification(firebaseUser.uid, notif.id).catch(() => {});
+                          setShowNotifications(false);
+                        }}
+                        style={{
+                          background: C.coop, border: "none", borderRadius: 6,
+                          padding: "4px 8px", color: "#fff", cursor: "pointer", fontSize: 9,
+                          fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                        }}
+                      >
+                        Join
+                      </button>
+                    )}
                     {notif.type === "coop_invite" && notif.data?.sessionId && (
                       <button
                         onClick={async () => {
@@ -14750,6 +14852,15 @@ export default function Pattrn() {
   // Pill action buttons for the bottom glass bar
   const playBackAction = () => {
     if (isCoop) { leaveCoopSession(); setView("menu"); return; }
+    // Vault mode: return to vault overview instead of home
+    if (isVault && vaultSessionId) {
+      stopTimer(); setRadialMenuStack([]);
+      setFriendReactionPickerOpen(false);
+      setVaultSolvingTile(null);
+      if (firebaseUser) updateVaultCurrentTile(vaultSessionId, firebaseUser.uid, -1).catch(() => {});
+      setView("vault");
+      return;
+    }
     if (difficulty === "cascade") {
       const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
       const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
@@ -14861,7 +14972,14 @@ export default function Pattrn() {
       startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true, isDaily ? currentDailyDate : null);
     }});
     // Next / Done / Back — the primary action
-    if (isCoop) {
+    if (isVault && vaultSessionId) {
+      // Vault: return to vault overview (auto-handled by timeout, but add explicit button too)
+      playPillButtons.push({ id: "done", icon: "back", color: "#54A0FF", onClick: () => {
+        setVaultSolvingTile(null);
+        if (firebaseUser) updateVaultCurrentTile(vaultSessionId, firebaseUser.uid, -1).catch(() => {});
+        setView("vault");
+      }});
+    } else if (isCoop) {
       playPillButtons.push({ id: "done", icon: "home", color: "#54A0FF", onClick: () => { leaveCoopSession(); setView("menu"); } });
     } else if (currentPuzzle < totalPuzzles - 1) {
       playPillButtons.push({ id: "next", icon: "forward", color: C.accent, onClick: () => startPuzzle(currentPuzzle + 1) });

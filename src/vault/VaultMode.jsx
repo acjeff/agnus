@@ -1,9 +1,9 @@
 // --- VaultMode Component ---
 // Main vault view: overview grid, lock interface, turn system, tile solving wrapper, pins.
-// This component manages the vault-specific state and delegates to VaultLock and VaultChat.
+// This component manages the vault-specific state and delegates to VaultLock.
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import VaultLock, { TokenTile, ProposalCard, parseToken } from "./VaultLock.jsx";
+import VaultLock, { TokenTile, parseToken } from "./VaultLock.jsx";
 import { buildVaultPuzzles, computeUnlockedTiles, getMastermindFeedback, VAULT_DIFFICULTIES } from "./VaultGenerator.js";
 import {
   subscribeToVaultSession,
@@ -13,12 +13,11 @@ import {
   updateVaultTileUnlocked,
   advanceVaultTurn,
   addVaultTurnHistory,
-  proposeLockPosition,
-  respondToLockProposal,
-  reactToLockProposal,
-  approveCounterProposal,
   submitVaultLock,
+  submitVaultGuess,
+  clearVaultGuess,
   clearLockPosition,
+  kickVaultPlayer,
   sendVaultChatMessage,
   sendVaultPin,
   clearVaultPin,
@@ -29,6 +28,7 @@ import {
 
 const COOP_MY_COLOR = "#54A0FF";
 const COOP_PARTNER_COLOR = "#FF6B6B";
+const PLAYER_COLORS = ["#54A0FF", "#FF6B6B", "#4ECB71", "#FFD93D"];
 
 export default function VaultMode({
   sessionId,
@@ -55,21 +55,29 @@ export default function VaultMode({
 
   // --- Derived state ---
   const players = sessionData?.players || {};
-  const playerUids = Object.keys(players);
-  const partnerUid = playerUids.find(uid => uid !== myUid);
-  const partnerUsername = partnerUid ? (players[partnerUid]?.username || "Partner") : null;
-  const partnerCurrentTile = partnerUid ? (players[partnerUid]?.currentTile ?? -1) : -1;
-  const isMyTurn = sessionData?.currentTurn === myUid;
+  const playerUids = Object.keys(players).sort(); // stable sort for consistent ordering
+  const playerCount = playerUids.length;
+  const playerNames = useMemo(() => {
+    const names = {};
+    for (const uid of playerUids) {
+      names[uid] = players[uid]?.username || "Player";
+    }
+    return names;
+  }, [players, playerUids]);
+  const isHost = sessionData?.hostUid === myUid;
+  const turnOrder = playerUids; // simple round-robin
+  const currentTurnUid = sessionData?.currentTurn;
+  const isMyTurn = currentTurnUid === myUid;
   const isComplete = sessionData?.status === "complete";
+  const isWaiting = sessionData?.status === "waiting";
   const tileProgress = sessionData?.tileProgress || {};
   const tileUnlocked = sessionData?.tileUnlocked || {};
   const lock = sessionData?.lock || { 0: null, 1: null, 2: null, 3: null };
+  const lockGuesses = sessionData?.lockGuesses || {};
   const lockAttempts = sessionData?.lockAttempts || 0;
   const maxAttempts = sessionData?.maxAttempts || 4;
   const lockFeedback = sessionData?.lockFeedback || [];
   const pins = sessionData?.pins || {};
-  const chat = sessionData?.chat || {};
-  const proposals = sessionData?.lockProposals || {};
   const difficulty = sessionData?.difficulty || "silver";
   const config = VAULT_DIFFICULTIES[difficulty] || VAULT_DIFFICULTIES.silver;
   const gridLayout = config.gridLayout;
@@ -154,9 +162,12 @@ export default function VaultMode({
     await updateVaultTileProgress(sessionId, tileIdx, attempts, time);
     await clearVaultTileFills(sessionId, tileIdx);
 
-    // Advance turn to partner
-    if (partnerUid) {
-      await advanceVaultTurn(sessionId, partnerUid);
+    // Advance turn to next player in order
+    const myIdx = turnOrder.indexOf(myUid);
+    const nextIdx = (myIdx + 1) % turnOrder.length;
+    const nextUid = turnOrder[nextIdx];
+    if (nextUid && nextUid !== myUid) {
+      await advanceVaultTurn(sessionId, nextUid);
       await addVaultTurnHistory(sessionId, {
         uid: myUid,
         tileIdx,
@@ -168,11 +179,10 @@ export default function VaultMode({
     currentTileRef.current = -1;
     updateVaultCurrentTile(sessionId, myUid, -1).catch(() => {});
     onTileSolved?.(tileIdx, attempts, time);
-  }, [sessionId, partnerUid, myUid, onTileSolved]);
+  }, [sessionId, turnOrder, myUid, onTileSolved]);
 
-  // --- Lock proposal handlers ---
-  const [proposingPosition, setProposingPosition] = useState(null);
-  const [showTokenPicker, setShowTokenPicker] = useState(false);
+  // --- Lock guess handlers (new system: per-player guesses) ---
+  const [pickerPosition, setPickerPosition] = useState(null); // which slot is being picked
 
   // Gather all unique tokens from solved puzzles for the token picker
   const availableTokens = useMemo(() => {
@@ -188,57 +198,45 @@ export default function VaultMode({
     return [...tokenSet];
   }, [vaultPuzzles, tileProgress]);
 
-  const handlePropose = useCallback((position) => {
-    setProposingPosition(position);
-    setShowTokenPicker(true);
+  const handleSlotClick = useCallback((position) => {
+    setPickerPosition(position);
   }, []);
 
-  const handleSelectToken = useCallback(async (token) => {
-    if (proposingPosition === null || !sessionId) return;
-    await proposeLockPosition(sessionId, myUid, proposingPosition, token, username);
-    setShowTokenPicker(false);
-    setProposingPosition(null);
-  }, [proposingPosition, sessionId, myUid, username]);
+  const handlePickToken = useCallback(async (token) => {
+    if (pickerPosition === null || !sessionId || !myUid) return;
+    await submitVaultGuess(sessionId, myUid, pickerPosition, token);
+    setPickerPosition(null);
+  }, [pickerPosition, sessionId, myUid]);
 
-  const handleApproveProposal = useCallback(async (proposalId) => {
-    if (!sessionId) return;
-    const proposal = proposals[proposalId];
-    if (!proposal) return;
-    if (proposal.status === "countered" && proposal.fromUid === myUid) {
-      // I'm approving a counter from my partner
-      await approveCounterProposal(sessionId, proposalId, myUid);
-    } else {
-      await respondToLockProposal(sessionId, proposalId, "approve", { uid: myUid, username });
-    }
-  }, [sessionId, proposals, myUid, username]);
+  const handleClearMyGuess = useCallback(async () => {
+    if (pickerPosition === null || !sessionId || !myUid) return;
+    await clearVaultGuess(sessionId, myUid, pickerPosition);
+    setPickerPosition(null);
+  }, [pickerPosition, sessionId, myUid]);
 
-  const handleCounterProposal = useCallback(async (proposalId, counterToken) => {
-    if (!sessionId) return;
-    await respondToLockProposal(sessionId, proposalId, "counter", {
-      uid: myUid, username, counterToken,
-    });
-  }, [sessionId, myUid, username]);
-
-  const handleReactToProposal = useCallback(async (proposalId, emoji) => {
-    if (!sessionId) return;
-    await reactToLockProposal(sessionId, proposalId, myUid, emoji);
-  }, [sessionId, myUid]);
-
+  // Submit lock: use consensus guesses or hard-locked positions
   const handleSubmitLock = useCallback(async () => {
     if (!sessionId || !vaultMeta) return;
-    const guess = [0, 1, 2, 3].map(pos => lock[pos]?.token || null);
+    const guess = [0, 1, 2, 3].map(pos => {
+      if (lock[pos]?.token) return lock[pos].token;
+      const posGuesses = lockGuesses[pos] || {};
+      const tokens = Object.values(posGuesses);
+      if (tokens.length > 0 && tokens.every(t => t === tokens[0])) return tokens[0];
+      return null;
+    });
     if (guess.some(t => !t)) return;
     const feedback = getMastermindFeedback(guess, vaultMeta.combination);
     await submitVaultLock(sessionId, guess, feedback);
     if (feedback.gold === 4) {
       await completeVaultSession(sessionId);
     }
-  }, [sessionId, lock, vaultMeta]);
+  }, [sessionId, lock, lockGuesses, vaultMeta]);
 
-  const handleClearPosition = useCallback(async (position) => {
-    if (!sessionId) return;
-    await clearLockPosition(sessionId, position);
-  }, [sessionId]);
+  // --- Kick player handler ---
+  const handleKickPlayer = useCallback(async (uid) => {
+    if (!sessionId || !isHost || uid === myUid) return;
+    await kickVaultPlayer(sessionId, uid);
+  }, [sessionId, isHost, myUid]);
 
   // --- Pin handlers ---
   const handlePin = useCallback(async (tileIdx) => {
@@ -250,10 +248,17 @@ export default function VaultMode({
     }
   }, [sessionId, pins, myUid]);
 
-  // --- Active proposals (pending or countered only) ---
-  const activeProposals = useMemo(() => {
-    return Object.values(proposals).filter(p => p.status === "pending" || p.status === "countered");
-  }, [proposals]);
+  // --- Clue tile detection ---
+  // Identify which unsolved tiles are clue tiles (tiles that contain silhouette clues)
+  const clueTileSet = useMemo(() => {
+    if (!vaultMeta?.clueTiles) return new Set();
+    return new Set(vaultMeta.clueTiles);
+  }, [vaultMeta]);
+
+  const decoyTileSet = useMemo(() => {
+    if (!vaultMeta?.decoyTiles) return new Set();
+    return new Set(vaultMeta.decoyTiles);
+  }, [vaultMeta]);
 
   // --- Tile sizing ---
   const tileSz = Math.min(60, Math.floor((280 - gridLayout * 4) / gridLayout));
@@ -284,94 +289,168 @@ export default function VaultMode({
       <style>{`@keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
 @keyframes vaultPulse { 0%,100% { box-shadow: 0 0 0 0 rgba(200,240,62,0); } 50% { box-shadow: 0 0 12px 2px rgba(200,240,62,0.3); } }`}</style>
 
-      {/* Turn Indicator */}
+      {/* Player Roster & Turn Indicator */}
       <div style={{
-        padding: "6px 16px",
-        borderRadius: 20,
-        backgroundColor: isMyTurn ? C.correct + "22" : C.textDim + "15",
-        border: `1px solid ${isMyTurn ? C.correct + "44" : C.textDim + "22"}`,
-        fontSize: 13, fontWeight: 700,
-        color: isMyTurn ? C.correct : C.textDim,
-        fontFamily: "'Inter', sans-serif",
-        display: "flex", alignItems: "center", gap: 6,
-        animation: isMyTurn ? "vaultPulse 2s infinite" : "none",
+        width: "100%", padding: "8px 12px", borderRadius: 12,
+        backgroundColor: C.surface, border: `1px solid ${C.border}`,
+        display: "flex", flexDirection: "column", gap: 6,
       }}>
-        <span style={{
-          width: 8, height: 8, borderRadius: 4,
-          backgroundColor: isMyTurn ? C.correct : C.textDim + "44",
-        }} />
-        {isComplete ? "Vault Complete!" : isMyTurn ? "Your Turn — Solve a Puzzle" : `Waiting for ${partnerUsername || "partner"}...`}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <div style={{
+            fontSize: 10, fontWeight: 700, color: C.textDim,
+            fontFamily: "'Inter', sans-serif", letterSpacing: 1, textTransform: "uppercase",
+          }}>
+            Players
+          </div>
+          {isWaiting && (
+            <div style={{
+              fontSize: 9, color: C.accent, fontWeight: 600,
+              fontFamily: "'Inter', sans-serif",
+              animation: "coopPulse 2s infinite",
+            }}>
+              Waiting for players...
+            </div>
+          )}
+        </div>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {turnOrder.map((uid, idx) => {
+            const name = playerNames[uid] || "Player";
+            const isMe = uid === myUid;
+            const isTurn = uid === currentTurnUid;
+            const color = PLAYER_COLORS[idx % PLAYER_COLORS.length];
+            const playerTile = players[uid]?.currentTile;
+            return (
+              <div key={uid} style={{
+                display: "flex", alignItems: "center", gap: 4,
+                padding: "4px 8px", borderRadius: 8,
+                backgroundColor: isTurn ? color + "18" : "transparent",
+                border: `1.5px solid ${isTurn ? color : "transparent"}`,
+                transition: "all 0.2s",
+                animation: isTurn ? "vaultPulse 2s infinite" : "none",
+              }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: 4,
+                  backgroundColor: color,
+                }} />
+                <span style={{
+                  fontSize: 11, fontWeight: isTurn ? 700 : 500,
+                  color: isTurn ? C.text : C.textDim,
+                  fontFamily: "'Inter', sans-serif",
+                }}>
+                  {isMe ? "You" : name}
+                </span>
+                {isTurn && !isComplete && (
+                  <span style={{ fontSize: 8, color, fontWeight: 700, fontFamily: "'Inter', sans-serif" }}>
+                    {isMe ? "(your turn)" : "(their turn)"}
+                  </span>
+                )}
+                {isHost && !isMe && (
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleKickPlayer(uid); }}
+                    title="Remove player"
+                    style={{
+                      marginLeft: 2, width: 14, height: 14, borderRadius: 7,
+                      border: "none", backgroundColor: "#FF6B6B22", color: "#FF6B6B",
+                      fontSize: 8, cursor: "pointer", display: "flex",
+                      alignItems: "center", justifyContent: "center", fontWeight: 700,
+                    }}
+                  >{"\u2715"}</button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {!isComplete && (
+          <div style={{
+            fontSize: 9, color: C.textDim + "88", fontFamily: "'Inter', sans-serif",
+          }}>
+            Turn order: {turnOrder.map((uid, i) => (uid === myUid ? "You" : (playerNames[uid] || "?"))).join(" \u2192 ")}
+          </div>
+        )}
       </div>
 
       {/* Lock Interface */}
       <VaultLock
         lock={lock}
+        lockGuesses={lockGuesses}
         lockAttempts={lockAttempts}
         maxAttempts={maxAttempts}
         lockFeedback={lockFeedback}
-        proposals={proposals}
+        playerUids={playerUids}
+        playerNames={playerNames}
         myUid={myUid}
-        onPropose={handlePropose}
+        onSlotClick={handleSlotClick}
         onSubmitLock={handleSubmitLock}
-        onClearPosition={handleClearPosition}
         isComplete={isComplete}
         C={C}
       />
 
-      {/* Active Proposals */}
-      {activeProposals.length > 0 && (
-        <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: 6 }}>
-          {activeProposals.map(p => (
-            <ProposalCard
-              key={p.id}
-              proposal={p}
-              myUid={myUid}
-              onApprove={handleApproveProposal}
-              onCounter={handleCounterProposal}
-              onReact={handleReactToProposal}
-              allTokens={availableTokens}
-              C={C}
-            />
-          ))}
-        </div>
-      )}
-
-      {/* Token Picker for Lock Proposals */}
-      {showTokenPicker && (
+      {/* Token Picker — inline below lock, appears when a slot is tapped */}
+      {pickerPosition !== null && (
         <div style={{
           padding: 12, borderRadius: 12,
           backgroundColor: C.surface,
           border: `1px solid ${C.border}`,
           width: "100%",
+          animation: "fadeUp 0.2s ease both",
         }}>
           <div style={{
             fontSize: 12, color: C.textDim, fontWeight: 600,
             fontFamily: "'Inter', sans-serif", marginBottom: 8,
           }}>
-            Pick a tile for position {(proposingPosition || 0) + 1}:
+            Your guess for position {pickerPosition + 1}:
           </div>
-          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-            {availableTokens.map((token, i) => (
-              <TokenTile
-                key={i}
-                token={token}
-                size={36}
-                onClick={() => handleSelectToken(token)}
-                style={{ cursor: "pointer", border: "2px solid transparent" }}
-              />
-            ))}
+          {availableTokens.length === 0 ? (
+            <div style={{ fontSize: 11, color: C.textDim + "88", fontFamily: "'Inter', sans-serif" }}>
+              Solve puzzles to discover tokens for the lock.
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {availableTokens.map((token, i) => {
+                const isSelected = lockGuesses?.[pickerPosition]?.[myUid] === token;
+                return (
+                  <div key={i} style={{ position: "relative" }}>
+                    <TokenTile
+                      token={token}
+                      size={36}
+                      onClick={() => handlePickToken(token)}
+                      style={{
+                        cursor: "pointer",
+                        border: isSelected ? `2px solid ${C.correct}` : "2px solid transparent",
+                        boxShadow: isSelected ? `0 0 8px ${C.correct}44` : "none",
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
+            {lockGuesses?.[pickerPosition]?.[myUid] && (
+              <button
+                onClick={handleClearMyGuess}
+                style={{
+                  padding: "5px 12px", borderRadius: 6,
+                  border: `1px solid ${C.border}`, backgroundColor: "transparent",
+                  color: C.textDim, fontSize: 11, cursor: "pointer",
+                  fontFamily: "'Inter', sans-serif", fontWeight: 600,
+                }}
+              >
+                Clear
+              </button>
+            )}
+            <button
+              onClick={() => setPickerPosition(null)}
+              style={{
+                padding: "5px 12px", borderRadius: 6,
+                border: `1px solid ${C.border}`, backgroundColor: "transparent",
+                color: C.textDim, fontSize: 11, cursor: "pointer",
+                fontFamily: "'Inter', sans-serif", fontWeight: 600,
+              }}
+            >
+              Done
+            </button>
           </div>
-          <button
-            onClick={() => { setShowTokenPicker(false); setProposingPosition(null); }}
-            style={{
-              marginTop: 8, padding: "4px 12px", borderRadius: 6,
-              border: `1px solid ${C.border}`, backgroundColor: "transparent",
-              color: C.textDim, fontSize: 11, cursor: "pointer",
-              fontFamily: "'Inter', sans-serif",
-            }}
-          >
-            Cancel
-          </button>
         </div>
       )}
 
@@ -397,9 +476,13 @@ export default function VaultMode({
           const isSolved = (tileProgress[i] || 0) > 0;
           const isUnlocked = effectiveUnlocked[i];
           const isPinned = !!pins[i];
-          const isPartnerHere = partnerCurrentTile === i;
+          const isClue = clueTileSet.has(i) && !isSolved;
+          const isDecoy = decoyTileSet.has(i) && !isSolved;
           const puzzle = vaultPuzzles[i];
           const canInteract = isUnlocked || isSolved;
+
+          // Check if any other player is on this tile
+          const playersHere = playerUids.filter(uid => uid !== myUid && players[uid]?.currentTile === i);
 
           return (
             <button
@@ -409,14 +492,14 @@ export default function VaultMode({
                 width: tileSz, height: tileSz,
                 borderRadius: 6,
                 border: `1.5px solid ${
-                  isPartnerHere ? COOP_PARTNER_COLOR :
+                  playersHere.length > 0 ? COOP_PARTNER_COLOR :
                   isPinned ? C.accent :
                   isSolved ? C.correct + "66" :
                   isUnlocked ? C.border :
                   C.textDim + "22"
                 }`,
                 backgroundColor: isSolved ? C.correct + "10" :
-                  isPartnerHere ? COOP_PARTNER_COLOR + "08" :
+                  playersHere.length > 0 ? COOP_PARTNER_COLOR + "08" :
                   isUnlocked ? C.surface :
                   C.bg,
                 cursor: canInteract ? "pointer" : "default",
@@ -428,10 +511,10 @@ export default function VaultMode({
                 overflow: "hidden",
                 opacity: isUnlocked || isSolved ? 1 : 0.35,
                 boxShadow: isPinned ? `0 0 8px ${C.accent}44` :
-                  isPartnerHere ? `0 0 8px ${COOP_PARTNER_COLOR}44` : "none",
+                  playersHere.length > 0 ? `0 0 8px ${COOP_PARTNER_COLOR}44` : "none",
               }}
               onMouseEnter={e => { if (canInteract) { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; } }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = isPartnerHere ? COOP_PARTNER_COLOR : isPinned ? C.accent : isSolved ? C.correct + "66" : isUnlocked ? C.border : C.textDim + "22"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = playersHere.length > 0 ? COOP_PARTNER_COLOR : isPinned ? C.accent : isSolved ? C.correct + "66" : isUnlocked ? C.border : C.textDim + "22"; }}
             >
               {/* Solved: show mini preview */}
               {isSolved && puzzle ? (
@@ -456,8 +539,27 @@ export default function VaultMode({
                   color: isUnlocked ? C.textDim : C.textDim + "55",
                   lineHeight: 1,
                 }}>
-                  {isUnlocked ? i + 1 : "🔒"}
+                  {isUnlocked ? i + 1 : "\uD83D\uDD12"}
                 </span>
+              )}
+
+              {/* Clue indicator — subtle sparkle dot for clue tiles */}
+              {isClue && isUnlocked && (
+                <div style={{
+                  position: "absolute", bottom: 2, right: 2,
+                  width: 6, height: 6, borderRadius: 3,
+                  backgroundColor: C.gold || "#FFD700",
+                  boxShadow: `0 0 4px ${C.gold || "#FFD700"}88`,
+                }} />
+              )}
+
+              {/* Decoy indicator — dimmer dot */}
+              {isDecoy && isUnlocked && (
+                <div style={{
+                  position: "absolute", bottom: 2, right: 2,
+                  width: 5, height: 5, borderRadius: 3,
+                  backgroundColor: C.textDim + "55",
+                }} />
               )}
 
               {/* Pin indicator */}
@@ -469,39 +571,39 @@ export default function VaultMode({
                 }} />
               )}
 
-              {/* Partner indicator */}
-              {isPartnerHere && (
-                <div style={{
-                  position: "absolute", top: 1, right: 1,
+              {/* Other players here */}
+              {playersHere.map((uid, pi) => (
+                <div key={uid} style={{
+                  position: "absolute", top: 1, right: 1 + pi * 10,
                   width: 14, height: 14, borderRadius: 7,
-                  backgroundColor: COOP_PARTNER_COLOR,
+                  backgroundColor: PLAYER_COLORS[playerUids.indexOf(uid) % PLAYER_COLORS.length],
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: 8, fontWeight: 700, color: "#fff",
                   fontFamily: "'Inter', sans-serif",
                 }}>
-                  {(partnerUsername || "P")[0]}
+                  {(playerNames[uid] || "P")[0]}
                 </div>
-              )}
+              ))}
             </button>
           );
         })}
       </div>
 
-      {/* Pin button for current view */}
-      {currentSolvingTile !== null && currentSolvingTile >= 0 && (
-        <button
-          onClick={() => handlePin(currentSolvingTile)}
-          style={{
-            padding: "6px 16px", borderRadius: 8,
-            border: `1px solid ${C.border}`,
-            backgroundColor: pins[currentSolvingTile] ? C.accent + "22" : "transparent",
-            color: pins[currentSolvingTile] ? C.accent : C.textDim,
-            fontSize: 12, fontWeight: 600, cursor: "pointer",
-            fontFamily: "'Inter', sans-serif",
-          }}
-        >
-          {pins[currentSolvingTile] ? "Unpin Tile" : "Pin for Partner"}
-        </button>
+      {/* Legend for tile indicators */}
+      {solvedCount > 0 && (
+        <div style={{
+          display: "flex", gap: 10, alignItems: "center",
+          fontSize: 9, color: C.textDim + "88", fontFamily: "'Inter', sans-serif",
+        }}>
+          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.gold || "#FFD700", display: "inline-block" }} />
+            Clue
+          </span>
+          <span style={{ display: "flex", alignItems: "center", gap: 3 }}>
+            <span style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: C.textDim + "55", display: "inline-block" }} />
+            Decoy
+          </span>
+        </div>
       )}
 
       {/* Back to Menu */}

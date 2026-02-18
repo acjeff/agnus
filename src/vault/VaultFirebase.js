@@ -302,6 +302,45 @@ export async function clearLockPosition(sessionId, position) {
   await set(ref(db, `coopVaultSessions/${sessionId}/lock/${position}`), null);
 }
 
+// Submit a per-player guess for a lock position
+export async function submitVaultGuess(sessionId, uid, position, token) {
+  const db = getDb();
+  if (!db) return;
+  await set(ref(db, `coopVaultSessions/${sessionId}/lockGuesses/${position}/${uid}`), token);
+}
+
+// Clear a per-player guess for a lock position
+export async function clearVaultGuess(sessionId, uid, position) {
+  const db = getDb();
+  if (!db) return;
+  await remove(ref(db, `coopVaultSessions/${sessionId}/lockGuesses/${position}/${uid}`));
+}
+
+// Kick a player from the vault session
+export async function kickVaultPlayer(sessionId, uid) {
+  const db = getDb();
+  if (!db) return;
+  await remove(ref(db, `coopVaultSessions/${sessionId}/players/${uid}`)).catch(() => {});
+  await remove(ref(db, `userCoopSessions/${uid}/${sessionId}`)).catch(() => {});
+  // Clean up their guesses
+  const guessSnap = await get(ref(db, `coopVaultSessions/${sessionId}/lockGuesses`));
+  if (guessSnap.exists()) {
+    const guesses = guessSnap.val();
+    const updates = {};
+    for (const pos of Object.keys(guesses)) {
+      if (guesses[pos]?.[uid]) updates[`lockGuesses/${pos}/${uid}`] = null;
+    }
+    if (Object.keys(updates).length > 0) {
+      await update(ref(db, `coopVaultSessions/${sessionId}`), updates);
+    }
+  }
+  // Check remaining players
+  const snap = await get(ref(db, `coopVaultSessions/${sessionId}/players`));
+  if (!snap.exists() || Object.keys(snap.val()).length < 2) {
+    await update(ref(db, `coopVaultSessions/${sessionId}`), { status: "waiting" });
+  }
+}
+
 // ============================================================
 // Chat Messages
 // ============================================================
