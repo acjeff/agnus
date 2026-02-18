@@ -8406,12 +8406,13 @@ export default function Pattrn() {
     return remaining;
   }, [puzzle, fills, lockedCells, isCoop, coopPartnerFills, isCoopMosaic, coopMosaicOtherFills]);
 
-  // Default to first tile when game loads with no selection
+  // Default to first available tile when game loads with no selection
   useEffect(() => {
     if (view === "play" && puzzle?.usedTokens?.length && selectedToken === null) {
-      setSelectedToken(puzzle.usedTokens[0]);
+      const firstAvailable = puzzle.usedTokens.find(t => (tokenRemaining[t] ?? 0) > 0);
+      setSelectedToken(firstAvailable ?? puzzle.usedTokens[0]);
     }
-  }, [view, puzzle, selectedToken]);
+  }, [view, puzzle, selectedToken, tokenRemaining]);
 
   // Auto-advance to next available token when current selection is exhausted
   // (only when it was depleted by placing, not when user manually picked it)
