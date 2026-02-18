@@ -11216,6 +11216,7 @@ export default function Pattrn() {
             setFriendReactionPickerOpen(prev => !prev);
           }}] : []),
         ] : [])}
+        {globalModalsEl}
       </div>
     );
   }
