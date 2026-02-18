@@ -3,6 +3,7 @@
 // This component manages the vault-specific state and delegates to VaultLock.
 
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { ChevronLeft } from "lucide-react";
 import VaultLock, { TokenTile, parseToken } from "./VaultLock.jsx";
 import { buildVaultPuzzles, computeUnlockedTiles, getMastermindFeedback, VAULT_DIFFICULTIES } from "./VaultGenerator.js";
 import {
@@ -325,6 +326,7 @@ export default function VaultMode({
   }
 
   return (
+    <>
     <div style={{
       display: "flex", flexDirection: "column", alignItems: "center",
       gap: 12, padding: "12px 8px", maxWidth: 400, margin: "0 auto",
@@ -676,21 +678,55 @@ export default function VaultMode({
         })}
       </div>
 
-      {/* Back to Menu */}
-      <button
-        onClick={onBackToMenu}
-        style={{
-          padding: "8px 20px", borderRadius: 8,
-          border: `1px solid ${C.border}`,
-          backgroundColor: "transparent",
-          color: C.textDim, fontSize: 12, fontWeight: 600,
-          cursor: "pointer", fontFamily: "'Inter', sans-serif",
-          transition: "all 0.15s",
-        }}
-      >
-        Leave Vault
-      </button>
-    </div>
+      </div>
+
+      {/* Back button — fixed bottom-left, matches standard app pattern */}
+      {(() => {
+        const fabSize = 56;
+        const springOpen = "cubic-bezier(0.175, 0.885, 0.32, 1.175)";
+        const strokeColor = "#fff";
+        return (
+          <div
+            onClick={onBackToMenu}
+            style={{
+              position: "fixed",
+              bottom: `calc(16px + env(safe-area-inset-bottom, 0px))`,
+              left: 20,
+              width: fabSize,
+              height: fabSize,
+              borderRadius: fabSize / 2,
+              background: activeTheme.gridBg || C.surface,
+              backdropFilter: "blur(28px) saturate(200%)",
+              WebkitBackdropFilter: "blur(28px) saturate(200%)",
+              border: "1px solid rgba(255,255,255,0.16)",
+              boxShadow: "none",
+              zIndex: 85,
+              overflow: "hidden",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+              transition: `transform 0.15s ${springOpen}, box-shadow 0.15s ease`,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
+            aria-label="Leave Vault"
+          >
+            {/* Liquid Glass sheen highlight */}
+            <div style={{
+              position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none",
+            }}>
+              <div style={{
+                position: "absolute", top: 0, left: "-10%", width: "120%", height: "50%",
+                background: "linear-gradient(180deg, rgba(255,255,255,0.10) 0%, rgba(255,255,255,0) 100%)",
+                borderRadius: "inherit",
+              }} />
+            </div>
+            <ChevronLeft size={22} color={strokeColor} strokeWidth={2.5} />
+          </div>
+        );
+      })()}
+    </>
   );
 }
 
