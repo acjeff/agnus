@@ -8117,7 +8117,9 @@ export default function Pattrn() {
     const seed = getDailySeedForDate(currentDailyDate);
     return buildDailyPuzzle(seed);
   }, [isDaily, currentDailyDate]);
-  const puzzle = isCascade ? cascadePuzzle : isDaily ? currentDailyPuzzle : puzzles[currentPuzzle];
+  const isVaultSolving = difficulty === "vault" && vaultSolvingTile !== null && vaultSolvingTile >= 0;
+  const vaultActivePuzzle = isVaultSolving ? vaultPuzzlesRef.current?.[vaultSolvingTile] : null;
+  const puzzle = isVaultSolving ? vaultActivePuzzle : isCascade ? cascadePuzzle : isDaily ? currentDailyPuzzle : puzzles[currentPuzzle];
   const diffProgress = progress[difficulty] || {};
   const isBlind = difficulty === "blind" && !isDaily;
   const isSpin = difficulty === "spin";
@@ -11038,13 +11040,14 @@ export default function Pattrn() {
           C={C}
           activeTheme={activeTheme}
           onStartPuzzle={(tileIdx, puzzle, canSolve) => {
-            setVaultSolvingTile(tileIdx);
             if (puzzle) {
               vaultPuzzlesRef.current = vaultPuzzlesRef.current || [];
               vaultPuzzlesRef.current[tileIdx] = puzzle;
+              // Set difficulty to "vault" so the puzzle derivation picks up from vaultPuzzlesRef
+              setDifficulty("vault");
+              setVaultSolvingTile(tileIdx);
               // If tile is already solved or can't solve (not my turn), show completed state
               if (!canSolve) {
-                setPuzzle(puzzle);
                 const solFills = {};
                 for (let r = 0; r < puzzle.gridSize; r++) for (let c = 0; c < puzzle.gridSize; c++) {
                   const key = `${r}-${c}`;
@@ -11056,13 +11059,11 @@ export default function Pattrn() {
                 setView("play");
               } else {
                 // Start solving
-                setPuzzle(puzzle);
                 setFills({});
                 setLockedCells(new Set());
                 setWrongCells(new Set());
                 setGameState("playing");
                 setAttempts(0);
-                setDifficulty("vault");
                 setView("play");
               }
             }
