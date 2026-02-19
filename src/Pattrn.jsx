@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Handshake, Clock, Bell, PaintBucket, Eraser, Settings, Cake, Trash2, Edit3, Award, X, Copy, Lightbulb, SmilePlus, Undo2, Redo2 } from "lucide-react";
+import { Play, Pencil, User, Home, LayoutGrid, Trophy, Globe, FolderOpen, Plus, Users, ChevronLeft, Grid3X3, Eye, Zap, Shuffle, Calendar, Layers, Star, Compass, Menu, Palette, Share2, Search, UserPlus, Upload, LogIn, LogOut, Check, RotateCcw, ChevronRight, HandHelping, Handshake, Clock, Bell, PaintBucket, Eraser, Settings, Cake, Trash2, Edit3, Award, X, Copy, Lightbulb, SmilePlus, Undo2, Redo2, Shield } from "lucide-react";
 import {
   isFirebaseConfigured,
   subscribeToAuthChanges,
@@ -5252,6 +5252,7 @@ export default function Pattrn() {
         <path d="M7 11V7a5 5 0 0 1 10 0v4" />
       </svg>
     ),
+    shield: (c) => <Shield size={18} color={c} strokeWidth={2} />,
   };
 
   // Quick Play sub-menu — shared across all views (accessed from nav)
@@ -5321,26 +5322,29 @@ export default function Pattrn() {
     }},
   ];
 
-  // Co-op submenu — global co-op menu
+  // Co-op submenu — session management only (Friends promoted to root)
   const coopSubMenu = [
     { id: "coop-create", icon: "play", label: "Create Session", sub: "coop-create" },
     { id: "coop-active", icon: "handshake", label: "Active Sessions", sub: "coop-active" },
     { id: "coop-completed", icon: "check", label: "Completed", sub: "coop-completed" },
-    { id: "coop-friends", icon: "users", label: totalFriendChatUnread > 0 ? `Friends (${totalFriendChatUnread > 99 ? "99+" : totalFriendChatUnread})` : "Friends", sub: "friends-view", beforeSub: () => { setFriendChatOpen(null); if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; } setFriendChatMessages({}); return true; } },
   ];
 
-  // Profile submenu — now global, includes account items + admin
+  // Profile submenu — focused on viewing/social (account management moved to Settings)
   const profileSubMenu = [
     { id: "profile-view-item", icon: "profile", label: "View Profile", sub: "profile-view" },
     { id: "profile-achievements", icon: "trophy", label: "Achievements", sub: "achievements-view" },
     { id: "profile-cosmetics", icon: "star", label: `Companions${(adminUnlockAll ? VAULT_COSMETICS.length : unlockedCosmetics.length) > 0 ? ` (${adminUnlockAll ? VAULT_COSMETICS.length : unlockedCosmetics.length})` : ""}`, sub: "cosmetics-view" },
     { id: "profile-share", icon: "share", label: "Share Stats", sub: "share-stats" },
-    { id: "profile-username", icon: "edit", label: "Change Username", sub: "username-edit" },
-    { id: "profile-birthday", icon: "cake", label: "Set Birthday", sub: "birthday-edit" },
-    ...(progress && Object.keys(progress).length > 0 ? [{ id: "profile-clear", icon: "trash", label: "Clear All Data", sub: "clear-confirm" }] : []),
-    { id: "profile-delete", icon: "trash", label: "Delete Account", sub: "delete-account" },
-    { id: "profile-signout", icon: "logout", label: "Sign Out", action: () => { handleSignOut(); } },
-    ...(isAdmin ? [{ id: "profile-admin", icon: "shield", label: "Admin", sub: "admin" }] : []),
+  ];
+
+  // Settings submenu — account management, preferences, and destructive actions
+  const settingsSubMenu = [
+    { id: "settings-theme", icon: "palette", label: "Theme", sub: "theme" },
+    { id: "settings-username", icon: "edit", label: "Change Username", sub: "username-edit" },
+    { id: "settings-birthday", icon: "cake", label: "Set Birthday", sub: "birthday-edit" },
+    ...(progress && Object.keys(progress).length > 0 ? [{ id: "settings-clear", icon: "trash", label: "Clear All Data", sub: "clear-confirm" }] : []),
+    { id: "settings-delete", icon: "trash", label: "Delete Account", sub: "delete-account" },
+    { id: "settings-signout", icon: "logout", label: "Sign Out", action: () => { handleSignOut(); } },
   ];
 
   // Contextual menu items per view — page-specific actions
@@ -5360,11 +5364,8 @@ export default function Pattrn() {
     }
     // Back action defined as pill button at call site
 
-    // Menu view items
+    // Menu view items (notifications now handled globally in buildRootWithProfile)
     const menuRoot = [];
-    if (firebaseConfigured && firebaseUser && notifications.length > 0) {
-      menuRoot.push({ id: "notifications", icon: "bell", label: "Notifications", sub: "notifications-view" });
-    }
 
     // Creator view items
     const creatorRoot = [];
@@ -5395,6 +5396,7 @@ export default function Pattrn() {
     const globalMenuStructure = {
       play: playSubMenu,
       profile: firebaseConfigured && firebaseUser ? profileSubMenu : [],
+      settings: firebaseConfigured && firebaseUser ? settingsSubMenu : [],
       admin: adminSubMenu,
       coop: firebaseConfigured && firebaseUser ? coopSubMenu : [],
       "coop-create": [],
@@ -5421,16 +5423,26 @@ export default function Pattrn() {
       "vault-chat": [],
     };
 
-    // Build root menu with global Profile and Co-op items
+    // Build root menu with flattened global items for easier access
     const buildRootWithProfile = (viewSpecificItems) => {
       const items = [...viewSpecificItems];
-      // Add Co-op as a permanent item if signed in
       if (firebaseConfigured && firebaseUser) {
+        // Notifications — globally visible (was previously Home-only)
+        if (notifications.length > 0) {
+          items.push({ id: "notifications", icon: "bell", label: "Notifications", sub: "notifications-view" });
+        }
+        // Friends — promoted to root level (was buried under Co-op)
+        items.push({ id: "nav-friends", icon: "friends", label: totalFriendChatUnread > 0 ? `Friends (${totalFriendChatUnread > 99 ? "99+" : totalFriendChatUnread})` : "Friends", sub: "friends-view", beforeSub: () => { setFriendChatOpen(null); if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; } setFriendChatMessages({}); return true; } });
+        // Co-op — session management only
         items.push({ id: "nav-coop-menu", icon: "handshake", label: "Co-op", sub: "coop" });
-      }
-      // Add Profile as a permanent item if signed in
-      if (firebaseConfigured && firebaseUser) {
+        // Profile — viewing/social items only
         items.push({ id: "nav-profile-menu", icon: "user-avatar", label: username || "Profile", sub: "profile" });
+        // Settings — account management and preferences
+        items.push({ id: "nav-settings-menu", icon: "settings", label: "Settings", sub: "settings" });
+        // Admin — promoted to root level (was buried under Profile)
+        if (isAdmin) {
+          items.push({ id: "nav-admin-menu", icon: "shield", label: "Admin", sub: "admin" });
+        }
       }
       return items;
     };
@@ -5941,6 +5953,15 @@ export default function Pattrn() {
           return {
             background: "linear-gradient(90deg, transparent 0%, rgba(168, 85, 247, 0.08) 20%, rgba(168, 85, 247, 0.25) 50%, rgba(168, 85, 247, 0.08) 80%, transparent 100%)",
             hoverBackground: "linear-gradient(90deg, transparent 0%, rgba(168, 85, 247, 0.12) 20%, rgba(168, 85, 247, 0.35) 50%, rgba(168, 85, 247, 0.12) 80%, transparent 100%)",
+            animation: "subtleGlowPulse 2.5s ease-in-out infinite",
+          };
+        }
+
+        // Green glow for Friends when there are unread messages (rectangular gradient from center)
+        if (item.id === "nav-friends" && totalFriendChatUnread > 0) {
+          return {
+            background: "linear-gradient(90deg, transparent 0%, rgba(34, 197, 94, 0.08) 20%, rgba(34, 197, 94, 0.25) 50%, rgba(34, 197, 94, 0.08) 80%, transparent 100%)",
+            hoverBackground: "linear-gradient(90deg, transparent 0%, rgba(34, 197, 94, 0.12) 20%, rgba(34, 197, 94, 0.35) 50%, rgba(34, 197, 94, 0.12) 80%, transparent 100%)",
             animation: "subtleGlowPulse 2.5s ease-in-out infinite",
           };
         }
