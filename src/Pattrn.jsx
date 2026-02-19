@@ -4770,9 +4770,13 @@ export default function Pattrn() {
   useEffect(() => {
     const vv = typeof window !== "undefined" && window.visualViewport;
     if (!vv) return;
-    const onVVResize = () => setVisualViewportH(vv.height);
+    let raf;
+    const onVVResize = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => setVisualViewportH(vv.height));
+    };
     vv.addEventListener("resize", onVVResize);
-    return () => vv.removeEventListener("resize", onVVResize);
+    return () => { vv.removeEventListener("resize", onVVResize); cancelAnimationFrame(raf); };
   }, []);
   const barObserverRef = useRef(null);
   useEffect(() => {
