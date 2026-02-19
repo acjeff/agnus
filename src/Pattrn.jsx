@@ -14622,6 +14622,18 @@ export default function Pattrn() {
 
   // --- MENU VIEW ---
   if (view === "menu") {
+    // Compute quick stats for the header
+    const _qsTotalSolved = DIFFICULTIES.reduce((sum, d) => {
+      const dp = progress[d.key] || {};
+      if (d.key === "cascade") return sum + Object.keys(dp).filter(k => /^\d+$/.test(k) && dp[k] === CASCADE_LEVELS.length).length;
+      if (d.key === "daily") return sum + Object.values(dp).filter(v => v > 0).length;
+      return sum + Object.keys(dp).filter(k => dp[k] > 0).length;
+    }, 0);
+    const _qsGoldCount = DIFFICULTIES.reduce((sum, d) => {
+      const dp = progress[d.key] || {};
+      return sum + Object.values(dp).filter(v => v === 1 || v === 2).length;
+    }, 0);
+    const _qsStreak = getDailyStreak(progress);
     return (
       <div style={{
         minHeight: "100vh", backgroundColor: C.bg, color: C.text,
@@ -14629,10 +14641,58 @@ export default function Pattrn() {
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingBottom: "calc(32px + env(safe-area-inset-bottom, 0px))", paddingLeft: 20, paddingRight: 20,
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } `}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); @keyframes fadeUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } } @keyframes fadeIn { from { opacity:0; } to { opacity:1; } } @keyframes slideInRight { from { opacity:0; transform:translateX(-8px); } to { opacity:1; transform:translateX(0); } } @keyframes pulseGlow { 0%,100%{ box-shadow: 0 0 12px ${C.accent}22; } 50%{ box-shadow: 0 0 24px ${C.accent}44; } } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } `}</style>
 
         {/* ── Scrollable content area ── */}
         <div style={{ width: "100%", maxWidth: 480, paddingTop: "calc(20px + env(safe-area-inset-top, 0px))", boxSizing: "border-box" }}>
+
+        {/* ── Branded Header ── */}
+        <div style={{
+          textAlign: "center", marginBottom: 24, animation: "fadeUp 0.35s ease both",
+        }}>
+          <h1 style={{
+            fontFamily: "'Inter', sans-serif", fontSize: 32, fontWeight: 800,
+            letterSpacing: 6, margin: 0, lineHeight: 1,
+            background: `linear-gradient(135deg, ${C.text} 0%, ${C.accent} 100%)`,
+            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}>
+            AGNUS
+          </h1>
+          <div style={{
+            fontSize: 11, color: C.textDim, letterSpacing: 2, marginTop: 6,
+            fontWeight: 400,
+          }}>
+            PATTERN PUZZLE
+          </div>
+        </div>
+
+        {/* ── Quick Stats Ribbon ── */}
+        {_qsTotalSolved > 0 && (
+          <div style={{
+            display: "flex", justifyContent: "center", gap: 20, marginBottom: 24,
+            animation: "fadeUp 0.4s 0.05s ease both",
+          }}>
+            {[
+              { value: _qsTotalSolved, label: "Solved", color: C.correct },
+              { value: _qsGoldCount, label: "Gold", color: C.gold },
+              { value: _qsStreak, label: "Streak", color: "#f97316" },
+            ].filter(s => s.value > 0).map((stat) => (
+              <div key={stat.label} style={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+              }}>
+                <span style={{
+                  fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 800,
+                  color: stat.color, lineHeight: 1,
+                }}>{stat.value}</span>
+                <span style={{
+                  fontSize: 9, color: C.textDim, textTransform: "uppercase",
+                  letterSpacing: 1.2, fontWeight: 600,
+                }}>{stat.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* ── Daily hero card ── */}
         {(() => {
@@ -14644,62 +14704,79 @@ export default function Pattrn() {
           const todayLabel = getDailyDateLabel(todayIdx);
           return (
             <div style={{
-              width: "100%", marginBottom: 20, animation: "fadeUp 0.4s ease both",
-              borderRadius: 16, overflow: "hidden",
-              background: `linear-gradient(135deg, ${C.surface} 0%, ${C.accent}11 100%)`,
+              width: "100%", marginBottom: 24, animation: "fadeUp 0.4s 0.08s ease both",
+              borderRadius: 20, overflow: "hidden", position: "relative",
+              background: `linear-gradient(135deg, ${C.surface} 0%, ${C.accent}0d 60%, ${C.accent}18 100%)`,
               border: `1px solid ${C.accent}33`,
-              padding: "20px", boxSizing: "border-box",
+              padding: "22px 20px", boxSizing: "border-box",
+              boxShadow: `0 4px 24px ${C.accent}0a, 0 1px 0 inset rgba(255,255,255,0.04)`,
             }}>
-              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 32, height: 32 }}>
-                    <Calendar size={28} color={C.accent} strokeWidth={2} />
+              {/* Subtle corner glow */}
+              <div style={{
+                position: "absolute", top: -40, right: -40, width: 120, height: 120,
+                borderRadius: "50%", background: `radial-gradient(circle, ${C.accent}15 0%, transparent 70%)`,
+                pointerEvents: "none",
+              }} />
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, position: "relative" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40,
+                    borderRadius: 12, backgroundColor: C.accent + "15", border: `1px solid ${C.accent}33`,
+                  }}>
+                    <Calendar size={22} color={C.accent} strokeWidth={2} />
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, color: C.textDim, textTransform: "uppercase", letterSpacing: 1.5, fontFamily: "'Inter', sans-serif", marginBottom: 4 }}>
+                    <div style={{ fontSize: 10, color: C.accent, textTransform: "uppercase", letterSpacing: 2, fontFamily: "'Inter', sans-serif", marginBottom: 4, fontWeight: 600 }}>
                       Daily Puzzle
                     </div>
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 20, fontWeight: 700, color: C.text, lineHeight: 1.2 }}>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 22, fontWeight: 800, color: C.text, lineHeight: 1.1 }}>
                       {todayLabel}
                     </div>
                   </div>
                 </div>
                 {streak > 0 && (
                   <div style={{
-                    display: "flex", alignItems: "center", gap: 4,
-                    padding: "4px 10px", borderRadius: 20,
-                    backgroundColor: C.gold + "18", border: `1px solid ${C.gold}33`,
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "6px 12px", borderRadius: 20,
+                    backgroundColor: C.gold + "15", border: `1px solid ${C.gold}33`,
+                    backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
                   }}>
-                    <span style={{ fontSize: 13 }}>🔥</span>
-                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.gold }}>{streak}</span>
+                    <span style={{ fontSize: 14, lineHeight: 1 }}>🔥</span>
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 800, color: C.gold }}>{streak}</span>
                   </div>
                 )}
               </div>
               {todayResult > 0 && (
                 <div style={{
-                  display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
-                  padding: "8px 12px", borderRadius: 10, backgroundColor: C.bg + "88",
+                  display: "flex", alignItems: "center", gap: 10, marginBottom: 16,
+                  padding: "10px 14px", borderRadius: 12, backgroundColor: C.bg + "66",
+                  backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+                  border: `1px solid ${C.border}44`,
                 }}>
                   <ScoreBadge attempts={todayResult} />
-                  <span style={{ fontSize: 12, color: C.text, fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                  <span style={{ fontSize: 13, color: C.text, fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                     Solved in {todayResult} attempt{todayResult !== 1 ? "s" : ""}
                   </span>
                   {todayTime != null && (
-                    <span style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                    <span style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginLeft: "auto" }}>
                       {formatTime(todayTime)}
                     </span>
                   )}
                 </div>
               )}
-              <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ display: "flex", gap: 10 }}>
                 <button
                   onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, todayLabel); }}
                   style={{
-                    flex: 1, padding: "12px 0", borderRadius: 12, fontSize: 13, fontWeight: 700,
-                    fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-                    background: C.accent, color: C.bg, border: "none", cursor: "pointer",
-                    transition: "transform 0.15s",
+                    flex: 1, padding: "14px 0", borderRadius: 14, fontSize: 13, fontWeight: 700,
+                    fontFamily: "'Inter', sans-serif", letterSpacing: 1.2,
+                    background: `linear-gradient(135deg, ${C.accent} 0%, ${C.accent}dd 100%)`,
+                    color: C.bg, border: "none", cursor: "pointer",
+                    transition: "transform 0.15s, box-shadow 0.15s",
+                    boxShadow: `0 2px 12px ${C.accent}33`,
                   }}
+                  onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = `0 4px 20px ${C.accent}55`; }}
+                  onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 2px 12px ${C.accent}33`; }}
                 >
                   {todayResult > 0 ? "View Result" : "Play Today"}
                 </button>
@@ -14723,10 +14800,14 @@ export default function Pattrn() {
                     setTimeout(() => setDailyShareMsg(""), 2000);
                   }}
                   style={{
-                    padding: "12px 16px", borderRadius: 12, fontSize: 12, fontWeight: 600,
+                    padding: "14px 18px", borderRadius: 14, fontSize: 12, fontWeight: 600,
                     fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                    background: "none", border: `1px solid ${C.accent}55`, color: C.accent, cursor: "pointer",
+                    background: C.accent + "0a", border: `1.5px solid ${C.accent}44`, color: C.accent, cursor: "pointer",
+                    transition: "all 0.15s",
+                    backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
                   }}
+                  onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.accent + "18"; e.currentTarget.style.borderColor = C.accent + "88"; }}
+                  onMouseLeave={e => { e.currentTarget.style.backgroundColor = C.accent + "0a"; e.currentTarget.style.borderColor = C.accent + "44"; }}
                 >
                   {dailyShareMsg || "Share"}
                 </button>
@@ -14927,29 +15008,32 @@ export default function Pattrn() {
           </div>
         )}
 
-        {/* Mode selector: categorized auto-wrapping grid */}
+        {/* Mode selector: categorized sections with improved cards */}
         <div style={{
-          marginBottom: 20, animation: "fadeUp 0.5s 0.05s ease both",
+          marginBottom: 24, animation: "fadeUp 0.45s 0.12s ease both",
           width: "100%",
-          display: "flex", flexDirection: "column", gap: 14,
+          display: "flex", flexDirection: "column", gap: 20,
         }}>
-          {MODE_CATEGORIES.map((cat) => {
+          {MODE_CATEGORIES.map((cat, catIdx) => {
             const entries = cat === "coop" ? COOP_MODES : DIFFICULTIES.filter((d) => d.cat === cat);
+            const catColors = { classic: C.accent, special: "#a78bfa", coop: C.coop };
+            const catColor = catColors[cat] || C.accent;
             return (
             <div key={cat}>
               <div style={{
-                fontSize: 9, color: C.textDim, textTransform: "uppercase",
-                letterSpacing: 1.5, marginBottom: 6,
-                fontFamily: "'Inter', sans-serif",
-                display: "flex", alignItems: "center", gap: 4,
+                fontSize: 10, color: catColor, textTransform: "uppercase",
+                letterSpacing: 2, marginBottom: 10,
+                fontFamily: "'Inter', sans-serif", fontWeight: 700,
+                display: "flex", alignItems: "center", gap: 6,
+                animation: `slideInRight 0.35s ${0.15 + catIdx * 0.06}s ease both`,
               }}>
-                {radialIcons[CATEGORY_ICONS[cat]](C.textDim)}
+                {radialIcons[CATEGORY_ICONS[cat]](catColor)}
                 <span>{cat}</span>
               </div>
               <div style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(100px, 1fr))",
-                gap: 8,
+                gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))",
+                gap: 10,
               }}>
                 {entries.map((d) => {
                   const isVaultEntry = d.key === "vault";
@@ -14960,6 +15044,9 @@ export default function Pattrn() {
                     : Object.keys(dp).filter((k) => dp[k] > 0).length;
                   const modeTotal = d.key === "mosaic" ? 25 : 50;
                   const isCleared = !isVaultEntry && d.key !== "daily" && solved >= modeTotal;
+                  const progressPct = isVaultEntry || d.key === "daily" ? 0 : Math.min(100, (solved / modeTotal) * 100);
+                  const activeBg = isCleared ? C.gold : d.key === "blind" ? "#e06040" : C.accent;
+                  const activeText = d.key === "blind" && !isCleared ? "#fff" : C.bg;
                   return (
                     <button
                       key={d.key}
@@ -14996,32 +15083,61 @@ export default function Pattrn() {
                         else { setDifficulty(d.key); }
                       }}
                       style={{
-                        padding: "12px 8px",
-                        background: active ? (isCleared ? C.gold : d.key === "blind" ? "#e06040" : C.accent) : C.surface,
-                        color: active ? (d.key === "blind" && !isCleared ? "#fff" : C.bg) : isCleared ? C.gold : C.textDim,
-                        border: active ? "1px solid transparent" : isCleared ? `1.5px solid ${C.gold}88` : `1px solid ${C.border}`,
-                        borderRadius: 10,
+                        padding: "14px 10px 12px",
+                        background: active ? activeBg : C.surface,
+                        color: active ? activeText : isCleared ? C.gold : C.text,
+                        border: active ? `1.5px solid ${activeBg}` : isCleared ? `1.5px solid ${C.gold}55` : `1px solid ${C.border}`,
+                        borderRadius: 14,
                         cursor: "pointer",
                         fontFamily: "'Inter', sans-serif",
                         fontSize: 11,
-                        fontWeight: active ? 700 : isCleared ? 600 : 400,
+                        fontWeight: active ? 700 : 500,
                         letterSpacing: 0.5,
                         textTransform: "uppercase",
-                        transition: "background 0.2s, color 0.2s, border 0.2s",
+                        transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)",
                         display: "flex",
                         flexDirection: "column",
                         alignItems: "center",
-                        gap: 2,
+                        gap: 4,
                         position: "relative",
+                        overflow: "hidden",
+                        boxShadow: active ? `0 4px 16px ${activeBg}33` : "none",
                       }}
+                      onMouseEnter={e => { if (!active) { e.currentTarget.style.borderColor = catColor + "88"; e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = `0 4px 16px ${catColor}18`; } }}
+                      onMouseLeave={e => { if (!active) { e.currentTarget.style.borderColor = isCleared ? C.gold + "55" : C.border; e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "none"; } }}
                     >
-                      {radialIcons[d.icon](active ? (d.key === "blind" && !isCleared ? "#fff" : C.bg) : isCleared ? C.gold : C.textDim)}
-                      <span style={{ whiteSpace: "nowrap" }}>{d.label}</span>
+                      <div style={{ marginBottom: 2 }}>
+                        {radialIcons[d.icon](active ? activeText : isCleared ? C.gold : C.textDim)}
+                      </div>
+                      <span style={{ whiteSpace: "nowrap", fontWeight: active ? 800 : 600, fontSize: 12 }}>{d.label}</span>
                       <span style={{
-                        fontSize: 8,
-                        color: active ? (d.key === "blind" && !isCleared ? "#fff9" : C.bg + "aa") : isCleared ? C.gold + "cc" : C.textDim,
+                        fontSize: 9,
+                        color: active ? (activeText + "bb") : isCleared ? C.gold + "cc" : C.textDim,
+                        fontWeight: 400, letterSpacing: 0.3, textTransform: "none",
                       }}>{d.desc}</span>
-                      {!isVaultEntry && <span style={{ fontSize: 8, color: active ? (d.key === "blind" && !isCleared ? "#fff7" : C.bg + "88") : isCleared ? C.gold + "bb" : C.textDim }}>{d.key === "daily" ? `${solved} solved` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}{isCleared ? " \u2713" : ""}</span>}
+                      {/* Progress bar for non-daily modes */}
+                      {!isVaultEntry && d.key !== "daily" && progressPct > 0 && (
+                        <div style={{
+                          width: "80%", height: 3, borderRadius: 2, marginTop: 4,
+                          backgroundColor: active ? (activeText + "22") : C.border,
+                          overflow: "hidden",
+                        }}>
+                          <div style={{
+                            width: `${progressPct}%`, height: "100%", borderRadius: 2,
+                            backgroundColor: active ? activeText : isCleared ? C.gold : C.correct,
+                            transition: "width 0.4s ease",
+                          }} />
+                        </div>
+                      )}
+                      {!isVaultEntry && (
+                        <span style={{
+                          fontSize: 8, fontWeight: 600, letterSpacing: 0.5,
+                          color: active ? (activeText + "99") : isCleared ? C.gold + "bb" : C.textDim,
+                          textTransform: "none",
+                        }}>
+                          {d.key === "daily" ? `${solved} solved` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}{isCleared ? " \u2713" : ""}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -15214,9 +15330,11 @@ export default function Pattrn() {
               </div>
               {/* Legend */}
               <div style={{
-                marginTop: 16, display: "flex", gap: 16, fontSize: 11, color: C.textDim,
-                fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                marginTop: 16, display: "flex", gap: 14, fontSize: 10, color: C.textDim,
+                fontFamily: "'Inter', sans-serif", letterSpacing: 0.3,
                 flexWrap: "wrap", justifyContent: "center",
+                padding: "10px 16px", borderRadius: 10,
+                backgroundColor: C.surface + "88", border: `1px solid ${C.border}44`,
               }}>
                 <span><span style={{ color: C.gold }}>{"\u2605"}</span> 1-2 tries</span>
                 <span><span style={{ color: C.silver }}>{"\u25CF"}</span> 3-4 tries</span>
@@ -15397,9 +15515,38 @@ export default function Pattrn() {
 
         {/* Puzzle grid: 50 for non-daily modes (not mosaic) */}
         {!isDaily && !isMosaic && (<>
+        {/* Mode progress summary bar */}
+        {(() => {
+          const dp = progress[difficulty] || {};
+          const mSolved = difficulty === "cascade"
+            ? Object.keys(dp).filter(k => /^\d+$/.test(k) && dp[k] === CASCADE_LEVELS.length).length
+            : Object.keys(dp).filter(k => dp[k] > 0).length;
+          const mTotal = 50;
+          const mPct = Math.min(100, (mSolved / mTotal) * 100);
+          return mSolved > 0 ? (
+            <div style={{
+              width: "100%", marginBottom: 16, animation: "fadeUp 0.4s 0.14s ease both",
+              display: "flex", alignItems: "center", gap: 12,
+            }}>
+              <div style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: C.border, overflow: "hidden" }}>
+                <div style={{
+                  width: `${mPct}%`, height: "100%", borderRadius: 2,
+                  background: mPct >= 100 ? `linear-gradient(90deg, ${C.gold}, ${C.gold}cc)` : `linear-gradient(90deg, ${C.correct}, ${C.correct}cc)`,
+                  transition: "width 0.5s ease",
+                }} />
+              </div>
+              <span style={{
+                fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700,
+                color: mPct >= 100 ? C.gold : C.correct, whiteSpace: "nowrap",
+              }}>
+                {mSolved}/{mTotal}
+              </span>
+            </div>
+          ) : null;
+        })()}
         <div style={{
           display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
-          width: "100%", animation: "fadeUp 0.5s 0.15s ease both",
+          width: "100%", animation: "fadeUp 0.45s 0.18s ease both",
         }}>
           {(isCascade ? Array.from({ length: 50 }, (_, i) => i) : puzzles).map((p, i) => {
             const idx = isCascade ? i : p?.id ?? i;
@@ -15423,27 +15570,28 @@ export default function Pattrn() {
               : null;
             const coopResult = (progress.coop || {})[`${difficulty}_${i}`];
             const coopSolved = coopResult > 0;
-            const borderColor = solved ? C.correct + "66" : failed ? C.incorrect + "44" : cascadeInProgress ? C.inProgress + "99" : C.border;
-            const bgColor = solved ? C.correct + "15" : failed ? C.incorrect + "10" : cascadeInProgress ? C.inProgress + "18" : C.surface;
+            const borderColor = solved ? C.correct + "55" : failed ? C.incorrect + "44" : cascadeInProgress ? C.inProgress + "88" : C.border;
+            const bgColor = solved ? C.correct + "0d" : failed ? C.incorrect + "0a" : cascadeInProgress ? C.inProgress + "12" : C.surface;
             const numColor = solved ? C.correct : failed ? C.incorrect : cascadeInProgress ? C.inProgress : C.text;
             return (
               <button key={i} onClick={() => startPuzzle(i, view === "menu" ? difficulty : undefined)}
                 style={{
-                  aspectRatio: "1", borderRadius: 10, border: `1.5px solid ${borderColor}`,
+                  aspectRatio: "1", borderRadius: 12, border: `1.5px solid ${borderColor}`,
                   backgroundColor: bgColor,
                   cursor: "pointer", display: "flex", flexDirection: "column",
-                  alignItems: "center", justifyContent: "center", gap: 1,
-                  transition: "all 0.15s", position: "relative", minWidth: 0,
+                  alignItems: "center", justifyContent: "center", gap: 2,
+                  transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)", position: "relative", minWidth: 0,
+                  boxShadow: solved ? `0 0 8px ${C.correct}11` : "none",
                 }}
-                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.06)"; e.currentTarget.style.borderColor = C.accent; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.boxShadow = `0 4px 12px ${C.accent}22`; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.boxShadow = solved ? `0 0 8px ${C.correct}11` : "none"; }}
               >
                 {coopSolved && (
                   <span style={{
                     position: "absolute", top: 3, right: 3,
-                    width: 8, height: 8, borderRadius: "50%",
+                    width: 7, height: 7, borderRadius: "50%",
                     backgroundColor: C.coop,
-                    boxShadow: `0 0 4px ${C.coop}66`,
+                    boxShadow: `0 0 6px ${C.coop}66`,
                   }} />
                 )}
                 <span style={{
@@ -15483,9 +15631,11 @@ export default function Pattrn() {
 
         {/* Legend */}
         <div style={{
-          marginTop: 24, display: "flex", gap: 16, fontSize: 11, color: C.textDim,
-          fontFamily: "'Inter', sans-serif", letterSpacing: 0.5, animation: "fadeUp 0.5s 0.25s ease both",
+          marginTop: 20, display: "flex", gap: 14, fontSize: 10, color: C.textDim,
+          fontFamily: "'Inter', sans-serif", letterSpacing: 0.3, animation: "fadeUp 0.45s 0.25s ease both",
           flexWrap: "wrap", justifyContent: "center",
+          padding: "10px 16px", borderRadius: 10,
+          backgroundColor: C.surface + "88", border: `1px solid ${C.border}44`,
         }}>
           <span><span style={{ color: C.gold }}>{"\u2605"}</span> 1-2 tries</span>
           <span><span style={{ color: C.silver }}>{"\u25CF"}</span> 3-4 tries</span>
