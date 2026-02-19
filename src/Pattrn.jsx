@@ -3226,6 +3226,8 @@ export default function Pattrn() {
   const [publicMosaicsList, setPublicMosaicsList] = useState([]);
   const [pendingMosaicsList, setPendingMosaicsList] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [adminUnlockAll, setAdminUnlockAll] = useState(false);
+  const adminUnlockPrevRef = useRef(null); // stores { activeThemeId, activeCosmetic } before unlock-all
   const [mosaicLoading, setMosaicLoading] = useState(false);
   const [mosaicMsg, setMosaicMsg] = useState("");
   const [shareEmailInput, setShareEmailInput] = useState("");
@@ -5281,7 +5283,7 @@ export default function Pattrn() {
   const themeAchList = computeAchievements(progress, times, savedAchievementIds);
   const themeSubMenu = [
     ...PUZZLE_THEMES.map(theme => {
-      const unlocked = isThemeUnlocked(theme, themeAchList);
+      const unlocked = adminUnlockAll || isThemeUnlocked(theme, themeAchList);
       const isActive = activeThemeId === theme.id;
       return {
         id: `theme-${theme.id}`,
@@ -5300,6 +5302,23 @@ export default function Pattrn() {
     { id: "admin-manage", icon: "list", label: "Manage", action: () => { setView("admin-manage"); loadMosaicData("manage"); } },
     { id: "admin-metrics", icon: "chart", label: "Metrics", action: () => { setView("admin-metrics"); loadAdminMetricsData(); } },
     { id: "admin-users", icon: "users", label: "Users", action: () => { setView("admin-users"); } },
+    { id: "admin-unlock-all", icon: adminUnlockAll ? "check" : "lock", label: adminUnlockAll ? "Unlock All \u2713" : "Unlock All", action: () => {
+      if (!adminUnlockAll) {
+        // Save current state before unlocking
+        adminUnlockPrevRef.current = { activeThemeId, activeCosmetic };
+        setAdminUnlockAll(true);
+      } else {
+        // Restore previous state
+        if (adminUnlockPrevRef.current) {
+          setActiveThemeId(adminUnlockPrevRef.current.activeThemeId);
+          saveTheme(adminUnlockPrevRef.current.activeThemeId);
+          setActiveCosmetic(adminUnlockPrevRef.current.activeCosmetic);
+          saveActiveCosmetic(adminUnlockPrevRef.current.activeCosmetic);
+          adminUnlockPrevRef.current = null;
+        }
+        setAdminUnlockAll(false);
+      }
+    }},
   ];
 
   // Co-op submenu — global co-op menu
@@ -5314,7 +5333,7 @@ export default function Pattrn() {
   const profileSubMenu = [
     { id: "profile-view-item", icon: "profile", label: "View Profile", sub: "profile-view" },
     { id: "profile-achievements", icon: "trophy", label: "Achievements", sub: "achievements-view" },
-    { id: "profile-cosmetics", icon: "star", label: `Companions${unlockedCosmetics.length > 0 ? ` (${unlockedCosmetics.length})` : ""}`, sub: "cosmetics-view" },
+    { id: "profile-cosmetics", icon: "star", label: `Companions${(adminUnlockAll ? VAULT_COSMETICS.length : unlockedCosmetics.length) > 0 ? ` (${adminUnlockAll ? VAULT_COSMETICS.length : unlockedCosmetics.length})` : ""}`, sub: "cosmetics-view" },
     { id: "profile-share", icon: "share", label: "Share Stats", sub: "share-stats" },
     { id: "profile-username", icon: "edit", label: "Change Username", sub: "username-edit" },
     { id: "profile-birthday", icon: "cake", label: "Set Birthday", sub: "birthday-edit" },
@@ -6319,7 +6338,9 @@ export default function Pattrn() {
                 </>
               );
             })() : isAchievementsView ? (() => {
-              const achievements = computeAchievements(progress, times, savedAchievementIds);
+              const achievements = adminUnlockAll
+                ? ACHIEVEMENTS.map(a => ({ ...a, unlocked: true }))
+                : computeAchievements(progress, times, savedAchievementIds);
               const unlocked = achievements.filter(a => a.unlocked).length;
               const total = achievements.length;
               const tierColors = { 1: C.bronze, 2: C.silver, 3: C.gold };
@@ -6383,7 +6404,7 @@ export default function Pattrn() {
                       Companions
                     </div>
                     <div style={{ fontSize: 10, color: C.textDim, marginBottom: 12, textAlign: "center", letterSpacing: 1 }}>
-                      {unlockedCosmetics.length}/{VAULT_COSMETICS.length} unlocked {"\u00B7"} Complete vaults to earn more
+                      {adminUnlockAll ? VAULT_COSMETICS.length : unlockedCosmetics.length}/{VAULT_COSMETICS.length} unlocked {"\u00B7"} {adminUnlockAll ? "Admin unlock active" : "Complete vaults to earn more"}
                     </div>
                     {/* Cosmetic items grouped by tier */}
                     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -6400,7 +6421,7 @@ export default function Pattrn() {
                             </div>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
                               {items.map(c => {
-                                const isUnlocked = unlockedCosmetics.includes(c.id);
+                                const isUnlocked = adminUnlockAll || unlockedCosmetics.includes(c.id);
                                 const isActive = activeCosmetic === c.id;
                                 return (
                                   <div
@@ -7318,7 +7339,7 @@ export default function Pattrn() {
                     <div style={{ fontSize: 10, color: C.textDim, marginBottom: 12 }}>Unlock themes through achievements or play on themed days</div>
                     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                       {PUZZLE_THEMES.map(theme => {
-                        const unlocked = isThemeUnlocked(theme, achList);
+                        const unlocked = adminUnlockAll || isThemeUnlocked(theme, achList);
                         const isActive = activeThemeId === theme.id;
                         const seasonalMonth = theme.unlock?.seasonal;
                         const achId = theme.unlock?.achievement;
@@ -14166,7 +14187,9 @@ export default function Pattrn() {
 
   // --- PROFILE VIEW ---
   if (view === "profile") {
-    const achs = computeAchievements(progress, times, savedAchievementIds);
+    const achs = adminUnlockAll
+      ? ACHIEVEMENTS.map(a => ({ ...a, unlocked: true }))
+      : computeAchievements(progress, times, savedAchievementIds);
     const achUnlocked = achs.filter(a => a.unlocked).length;
     const achTotal = achs.length;
     const totalSolvedAll = [...SOLVE_MODES, "daily"].reduce((s, m) => s + countModeSolved(progress[m]), 0)
