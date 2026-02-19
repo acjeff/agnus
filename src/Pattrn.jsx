@@ -6091,7 +6091,7 @@ export default function Pattrn() {
         <div
           style={{
             position: "fixed",
-            bottom: isOpen && isMobileMenu ? mobileMenuMargin : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
+            bottom: isOpen && isMobileMenu ? (mobileMenuMargin + window.innerHeight - visualViewportH) : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
             right: isOpen && isMobileMenu ? mobileMenuMargin : 20,
             width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
             height: isOpen ? openHeight : fabSize + passUIHeight,
