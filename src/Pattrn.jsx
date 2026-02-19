@@ -5583,7 +5583,8 @@ export default function Pattrn() {
     const openExtraWidth = hasPillButtons ? (isSubMenu ? 120 : 50) : 0;
     const isWidePanel = isFriendsView || isVaultChat;
     const isMobileMenu = viewportSize.w < 480;
-    const panelWidth = isMobileMenu && isOpen ? viewportSize.w : (isWidePanel ? 380 : isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth));
+    const mobileMenuMargin = 12; // breathing room around the panel on mobile
+    const panelWidth = isMobileMenu && isOpen ? viewportSize.w - mobileMenuMargin * 2 : (isWidePanel ? 380 : isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth));
     const itemHeight = 44;
     const panelPad = 8;
     const dividerHeight = 13;
@@ -5912,8 +5913,8 @@ export default function Pattrn() {
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
     const bottomOffset = bottomPx; // matches the bottom positioning
     const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
-    const mobileFullHeight = visualViewportH;
-    const openHeight = isMobileMenu ? mobileFullHeight : Math.min(contentHeight, maxPanelHeight);
+    const mobileMaxHeight = visualViewportH - mobileMenuMargin * 2;
+    const openHeight = isMobileMenu ? Math.min(contentHeight, mobileMaxHeight) : Math.min(contentHeight, maxPanelHeight);
     const needsScroll = contentHeight > maxPanelHeight;
 
     // Liquid Glass spring curves — fast initial movement, subtle overshoot, quick settle
@@ -6090,26 +6091,24 @@ export default function Pattrn() {
         <div
           style={{
             position: "fixed",
-            bottom: isOpen && isMobileMenu ? `${window.innerHeight - visualViewportH}px` : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
-            right: isOpen && isMobileMenu ? 0 : 20,
-            left: isOpen && isMobileMenu ? 0 : undefined,
-            top: isOpen && isMobileMenu ? 0 : undefined,
+            bottom: isOpen && isMobileMenu ? mobileMenuMargin : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
+            right: isOpen && isMobileMenu ? mobileMenuMargin : 20,
             width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
-            height: isOpen ? (isMobileMenu ? openHeight : openHeight) : fabSize + passUIHeight,
-            maxHeight: isOpen ? (isMobileMenu ? openHeight : `calc(100vh - ${bottomPx}px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 20px)`) : undefined,
-            borderRadius: isOpen ? (isMobileMenu ? 0 : 22) : (hasPassUI ? 22 : fabSize / 2),
+            height: isOpen ? openHeight : fabSize + passUIHeight,
+            maxHeight: isOpen ? (isMobileMenu ? mobileMaxHeight : `calc(100vh - ${bottomPx}px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 20px)`) : undefined,
+            borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
             background: activeTheme.gridBg || C.surface,
             backdropFilter: "blur(28px) saturate(200%)",
             WebkitBackdropFilter: "blur(28px) saturate(200%)",
-            border: isOpen ? (isMobileMenu ? "none" : "1px solid rgba(255,255,255,0.18)") : "1px solid rgba(255,255,255,0.16)",
+            border: isOpen ? "1px solid rgba(255,255,255,0.18)" : "1px solid rgba(255,255,255,0.16)",
             boxShadow: defaultShadow,
             zIndex: 85,
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
             transition: isOpen
-              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, max-height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease, top 0.3s ${springOpen}, left 0.3s ${springOpen}, bottom 0.3s ${springOpen}, right 0.3s ${springOpen}`
-              : `width 0.22s ${springClose}, height 0.22s ${springClose}, max-height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease, top 0.22s ${springClose}, left 0.22s ${springClose}, bottom 0.22s ${springClose}, right 0.22s ${springClose}`,
+              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, max-height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease, bottom 0.3s ${springOpen}, right 0.3s ${springOpen}`
+              : `width 0.22s ${springClose}, height 0.22s ${springClose}, max-height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease, bottom 0.22s ${springClose}, right 0.22s ${springClose}`,
           }}
           aria-label="Quick actions"
         >
@@ -6125,7 +6124,7 @@ export default function Pattrn() {
           </div>
 
           {/* Menu content — always rendered, animated via transitions */}
-          <div style={{ padding: isOpen ? (isMobileMenu ? `calc(${panelPad}px + env(safe-area-inset-top, 0px)) 0 0 0` : `${panelPad}px 0 0 0`) : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? (isWidePanel ? "hidden" : "auto") : "hidden", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? (isWidePanel ? "hidden" : "auto") : "hidden", WebkitOverflowScrolling: "touch" }}>
             {isSignInMenu ? (() => {
               return (
                 <>
@@ -8443,7 +8442,6 @@ export default function Pattrn() {
             display: "flex", alignItems: "center",
             height: fabSize, flexShrink: 0,
             borderTop: (isOpen || hasPassUI) ? "1px solid rgba(255,255,255,0.06)" : "none",
-            paddingBottom: isOpen && isMobileMenu ? "env(safe-area-inset-bottom, 0px)" : 0,
           }}>
             {/* Action buttons in the pill */}
             {pillButtons.map((btn) => (
