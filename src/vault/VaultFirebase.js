@@ -372,6 +372,25 @@ export async function kickVaultPlayer(sessionId, uid) {
 }
 
 // ============================================================
+// Pending Unlock Choices (player picks which adjacent tile to unlock)
+// ============================================================
+export async function setVaultPendingUnlock(sessionId, forTile, candidates) {
+  const db = getDb();
+  if (!db) return;
+  await set(ref(db, `coopVaultSessions/${sessionId}/pendingUnlockChoices`), {
+    forTile,
+    candidates,
+    timestamp: Date.now(),
+  });
+}
+
+export async function clearVaultPendingUnlock(sessionId) {
+  const db = getDb();
+  if (!db) return;
+  await remove(ref(db, `coopVaultSessions/${sessionId}/pendingUnlockChoices`));
+}
+
+// ============================================================
 // Chat Messages
 // ============================================================
 export async function sendVaultChatMessage(sessionId, uid, username, text) {
