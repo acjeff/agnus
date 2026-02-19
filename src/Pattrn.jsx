@@ -6112,7 +6112,7 @@ export default function Pattrn() {
           </div>
 
           {/* Menu content — always rendered, animated via transitions */}
-          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? "auto" : "hidden", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? (isWidePanel ? "hidden" : "auto") : "hidden", WebkitOverflowScrolling: "touch" }}>
             {isSignInMenu ? (() => {
               return (
                 <>
@@ -6523,6 +6523,7 @@ export default function Pattrn() {
                 const chatFriendOnline = chatFriendPresence && chatFriendPresence.lastSeen && (Date.now() - chatFriendPresence.lastSeen) < 120000;
                 return (
                   <div style={{
+                    flex: 1, minHeight: 0, display: "flex", flexDirection: "column",
                     opacity: isOpen ? 1 : 0,
                     transform: isOpen ? "translateY(0)" : "translateY(8px)",
                     transition: isOpen
@@ -6556,12 +6557,13 @@ export default function Pattrn() {
                 <>
                   <div style={{
                     padding: "0 12px 12px",
+                    flex: 1, minHeight: 0,
                     opacity: isOpen ? 1 : 0,
                     transform: isOpen ? "translateY(0)" : "translateY(8px)",
                     transition: isOpen
                       ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
-                    display: "flex", flexDirection: "column", height: "100%", minHeight: 0,
+                    display: "flex", flexDirection: "column",
                   }}>
                     {/* Header */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 4px 12px", borderBottom: `1px solid ${C.border}44`, marginBottom: 12, flexShrink: 0 }}>
@@ -8058,6 +8060,7 @@ export default function Pattrn() {
             })() : isVaultChat ? (() => {
               return (
                 <div style={{
+                  flex: 1, minHeight: 0, display: "flex", flexDirection: "column",
                   opacity: isOpen ? 1 : 0,
                   transform: isOpen ? "translateY(0)" : "translateY(8px)",
                   transition: isOpen
