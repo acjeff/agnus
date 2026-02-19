@@ -4755,6 +4755,7 @@ export default function Pattrn() {
   // Viewport size tracking for dynamic grid sizing
   const [viewportSize, setViewportSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
   const [visualViewportH, setVisualViewportH] = useState(() => typeof window !== "undefined" && window.visualViewport ? window.visualViewport.height : window.innerHeight);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(140);
   const [infoRowHeight, setInfoRowHeight] = useState(40);
@@ -4773,7 +4774,10 @@ export default function Pattrn() {
     let raf;
     const onVVResize = () => {
       cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => setVisualViewportH(vv.height));
+      raf = requestAnimationFrame(() => {
+        setVisualViewportH(vv.height);
+        setKeyboardOffset(Math.max(0, window.innerHeight - vv.height));
+      });
     };
     vv.addEventListener("resize", onVVResize);
     return () => { vv.removeEventListener("resize", onVVResize); cancelAnimationFrame(raf); };
@@ -6097,7 +6101,7 @@ export default function Pattrn() {
             position: "fixed",
             bottom: isOpen && isMobileMenu ? mobileMenuMargin : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
             right: isOpen && isMobileMenu ? mobileMenuMargin : 20,
-            transform: isOpen && isMobileMenu ? `translateY(-${Math.max(0, window.innerHeight - visualViewportH)}px)` : undefined,
+            transform: isOpen && isMobileMenu ? `translateY(-${keyboardOffset}px)` : undefined,
             width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
             height: isOpen ? openHeight : fabSize + passUIHeight,
             maxHeight: isOpen ? (isMobileMenu ? mobileMaxHeight : `calc(100vh - ${bottomPx}px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 20px)`) : undefined,
