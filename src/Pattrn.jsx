@@ -6091,8 +6091,9 @@ export default function Pattrn() {
         <div
           style={{
             position: "fixed",
-            bottom: isOpen && isMobileMenu ? (mobileMenuMargin + window.innerHeight - visualViewportH) : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
+            bottom: isOpen && isMobileMenu ? mobileMenuMargin : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
             right: isOpen && isMobileMenu ? mobileMenuMargin : 20,
+            transform: isOpen && isMobileMenu ? `translateY(-${Math.max(0, window.innerHeight - visualViewportH)}px)` : undefined,
             width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
             height: isOpen ? openHeight : fabSize + passUIHeight,
             maxHeight: isOpen ? (isMobileMenu ? mobileMaxHeight : `calc(100vh - ${bottomPx}px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 20px)`) : undefined,
@@ -6107,8 +6108,8 @@ export default function Pattrn() {
             display: "flex",
             flexDirection: "column",
             transition: isOpen
-              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, max-height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease, bottom 0.3s ${springOpen}, right 0.3s ${springOpen}`
-              : `width 0.22s ${springClose}, height 0.22s ${springClose}, max-height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease, bottom 0.22s ${springClose}, right 0.22s ${springClose}`,
+              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, max-height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease, bottom 0.3s ${springOpen}, right 0.3s ${springOpen}, transform 0.25s ease-out`
+              : `width 0.22s ${springClose}, height 0.22s ${springClose}, max-height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease, bottom 0.22s ${springClose}, right 0.22s ${springClose}, transform 0.2s ease-out`,
           }}
           aria-label="Quick actions"
         >
