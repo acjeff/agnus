@@ -154,6 +154,16 @@ export default function VaultMode({
     }
   }, [sessionId, vaultMeta]);
 
+  // --- Handle pending unlock choice (player picks which adjacent tile to unlock) ---
+  const handleUnlockChoice = useCallback(async (chosenTileIdx) => {
+    if (!sessionId || !pendingUnlockChoices) return;
+    if (!pendingCandidateSet.has(chosenTileIdx)) return;
+    const currentUnlockedMap = sessionData?.tileUnlocked || {};
+    const newUnlocked = { ...currentUnlockedMap, [chosenTileIdx]: true };
+    await updateVaultTileUnlocked(sessionId, newUnlocked);
+    await clearVaultPendingUnlock(sessionId);
+  }, [sessionId, pendingUnlockChoices, pendingCandidateSet, sessionData?.tileUnlocked]);
+
   // --- Handle tile selection ---
   const handleTileClick = useCallback((tileIdx) => {
     if (!vaultPuzzles || !sessionId || isFailed) return;
@@ -206,16 +216,6 @@ export default function VaultMode({
     updateVaultCurrentTile(sessionId, myUid, -1).catch(() => {});
     onTileSolved?.(tileIdx, attempts, time);
   }, [sessionId, turnOrder, myUid, onTileSolved]);
-
-  // --- Handle pending unlock choice (player picks which adjacent tile to unlock) ---
-  const handleUnlockChoice = useCallback(async (chosenTileIdx) => {
-    if (!sessionId || !pendingUnlockChoices) return;
-    if (!pendingCandidateSet.has(chosenTileIdx)) return;
-    const currentUnlockedMap = sessionData?.tileUnlocked || {};
-    const newUnlocked = { ...currentUnlockedMap, [chosenTileIdx]: true };
-    await updateVaultTileUnlocked(sessionId, newUnlocked);
-    await clearVaultPendingUnlock(sessionId);
-  }, [sessionId, pendingUnlockChoices, pendingCandidateSet, sessionData?.tileUnlocked]);
 
   // --- Lock guess handlers (new system: per-player guesses) ---
   const [pickerPosition, setPickerPosition] = useState(null); // which slot is being picked
