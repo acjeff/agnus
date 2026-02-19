@@ -4754,6 +4754,8 @@ export default function Pattrn() {
 
   // Viewport size tracking for dynamic grid sizing
   const [viewportSize, setViewportSize] = useState(() => ({ w: window.innerWidth, h: window.innerHeight }));
+  const [visualViewportH, setVisualViewportH] = useState(() => typeof window !== "undefined" && window.visualViewport ? window.visualViewport.height : window.innerHeight);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
   const [headerHeight, setHeaderHeight] = useState(0);
   const [footerHeight, setFooterHeight] = useState(140);
   const [infoRowHeight, setInfoRowHeight] = useState(40);
@@ -4764,6 +4766,23 @@ export default function Pattrn() {
     const onResize = () => setViewportSize({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
+  }, []);
+  // Track visual viewport height for mobile keyboard awareness
+  useEffect(() => {
+    const vv = typeof window !== "undefined" && window.visualViewport;
+    if (!vv) return;
+    let raf;
+    const onVVChange = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        setVisualViewportH(vv.height);
+        // Include offsetTop for iOS Safari which scrolls the layout viewport
+        setKeyboardOffset(Math.max(0, window.innerHeight - vv.height - vv.offsetTop));
+      });
+    };
+    vv.addEventListener("resize", onVVChange);
+    vv.addEventListener("scroll", onVVChange);
+    return () => { vv.removeEventListener("resize", onVVChange); vv.removeEventListener("scroll", onVVChange); cancelAnimationFrame(raf); };
   }, []);
   const barObserverRef = useRef(null);
   useEffect(() => {
@@ -5573,7 +5592,9 @@ export default function Pattrn() {
     // Calculate panel width: when open, add space for close button (~50px) and back button if submenu (~70px)
     const openExtraWidth = hasPillButtons ? (isSubMenu ? 120 : 50) : 0;
     const isWidePanel = isFriendsView || isVaultChat;
-    const panelWidth = isWidePanel ? 380 : isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth);
+    const isMobileMenu = viewportSize.w < 480;
+    const mobileMenuMargin = 12; // breathing room around the panel on mobile
+    const panelWidth = isMobileMenu && isOpen ? viewportSize.w - mobileMenuMargin * 2 : (isWidePanel ? 380 : isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth));
     const itemHeight = 44;
     const panelPad = 8;
     const dividerHeight = 13;
@@ -5902,7 +5923,8 @@ export default function Pattrn() {
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
     const bottomOffset = bottomPx; // matches the bottom positioning
     const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - 20 : 600;
-    const openHeight = Math.min(contentHeight, maxPanelHeight);
+    const mobileMaxHeight = visualViewportH - mobileMenuMargin * 2;
+    const openHeight = isMobileMenu ? Math.min(contentHeight, mobileMaxHeight) : Math.min(contentHeight, maxPanelHeight);
     const needsScroll = contentHeight > maxPanelHeight;
 
     // Liquid Glass spring curves — fast initial movement, subtle overshoot, quick settle
@@ -6079,11 +6101,11 @@ export default function Pattrn() {
         <div
           style={{
             position: "fixed",
-            bottom: `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
-            right: 20,
+            bottom: isOpen && isMobileMenu ? mobileMenuMargin + keyboardOffset : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
+            right: isOpen && isMobileMenu ? mobileMenuMargin : 20,
             width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
             height: isOpen ? openHeight : fabSize + passUIHeight,
-            maxHeight: isOpen ? `calc(100vh - ${bottomPx}px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 20px)` : undefined,
+            maxHeight: isOpen ? (isMobileMenu ? mobileMaxHeight : `calc(100vh - ${bottomPx}px - env(safe-area-inset-bottom, 0px) - env(safe-area-inset-top, 0px) - 20px)`) : undefined,
             borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
             background: activeTheme.gridBg || C.surface,
             backdropFilter: "blur(28px) saturate(200%)",
@@ -6095,8 +6117,8 @@ export default function Pattrn() {
             display: "flex",
             flexDirection: "column",
             transition: isOpen
-              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, max-height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease`
-              : `width 0.22s ${springClose}, height 0.22s ${springClose}, max-height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease`,
+              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, max-height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease, bottom 0.3s ${springOpen}, right 0.3s ${springOpen}`
+              : `width 0.22s ${springClose}, height 0.22s ${springClose}, max-height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease, bottom 0.22s ${springClose}, right 0.22s ${springClose}`,
           }}
           aria-label="Quick actions"
         >
