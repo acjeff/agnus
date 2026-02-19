@@ -5572,7 +5572,8 @@ export default function Pattrn() {
     const closedWidth = hasPillButtons ? (pillButtons.length + 1) * fabSize : fabSize;
     // Calculate panel width: when open, add space for close button (~50px) and back button if submenu (~70px)
     const openExtraWidth = hasPillButtons ? (isSubMenu ? 120 : 50) : 0;
-    const panelWidth = isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth);
+    const isWidePanel = isFriendsView || isVaultChat;
+    const panelWidth = isWidePanel ? 380 : isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth);
     const itemHeight = 44;
     const panelPad = 8;
     const dividerHeight = 13;
@@ -5693,20 +5694,22 @@ export default function Pattrn() {
       return h;
     })();
 
-    // Friends view height — header + tabs + content
+    // Friends view height — use most of available screen space for a messaging-app feel
     const friendsContentHeight = (() => {
       if (!isFriendsView) return 0;
+      const screenH = typeof window !== "undefined" ? window.innerHeight : 700;
+      const availH = screenH - bottomPx - 40; // leave margin top + bottom
       let h = panelPad + fabSize; // padding + bottom bar
       if (friendChatOpen) {
-        // Chat view: header + messages area + input
-        h += 40 + 8; // header with back button + gap
-        h += 220 + 8; // messages area + gap
-        h += 36; // input row
+        // Chat view: header + messages area + input — fill available space
+        h += 56 + 8; // header with back button + friend info + gap
+        h += Math.max(300, availH - 200) + 8; // messages area (large) + gap
+        h += 44; // input row
         h += 12; // bottom padding
       } else {
-        h += 20 + 8; // header + margin
-        h += 36 + 8; // add friend input + margin
-        h += Math.min(friendsList.length, 5) * 46 + 16; // friend list items (cap at 5, rest scrolls)
+        h += 28 + 12; // header + margin
+        h += 44 + 8; // add friend input + margin
+        h += Math.min(friendsList.length, 8) * 72 + 16; // friend list items (show up to 8, rest scrolls)
         h += 12; // bottom padding
       }
       return h;
@@ -5894,7 +5897,7 @@ export default function Pattrn() {
                           isSignInMenu ? signInContentHeight :
                           isMosaicSaveMenu ? mosaicSaveContentHeight :
                           isCoopStartMenu ? coopStartContentHeight :
-                          isVaultChat ? (panelPad + fabSize + 20 + 8 + 200 + 8 + 36 + 12) :
+                          isVaultChat ? (() => { const screenH = typeof window !== "undefined" ? window.innerHeight : 700; return panelPad + fabSize + 56 + 8 + Math.max(300, screenH - bottomPx - 240) + 8 + 44 + 12; })() :
                           (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
     // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
     const bottomOffset = bottomPx; // matches the bottom positioning
@@ -6552,27 +6555,29 @@ export default function Pattrn() {
               return (
                 <>
                   <div style={{
-                    padding: "0 16px 12px",
+                    padding: "0 12px 12px",
                     opacity: isOpen ? 1 : 0,
                     transform: isOpen ? "translateY(0)" : "translateY(8px)",
                     transition: isOpen
                       ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                    display: "flex", flexDirection: "column", height: "100%", minHeight: 0,
                   }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text }}>Friends</div>
+                    {/* Header */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 4px 12px", borderBottom: `1px solid ${C.border}44`, marginBottom: 12, flexShrink: 0 }}>
+                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.text }}>Messages</div>
                       {totalFriendChatUnread > 0 && (
                         <span style={{
-                          fontSize: 10, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                          fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
                           color: "#fff", backgroundColor: C.accent,
-                          padding: "2px 7px", borderRadius: 10, minWidth: 16, textAlign: "center",
+                          padding: "3px 9px", borderRadius: 12, minWidth: 18, textAlign: "center",
                         }}>
                           {totalFriendChatUnread > 99 ? "99+" : totalFriendChatUnread}
                         </span>
                       )}
                     </div>
                         {/* Add friend input */}
-                        <div style={{ display: "flex", gap: 6, marginBottom: addFriendMsg ? 4 : 12 }}>
+                        <div style={{ display: "flex", gap: 8, marginBottom: addFriendMsg ? 4 : 12, flexShrink: 0, padding: "0 4px" }}>
                           <input
                             type="text"
                             placeholder="Add friend by username..."
@@ -6580,36 +6585,47 @@ export default function Pattrn() {
                             onChange={(e) => setAddFriendInput(e.target.value)}
                             onKeyDown={(e) => { if (e.key === "Enter" && addFriendInput.trim()) handleAddFriend(); }}
                             style={{
-                              flex: 1, padding: "10px 12px", borderRadius: 8, fontSize: 13,
+                              flex: 1, padding: "10px 14px", borderRadius: 20, fontSize: 13,
                               fontFamily: "'Inter', sans-serif",
-                              background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: C.text,
+                              background: "rgba(255,255,255,0.04)", border: `1px solid ${C.border}`, color: C.text,
                               outline: "none", boxSizing: "border-box",
+                              transition: "border-color 0.15s",
                             }}
+                            onFocus={e => { e.target.style.borderColor = C.accent + "66"; }}
+                            onBlur={e => { e.target.style.borderColor = C.border; }}
                           />
                           <button
                             onClick={handleAddFriend}
                             disabled={!addFriendInput.trim() || addFriendLoading}
                             style={{
-                              padding: "10px 14px", borderRadius: 8, fontSize: 10, fontWeight: 700,
-                              fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                              background: addFriendInput.trim() ? C.accent : "rgba(255,255,255,0.06)",
+                              width: 38, height: 38, borderRadius: "50%", fontSize: 10, fontWeight: 700,
+                              fontFamily: "'Inter', sans-serif",
+                              background: addFriendInput.trim() ? C.accent : C.textDim + "22",
                               color: addFriendInput.trim() ? C.bg : C.textDim,
                               border: "none", cursor: addFriendInput.trim() ? "pointer" : "not-allowed",
-                              textTransform: "uppercase", flexShrink: 0,
+                              flexShrink: 0,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              transition: "all 0.2s",
                             }}
                           >
-                            {addFriendLoading ? "..." : "Add"}
+                            {addFriendLoading ? "..." : <UserPlus size={16} strokeWidth={2.5} />}
                           </button>
                         </div>
                         {addFriendMsg && (
-                          <div style={{ fontSize: 11, color: addFriendMsg.includes("added") ? C.correct : C.textDim, marginBottom: 8, fontFamily: "'Inter', sans-serif" }}>
+                          <div style={{ fontSize: 11, color: addFriendMsg.includes("added") ? C.correct : C.textDim, marginBottom: 8, fontFamily: "'Inter', sans-serif", padding: "0 4px" }}>
                             {addFriendMsg}
                           </div>
                         )}
-                        {/* Friends list */}
-                        <div style={{ maxHeight: 230, overflowY: "auto", display: "flex", flexDirection: "column", gap: 6 }}>
+                        {/* Friends / Conversations list */}
+                        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 2 }}>
                           {friendsList.length === 0 ? (
-                            <div style={{ textAlign: "center", padding: "20px 0", color: C.textDim, fontSize: 11 }}>No friends yet. Add one above!</div>
+                            <div style={{ textAlign: "center", padding: "40px 20px", color: C.textDim, fontSize: 13, fontFamily: "'Inter', sans-serif" }}>
+                              <div style={{ fontSize: 28, marginBottom: 8, opacity: 0.4 }}>
+                                <Users size={28} strokeWidth={1.5} color={C.textDim} />
+                              </div>
+                              No friends yet
+                              <div style={{ fontSize: 11, marginTop: 4, opacity: 0.7 }}>Add someone above to get started</div>
+                            </div>
                           ) : (
                             (() => {
                               // Sort friends: unread messages first, then online, then offline
@@ -6618,7 +6634,6 @@ export default function Pattrn() {
                                 const bPresence = friendPresence[b.uid];
                                 const aOnline = aPresence && aPresence.lastSeen && (Date.now() - aPresence.lastSeen) < 120000;
                                 const bOnline = bPresence && bPresence.lastSeen && (Date.now() - bPresence.lastSeen) < 120000;
-                                // Check unread status
                                 const aChatId = firebaseUser ? getFriendChatId(firebaseUser.uid, a.uid) : "";
                                 const bChatId = firebaseUser ? getFriendChatId(firebaseUser.uid, b.uid) : "";
                                 const aMeta = friendChatMetas[aChatId];
@@ -6636,24 +6651,20 @@ export default function Pattrn() {
 
                               return sortedFriends.map(friend => {
                                 const presence = friendPresence[friend.uid];
-                                const stats = friendStats[friend.uid];
                                 const isOnline = presence && presence.lastSeen && (Date.now() - presence.lastSeen) < 120000;
                                 const isPlaying = isOnline && presence.status === "playing" && presence.currentMode;
                                 const currentSession = presence?.currentCoopSessionId;
                                 const showingConfirm = removeFriendConfirm === friend.uid;
 
-                                // Unread message check
                                 const chatId = firebaseUser ? getFriendChatId(firebaseUser.uid, friend.uid) : "";
                                 const chatMeta = friendChatMetas[chatId];
                                 const lastRead = friendChatLastReads[chatId] || 0;
                                 const hasUnread = chatMeta && chatMeta.lastMessageAt && chatMeta.lastMessageBy !== firebaseUser?.uid && chatMeta.lastMessageAt > lastRead;
 
-                                // Format activity text
-                                let activityText = "";
-                                let activityColor = C.textDim;
-                                if (!isOnline) {
-                                  activityText = "Offline";
-                                } else if (isPlaying) {
+                                // Format activity / status text
+                                let statusText = "Offline";
+                                let statusColor = C.textDim;
+                                if (isPlaying) {
                                   const modeName = presence.currentMode === "easy" ? "Easy" :
                                                    presence.currentMode === "medium" ? "Medium" :
                                                    presence.currentMode === "hard" ? "Hard" :
@@ -6661,115 +6672,114 @@ export default function Pattrn() {
                                                    presence.currentMode === "daily" ? "Daily" :
                                                    presence.currentMode === "mosaic" ? "Mosaic" :
                                                    presence.currentMode;
-                                  activityText = currentSession ? `Playing ${modeName} (Co-op)` : `Playing ${modeName}`;
-                                  activityColor = C.correct;
-                                } else {
-                                  activityText = "Online";
-                                  activityColor = "#06B6D4";
+                                  statusText = currentSession ? `Playing ${modeName} (Co-op)` : `Playing ${modeName}`;
+                                  statusColor = C.correct;
+                                } else if (isOnline) {
+                                  statusText = "Online";
+                                  statusColor = "#06B6D4";
                                 }
 
-                                // Helper: format time ago
-                                const fmtTimeAgo = (ts) => {
-                                  if (!ts) return "Never";
+                                // Time label for last message
+                                const fmtMsgTime = (ts) => {
+                                  if (!ts) return "";
                                   const diff = Date.now() - ts;
-                                  if (diff < 60000) return "Just now";
-                                  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-                                  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-                                  if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
-                                  return new Date(ts).toLocaleDateString();
+                                  if (diff < 60000) return "now";
+                                  if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
+                                  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
+                                  if (diff < 604800000) return `${Math.floor(diff / 86400000)}d`;
+                                  return new Date(ts).toLocaleDateString([], { month: "short", day: "numeric" });
+                                };
+
+                                // Open chat handler
+                                const openChat = () => {
+                                  if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; }
+                                  setFriendChatMessages({});
+                                  setFriendChatOpen(friend.uid);
+                                  friendChatUnsubRef.current = subscribeToFriendChat(firebaseUser.uid, friend.uid, (msgs) => {
+                                    setFriendChatMessages(msgs);
+                                  });
+                                  updateFriendChatLastRead(firebaseUser.uid, friend.uid).catch(() => {});
                                 };
 
                                 return (
-                                  <div key={friend.uid} style={{
-                                    padding: "12px 14px", borderRadius: 12,
-                                    backgroundColor: C.surface, border: `1px solid ${showingConfirm ? C.incorrect : (hasUnread ? C.accent + "66" : (isOnline ? C.correct + "44" : C.border))}`,
-                                    transition: "all 0.2s",
-                                  }}>
+                                  <div key={friend.uid}>
                                     {showingConfirm ? (
-                                      // Inline confirmation view
-                                      <div>
+                                      <div style={{
+                                        padding: "12px 14px", borderRadius: 14,
+                                        border: `1px solid ${C.incorrect}66`,
+                                        backgroundColor: C.incorrect + "08",
+                                        transition: "all 0.2s",
+                                      }}>
                                         <div style={{
-                                          fontFamily: "'Inter', sans-serif",
-                                          fontSize: 11,
-                                          fontWeight: 600,
-                                          color: C.text,
-                                          marginBottom: 8,
+                                          fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 600, color: C.text, marginBottom: 10,
                                         }}>
                                           Remove <strong>{friend.username}</strong>?
                                         </div>
-                                        <div style={{ display: "flex", gap: 6 }}>
+                                        <div style={{ display: "flex", gap: 8 }}>
                                           <button
                                             onClick={() => setRemoveFriendConfirm(null)}
                                             style={{
-                                              flex: 1,
-                                              padding: "6px 12px",
-                                              borderRadius: 6,
-                                              fontSize: 10,
-                                              fontWeight: 700,
-                                              fontFamily: "'Inter', sans-serif",
-                                              textTransform: "uppercase",
-                                              letterSpacing: 0.5,
-                                              backgroundColor: C.surface,
-                                              border: `1px solid ${C.border}`,
-                                              color: C.text,
-                                              cursor: "pointer",
-                                              transition: "all 0.15s",
+                                              flex: 1, padding: "8px 12px", borderRadius: 8,
+                                              fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                                              textTransform: "uppercase", letterSpacing: 0.5,
+                                              backgroundColor: "rgba(255,255,255,0.06)", border: `1px solid ${C.border}`, color: C.text,
+                                              cursor: "pointer", transition: "all 0.15s",
                                             }}
-                                            onMouseEnter={e => { e.currentTarget.style.backgroundColor = C.surfaceLight; }}
-                                            onMouseLeave={e => { e.currentTarget.style.backgroundColor = C.surface; }}
                                           >
                                             Cancel
                                           </button>
                                           <button
                                             onClick={() => handleRemoveFriend(friend.uid)}
                                             style={{
-                                              flex: 1,
-                                              padding: "6px 12px",
-                                              borderRadius: 6,
-                                              fontSize: 10,
-                                              fontWeight: 700,
-                                              fontFamily: "'Inter', sans-serif",
-                                              textTransform: "uppercase",
-                                              letterSpacing: 0.5,
-                                              backgroundColor: C.incorrect,
-                                              border: "none",
-                                              color: "#fff",
-                                              cursor: "pointer",
-                                              transition: "all 0.15s",
+                                              flex: 1, padding: "8px 12px", borderRadius: 8,
+                                              fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                                              textTransform: "uppercase", letterSpacing: 0.5,
+                                              backgroundColor: C.incorrect, border: "none", color: "#fff",
+                                              cursor: "pointer", transition: "all 0.15s",
                                             }}
-                                            onMouseEnter={e => { e.currentTarget.style.opacity = 0.9; }}
-                                            onMouseLeave={e => { e.currentTarget.style.opacity = 1; }}
                                           >
                                             Remove
                                           </button>
                                         </div>
                                       </div>
                                     ) : (
-                                      // Normal friend card view
-                                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                                        {/* Online indicator dot */}
-                                        <div style={{
-                                          width: 8, height: 8, borderRadius: "50%", flexShrink: 0,
-                                          backgroundColor: isOnline ? C.correct : C.textDim + "44",
-                                          boxShadow: isOnline ? `0 0 8px ${C.correct}66` : "none",
-                                        }} />
-
-                                        {/* Profile picture */}
+                                      /* Conversation row — tap anywhere to open chat */
+                                      <div
+                                        onClick={openChat}
+                                        style={{
+                                          display: "flex", alignItems: "center", gap: 12,
+                                          padding: "10px 8px",
+                                          borderRadius: 12,
+                                          cursor: "pointer",
+                                          transition: "background 0.15s",
+                                          position: "relative",
+                                        }}
+                                        onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.06)"; }}
+                                        onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
+                                      >
+                                        {/* Avatar with online indicator */}
                                         <div style={{ position: "relative", flexShrink: 0 }}>
                                           {friend.profilePicture ? (
-                                            <img src={friend.profilePicture} alt="" style={{ width: 32, height: 32, borderRadius: "50%", objectFit: "cover" }} />
+                                            <img src={friend.profilePicture} alt="" style={{ width: 44, height: 44, borderRadius: "50%", objectFit: "cover" }} />
                                           ) : (
-                                            <div style={{ width: 32, height: 32, borderRadius: "50%", backgroundColor: C.accent + "33", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, color: C.accent, fontWeight: 700 }}>
+                                            <div style={{ width: 44, height: 44, borderRadius: "50%", backgroundColor: C.accent + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, color: C.accent, fontWeight: 700 }}>
                                               {(friend.username || "?")[0].toUpperCase()}
                                             </div>
                                           )}
+                                          <div style={{
+                                            position: "absolute", bottom: 0, right: 0,
+                                            width: 12, height: 12, borderRadius: "50%",
+                                            backgroundColor: isOnline ? "#22C55E" : C.textDim + "44",
+                                            border: `2.5px solid ${C.surface || "#1a1a2e"}`,
+                                            transition: "background-color 0.3s",
+                                          }} />
                                         </div>
 
-                                        {/* User info */}
+                                        {/* Name + message preview */}
                                         <div style={{ flex: 1, minWidth: 0 }}>
-                                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
+                                          <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 2 }}>
                                             <span style={{
-                                              fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700, color: C.text,
+                                              fontFamily: "'Inter', sans-serif", fontSize: 14, fontWeight: hasUnread ? 700 : 600, color: C.text,
                                               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
                                             }}>
                                               {friend.username}
@@ -6778,165 +6788,85 @@ export default function Pattrn() {
                                               <span style={{
                                                 fontSize: 8, fontFamily: "'Inter', sans-serif", fontWeight: 700,
                                                 color: C.bg, backgroundColor: C.correct, padding: "1px 5px", borderRadius: 3,
-                                                textTransform: "uppercase", letterSpacing: 0.5,
+                                                textTransform: "uppercase", letterSpacing: 0.5, flexShrink: 0,
                                               }}>
                                                 Playing
                                               </span>
                                             )}
-                                            {isOnline && !isPlaying && (
-                                              <span style={{
-                                                fontSize: 8, fontFamily: "'Inter', sans-serif", fontWeight: 700,
-                                                color: C.bg, backgroundColor: "#06B6D4", padding: "1px 5px", borderRadius: 3,
-                                                textTransform: "uppercase", letterSpacing: 0.5,
-                                              }}>
-                                                Online
-                                              </span>
-                                            )}
                                           </div>
-                                          {/* Last message preview or activity */}
+                                          {/* Last message preview or activity status */}
                                           {chatMeta && chatMeta.lastMessage ? (
                                             <div style={{
-                                              fontSize: 10, color: hasUnread ? C.text : C.textDim,
-                                              fontFamily: "'Inter', sans-serif", marginBottom: 3,
+                                              fontSize: 12, color: hasUnread ? C.text : C.textDim,
+                                              fontFamily: "'Inter', sans-serif",
                                               fontWeight: hasUnread ? 600 : 400,
                                               overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                              lineHeight: 1.3,
                                             }}>
-                                              {chatMeta.lastMessageBy === firebaseUser?.uid ? "You: " : ""}{chatMeta.lastMessage.length > 30 ? chatMeta.lastMessage.slice(0, 30) + "..." : chatMeta.lastMessage}
+                                              {chatMeta.lastMessageBy === firebaseUser?.uid ? "You: " : ""}{chatMeta.lastMessage.length > 40 ? chatMeta.lastMessage.slice(0, 40) + "..." : chatMeta.lastMessage}
                                             </div>
                                           ) : (
-                                            <div style={{ fontSize: 10, color: activityColor, fontFamily: "'Inter', sans-serif", marginBottom: 3 }}>
-                                              {activityText}
-                                            </div>
-                                          )}
-                                          {/* Stats row */}
-                                          {stats && (
-                                            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 4 }}>
-                                              <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.accent }}>
-                                                {stats.totalSolved} solved
-                                              </span>
-                                              <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.gold }}>
-                                                {stats.achievements} achievements
-                                              </span>
-                                              {stats.updatedAt > 0 && (
-                                                <span style={{ fontSize: 9, fontFamily: "'Inter', sans-serif", color: C.textDim }}>
-                                                  Synced {fmtTimeAgo(stats.updatedAt)}
-                                                </span>
-                                              )}
-                                            </div>
-                                          )}
-                                          {/* Mode breakdown */}
-                                          {stats && stats.totalSolved > 0 && (
-                                            <div style={{ display: "flex", gap: 4, marginTop: 4, flexWrap: "wrap" }}>
-                                              {["easy", "medium", "hard", "blind", "daily", "cascade", "spin", "mosaic"]
-                                                .filter(mode => (stats.progress[mode] || 0) > 0)
-                                                .map(mode => (
-                                                  <span key={mode} style={{
-                                                    fontSize: 8, fontFamily: "'Inter', sans-serif",
-                                                    color: C.textDim, backgroundColor: C.surfaceLight,
-                                                    padding: "1px 4px", borderRadius: 3,
-                                                  }}>
-                                                    {mode}: {stats.progress[mode]}
-                                                  </span>
-                                                ))
-                                              }
+                                            <div style={{ fontSize: 12, color: statusColor, fontFamily: "'Inter', sans-serif", lineHeight: 1.3 }}>
+                                              {statusText}
                                             </div>
                                           )}
                                         </div>
 
-                                        {/* Action buttons */}
-                                        <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end" }}>
-                                          {/* Chat button with unread badge */}
-                                          <button
-                                            onClick={() => {
-                                              // Open chat with this friend
-                                              if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; }
-                                              setFriendChatMessages({});
-                                              setFriendChatOpen(friend.uid);
-                                              // Subscribe to this friend's chat messages
-                                              friendChatUnsubRef.current = subscribeToFriendChat(firebaseUser.uid, friend.uid, (msgs) => {
-                                                setFriendChatMessages(msgs);
-                                              });
-                                              // Mark as read
-                                              updateFriendChatLastRead(firebaseUser.uid, friend.uid).catch(() => {});
-                                            }}
-                                            title="Chat"
-                                            style={{
-                                              position: "relative",
-                                              padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
-                                              fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                                              background: hasUnread ? C.accent + "22" : C.surfaceLight,
-                                              color: hasUnread ? C.accent : C.textDim,
-                                              border: hasUnread ? `1px solid ${C.accent}44` : `1px solid ${C.border}`,
-                                              cursor: "pointer", textTransform: "uppercase",
-                                              transition: "all 0.15s",
-                                            }}
-                                          >
-                                            Chat
+                                        {/* Right side: time + unread badge + actions */}
+                                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
+                                          {chatMeta && chatMeta.lastMessageAt && (
+                                            <span style={{ fontSize: 10, color: hasUnread ? C.accent : C.textDim, fontFamily: "'Inter', sans-serif", fontWeight: hasUnread ? 600 : 400 }}>
+                                              {fmtMsgTime(chatMeta.lastMessageAt)}
+                                            </span>
+                                          )}
+                                          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                                             {hasUnread && (
-                                              <span style={{
-                                                position: "absolute", top: -4, right: -4,
-                                                width: 8, height: 8, borderRadius: "50%",
+                                              <div style={{
+                                                width: 9, height: 9, borderRadius: "50%",
                                                 backgroundColor: C.accent,
-                                                border: `2px solid ${C.surface}`,
+                                                boxShadow: `0 0 6px ${C.accent}66`,
                                               }} />
                                             )}
-                                          </button>
-                                          {currentSession && (
-                                            <button onClick={async () => {
-                                              // Join friend's coop session
-                                              if (currentSession && presence.currentMode && presence.currentPuzzle) {
-                                                const mode = presence.currentMode;
-                                                const puzzleId = presence.currentPuzzle;
-
-                                                // Set up coop session
-                                                setCoopSessionId(currentSession);
-                                                setCoopRole("guest");
-                                                setCoopStatus("playing");
-                                                setDifficulty(mode);
-
-                                                // Set puzzle based on mode
-                                                if (mode === "daily") {
-                                                  setDailyDate(puzzleId);
-                                                  setCurrentDailyDate(puzzleId);
-                                                } else if (mode === "cascade") {
-                                                  setCascadeRunIndex(parseInt(puzzleId) || 0);
-                                                } else {
-                                                  setCurrentPuzzle(parseInt(puzzleId) || 0);
+                                            {currentSession && (
+                                              <button onClick={(e) => {
+                                                e.stopPropagation();
+                                                if (currentSession && presence.currentMode && presence.currentPuzzle) {
+                                                  const mode = presence.currentMode;
+                                                  const puzzleId = presence.currentPuzzle;
+                                                  setCoopSessionId(currentSession);
+                                                  setCoopRole("guest");
+                                                  setCoopStatus("playing");
+                                                  setDifficulty(mode);
+                                                  if (mode === "daily") { setDailyDate(puzzleId); setCurrentDailyDate(puzzleId); }
+                                                  else if (mode === "cascade") { setCascadeRunIndex(parseInt(puzzleId) || 0); }
+                                                  else { setCurrentPuzzle(parseInt(puzzleId) || 0); }
+                                                  setRadialMenuStack(["root"]);
+                                                  if (firebaseUser && username) joinCoopSession(currentSession, firebaseUser.uid, username).catch(() => {});
                                                 }
-
-                                                // Close menu and load puzzle
-                                                setRadialMenuStack(["root"]);
-
-                                                // Try to join the session in Firebase
-                                                if (firebaseUser && username) {
-                                                  joinCoopSession(currentSession, firebaseUser.uid, username).catch(() => {});
-                                                }
-                                              }
-                                            }} style={{
-                                              padding: "4px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
-                                              fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                                              background: C.correct + "22", color: C.correct,
-                                              border: "none", cursor: "pointer", textTransform: "uppercase",
-                                            }}>Join</button>
-                                          )}
-                                          <button
-                                            onClick={() => setRemoveFriendConfirm(friend.uid)}
-                                            title="Remove friend"
-                                            style={{
-                                              width: 24, height: 24, borderRadius: 6,
-                                              backgroundColor: "transparent",
-                                              border: `1px solid ${C.border}`,
-                                              color: C.textDim,
-                                              cursor: "pointer",
-                                              display: "flex", alignItems: "center", justifyContent: "center",
-                                              transition: "all 0.15s",
-                                              flexShrink: 0,
-                                            }}
-                                            onMouseEnter={e => { e.currentTarget.style.borderColor = C.incorrect; e.currentTarget.style.color = C.incorrect; e.currentTarget.style.backgroundColor = C.incorrect + "11"; }}
-                                            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.textDim; e.currentTarget.style.backgroundColor = "transparent"; }}
-                                          >
-                                            <X size={14} strokeWidth={2.5} />
-                                          </button>
+                                              }} style={{
+                                                padding: "3px 8px", borderRadius: 6, fontSize: 9, fontWeight: 700,
+                                                fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                                background: C.correct + "22", color: C.correct,
+                                                border: "none", cursor: "pointer", textTransform: "uppercase",
+                                              }}>Join</button>
+                                            )}
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); setRemoveFriendConfirm(friend.uid); }}
+                                              title="Remove friend"
+                                              style={{
+                                                width: 22, height: 22, borderRadius: 6,
+                                                backgroundColor: "transparent", border: "none",
+                                                color: C.textDim + "66", cursor: "pointer",
+                                                display: "flex", alignItems: "center", justifyContent: "center",
+                                                transition: "all 0.15s", flexShrink: 0, padding: 0,
+                                                opacity: 0,
+                                              }}
+                                              onMouseEnter={e => { e.currentTarget.style.color = C.incorrect; e.currentTarget.style.opacity = 1; }}
+                                              onMouseLeave={e => { e.currentTarget.style.color = C.textDim + "66"; e.currentTarget.style.opacity = 0; }}
+                                            >
+                                              <X size={13} strokeWidth={2.5} />
+                                            </button>
+                                          </div>
                                         </div>
                                       </div>
                                     )}
