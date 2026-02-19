@@ -1,6 +1,6 @@
 // --- VaultChat Component ---
 // Chat panel rendered inside the Liquid Glass menu for vault coop sessions.
-// Shows message history with auto-scroll and input field.
+// Matches the FriendChat messaging UI style (iMessage / WhatsApp feel).
 
 import { useState, useEffect, useRef, useCallback } from "react";
 
@@ -12,8 +12,29 @@ export default function VaultChat({
   onClose,         // () => void — optional close handler
 }) {
   const [inputText, setInputText] = useState("");
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const scrollRef = useRef(null);
   const prevMsgCount = useRef(0);
+  const inputRef = useRef(null);
+
+  // Detect mobile keyboard via visualViewport API
+  useEffect(() => {
+    const vv = typeof window !== "undefined" && window.visualViewport;
+    if (!vv) return;
+    const threshold = 100;
+    const fullHeight = window.innerHeight;
+    const onResize = () => {
+      const isKb = fullHeight - vv.height > threshold;
+      setKeyboardOpen(isKb);
+      if (isKb && scrollRef.current) {
+        requestAnimationFrame(() => {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        });
+      }
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
 
   // Sort messages by timestamp
   const sortedMessages = Object.entries(messages || {})
@@ -27,6 +48,13 @@ export default function VaultChat({
     }
     prevMsgCount.current = sortedMessages.length;
   }, [sortedMessages.length]);
+
+  // Scroll to bottom on initial mount
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, []);
 
   const handleSend = useCallback(() => {
     const trimmed = inputText.trim();
@@ -42,28 +70,78 @@ export default function VaultChat({
     }
   }, [handleSend]);
 
-  // Format timestamp to relative time
+  // Format timestamp — show time for today, date for older
   const formatTime = (ts) => {
     if (!ts) return "";
-    const diff = Date.now() - ts;
+    const date = new Date(ts);
+    const now = new Date();
+    const diff = now - date;
     if (diff < 60000) return "now";
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h`;
-    return `${Math.floor(diff / 86400000)}d`;
+    const sameDay = date.toDateString() === now.toDateString();
+    if (sameDay) {
+      return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+    if (diff < 604800000) {
+      const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      return days[date.getDay()] + " " + date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }
+    return date.toLocaleDateString([], { month: "short", day: "numeric" });
+  };
+
+  // Check if we should show a date separator between messages
+  const shouldShowDateSep = (msg, prevMsg) => {
+    if (!prevMsg) return true;
+    const d1 = new Date(msg.timestamp || 0);
+    const d2 = new Date(prevMsg.timestamp || 0);
+    return d1.toDateString() !== d2.toDateString();
+  };
+
+  // Check if consecutive messages from same sender (for grouping)
+  const isSameSender = (msg, prevMsg) => {
+    if (!prevMsg) return false;
+    return msg.uid === prevMsg.uid && (msg.timestamp - prevMsg.timestamp) < 120000;
+  };
+
+  const formatDateSep = (ts) => {
+    if (!ts) return "";
+    const date = new Date(ts);
+    const now = new Date();
+    if (date.toDateString() === now.toDateString()) return "Today";
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (date.toDateString() === yesterday.toDateString()) return "Yesterday";
+    return date.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric" });
   };
 
   return (
-    <div style={{ padding: "0 16px 12px", display: "flex", flexDirection: "column", gap: 8 }}>
+    <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       {/* Header */}
       <div style={{
-        fontSize: 15, fontWeight: 700, color: C.text,
-        fontFamily: "'Inter', sans-serif",
-        display: "flex", alignItems: "center", justifyContent: "space-between",
+        display: "flex", alignItems: "center", gap: 10,
+        padding: keyboardOpen ? "4px 4px 4px" : "8px 4px 12px",
+        borderBottom: `1px solid ${C.border}44`,
+        marginBottom: 0,
+        flexShrink: 0,
+        transition: "padding 0.2s ease",
       }}>
-        <span>Vault Chat</span>
-        <span style={{ fontSize: 11, color: C.textDim, fontWeight: 500 }}>
-          {sortedMessages.length} message{sortedMessages.length !== 1 ? "s" : ""}
-        </span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontSize: keyboardOpen ? 13 : 15, fontWeight: 700, color: C.text,
+            fontFamily: "'Inter', sans-serif",
+            transition: "font-size 0.2s ease",
+          }}>
+            Vault Chat
+          </div>
+          {!keyboardOpen && (
+            <div style={{
+              fontSize: 11, color: C.textDim,
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 500,
+            }}>
+              {sortedMessages.length} message{sortedMessages.length !== 1 ? "s" : ""}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Messages Area */}
@@ -71,53 +149,117 @@ export default function VaultChat({
         ref={scrollRef}
         data-drawer-scroll
         style={{
-          maxHeight: 200, minHeight: 80,
+          flex: 1, minHeight: 0,
           overflowY: "auto",
-          display: "flex", flexDirection: "column", gap: 4,
-          padding: 4,
-          borderRadius: 8,
-          backgroundColor: C.bg + "80",
+          display: "flex", flexDirection: "column", gap: 2,
+          padding: "12px 4px 8px",
         }}
       >
         {sortedMessages.length === 0 ? (
           <div style={{
-            fontSize: 12, color: C.textDim + "88",
-            fontFamily: "'Inter', sans-serif",
-            textAlign: "center", padding: "20px 8px",
+            flex: 1, display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center", gap: 8,
+            padding: "40px 20px",
           }}>
-            No messages yet. Say something!
+            <div style={{
+              width: 48, height: 48, borderRadius: "50%",
+              backgroundColor: C.accent + "22",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={C.accent + "88"} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <div style={{
+              fontSize: 13, color: C.textDim + "99",
+              fontFamily: "'Inter', sans-serif",
+              textAlign: "center",
+            }}>
+              No messages yet
+            </div>
+            <div style={{
+              fontSize: 11, color: C.textDim + "66",
+              fontFamily: "'Inter', sans-serif",
+              textAlign: "center",
+            }}>
+              Say something to your co-op partner!
+            </div>
           </div>
         ) : (
-          sortedMessages.map((msg) => {
+          sortedMessages.map((msg, idx) => {
             const isMe = msg.uid === myUid;
+            const prevMsg = idx > 0 ? sortedMessages[idx - 1] : null;
+            const showDate = shouldShowDateSep(msg, prevMsg);
+            const grouped = !showDate && isSameSender(msg, prevMsg);
+
             return (
-              <div key={msg.id} style={{
-                display: "flex", flexDirection: "column",
-                alignItems: isMe ? "flex-end" : "flex-start",
-                gap: 1,
-              }}>
+              <div key={msg.id}>
+                {/* Date separator */}
+                {showDate && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: idx === 0 ? "0 0 8px" : "12px 0 8px",
+                  }}>
+                    <div style={{ flex: 1, height: 1, backgroundColor: C.border + "44" }} />
+                    <span style={{
+                      fontSize: 10, color: C.textDim, fontWeight: 600,
+                      fontFamily: "'Inter', sans-serif",
+                      letterSpacing: 0.3, textTransform: "uppercase",
+                    }}>
+                      {formatDateSep(msg.timestamp)}
+                    </span>
+                    <div style={{ flex: 1, height: 1, backgroundColor: C.border + "44" }} />
+                  </div>
+                )}
+
+                {/* Message bubble */}
                 <div style={{
-                  fontSize: 10, color: C.textDim,
-                  fontFamily: "'Inter', sans-serif",
-                  fontWeight: 600,
+                  display: "flex", flexDirection: "column",
+                  alignItems: isMe ? "flex-end" : "flex-start",
+                  marginTop: grouped ? 2 : 8,
                 }}>
-                  {isMe ? "You" : (msg.username || "Partner")}
-                  <span style={{ fontWeight: 400, marginLeft: 4, opacity: 0.6 }}>
-                    {formatTime(msg.timestamp)}
-                  </span>
-                </div>
-                <div style={{
-                  padding: "5px 10px",
-                  borderRadius: isMe ? "10px 10px 2px 10px" : "10px 10px 10px 2px",
-                  backgroundColor: isMe ? (C.coop + "22") : (C.surfaceLight),
-                  color: C.text,
-                  fontSize: 13,
-                  fontFamily: "'Inter', sans-serif",
-                  maxWidth: "85%",
-                  wordBreak: "break-word",
-                  lineHeight: 1.35,
-                }}>
-                  {msg.text}
+                  {/* Sender name — only show for first message in a group from partner */}
+                  {!isMe && !grouped && (
+                    <div style={{
+                      fontSize: 10, color: C.accent, fontWeight: 600,
+                      fontFamily: "'Inter', sans-serif",
+                      marginBottom: 3, marginLeft: 4,
+                    }}>
+                      {msg.username || "Partner"}
+                    </div>
+                  )}
+                  <div style={{
+                    display: "flex", alignItems: "flex-end", gap: 6,
+                    flexDirection: isMe ? "row-reverse" : "row",
+                  }}>
+                    <div style={{
+                      padding: "8px 12px",
+                      borderRadius: isMe
+                        ? (grouped ? "16px 4px 4px 16px" : "16px 16px 4px 16px")
+                        : (grouped ? "4px 16px 16px 4px" : "16px 16px 16px 4px"),
+                      backgroundColor: isMe ? (C.accent + "28") : "rgba(255,255,255,0.06)",
+                      border: isMe ? `1px solid ${C.accent}22` : "1px solid rgba(255,255,255,0.06)",
+                      color: C.text,
+                      fontSize: 13,
+                      fontFamily: "'Inter', sans-serif",
+                      maxWidth: "80%",
+                      wordBreak: "break-word",
+                      lineHeight: 1.4,
+                    }}>
+                      {msg.text}
+                    </div>
+                    {/* Timestamp — show on last message of group or non-grouped */}
+                    {(!sortedMessages[idx + 1] || !isSameSender(sortedMessages[idx + 1], msg) || shouldShowDateSep(sortedMessages[idx + 1] || {}, msg)) && (
+                      <span style={{
+                        fontSize: 9, color: C.textDim + "88",
+                        fontFamily: "'Inter', sans-serif",
+                        flexShrink: 0, alignSelf: "flex-end",
+                        marginBottom: 2,
+                      }}>
+                        {formatTime(msg.timestamp)}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             );
@@ -125,45 +267,55 @@ export default function VaultChat({
         )}
       </div>
 
-      {/* Input */}
+      {/* Input bar */}
       <div style={{
-        display: "flex", gap: 6, alignItems: "center",
+        display: "flex", gap: keyboardOpen ? 6 : 8, alignItems: "center",
+        padding: keyboardOpen ? "6px 0 0" : "10px 0 0",
+        borderTop: `1px solid ${C.border}44`,
+        flexShrink: 0,
+        transition: "padding 0.2s ease, gap 0.2s ease",
       }}>
         <input
+          ref={inputRef}
           type="text"
           value={inputText}
           onChange={e => setInputText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Type a message..."
+          placeholder="Message..."
           maxLength={200}
           style={{
-            flex: 1, padding: "7px 10px",
-            borderRadius: 8,
+            flex: 1, padding: keyboardOpen ? "8px 12px" : "10px 14px",
+            borderRadius: 20,
             border: `1px solid ${C.border}`,
-            backgroundColor: C.bg,
+            backgroundColor: "rgba(255,255,255,0.04)",
             color: C.text,
-            fontSize: 13,
+            fontSize: keyboardOpen ? 13 : 14,
             fontFamily: "'Inter', sans-serif",
             outline: "none",
+            transition: "border-color 0.15s, padding 0.2s ease, font-size 0.2s ease",
           }}
+          onFocus={e => { e.target.style.borderColor = C.accent + "66"; }}
+          onBlur={e => { e.target.style.borderColor = C.border; }}
         />
         <button
           onClick={handleSend}
           disabled={!inputText.trim()}
           style={{
-            padding: "7px 14px",
-            borderRadius: 8,
+            width: keyboardOpen ? 34 : 38, height: keyboardOpen ? 34 : 38,
+            borderRadius: "50%",
             border: "none",
-            backgroundColor: inputText.trim() ? C.accent : C.textDim + "33",
+            backgroundColor: inputText.trim() ? C.accent : C.textDim + "22",
             color: inputText.trim() ? C.bg : C.textDim,
-            fontSize: 13, fontWeight: 700,
-            fontFamily: "'Inter', sans-serif",
             cursor: inputText.trim() ? "pointer" : "default",
-            transition: "all 0.15s",
+            transition: "all 0.2s",
             flexShrink: 0,
+            display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
-          Send
+          <svg width={keyboardOpen ? 16 : 18} height={keyboardOpen ? 16 : 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13" />
+            <polygon points="22 2 15 22 11 13 2 9 22 2" />
+          </svg>
         </button>
       </div>
     </div>
