@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { ChevronLeft } from "lucide-react";
 import VaultLock, { TokenTile, parseToken, LOCK_SHAPES, ColorShapePicker } from "./VaultLock.jsx";
-import { buildVaultPuzzles, computeUnlockedTiles, pickOneAdjacentUnlock, getMastermindFeedback, VAULT_DIFFICULTIES, OUTLINE_GREY } from "./VaultGenerator.js";
+import { buildVaultPuzzles, computeUnlockedTiles, pickOneAdjacentUnlock, getAdjacentUnlockCandidates, getMastermindFeedback, VAULT_DIFFICULTIES, OUTLINE_GREY } from "./VaultGenerator.js";
 import {
   subscribeToVaultSession,
   updateVaultFill,
@@ -27,6 +27,8 @@ import {
   sendVaultReaction,
   clearVaultTileFills,
   completeVaultSession,
+  setVaultPendingUnlock,
+  clearVaultPendingUnlock,
 } from "./VaultFirebase.js";
 
 const COOP_MY_COLOR = "#54A0FF";
@@ -93,6 +95,9 @@ export default function VaultMode({
   const maxAttempts = sessionData?.maxAttempts || 4;
   const lockFeedback = sessionData?.lockFeedback || [];
   const pins = sessionData?.pins || {};
+  const pendingUnlockChoices = sessionData?.pendingUnlockChoices || null;
+  const pendingCandidates = pendingUnlockChoices?.candidates || [];
+  const pendingCandidateSet = useMemo(() => new Set(pendingCandidates), [pendingCandidates]);
   const difficulty = sessionData?.difficulty || "silver";
   const config = VAULT_DIFFICULTIES[difficulty] || VAULT_DIFFICULTIES.silver;
   const gridLayout = config.gridLayout;
@@ -152,6 +157,13 @@ export default function VaultMode({
   // --- Handle tile selection ---
   const handleTileClick = useCallback((tileIdx) => {
     if (!vaultPuzzles || !sessionId || isFailed) return;
+
+    // If there are pending unlock choices and this tile is a candidate, handle the choice
+    if (pendingCandidateSet.has(tileIdx)) {
+      handleUnlockChoice(tileIdx);
+      return;
+    }
+
     const isSolved = (tileProgress[tileIdx] || 0) > 0;
     const isUnlocked = effectiveUnlocked[tileIdx];
 
@@ -168,7 +180,7 @@ export default function VaultMode({
       onStartPuzzle?.(tileIdx, vaultPuzzles[tileIdx], true);
     }
     // If not my turn and not solved, just view (read-only)
-  }, [vaultPuzzles, sessionId, tileProgress, effectiveUnlocked, isMyTurn, isFailed, myUid, onStartPuzzle]);
+  }, [vaultPuzzles, sessionId, tileProgress, effectiveUnlocked, isMyTurn, isFailed, myUid, onStartPuzzle, pendingCandidateSet, handleUnlockChoice]);
 
   // --- Handle tile solved callback ---
   const handleTileSolved = useCallback(async (tileIdx, attempts, time) => {
@@ -194,6 +206,16 @@ export default function VaultMode({
     updateVaultCurrentTile(sessionId, myUid, -1).catch(() => {});
     onTileSolved?.(tileIdx, attempts, time);
   }, [sessionId, turnOrder, myUid, onTileSolved]);
+
+  // --- Handle pending unlock choice (player picks which adjacent tile to unlock) ---
+  const handleUnlockChoice = useCallback(async (chosenTileIdx) => {
+    if (!sessionId || !pendingUnlockChoices) return;
+    if (!pendingCandidateSet.has(chosenTileIdx)) return;
+    const currentUnlockedMap = sessionData?.tileUnlocked || {};
+    const newUnlocked = { ...currentUnlockedMap, [chosenTileIdx]: true };
+    await updateVaultTileUnlocked(sessionId, newUnlocked);
+    await clearVaultPendingUnlock(sessionId);
+  }, [sessionId, pendingUnlockChoices, pendingCandidateSet, sessionData?.tileUnlocked]);
 
   // --- Lock guess handlers (new system: per-player guesses) ---
   const [pickerPosition, setPickerPosition] = useState(null); // which slot is being picked
@@ -473,6 +495,23 @@ export default function VaultMode({
         {solvedCount} / {totalPuzzles} puzzles solved
       </div>
 
+      {/* Pending unlock choice prompt */}
+      {pendingCandidates.length > 0 && (
+        <div style={{
+          padding: "6px 14px", borderRadius: 8,
+          backgroundColor: C.accent + "14",
+          border: `1px solid ${C.accent}44`,
+          textAlign: "center",
+        }}>
+          <span style={{
+            fontSize: 11, fontWeight: 700, color: C.accent,
+            fontFamily: "'Inter', sans-serif",
+          }}>
+            Pick a tile to unlock
+          </span>
+        </div>
+      )}
+
       {/* Puzzle Grid — with quadrant grouping gaps for 4x4 */}
       <div style={{
         display: "grid",
@@ -503,7 +542,8 @@ export default function VaultMode({
           const isUnlocked = effectiveUnlocked[i];
           const isPinned = !!pins[i];
           const puzzle = vaultPuzzles[i];
-          const canInteract = isUnlocked || isSolved;
+          const isCandidate = pendingCandidateSet.has(i);
+          const canInteract = isUnlocked || isSolved || isCandidate;
 
           // Check if any other player is on this tile
           const playersHere = playerUids.filter(uid => uid !== myUid && players[uid]?.currentTile === i);
@@ -517,13 +557,15 @@ export default function VaultMode({
                 width: tileSz, height: tileSz,
                 borderRadius: 6,
                 border: `1.5px solid ${
+                  isCandidate ? C.accent :
                   playersHere.length > 0 ? COOP_PARTNER_COLOR :
                   isPinned ? C.accent :
                   isSolved ? C.correct + "66" :
                   isUnlocked ? C.border :
                   C.textDim + "22"
                 }`,
-                backgroundColor: isSolved ? C.correct + "10" :
+                backgroundColor: isCandidate ? (C.accent + "18") :
+                  isSolved ? C.correct + "10" :
                   playersHere.length > 0 ? COOP_PARTNER_COLOR + "08" :
                   isUnlocked ? C.surface :
                   C.bg,
@@ -534,12 +576,14 @@ export default function VaultMode({
                 alignItems: "center", justifyContent: "center",
                 transition: "all 0.15s",
                 overflow: "hidden",
-                opacity: isUnlocked || isSolved ? 1 : 0.35,
-                boxShadow: isPinned ? `0 0 8px ${C.accent}44` :
+                opacity: isUnlocked || isSolved || isCandidate ? 1 : 0.35,
+                boxShadow: isCandidate ? `0 0 10px ${C.accent}55` :
+                  isPinned ? `0 0 8px ${C.accent}44` :
                   playersHere.length > 0 ? `0 0 8px ${COOP_PARTNER_COLOR}44` : "none",
+                animation: isCandidate ? "vaultPulse 2s infinite" : "none",
               }}
               onMouseEnter={e => { if (canInteract) { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; } }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = playersHere.length > 0 ? COOP_PARTNER_COLOR : isPinned ? C.accent : isSolved ? C.correct + "66" : isUnlocked ? C.border : C.textDim + "22"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = isCandidate ? C.accent : playersHere.length > 0 ? COOP_PARTNER_COLOR : isPinned ? C.accent : isSolved ? C.correct + "66" : isUnlocked ? C.border : C.textDim + "22"; }}
             >
               {/* Solved: show mini preview */}
               {isSolved && puzzle ? (
@@ -563,12 +607,12 @@ export default function VaultMode({
               ) : (
                 <span style={{
                   fontFamily: "'Inter', sans-serif",
-                  fontSize: isUnlocked ? 13 : 10,
+                  fontSize: isUnlocked || isCandidate ? 13 : 10,
                   fontWeight: 700,
-                  color: isUnlocked ? C.textDim : C.textDim + "55",
+                  color: isCandidate ? C.accent : isUnlocked ? C.textDim : C.textDim + "55",
                   lineHeight: 1,
                 }}>
-                  {isUnlocked ? i + 1 : "\uD83D\uDD12"}
+                  {isUnlocked || isCandidate ? i + 1 : "\uD83D\uDD12"}
                 </span>
               )}
 
@@ -604,7 +648,8 @@ export default function VaultMode({
             const isUnlocked = effectiveUnlocked[i];
             const isPinned = !!pins[i];
             const puzzle = vaultPuzzles[i];
-            const canInteract = isUnlocked || isSolved;
+            const isCandidate = pendingCandidateSet.has(i);
+            const canInteract = isUnlocked || isSolved || isCandidate;
             const playersHere = playerUids.filter(uid => uid !== myUid && players[uid]?.currentTile === i);
             return (
               <button
@@ -612,12 +657,18 @@ export default function VaultMode({
                 onClick={() => canInteract ? handleTileClick(i) : null}
                 style={{
                   width: tileSz, height: tileSz, borderRadius: 6,
-                  border: `1.5px solid ${isSolved ? C.correct + "66" : isUnlocked ? C.border : C.textDim + "22"}`,
-                  backgroundColor: isSolved ? C.correct + "10" : isUnlocked ? C.surface : C.bg,
+                  border: `1.5px solid ${
+                    isCandidate ? C.accent :
+                    isSolved ? C.correct + "66" : isUnlocked ? C.border : C.textDim + "22"
+                  }`,
+                  backgroundColor: isCandidate ? (C.accent + "18") :
+                    isSolved ? C.correct + "10" : isUnlocked ? C.surface : C.bg,
                   cursor: canInteract ? "pointer" : "default",
                   padding: 2, position: "relative",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  opacity: isUnlocked || isSolved ? 1 : 0.35,
+                  opacity: isUnlocked || isSolved || isCandidate ? 1 : 0.35,
+                  boxShadow: isCandidate ? `0 0 10px ${C.accent}55` : "none",
+                  animation: isCandidate ? "vaultPulse 2s infinite" : "none",
                 }}
               >
                 {isSolved && puzzle ? (
@@ -632,8 +683,11 @@ export default function VaultMode({
                     ))}
                   </div>
                 ) : (
-                  <span style={{ fontSize: isUnlocked ? 13 : 10, fontWeight: 700, color: C.textDim }}>
-                    {isUnlocked ? i + 1 : "\uD83D\uDD12"}
+                  <span style={{
+                    fontSize: isUnlocked || isCandidate ? 13 : 10, fontWeight: 700,
+                    color: isCandidate ? C.accent : C.textDim,
+                  }}>
+                    {isUnlocked || isCandidate ? i + 1 : "\uD83D\uDD12"}
                   </span>
                 )}
               </button>

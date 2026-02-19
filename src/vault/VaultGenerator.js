@@ -372,6 +372,13 @@ export function pickOneAdjacentUnlock(tileIdx, currentUnlocked, solvedTiles, gri
   return null;
 }
 
+// Get ALL adjacent tiles that could be unlocked after solving a tile.
+// Returns an array of tile indices (sorted in reading order).
+export function getAdjacentUnlockCandidates(tileIdx, currentUnlocked, solvedTiles, gridLayout) {
+  const neighbors = getAdjacentTiles(tileIdx, gridLayout).sort((a, b) => a - b);
+  return neighbors.filter(n => !currentUnlocked[n] && !(solvedTiles[n] > 0));
+}
+
 // ============================================================
 // Mastermind Feedback
 // ============================================================

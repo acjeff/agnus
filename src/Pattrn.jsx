@@ -101,7 +101,7 @@ import {
 import VaultMode, { getVaultSummary } from "./vault/VaultMode.jsx";
 import VaultChat, { getUnreadCount } from "./vault/VaultChat.jsx";
 import FriendChat from "./FriendChat.jsx";
-import { buildVaultPuzzles, VAULT_DIFFICULTIES, computeUnlockedTiles, pickOneAdjacentUnlock, getMastermindFeedback } from "./vault/VaultGenerator.js";
+import { buildVaultPuzzles, VAULT_DIFFICULTIES, computeUnlockedTiles, pickOneAdjacentUnlock, getAdjacentUnlockCandidates, getMastermindFeedback } from "./vault/VaultGenerator.js";
 import {
   generateVaultSessionId,
   createVaultSession,
@@ -120,6 +120,8 @@ import {
   playerLeaveVaultSession,
   addVaultInvitedUid,
   addVaultStrike,
+  setVaultPendingUnlock,
+  clearVaultPendingUnlock,
 } from "./vault/VaultFirebase.js";
 
 // --- Theme ---
@@ -10658,10 +10660,22 @@ export default function Pattrn() {
               }
               const currentUnlocked = vSnap.tileUnlocked || {};
               const updatedProgress = { ...vSnap.tileProgress, [tileIdx]: vaultAttempts };
-              const neighborToUnlock = pickOneAdjacentUnlock(tileIdx, currentUnlocked, updatedProgress, vSnap.gridLayout);
+              const candidates = getAdjacentUnlockCandidates(tileIdx, currentUnlocked, updatedProgress, vSnap.gridLayout);
               const newUnlocked = { ...currentUnlocked, [tileIdx]: true };
-              if (neighborToUnlock !== null) newUnlocked[neighborToUnlock] = true;
-              updateVaultTileUnlocked(vaultSessionId, newUnlocked).catch(() => {});
+              if (candidates.length === 1) {
+                // Only one option — auto-unlock it
+                newUnlocked[candidates[0]] = true;
+                updateVaultTileUnlocked(vaultSessionId, newUnlocked).catch(() => {});
+                clearVaultPendingUnlock(vaultSessionId).catch(() => {});
+              } else if (candidates.length > 1) {
+                // Multiple options — let the player choose
+                updateVaultTileUnlocked(vaultSessionId, newUnlocked).catch(() => {});
+                setVaultPendingUnlock(vaultSessionId, tileIdx, candidates).catch(() => {});
+              } else {
+                // No candidates — just mark the solved tile
+                updateVaultTileUnlocked(vaultSessionId, newUnlocked).catch(() => {});
+                clearVaultPendingUnlock(vaultSessionId).catch(() => {});
+              }
             }
             updateVaultCurrentTile(vaultSessionId, firebaseUser.uid, -1).catch(() => {});
           }).catch(() => {});
