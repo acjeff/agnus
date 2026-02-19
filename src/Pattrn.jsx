@@ -10555,7 +10555,7 @@ export default function Pattrn() {
   }, [view, gameState, puzzle, selectedToken, handleTokenSelect]);
 
   const vaultConfig = isVault && vaultSessionDataRef.current?.difficulty ? (VAULT_DIFFICULTIES[vaultSessionDataRef.current.difficulty] || VAULT_DIFFICULTIES.silver) : null;
-  const maxAttempts = isVault ? (vaultConfig?.maxAttempts ?? 4) : isCoopMosaic ? Infinity : isCascade ? 5 : isBlind ? 6 : 5;
+  const maxAttempts = isVault ? 2 : isCoopMosaic ? Infinity : isCascade ? 5 : isBlind ? 6 : 5;
 
   const checkSolution = () => {
     if (!puzzle) return;
