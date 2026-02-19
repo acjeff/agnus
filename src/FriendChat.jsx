@@ -15,8 +15,30 @@ export default function FriendChat({
   isOnline,        // boolean — whether friend is currently online
 }) {
   const [inputText, setInputText] = useState("");
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
   const scrollRef = useRef(null);
   const prevMsgCount = useRef(0);
+  const inputRef = useRef(null);
+
+  // Detect mobile keyboard via visualViewport API
+  useEffect(() => {
+    const vv = typeof window !== "undefined" && window.visualViewport;
+    if (!vv) return;
+    const threshold = 100; // px reduction that signals keyboard
+    const fullHeight = window.innerHeight;
+    const onResize = () => {
+      const isKb = fullHeight - vv.height > threshold;
+      setKeyboardOpen(isKb);
+      // Keep input visible by scrolling messages to bottom
+      if (isKb && scrollRef.current) {
+        requestAnimationFrame(() => {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        });
+      }
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
 
   // Sort messages by timestamp
   const sortedMessages = Object.entries(messages || {})
@@ -97,18 +119,19 @@ export default function FriendChat({
 
   return (
     <div style={{ padding: "0 12px 12px", display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
-      {/* Header bar — messaging app style */}
+      {/* Header bar — messaging app style, compact when keyboard is open */}
       <div style={{
-        display: "flex", alignItems: "center", gap: 12,
-        padding: "8px 4px 12px",
+        display: "flex", alignItems: "center", gap: keyboardOpen ? 8 : 12,
+        padding: keyboardOpen ? "4px 4px 4px" : "8px 4px 12px",
         borderBottom: `1px solid ${C.border}44`,
         marginBottom: 0,
         flexShrink: 0,
+        transition: "padding 0.2s ease, gap 0.2s ease",
       }}>
         <button
           onClick={onBack}
           style={{
-            width: 32, height: 32, borderRadius: 10,
+            width: keyboardOpen ? 28 : 32, height: keyboardOpen ? 28 : 32, borderRadius: keyboardOpen ? 8 : 10,
             backgroundColor: "rgba(255,255,255,0.06)",
             border: "none",
             color: C.text,
@@ -121,50 +144,63 @@ export default function FriendChat({
           onMouseEnter={e => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.12)"; }}
           onMouseLeave={e => { e.currentTarget.style.backgroundColor = "rgba(255,255,255,0.06)"; }}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width={keyboardOpen ? 14 : 16} height={keyboardOpen ? 14 : 16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M19 12H5M12 19l-7-7 7-7" />
           </svg>
         </button>
 
-        {/* Friend avatar — larger */}
-        <div style={{ position: "relative", flexShrink: 0 }}>
-          {friendPicture ? (
-            <img src={friendPicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
-          ) : (
+        {/* Friend avatar — hidden when keyboard is open to save space */}
+        {!keyboardOpen && (
+          <div style={{ position: "relative", flexShrink: 0 }}>
+            {friendPicture ? (
+              <img src={friendPicture} alt="" style={{ width: 36, height: 36, borderRadius: "50%", objectFit: "cover" }} />
+            ) : (
+              <div style={{
+                width: 36, height: 36, borderRadius: "50%",
+                backgroundColor: C.accent + "33",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 15, color: C.accent, fontWeight: 700,
+              }}>
+                {(friendName || "?")[0].toUpperCase()}
+              </div>
+            )}
+            {/* Online indicator */}
             <div style={{
-              width: 36, height: 36, borderRadius: "50%",
-              backgroundColor: C.accent + "33",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 15, color: C.accent, fontWeight: 700,
-            }}>
-              {(friendName || "?")[0].toUpperCase()}
-            </div>
-          )}
-          {/* Online indicator */}
-          <div style={{
-            position: "absolute", bottom: 0, right: 0,
-            width: 10, height: 10, borderRadius: "50%",
-            backgroundColor: isOnline ? "#22C55E" : C.textDim + "66",
-            border: `2px solid ${C.surface || "#1a1a2e"}`,
-            transition: "background-color 0.3s",
-          }} />
-        </div>
+              position: "absolute", bottom: 0, right: 0,
+              width: 10, height: 10, borderRadius: "50%",
+              backgroundColor: isOnline ? "#22C55E" : C.textDim + "66",
+              border: `2px solid ${C.surface || "#1a1a2e"}`,
+              transition: "background-color 0.3s",
+            }} />
+          </div>
+        )}
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{
-            fontSize: 15, fontWeight: 700, color: C.text,
+            fontSize: keyboardOpen ? 13 : 15, fontWeight: 700, color: C.text,
             fontFamily: "'Inter', sans-serif",
             overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+            transition: "font-size 0.2s ease",
           }}>
             {friendName}
+            {keyboardOpen && (
+              <span style={{
+                fontSize: 10, fontWeight: 500, marginLeft: 6,
+                color: isOnline ? "#22C55E" : C.textDim,
+              }}>
+                {isOnline ? "\u2022 Online" : "\u2022 Offline"}
+              </span>
+            )}
           </div>
-          <div style={{
-            fontSize: 11, color: isOnline ? "#22C55E" : C.textDim,
-            fontFamily: "'Inter', sans-serif",
-            fontWeight: 500,
-          }}>
-            {isOnline ? "Online" : "Offline"}
-          </div>
+          {!keyboardOpen && (
+            <div style={{
+              fontSize: 11, color: isOnline ? "#22C55E" : C.textDim,
+              fontFamily: "'Inter', sans-serif",
+              fontWeight: 500,
+            }}>
+              {isOnline ? "Online" : "Offline"}
+            </div>
+          )}
         </div>
       </div>
 
@@ -297,14 +333,16 @@ export default function FriendChat({
         )}
       </div>
 
-      {/* Input bar — messaging app style */}
+      {/* Input bar — messaging app style, compact when keyboard is open */}
       <div style={{
-        display: "flex", gap: 8, alignItems: "center",
-        padding: "10px 0 0",
+        display: "flex", gap: keyboardOpen ? 6 : 8, alignItems: "center",
+        padding: keyboardOpen ? "6px 0 0" : "10px 0 0",
         borderTop: `1px solid ${C.border}44`,
         flexShrink: 0,
+        transition: "padding 0.2s ease, gap 0.2s ease",
       }}>
         <input
+          ref={inputRef}
           type="text"
           value={inputText}
           onChange={e => setInputText(e.target.value)}
@@ -312,15 +350,15 @@ export default function FriendChat({
           placeholder="Message..."
           maxLength={200}
           style={{
-            flex: 1, padding: "10px 14px",
+            flex: 1, padding: keyboardOpen ? "8px 12px" : "10px 14px",
             borderRadius: 20,
             border: `1px solid ${C.border}`,
             backgroundColor: "rgba(255,255,255,0.04)",
             color: C.text,
-            fontSize: 14,
+            fontSize: keyboardOpen ? 13 : 14,
             fontFamily: "'Inter', sans-serif",
             outline: "none",
-            transition: "border-color 0.15s",
+            transition: "border-color 0.15s, padding 0.2s ease, font-size 0.2s ease",
           }}
           onFocus={e => { e.target.style.borderColor = C.accent + "66"; }}
           onBlur={e => { e.target.style.borderColor = C.border; }}
@@ -329,7 +367,7 @@ export default function FriendChat({
           onClick={handleSend}
           disabled={!inputText.trim()}
           style={{
-            width: 38, height: 38,
+            width: keyboardOpen ? 34 : 38, height: keyboardOpen ? 34 : 38,
             borderRadius: "50%",
             border: "none",
             backgroundColor: inputText.trim() ? C.accent : C.textDim + "22",
@@ -340,7 +378,7 @@ export default function FriendChat({
             display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width={keyboardOpen ? 16 : 18} height={keyboardOpen ? 16 : 18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
             <line x1="22" y1="2" x2="11" y2="13" />
             <polygon points="22 2 15 22 11 13 2 9 22 2" />
           </svg>
