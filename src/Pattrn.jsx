@@ -3145,8 +3145,8 @@ function FloatingCosmetic({ mood, accessory, speech }) {
     setIsWandering(true);
     const wander = () => {
       const cur = posRef.current;
-      const maxW = typeof window !== "undefined" ? window.innerWidth - 53 : 300;
-      const maxH = typeof window !== "undefined" ? window.innerHeight - 53 : 600;
+      const maxW = typeof window !== "undefined" ? window.innerWidth - 74 : 300;
+      const maxH = typeof window !== "undefined" ? window.innerHeight - 74 : 600;
       const range = 35; // small drift radius
       const nx = Math.max(0, Math.min(maxW, cur.x + (Math.random() - 0.5) * range * 2));
       const ny = Math.max(0, Math.min(maxH, cur.y + (Math.random() - 0.5) * range * 2));
@@ -3217,8 +3217,8 @@ function FloatingCosmetic({ mood, accessory, speech }) {
     const onMove = (e) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      const nx = Math.max(0, Math.min(window.innerWidth - 53, clientX - dragOffset.current.x));
-      const ny = Math.max(0, Math.min(window.innerHeight - 53, clientY - dragOffset.current.y));
+      const nx = Math.max(0, Math.min(window.innerWidth - 74, clientX - dragOffset.current.x));
+      const ny = Math.max(0, Math.min(window.innerHeight - 74, clientY - dragOffset.current.y));
       setPos({ x: nx, y: ny });
     };
     const onUp = () => {
@@ -3283,7 +3283,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         return (
           <div key={displayText} style={{
             position: "absolute",
-            bottom: 52,
+            bottom: 73,
             ...(bubbleOnLeft
               ? { right: 4, left: "auto" }
               : { left: 4, right: "auto" }),
@@ -3308,8 +3308,8 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         onPointerDown={onPointerDown}
         onTouchStart={onPointerDown}
         style={{
-          width: 53,
-          height: 53,
+          width: 74,
+          height: 74,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -3329,7 +3329,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         }}
         title={AGGIE_LABEL}
       >
-        {renderAggieSVG(53, mood, true, accessory)}
+        {renderAggieSVG(74, mood, true, accessory)}
       </div>
     </div>
   );
