@@ -3122,7 +3122,7 @@ const IDLE_ANIMS = {
 };
 
 function FloatingCosmetic({ mood, accessory, speech }) {
-  const AGGIE_SIZE = 74;
+  const AGGIE_SIZE = 96;
   const AVOID_PAD = 16; // extra padding around obstacles
 
   const [pos, setPos] = useState(() => {
@@ -3443,8 +3443,8 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         onPointerDown={onPointerDown}
         onTouchStart={onPointerDown}
         style={{
-          width: 74,
-          height: 74,
+          width: AGGIE_SIZE,
+          height: AGGIE_SIZE,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -3464,7 +3464,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         }}
         title={AGGIE_LABEL}
       >
-        {renderAggieSVG(74, mood, true, accessory)}
+        {renderAggieSVG(AGGIE_SIZE, mood, true, accessory)}
       </div>
     </div>
   );
