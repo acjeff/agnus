@@ -105,6 +105,9 @@ import {
   joinHangout,
   leaveHangout,
   subscribeToHangout,
+  startOfflineHangout,
+  endOfflineHangout,
+  subscribeToOfflineHangouts,
 } from "./firebase.js";
 import VaultMode, { getVaultSummary } from "./vault/VaultMode.jsx";
 import VaultChat, { getUnreadCount } from "./vault/VaultChat.jsx";
@@ -5496,13 +5499,33 @@ export default function Pattrn() {
   const [hangoutActive, setHangoutActive] = useState(false); // currently in hangout
   const [hangoutPeers, setHangoutPeers] = useState({}); // { uid: { username, accessory, traits, happinessMood, ... } }
   const hangoutUnsubRef = useRef(null);
-  // Combined traits = own + shared from hangout peers
+
+  // --- Offline hangout system ---
+  // Aggies can hang out with a friend's Aggie even when the friend is offline.
+  // While on a hangout the Aggie is "away" (hidden from puzzle screen) but trait sharing still applies.
+  const [offlineHangouts, setOfflineHangouts] = useState([]); // all active offline hangouts for this user
+  const offlineHangoutsUnsubRef = useRef(null);
+
+  // Combined traits = own + shared from hangout peers + offline hangout peers
   const hangoutSharedTraits = useMemo(() => {
-    if (!hangoutActive || !Object.keys(hangoutPeers).length) return aggieTraits;
     const all = new Set(aggieTraits);
-    Object.values(hangoutPeers).forEach(p => { (p.traits || []).forEach(t => all.add(t)); });
+    // Live hangout peers
+    if (hangoutActive && Object.keys(hangoutPeers).length) {
+      Object.values(hangoutPeers).forEach(p => { (p.traits || []).forEach(t => all.add(t)); });
+    }
+    // Offline hangout peers — always active while a hangout exists
+    if (offlineHangouts.length > 0 && firebaseUser?.uid) {
+      offlineHangouts.forEach(h => {
+        const participants = h.participants || {};
+        Object.entries(participants).forEach(([uid, data]) => {
+          if (uid !== firebaseUser.uid) {
+            (data.traits || []).forEach(t => all.add(t));
+          }
+        });
+      });
+    }
     return [...all];
-  }, [aggieTraits, hangoutActive, hangoutPeers]);
+  }, [aggieTraits, hangoutActive, hangoutPeers, offlineHangouts, firebaseUser]);
 
   // Happiness decay effect — runs every minute, decays based on elapsed time
   // Energetic trait: decay 50% slower
@@ -5760,6 +5783,70 @@ export default function Pattrn() {
       if (hangoutUnsubRef.current) hangoutUnsubRef.current();
     };
   }, []);
+
+  // --- Offline hangout subscription ---
+  // Subscribe to the user's offline hangouts when logged in
+  useEffect(() => {
+    if (!firebaseUser?.uid) {
+      setOfflineHangouts([]);
+      return;
+    }
+    if (offlineHangoutsUnsubRef.current) offlineHangoutsUnsubRef.current();
+    offlineHangoutsUnsubRef.current = subscribeToOfflineHangouts(firebaseUser.uid, (hangouts) => {
+      setOfflineHangouts(hangouts);
+    });
+    return () => {
+      if (offlineHangoutsUnsubRef.current) { offlineHangoutsUnsubRef.current(); offlineHangoutsUnsubRef.current = null; }
+    };
+  }, [firebaseUser]);
+
+  // Start an offline hangout with a friend (works even if they're offline)
+  const startOfflineHangoutWithFriend = useCallback(async (friendUid, friendUsername) => {
+    if (!firebaseUser?.uid) return;
+    // Load friend's aggie data from publicStats
+    let friendTraits = [];
+    let friendAccessory = "none";
+    let friendMood = "neutral";
+    try {
+      const stats = await loadPublicStats(friendUid);
+      if (stats) {
+        friendTraits = stats.aggieTraits || [];
+        friendAccessory = stats.aggieAccessory || "none";
+      }
+    } catch { /* use defaults */ }
+    const myData = {
+      username: username || firebaseUser.email || "???",
+      traits: aggieTraits || [],
+      accessory: aggieAccessory || {},
+      happinessMood: aggieHappinessMood || "neutral",
+      size: aggieSize || "medium",
+    };
+    const friendData = {
+      username: friendUsername || "Friend",
+      traits: friendTraits,
+      accessory: friendAccessory,
+      happinessMood: friendMood,
+    };
+    await startOfflineHangout(firebaseUser.uid, friendUid, myData, friendData);
+  }, [firebaseUser, username, aggieTraits, aggieAccessory, aggieHappinessMood, aggieSize]);
+
+  // End an offline hangout with a friend
+  const endOfflineHangoutWithFriend = useCallback(async (friendUid) => {
+    if (!firebaseUser?.uid) return;
+    await endOfflineHangout(firebaseUser.uid, friendUid);
+  }, [firebaseUser]);
+
+  // Check if a specific friend has an active offline hangout with this user
+  const getOfflineHangoutWithFriend = useCallback((friendUid) => {
+    if (!firebaseUser?.uid) return null;
+    return offlineHangouts.find(h => {
+      const participants = h.participants || {};
+      return participants[friendUid] && participants[firebaseUser.uid];
+    }) || null;
+  }, [offlineHangouts, firebaseUser]);
+
+  // Whether the user's aggie is currently away on any offline hangout
+  const aggieOnOfflineHangout = offlineHangouts.length > 0;
 
   // --- Multiplayer Aggie state ---
   const [peerAggieStates, setPeerAggieStates] = useState({});
@@ -6938,6 +7025,11 @@ export default function Pattrn() {
       };
       if (username) {
         publicStats.username = username;
+      }
+      // Include aggie data so friends can start offline hangouts
+      if (data.companion) {
+        publicStats.aggieTraits = data.companion.traits || [];
+        publicStats.aggieAccessory = data.companion.accessory || "none";
       }
       savePublicStats(uid, publicStats).catch(() => {});
       setSyncStatus("synced");
@@ -9136,7 +9228,7 @@ export default function Pattrn() {
                                   backgroundColor: C.accent,
                                 }} />
                               )}
-                              {key === "hangout" && hangoutActive && (
+                              {key === "hangout" && (hangoutActive || offlineHangouts.length > 0) && (
                                 <span style={{
                                   position: "absolute", top: 2, right: 8,
                                   width: 7, height: 7, borderRadius: "50%",
@@ -9523,15 +9615,50 @@ export default function Pattrn() {
                               </div>
                             );
                           })}
+                          {/* Offline hangout peers — shown even when live hangout is inactive */}
+                          {offlineHangouts.map((h, hIdx) => {
+                            const participants = h.participants || {};
+                            return Object.entries(participants)
+                              .filter(([uid]) => uid !== firebaseUser?.uid)
+                              .map(([uid, peer], pidx) => {
+                                const totalLive = Object.keys(hangoutPeers).length;
+                                const idx = totalLive + hIdx + pidx;
+                                const totalAll = totalLive + offlineHangouts.length;
+                                const angle = (idx / Math.max(totalAll, 1)) * Math.PI * 2 - Math.PI / 2;
+                                const rx = 55, ry = 35;
+                                const px = 50 + rx * Math.cos(angle);
+                                const py = 50 + ry * Math.sin(angle);
+                                return (
+                                  <div key={`offline-${uid}`} style={{
+                                    position: "absolute",
+                                    left: `${px}%`, top: `${py}%`,
+                                    transform: "translate(-50%, -50%)",
+                                    display: "flex", flexDirection: "column", alignItems: "center",
+                                    transition: "left 0.5s, top 0.5s",
+                                    opacity: 0.7,
+                                  }}>
+                                    <div style={{ animation: `companionFloat ${3 + idx * 0.3}s ease-in-out infinite` }}>
+                                      {renderAggieSVG(44, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
+                                    </div>
+                                    <span style={{ fontSize: 7, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>
+                                      {peer.username || "???"}
+                                    </span>
+                                    <span style={{ fontSize: 6, color: C.accent, fontFamily: "'Inter', sans-serif", opacity: 0.7 }}>
+                                      offline
+                                    </span>
+                                  </div>
+                                );
+                              });
+                          })}
                           {/* Empty state */}
-                          {!hangoutActive && Object.keys(hangoutPeers).length === 0 && (
+                          {!hangoutActive && Object.keys(hangoutPeers).length === 0 && offlineHangouts.length === 0 && (
                             <div style={{
                               position: "absolute", inset: 0,
                               display: "flex", alignItems: "center", justifyContent: "center",
                               color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif", opacity: 0.6,
                               pointerEvents: "none",
                             }}>
-                              Open your hangout to let friends visit!
+                              Send your Aggie to hang out with a friend!
                             </div>
                           )}
                         </div>
@@ -9561,8 +9688,8 @@ export default function Pattrn() {
                           )}
                         </div>
 
-                        {/* Shared traits from hangout */}
-                        {hangoutActive && Object.keys(hangoutPeers).length > 0 && (
+                        {/* Shared traits from hangout (live or offline) */}
+                        {hangoutSharedTraits.filter(tId => !aggieTraits.includes(tId)).length > 0 && (
                           <div style={{ marginBottom: 12 }}>
                             <div style={{ fontSize: 11, fontWeight: 700, color: C.correct, fontFamily: "'Inter', sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
                               Shared Trait Bonuses
@@ -9571,7 +9698,18 @@ export default function Pattrn() {
                               {hangoutSharedTraits.filter(tId => !aggieTraits.includes(tId)).map(tId => {
                                 const t = AGGIE_TRAITS.find(x => x.id === tId);
                                 if (!t) return null;
+                                // Find source: live peer or offline hangout peer
                                 const fromPeer = Object.values(hangoutPeers).find(p => (p.traits || []).includes(tId));
+                                let fromOffline = null;
+                                if (!fromPeer) {
+                                  for (const h of offlineHangouts) {
+                                    const participants = h.participants || {};
+                                    const found = Object.entries(participants).find(([uid, data]) =>
+                                      uid !== firebaseUser?.uid && (data.traits || []).includes(tId));
+                                    if (found) { fromOffline = found[1]; break; }
+                                  }
+                                }
+                                const sourceName = fromPeer?.username || fromOffline?.username;
                                 return (
                                   <div key={tId} style={{
                                     display: "flex", alignItems: "center", gap: 4,
@@ -9581,15 +9719,10 @@ export default function Pattrn() {
                                   }}>
                                     <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.color, opacity: 0.7 }} />
                                     <span style={{ fontSize: 9, fontWeight: 600, color: t.color, fontFamily: "'Inter', sans-serif" }}>{t.label}</span>
-                                    {fromPeer && <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>via {fromPeer.username}</span>}
+                                    {sourceName && <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>via {sourceName}</span>}
                                   </div>
                                 );
                               })}
-                              {hangoutSharedTraits.filter(tId => !aggieTraits.includes(tId)).length === 0 && (
-                                <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", opacity: 0.6 }}>
-                                  No new traits shared yet — friends with different traits will add bonuses!
-                                </span>
-                              )}
                             </div>
                           </div>
                         )}
@@ -9607,12 +9740,15 @@ export default function Pattrn() {
                             const presence = friendPresence[friend.uid];
                             const isOnline = presence && presence.lastSeen && (Date.now() - presence.lastSeen) < 120000;
                             const isPeerInHangout = !!hangoutPeers[friend.uid];
+                            const offlineH = getOfflineHangoutWithFriend(friend.uid);
+                            const isOnOfflineHangout = !!offlineH;
+                            const isHanging = isPeerInHangout || isOnOfflineHangout;
                             return (
                               <div key={friend.uid} style={{
                                 display: "flex", alignItems: "center", gap: 10,
                                 padding: "8px 10px", borderRadius: 10,
-                                backgroundColor: isPeerInHangout ? C.correct + "10" : C.surface,
-                                border: `1px solid ${isPeerInHangout ? C.correct + "44" : C.border}`,
+                                backgroundColor: isHanging ? C.correct + "10" : C.surface,
+                                border: `1px solid ${isHanging ? C.correct + "44" : C.border}`,
                               }}>
                                 <div style={{
                                   width: 8, height: 8, borderRadius: 4,
@@ -9623,16 +9759,18 @@ export default function Pattrn() {
                                   <div style={{ fontSize: 12, fontWeight: 600, color: C.text, fontFamily: "'Inter', sans-serif" }}>
                                     {friend.username || "Friend"}
                                   </div>
-                                  <div style={{ fontSize: 9, color: isPeerInHangout ? C.correct : C.textDim, fontFamily: "'Inter', sans-serif" }}>
-                                    {isPeerInHangout ? "Hanging out!" : isOnline ? "Online" : "Offline"}
+                                  <div style={{ fontSize: 9, color: isHanging ? C.correct : C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                    {isPeerInHangout ? "Hanging out!" : isOnOfflineHangout ? "Aggies hanging out" : isOnline ? "Online" : "Offline"}
                                   </div>
                                 </div>
-                                {hangoutActive && !isPeerInHangout && isOnline && (
+                                {/* Live hangout: waiting for online friend to join */}
+                                {hangoutActive && !isPeerInHangout && !isOnOfflineHangout && isOnline && (
                                   <span style={{ fontSize: 9, color: C.textDim, fontFamily: "'Inter', sans-serif", opacity: 0.5 }}>
                                     Waiting...
                                   </span>
                                 )}
-                                {!hangoutActive && isOnline && (
+                                {/* Live visit button for online friends (when not in live hangout and no offline hangout) */}
+                                {!hangoutActive && isOnline && !isOnOfflineHangout && (
                                   <button onClick={() => joinFriendHangout(friend.uid)} style={{
                                     padding: "4px 10px", borderRadius: 6, fontSize: 9, fontWeight: 700,
                                     fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
@@ -9640,6 +9778,28 @@ export default function Pattrn() {
                                     border: "none", cursor: "pointer", textTransform: "uppercase",
                                   }}>
                                     Visit
+                                  </button>
+                                )}
+                                {/* Send to hangout button — available for any friend not already in a hangout */}
+                                {!isPeerInHangout && !isOnOfflineHangout && !hangoutActive && (
+                                  <button onClick={() => startOfflineHangoutWithFriend(friend.uid, friend.username)} style={{
+                                    padding: "4px 10px", borderRadius: 6, fontSize: 9, fontWeight: 700,
+                                    fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                    background: C.accent + "12", color: C.accent,
+                                    border: `1px solid ${C.accent}33`, cursor: "pointer", textTransform: "uppercase",
+                                  }}>
+                                    Hangout
+                                  </button>
+                                )}
+                                {/* End offline hangout button */}
+                                {isOnOfflineHangout && (
+                                  <button onClick={() => endOfflineHangoutWithFriend(friend.uid)} style={{
+                                    padding: "4px 10px", borderRadius: 6, fontSize: 9, fontWeight: 700,
+                                    fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                    background: C.incorrect + "12", color: C.incorrect,
+                                    border: `1px solid ${C.incorrect}33`, cursor: "pointer", textTransform: "uppercase",
+                                  }}>
+                                    End
                                   </button>
                                 )}
                               </div>
@@ -9699,6 +9859,26 @@ export default function Pattrn() {
                         </div>
                       </div>
 
+                      {/* Away on hangout banner */}
+                      {aggieOnOfflineHangout && (
+                        <div style={{
+                          padding: "6px 10px", borderRadius: 8, marginBottom: 6,
+                          backgroundColor: C.accent + "12",
+                          border: `1.5px dashed ${C.accent}44`,
+                          display: "flex", alignItems: "center", gap: 6,
+                        }}>
+                          <span style={{ fontSize: 14 }}>&#128587;</span>
+                          <div>
+                            <div style={{ fontSize: 10, fontWeight: 700, color: C.accent, fontFamily: "'Inter', sans-serif" }}>
+                              Away on hangout
+                            </div>
+                            <div style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                              Your Aggie is hanging out with a friend! Trait bonuses still active.
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Happiness bar */}
                       <div style={{ marginBottom: 6 }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
@@ -9739,7 +9919,7 @@ export default function Pattrn() {
                               </div>
                             );
                           })}
-                          {hangoutActive && hangoutSharedTraits.filter(t => !aggieTraits.includes(t)).length > 0 && (
+                          {hangoutSharedTraits.filter(t => !aggieTraits.includes(t)).length > 0 && (
                             hangoutSharedTraits.filter(t => !aggieTraits.includes(t)).map(tId => {
                               const t = AGGIE_TRAITS.find(x => x.id === tId);
                               if (!t) return null;
@@ -15086,7 +15266,8 @@ export default function Pattrn() {
   // --- Global modals element (included in every return) ---
   // --- Floating Aggie Companion ---
   const isWardrobeOpen = radialMenuStack[radialMenuStack.length - 1] === "aggie-wardrobe";
-  const floatingCosmeticEl = activeCosmetic && !isWardrobeOpen ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} activeBuff={aggieBuff} activeDebuff={aggieDebuff} /> : null;
+  // Hide floating Aggie when it's away on an offline hangout (can't use in puzzles)
+  const floatingCosmeticEl = activeCosmetic && !isWardrobeOpen && !aggieOnOfflineHangout ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} activeBuff={aggieBuff} activeDebuff={aggieDebuff} /> : null;
 
   // Cascade level-complete celebration banner
   const cascadeBannerEl = cascadeLevelBanner ? (
