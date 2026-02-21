@@ -1752,3 +1752,74 @@ export function subscribeToHangout(hostUid, callback) {
   });
   return () => off(hangoutRef, "value", handler);
 }
+
+// --- Offline Aggie Hangouts ---
+// Allows Aggies to hang out with a friend's Aggie even when the friend is offline.
+// While on a hangout, the Aggie is "away" (hidden from puzzle screen) but trait
+// sharing bonuses still apply. Stored persistently so it survives page reloads.
+
+// Generate a deterministic hangout ID for two users (alphabetically sorted)
+function getOfflineHangoutId(uid1, uid2) {
+  return uid1 < uid2 ? `${uid1}_${uid2}` : `${uid2}_${uid1}`;
+}
+
+// Start an offline hangout between two Aggies.
+// myData = { username, traits, accessory, happinessMood, size }
+// friendData = { username, traits, accessory, happinessMood } (loaded from publicStats)
+export async function startOfflineHangout(myUid, friendUid, myData, friendData) {
+  if (!db) return null;
+  const hangoutId = getOfflineHangoutId(myUid, friendUid);
+  await set(ref(db, `offlineHangouts/${hangoutId}`), {
+    id: hangoutId,
+    participants: {
+      [myUid]: { ...removeUndefined(myData), joinedAt: serverTimestamp() },
+      [friendUid]: { ...removeUndefined(friendData), joinedAt: serverTimestamp() },
+    },
+    startedBy: myUid,
+    startedAt: serverTimestamp(),
+  });
+  // Index for both users so they can load their active hangouts
+  await Promise.all([
+    set(ref(db, `userOfflineHangouts/${myUid}/${hangoutId}`), { friendUid, startedAt: serverTimestamp() }),
+    set(ref(db, `userOfflineHangouts/${friendUid}/${hangoutId}`), { friendUid: myUid, startedAt: serverTimestamp() }),
+  ]);
+  return hangoutId;
+}
+
+// End an offline hangout
+export async function endOfflineHangout(myUid, friendUid) {
+  if (!db) return;
+  const hangoutId = getOfflineHangoutId(myUid, friendUid);
+  await remove(ref(db, `offlineHangouts/${hangoutId}`));
+  await Promise.all([
+    remove(ref(db, `userOfflineHangouts/${myUid}/${hangoutId}`)),
+    remove(ref(db, `userOfflineHangouts/${friendUid}/${hangoutId}`)),
+  ]);
+}
+
+// Load a specific offline hangout
+export async function loadOfflineHangout(uid1, uid2) {
+  if (!db) return null;
+  const hangoutId = getOfflineHangoutId(uid1, uid2);
+  const snap = await get(ref(db, `offlineHangouts/${hangoutId}`));
+  return snap.exists() ? snap.val() : null;
+}
+
+// Subscribe to all offline hangouts for a user (real-time).
+// Resolves each hangout index entry to the full hangout data. Returns unsubscribe fn.
+export function subscribeToOfflineHangouts(uid, callback) {
+  if (!db) return () => {};
+  const indexRef = ref(db, `userOfflineHangouts/${uid}`);
+  const handler = onValue(indexRef, async (snap) => {
+    if (!snap.exists()) { callback([]); return; }
+    const entries = snap.val();
+    const hangouts = await Promise.all(
+      Object.keys(entries).map(async (hid) => {
+        const hSnap = await get(ref(db, `offlineHangouts/${hid}`));
+        return hSnap.exists() ? hSnap.val() : null;
+      })
+    );
+    callback(hangouts.filter(Boolean));
+  });
+  return () => off(indexRef, "value", handler);
+}
