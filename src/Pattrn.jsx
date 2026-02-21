@@ -1734,19 +1734,26 @@ const AGGIE_ACCESSORY_KEY = "pattrn-aggie-accessory";
 const AGGIE_SIZE_KEY = "pattrn-aggie-size";
 const AGGIE_SIZES = { small: 64, medium: 96, large: 128 };
 const AGGIE_ACCESSORIES = [
-  { id: "none", label: "None" },
-  { id: "party-hat", label: "Party Hat" },
-  { id: "crown", label: "Crown" },
-  { id: "top-hat", label: "Top Hat" },
-  { id: "beanie", label: "Beanie" },
-  { id: "cat-ears", label: "Cat Ears" },
-  { id: "devil-horns", label: "Devil Horns" },
-  { id: "halo", label: "Halo" },
-  { id: "pirate-hat", label: "Pirate Hat" },
-  { id: "bandana", label: "Bandana" },
-  { id: "sunglasses", label: "Sunglasses" },
-  { id: "monocle", label: "Monocle" },
+  { id: "none", label: "None", cost: 0 },
+  { id: "party-hat", label: "Party Hat", cost: 0 },
+  { id: "beanie", label: "Beanie", cost: 0 },
+  { id: "cat-ears", label: "Cat Ears", cost: 0 },
+  { id: "bandana", label: "Bandana", cost: 0 },
+  { id: "crown", label: "Crown", cost: 30 },
+  { id: "top-hat", label: "Top Hat", cost: 25 },
+  { id: "devil-horns", label: "Devil Horns", cost: 20 },
+  { id: "halo", label: "Halo", cost: 35 },
+  { id: "pirate-hat", label: "Pirate Hat", cost: 20 },
+  { id: "sunglasses", label: "Sunglasses", cost: 15 },
+  { id: "monocle", label: "Monocle", cost: 40 },
 ];
+const AGGIE_UNLOCKED_ACC_KEY = "pattrn-aggie-unlocked-acc";
+function loadUnlockedAccessories() {
+  try { const raw = localStorage.getItem(AGGIE_UNLOCKED_ACC_KEY); return raw ? new Set(JSON.parse(raw)) : new Set(); } catch { return new Set(); }
+}
+function saveUnlockedAccessories(set) {
+  try { localStorage.setItem(AGGIE_UNLOCKED_ACC_KEY, JSON.stringify([...set])); } catch { /* ignore */ }
+}
 function loadAggieAccessory() {
   try { return localStorage.getItem(AGGIE_ACCESSORY_KEY) || "none"; } catch { return "none"; }
 }
@@ -4896,6 +4903,7 @@ export default function Pattrn() {
   const aggieHappinessMood = getHappinessMood(aggieHappiness);
   const aggieDecayTimer = useRef(null);
   const [aggieWardrobeTab, setAggieWardrobeTab] = useState("shop"); // "shop" | "accessories"
+  const [unlockedAccessories, setUnlockedAccessories] = useState(() => loadUnlockedAccessories());
 
   // Happiness decay effect — runs every minute, decays based on elapsed time
   useEffect(() => {
@@ -4972,6 +4980,23 @@ export default function Pattrn() {
     }
     return true;
   }, [aggieCogs, aggieDesire]);
+
+  // Helper: buy/unlock an accessory
+  const buyAccessory = useCallback((acc) => {
+    if (!acc.cost || acc.cost <= 0) return; // free items don't need buying
+    if (aggieCogs < acc.cost) return;
+    setAggieCogs(prev => {
+      const next = prev - acc.cost;
+      saveAggieCogs(next);
+      return next;
+    });
+    setUnlockedAccessories(prev => {
+      const next = new Set(prev);
+      next.add(acc.id);
+      saveUnlockedAccessories(next);
+      return next;
+    });
+  }, [aggieCogs]);
 
   // --- Multiplayer Aggie state ---
   const [peerAggieStates, setPeerAggieStates] = useState({});
@@ -8615,7 +8640,8 @@ export default function Pattrn() {
                       ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
                     display: "flex", flexDirection: "column",
-                    maxHeight: "70vh",
+                    height: `calc(100% - ${panelPad + fabSize}px)`,
+                    overflow: "hidden",
                   }}>
 
                     {/* ===== TOP HALF: Aggie's Room ===== */}
@@ -8876,10 +8902,18 @@ export default function Pattrn() {
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
                             {AGGIE_ACCESSORIES.filter(a => a.id !== "none").map(a => {
                               const isActive = currentAcc === a.id;
+                              const isFree = !a.cost || a.cost <= 0;
+                              const isUnlocked = isFree || unlockedAccessories.has(a.id);
+                              const canAfford = aggieCogs >= (a.cost || 0);
                               return (
                                 <div
                                   key={a.id}
                                   onClick={() => {
+                                    if (!isUnlocked) {
+                                      // Buy to unlock
+                                      if (canAfford) buyAccessory(a);
+                                      return;
+                                    }
                                     const next = isActive ? "none" : a.id;
                                     setAggieAccessory(next);
                                     saveAggieAccessory(next);
@@ -8887,21 +8921,45 @@ export default function Pattrn() {
                                   style={{
                                     display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
                                     padding: "8px 4px", borderRadius: 10,
-                                    backgroundColor: isActive ? C.accent + "18" : C.surface,
-                                    border: `1.5px solid ${isActive ? C.accent : C.border}`,
-                                    cursor: "pointer", transition: "all 0.15s",
+                                    backgroundColor: isActive ? C.accent + "18" : !isUnlocked ? "rgba(0,0,0,0.15)" : C.surface,
+                                    border: `1.5px solid ${isActive ? C.accent : !isUnlocked ? C.border + "60" : C.border}`,
+                                    cursor: isUnlocked || canAfford ? "pointer" : "default",
+                                    opacity: !isUnlocked && !canAfford ? 0.45 : 1,
+                                    transition: "all 0.15s",
+                                    position: "relative",
                                   }}
                                 >
-                                  <div style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                  <div style={{
+                                    width: 28, height: 28,
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    filter: !isUnlocked ? "brightness(0.5)" : "none",
+                                  }}>
                                     {renderAccessoryPreview(a.id, 28)}
                                   </div>
                                   <span style={{
-                                    fontSize: 8, fontWeight: 600, color: isActive ? C.accent : C.textDim,
+                                    fontSize: 8, fontWeight: 600, color: isActive ? C.accent : !isUnlocked ? C.textDim + "88" : C.textDim,
                                     fontFamily: "'Inter', sans-serif", textAlign: "center",
                                     lineHeight: 1.1, maxWidth: 60,
                                   }}>
                                     {a.label}
                                   </span>
+                                  {!isUnlocked && (
+                                    <div style={{
+                                      display: "flex", alignItems: "center", gap: 2, marginTop: -1,
+                                    }}>
+                                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
+                                        <circle cx="12" cy="12" r="5" stroke={canAfford ? C.accent : C.textDim} strokeWidth="2" fill="none" />
+                                        <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" strokeLinecap="round" />
+                                      </svg>
+                                      <span style={{
+                                        fontSize: 8, fontWeight: 700,
+                                        color: canAfford ? C.accent : C.textDim,
+                                        fontFamily: "'Inter', sans-serif",
+                                      }}>
+                                        {a.cost}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               );
                             })}
