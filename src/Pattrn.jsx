@@ -1748,6 +1748,17 @@ const AGGIE_ACCESSORIES = [
   { id: "pirate-hat", label: "Pirate Hat", cost: 20 },
   { id: "sunglasses", label: "Sunglasses", cost: 15 },
   { id: "monocle", label: "Monocle", cost: 40 },
+  { id: "earrings-gold", label: "Gold Earrings", cost: 25 },
+  { id: "earrings-crystal", label: "Crystal Earrings", cost: 45 },
+  { id: "glow-purple", label: "Purple Glow", cost: 20 },
+  { id: "glow-cyan", label: "Cyan Glow", cost: 20 },
+  { id: "glow-pink", label: "Pink Glow", cost: 20 },
+  { id: "eyes-red", label: "Red Eyes", cost: 15 },
+  { id: "eyes-green", label: "Green Eyes", cost: 15 },
+  { id: "eyes-gold", label: "Gold Eyes", cost: 30 },
+  { id: "wig-curly", label: "Curly Wig", cost: 30 },
+  { id: "wig-punk", label: "Punk Spikes", cost: 35 },
+  { id: "wig-long", label: "Long Hair", cost: 25 },
 ];
 const AGGIE_UNLOCKED_ACC_KEY = "pattrn-aggie-unlocked-acc";
 function loadUnlockedAccessories() {
@@ -1961,12 +1972,28 @@ function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
   const acc = accessory && accessory !== "none" ? accessory : null;
   const uid = `ag${w}`;
 
+  // Eye color overrides from eye accessories
+  const eyeOverrides = {
+    "eyes-red": { color: "#ff6666", glow: "#cc3333" },
+    "eyes-green": { color: "#66ff88", glow: "#33aa55" },
+    "eyes-gold": { color: "#FFD700", glow: "#DAA520" },
+  };
+  const eyeOv = acc && eyeOverrides[acc] ? eyeOverrides[acc] : null;
+
+  // Glow color overrides from glow accessories
+  const glowOverrides = {
+    "glow-purple": "#a855f7",
+    "glow-cyan": "#22d3ee",
+    "glow-pink": "#f472b6",
+  };
+  const glowColor = acc && glowOverrides[acc] ? glowOverrides[acc] : null;
+
   // Dark spirit colors — smoky, shadowy; grumpy = slightly reddish tint
   const bodyCore = isSad ? "#0e0c14" : isGrumpy ? "#100810" : "#0a0810";
   const bodyMid = isSad ? "#16131e" : isGrumpy ? "#18101a" : "#12101a";
   const bodyEdge = isSad ? "#1e1a2a" : isGrumpy ? "#221826" : "#1a1624";
-  const eyeColor = isSad ? "#8888aa" : isHappy ? "#f0eeff" : isGrumpy ? "#cc8888" : isEcstatic ? "#f0eeff" : "#dddcf0";
-  const eyeGlow = isSad ? "#5555770" : isHappy ? "#ccc8ff" : isGrumpy ? "#884444" : isEcstatic ? "#ccc8ff" : "#9a96cc";
+  const eyeColor = eyeOv ? eyeOv.color : isSad ? "#8888aa" : isHappy ? "#f0eeff" : isGrumpy ? "#cc8888" : isEcstatic ? "#f0eeff" : "#dddcf0";
+  const eyeGlow = eyeOv ? eyeOv.glow : isSad ? "#5555770" : isHappy ? "#ccc8ff" : isGrumpy ? "#884444" : isEcstatic ? "#ccc8ff" : "#9a96cc";
   const mouthColor = isSad ? "#66668840" : isHappy ? "#dddcf0" : isGrumpy ? "#aa666688" : "#9a96ccaa";
 
   // Eyes — bright glowing dots peering out of the dark
@@ -2098,6 +2125,52 @@ function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
         <circle cx="64" cy="44" r="8" fill="none" stroke="#DAA520" strokeWidth="0.5" opacity="0.4" />
         <path d="M70 54 Q74 68 70 80" stroke="#DAA520" strokeWidth="1.5" fill="none" />
       </g>
+    ) : acc === "earrings-gold" ? (
+      <g>
+        <circle cx="16" cy="54" r="3.5" fill="#FFD700" stroke="#DAA520" strokeWidth="1" />
+        <circle cx="16" cy="54" r="1.5" fill="#FFF8DC" opacity="0.6" />
+        <line x1="18" y1="44" x2="16" y2="50" stroke="#DAA520" strokeWidth="1" />
+        <circle cx="84" cy="54" r="3.5" fill="#FFD700" stroke="#DAA520" strokeWidth="1" />
+        <circle cx="84" cy="54" r="1.5" fill="#FFF8DC" opacity="0.6" />
+        <line x1="82" y1="44" x2="84" y2="50" stroke="#DAA520" strokeWidth="1" />
+      </g>
+    ) : acc === "earrings-crystal" ? (
+      <g>
+        <line x1="18" y1="44" x2="15" y2="52" stroke="#8b6ff0" strokeWidth="1" />
+        <polygon points="15,52 11,62 15,60 19,62" fill="#a78bfa" stroke="#8b6ff0" strokeWidth="0.8" />
+        <polygon points="15,52 13,57 17,57" fill="#c8b8ff" opacity="0.5" />
+        <line x1="82" y1="44" x2="85" y2="52" stroke="#8b6ff0" strokeWidth="1" />
+        <polygon points="85,52 81,62 85,60 89,62" fill="#a78bfa" stroke="#8b6ff0" strokeWidth="0.8" />
+        <polygon points="85,52 83,57 87,57" fill="#c8b8ff" opacity="0.5" />
+      </g>
+    ) : acc === "wig-curly" ? (
+      <g>
+        <path d="M18 36 Q10 20 22 10 Q30 4 40 6 Q48 2 56 6 Q66 4 74 10 Q86 20 78 36" fill="#5a3a1a" stroke="#4a2a10" strokeWidth="1.5" />
+        <circle cx="22" cy="14" r="6" fill="#6b4423" opacity="0.7" />
+        <circle cx="38" cy="8" r="7" fill="#6b4423" opacity="0.7" />
+        <circle cx="54" cy="7" r="6" fill="#5a3a1a" opacity="0.7" />
+        <circle cx="68" cy="10" r="6.5" fill="#6b4423" opacity="0.7" />
+        <circle cx="78" cy="18" r="5" fill="#5a3a1a" opacity="0.6" />
+        <circle cx="18" cy="24" r="5" fill="#5a3a1a" opacity="0.6" />
+        <circle cx="30" cy="10" r="4" fill="#7a5433" opacity="0.4" />
+        <circle cx="60" cy="8" r="4" fill="#7a5433" opacity="0.4" />
+      </g>
+    ) : acc === "wig-punk" ? (
+      <g>
+        <path d="M30 28 L26 -4 L34 18" fill="#cc2255" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
+        <path d="M42 26 L40 -8 L48 16" fill="#dd3366" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
+        <path d="M54 26 L56 -10 L60 16" fill="#cc2255" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
+        <path d="M66 28 L70 -4 L72 18" fill="#dd3366" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
+        <path d="M20 34 Q20 18 30 12 Q40 6 50 6 Q60 6 70 12 Q80 18 80 34" fill="#cc2255" stroke="#aa1144" strokeWidth="1.5" opacity="0.7" />
+      </g>
+    ) : acc === "wig-long" ? (
+      <g>
+        <path d="M16 30 Q14 14 30 6 Q44 0 56 2 Q70 4 80 14 Q86 22 84 34" fill="#1a1a3a" stroke="#2a2a4a" strokeWidth="1.5" />
+        <path d="M16 30 Q12 50 16 72 Q18 80 22 82" stroke="#2a2a4a" strokeWidth="3" strokeLinecap="round" fill="none" />
+        <path d="M84 34 Q88 54 84 72 Q82 80 78 82" stroke="#2a2a4a" strokeWidth="3" strokeLinecap="round" fill="none" />
+        <path d="M20 34 Q18 44 20 56" stroke="#3a3a5a" strokeWidth="1.5" fill="none" opacity="0.4" />
+        <path d="M80 36 Q82 46 80 58" stroke="#3a3a5a" strokeWidth="1.5" fill="none" opacity="0.4" />
+      </g>
     ) : null;
 
   // Smoky body shape
@@ -2125,7 +2198,25 @@ function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
         <filter id={`${uid}glow`} x="-150%" y="-150%" width="400%" height="400%">
           <feGaussianBlur stdDeviation="4" />
         </filter>
+        {/* Body glow filter for glow accessories */}
+        {glowColor && (
+          <filter id={`${uid}bodyglow`} x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="8" />
+          </filter>
+        )}
       </defs>
+
+      {/* Glow aura behind body when glow accessory is active */}
+      {glowColor && (
+        <g>
+          <path d={bodyPath} fill={glowColor} opacity="0.25" filter={`url(#${uid}bodyglow)`}>
+            {animate && <animate attributeName="opacity" values="0.15;0.3;0.15" dur="3s" repeatCount="indefinite" />}
+          </path>
+          <path d={bodyPath} fill={glowColor} opacity="0.1" transform="scale(1.1) translate(-5,-5)">
+            {animate && <animate attributeName="opacity" values="0.05;0.15;0.05" dur="2.5s" repeatCount="indefinite" />}
+          </path>
+        </g>
+      )}
 
       {/* Main body — drawn through the soft-edge mask so edges dissolve */}
       <g mask={`url(#${uid}mask)`}>
@@ -2153,6 +2244,17 @@ function renderAccessoryPreview(accId, size) {
     "bandana": <><path d="M16 58 Q16 38 50 34 Q84 38 84 58" fill="#cc4444" stroke="#aa3333" strokeWidth="2" /><path d="M76 50 L92 64 L84 54" fill="#cc4444" /></>,
     "sunglasses": <><rect x="16" y="34" width="28" height="20" rx="4" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="2" /><rect x="56" y="34" width="28" height="20" rx="4" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="2" /><line x1="44" y1="44" x2="56" y2="44" stroke="#3a3a5a" strokeWidth="2" /></>,
     "monocle": <><circle cx="50" cy="42" r="16" fill="none" stroke="#DAA520" strokeWidth="3" /><path d="M58 58 Q64 76 60 90" stroke="#DAA520" strokeWidth="2" fill="none" /></>,
+    "earrings-gold": <><circle cx="24" cy="56" r="7" fill="#FFD700" stroke="#DAA520" strokeWidth="1.5" /><circle cx="24" cy="56" r="3" fill="#FFF8DC" opacity="0.6" /><circle cx="76" cy="56" r="7" fill="#FFD700" stroke="#DAA520" strokeWidth="1.5" /><circle cx="76" cy="56" r="3" fill="#FFF8DC" opacity="0.6" /></>,
+    "earrings-crystal": <><polygon points="24,36 18,56 24,52 30,56" fill="#a78bfa" stroke="#8b6ff0" strokeWidth="1.5" /><polygon points="24,36 21,46 27,46" fill="#c8b8ff" opacity="0.5" /><polygon points="76,36 70,56 76,52 82,56" fill="#a78bfa" stroke="#8b6ff0" strokeWidth="1.5" /><polygon points="76,36 73,46 79,46" fill="#c8b8ff" opacity="0.5" /></>,
+    "glow-purple": <><circle cx="50" cy="50" r="36" fill="#a855f7" opacity="0.25" /><circle cx="50" cy="50" r="28" fill="#a855f7" opacity="0.35" /><circle cx="50" cy="50" r="16" fill="#c084fc" opacity="0.4" /></>,
+    "glow-cyan": <><circle cx="50" cy="50" r="36" fill="#22d3ee" opacity="0.25" /><circle cx="50" cy="50" r="28" fill="#22d3ee" opacity="0.35" /><circle cx="50" cy="50" r="16" fill="#67e8f9" opacity="0.4" /></>,
+    "glow-pink": <><circle cx="50" cy="50" r="36" fill="#f472b6" opacity="0.25" /><circle cx="50" cy="50" r="28" fill="#f472b6" opacity="0.35" /><circle cx="50" cy="50" r="16" fill="#f9a8d4" opacity="0.4" /></>,
+    "eyes-red": <><circle cx="36" cy="48" r="10" fill="#cc3333" opacity="0.3" /><circle cx="36" cy="48" r="5" fill="#ff6666" /><circle cx="64" cy="48" r="10" fill="#cc3333" opacity="0.3" /><circle cx="64" cy="48" r="5" fill="#ff6666" /></>,
+    "eyes-green": <><circle cx="36" cy="48" r="10" fill="#33aa55" opacity="0.3" /><circle cx="36" cy="48" r="5" fill="#66ff88" /><circle cx="64" cy="48" r="10" fill="#33aa55" opacity="0.3" /><circle cx="64" cy="48" r="5" fill="#66ff88" /></>,
+    "eyes-gold": <><circle cx="36" cy="48" r="10" fill="#DAA520" opacity="0.3" /><circle cx="36" cy="48" r="5" fill="#FFD700" /><circle cx="64" cy="48" r="10" fill="#DAA520" opacity="0.3" /><circle cx="64" cy="48" r="5" fill="#FFD700" /></>,
+    "wig-curly": <><path d="M18 60 Q10 30 30 18 Q44 8 56 12 Q70 8 78 22 Q90 36 80 60" fill="#5a3a1a" stroke="#4a2a10" strokeWidth="2" /><circle cx="30" cy="22" r="8" fill="#6b4423" opacity="0.7" /><circle cx="50" cy="14" r="9" fill="#6b4423" opacity="0.7" /><circle cx="70" cy="22" r="8" fill="#5a3a1a" opacity="0.7" /></>,
+    "wig-punk": <><path d="M34 60 L28 4 L42 44" fill="#cc2255" stroke="#aa1144" strokeWidth="1.5" /><path d="M48 56 L46 0 L56 40" fill="#dd3366" stroke="#aa1144" strokeWidth="1.5" /><path d="M62 56 L64 0 L70 40" fill="#cc2255" stroke="#aa1144" strokeWidth="1.5" /><path d="M20 60 Q20 30 50 18 Q80 30 80 60" fill="#cc2255" opacity="0.5" /></>,
+    "wig-long": <><path d="M16 50 Q14 24 36 14 Q48 8 60 12 Q78 18 84 46" fill="#1a1a3a" stroke="#2a2a4a" strokeWidth="2" /><path d="M16 50 Q12 70 18 86" stroke="#2a2a4a" strokeWidth="4" strokeLinecap="round" fill="none" /><path d="M84 50 Q88 70 82 86" stroke="#2a2a4a" strokeWidth="4" strokeLinecap="round" fill="none" /></>,
   };
   return (
     <svg width={w} height={w} viewBox="0 0 100 100" fill="none">
@@ -3575,7 +3677,7 @@ function getMoodLines(happinessMood, lineType) {
   return null; // use default lines
 }
 
-const IDLE_ACTIONS = ["stretch", "spin", "peek", "wiggle", "bounce", "yawn"];
+const IDLE_ACTIONS = ["stretch", "spin", "peek", "wiggle", "bounce", "yawn", "play-toy"];
 const IDLE_ANIMS = {
   stretch: "aggieStretch 0.8s ease-in-out",
   spin: "aggieSpin 0.7s ease-in-out",
@@ -3583,7 +3685,14 @@ const IDLE_ANIMS = {
   wiggle: "aggieWiggle 0.6s ease-in-out",
   bounce: "aggieBounce 0.5s ease-in-out",
   yawn: "aggieYawn 1.2s ease-in-out",
+  "play-toy": "aggiePlayToy 2.4s ease-in-out",
 };
+// Toy lines Aggie says when playing with her toy
+const AGGIE_TOY_LINES = [
+  "*plays with cube*", "Wheee!", "*boing boing*", "My favourite!",
+  "*spins toy*", "Catch!", "*tosses cube*", "So shiny...",
+  "*rolls toy around*", "Mine!", "Hehe!", "*poke poke*",
+];
 
 // --- Multiplayer Aggie Interactions ---
 const AGGIE_INTERACTIONS = [
@@ -4210,6 +4319,14 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
             chatConvoRef.current = null;
           }, 2500);
         }
+        // Toy play speech — always show a line when playing with toy
+        else if (action === "play-toy" && !speech && !chatSpeech) {
+          const line = AGGIE_TOY_LINES[Math.floor(Math.random() * AGGIE_TOY_LINES.length)];
+          speechSeqRef.current += 1;
+          setIdleSpeech(line);
+          clearTimeout(idleSpeechTimer.current);
+          idleSpeechTimer.current = setTimeout(() => setIdleSpeech(null), 2800);
+        }
         // Idle speech — mood-aware; grumpy/miserable Aggies speak more often
         else if (Math.random() < ((happinessMood === "grumpy" || happinessMood === "miserable") ? 0.12 : 0.05) && !speech && !chatSpeech) {
           const moodIdle = getMoodLines(happinessMood, "idle") || AGGIE_IDLE_LINES;
@@ -4219,8 +4336,8 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
           clearTimeout(idleSpeechTimer.current);
           idleSpeechTimer.current = setTimeout(() => setIdleSpeech(null), 2500);
         }
-        // Clear after animation plays
-        setTimeout(() => setIdleAction(null), 1200);
+        // Clear after animation plays (play-toy lasts longer)
+        setTimeout(() => setIdleAction(null), action === "play-toy" ? 2600 : 1200);
         scheduleIdle();
       }, 5000 + Math.random() * 5000); // 5-10s
     };
@@ -4409,6 +4526,8 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes aggieWiggle { 0%,100% { transform: rotate(0deg); } 20% { transform: rotate(-8deg); } 40% { transform: rotate(8deg); } 60% { transform: rotate(-5deg); } 80% { transform: rotate(5deg); } }
 @keyframes aggieBounce { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-14px); } 60% { transform: translateY(-2px); } }
 @keyframes aggieYawn { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+@keyframes aggiePlayToy { 0%,100% { transform: translateY(0) rotate(0deg); } 15% { transform: translateY(-6px) rotate(-5deg); } 30% { transform: translateY(0) rotate(3deg); } 45% { transform: translateY(-8px) rotate(-3deg); } 60% { transform: translateY(-2px) rotate(5deg); } 75% { transform: translateY(-10px) rotate(-4deg); } 90% { transform: translateY(-3px) rotate(2deg); } }
+@keyframes aggieToyFloat { 0% { opacity: 0; transform: translate(-50%, 10px) scale(0.3) rotate(0deg); } 10% { opacity: 1; transform: translate(-50%, 0px) scale(1) rotate(10deg); } 25% { transform: translate(-60%, -8px) scale(1.05) rotate(-15deg); } 40% { transform: translate(-40%, -4px) scale(0.95) rotate(20deg); } 55% { transform: translate(-55%, -10px) scale(1.1) rotate(-10deg); } 70% { transform: translate(-45%, -6px) scale(1) rotate(15deg); } 85% { opacity: 1; transform: translate(-50%, -2px) scale(0.9) rotate(-5deg); } 95% { opacity: 0.5; transform: translate(-50%, 4px) scale(0.5) rotate(0deg); } 100% { opacity: 0; transform: translate(-50%, 8px) scale(0.2) rotate(0deg); } }
 @keyframes aggieConfetti { 0% { transform: translate(0px, 0px) scale(1) rotate(0deg); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--ex), var(--ey)) scale(0.6) rotate(var(--cr)); } }
 @keyframes aggieTearShoot { 0% { opacity: 1; transform: translate(0px, 0px) scale(0.6); } 15% { opacity: 1; transform: translate(calc(var(--tx) * 0.4), calc(var(--ty) * 0.3)) scale(1); } 100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.3); } }
 @keyframes itemUseTreat { 0% { transform: scale(1) translateY(0); opacity: 1; } 30% { transform: scale(1.3) translateY(-8px); } 60% { transform: scale(0.6) translateY(10px); opacity: 0.8; } 100% { transform: scale(0) translateY(20px); opacity: 0; } }
@@ -4587,6 +4706,25 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       >
         {renderAggieSVG(AGGIE_SIZE, mood, true, accessory, happinessMood)}
       </div>
+
+      {/* Toy — appears when play-toy idle action is active */}
+      {idleAction === "play-toy" && (
+        <div style={{
+          position: "absolute",
+          left: AGGIE_SIZE / 2,
+          top: AGGIE_SIZE * 0.7,
+          pointerEvents: "none",
+          zIndex: 3,
+          animation: "aggieToyFloat 2.4s ease-in-out forwards",
+        }}>
+          <svg width={Math.max(18, AGGIE_SIZE * 0.22)} height={Math.max(18, AGGIE_SIZE * 0.22)} viewBox="0 0 24 24" fill="none">
+            <rect x="3" y="3" width="18" height="18" rx="3" fill="#7c5cbf" stroke="#9b7ed8" strokeWidth="1.5" />
+            <rect x="7" y="7" width="10" height="10" rx="1.5" fill="#9b7ed8" stroke="#c8b8ff" strokeWidth="0.8" />
+            <circle cx="12" cy="12" r="2.5" fill="#c8b8ff" />
+            <circle cx="12" cy="12" r="1" fill="#fff" opacity="0.6" />
+          </svg>
+        </div>
+      )}
 
       {/* Active buff badge — small icon + charges near bottom-right of aggie */}
       {activeBuff && activeBuff.charges > 0 && (() => {
