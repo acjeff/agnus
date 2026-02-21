@@ -5213,6 +5213,8 @@ export default function Pattrn() {
   const [companionMood, setCompanionMood] = useState(null); // "celebrate" | "sad" | null
   const companionMoodTimer = useRef(null);
   const prevGameStateRef = useRef("playing");
+  const isRevisitRef = useRef(false); // true when viewing a previously completed puzzle (skip success events)
+  const [showWinOverlay, setShowWinOverlay] = useState(true); // toggle for completed puzzle overlay
   const [aggieSpeech, setAggieSpeech] = useState(null);
   const aggieSpeechTimer = useRef(null);
 
@@ -5427,14 +5429,17 @@ export default function Pattrn() {
     prevGameStateRef.current = gameState;
     if (prev === gameState) return;
     if (gameState === "won") {
-      clearTimeout(companionMoodTimer.current);
-      setCompanionMood("celebrate");
-      companionMoodTimer.current = setTimeout(() => setCompanionMood(null), 4000);
-      // Reset fail streak on win
-      setAggieFailStreak(0);
-      saveFailStreak(0);
-      // Consume one debuff charge on puzzle completion
-      consumeDebuffCharge();
+      // Skip success events when revisiting a previously completed puzzle
+      if (!isRevisitRef.current) {
+        clearTimeout(companionMoodTimer.current);
+        setCompanionMood("celebrate");
+        companionMoodTimer.current = setTimeout(() => setCompanionMood(null), 4000);
+        // Reset fail streak on win
+        setAggieFailStreak(0);
+        saveFailStreak(0);
+        // Consume one debuff charge on puzzle completion
+        consumeDebuffCharge();
+      }
     } else if (gameState === "lost") {
       clearTimeout(companionMoodTimer.current);
       setCompanionMood("sad");
@@ -11507,10 +11512,12 @@ export default function Pattrn() {
       const savedTime = dTimes[lookupKey] ?? (isCoopMosaic ? coopMosaicSharedTileTimes[lookupKey] : undefined);
       const alreadyCompleted = !forceRestart && savedAttempts > 0 && savedTime != null && puz;
       if (alreadyCompleted) {
+        isRevisitRef.current = true;
         setFills(solutionFillsFromPuzzle(puz));
         setAttempts(savedAttempts);
         setElapsedTime(savedTime);
         setGameState("won");
+        setShowWinOverlay(true);
         setLockedCells(new Set(puz.blanks));
         setSelectedCell(null);
         setSelectedToken(null);
@@ -11525,9 +11532,11 @@ export default function Pattrn() {
       setFills({});
       setAttempts(0);
     }
+    isRevisitRef.current = false;
     setSelectedCell(null);
     setSelectedToken(null);
     setGameState("playing");
+    setShowWinOverlay(true);
     setWrongCells(new Set());
     setLockedCells(new Set());
     setClearedBlanks(new Set());
@@ -19400,7 +19409,7 @@ export default function Pattrn() {
       </div>
       </div>
       {/* Puzzle complete overlay — blurry area on top of finished grid */}
-      {gameState === "won" && (
+      {gameState === "won" && showWinOverlay && (
         <div style={{
           position: "absolute",
           inset: 0,
@@ -19494,6 +19503,34 @@ export default function Pattrn() {
             </div>
           )}
         </div>
+      )}
+      {/* Toggle overlay button — shown when puzzle is won */}
+      {gameState === "won" && (
+        <button
+          onClick={() => setShowWinOverlay(prev => !prev)}
+          style={{
+            position: "absolute",
+            top: 12,
+            right: 12,
+            zIndex: 10,
+            width: 36,
+            height: 36,
+            borderRadius: "50%",
+            border: `1px solid ${C.border}`,
+            backgroundColor: showWinOverlay ? C.surface : C.correct + "22",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            cursor: "pointer",
+            opacity: 0.85,
+            transition: "opacity 0.2s, background-color 0.2s",
+          }}
+          onMouseEnter={e => { e.currentTarget.style.opacity = "1"; }}
+          onMouseLeave={e => { e.currentTarget.style.opacity = "0.85"; }}
+          title={showWinOverlay ? "Show puzzle" : "Show overlay"}
+        >
+          <Eye size={16} color={showWinOverlay ? C.textDim : C.correct} />
+        </button>
       )}
 
       {/* Puzzle failed overlay — blurry area on top of failed grid */}
