@@ -1726,6 +1726,8 @@ const CHEAT_BIRTHDAY = "23-06-1912";
 const AGGIE_ID = "blob";
 const AGGIE_LABEL = "Aggie";
 const AGGIE_ACCESSORY_KEY = "pattrn-aggie-accessory";
+const AGGIE_SIZE_KEY = "pattrn-aggie-size";
+const AGGIE_SIZES = { small: 64, medium: 96, large: 128 };
 const AGGIE_ACCESSORIES = [
   { id: "none", label: "None" },
   { id: "party-hat", label: "Party Hat" },
@@ -1745,6 +1747,12 @@ function loadAggieAccessory() {
 }
 function saveAggieAccessory(id) {
   try { if (id && id !== "none") localStorage.setItem(AGGIE_ACCESSORY_KEY, id); else localStorage.removeItem(AGGIE_ACCESSORY_KEY); } catch { /* ignore */ }
+}
+function loadAggieSize() {
+  try { const s = localStorage.getItem(AGGIE_SIZE_KEY); return s && AGGIE_SIZES[s] ? s : "medium"; } catch { return "medium"; }
+}
+function saveAggieSize(size) {
+  try { localStorage.setItem(AGGIE_SIZE_KEY, size); } catch { /* ignore */ }
 }
 
 // --- Aggie SVG Renderer ---
@@ -3031,8 +3039,9 @@ function updateUrl(mode, level, replace = true, date = null, viewParam = null) {
   if (vaultVal) params.set("vault", vaultVal);
   const search = params.toString();
   const url = search ? `${window.location.pathname}?${search}` : window.location.pathname;
-  if (replace) window.history.replaceState({}, "", url);
-  else window.history.pushState({}, "", url);
+  const prevState = window.history.state || {};
+  if (replace) window.history.replaceState(prevState, "", url);
+  else window.history.pushState(prevState, "", url);
 }
 
 function setCoopUrlParam(paramName, value) {
@@ -3040,7 +3049,7 @@ function setCoopUrlParam(paramName, value) {
   const params = new URLSearchParams(window.location.search);
   params.set(paramName, value);
   const url = `${window.location.pathname}?${params}`;
-  window.history.replaceState({}, "", url);
+  window.history.replaceState(window.history.state || {}, "", url);
 }
 
 function clearCoopUrlParam(paramName) {
@@ -3048,7 +3057,7 @@ function clearCoopUrlParam(paramName) {
   const params = new URLSearchParams(window.location.search);
   params.delete(paramName);
   const url = params.toString() ? `${window.location.pathname}?${params}` : window.location.pathname;
-  window.history.replaceState({}, "", url);
+  window.history.replaceState(window.history.state || {}, "", url);
 }
 
 // --- Main App ---
@@ -3120,7 +3129,10 @@ const IDLE_ANIMS = {
   yawn: "aggieYawn 1.2s ease-in-out",
 };
 
-function FloatingCosmetic({ mood, accessory, speech }) {
+function FloatingCosmetic({ mood, accessory, speech, size = 96 }) {
+  const AGGIE_SIZE = size;
+  const AVOID_PAD = 16; // extra padding around obstacles
+
   const [pos, setPos] = useState(() => {
     try {
       const saved = localStorage.getItem("pattrn-cosmetic-pos");
@@ -3134,34 +3146,147 @@ function FloatingCosmetic({ mood, accessory, speech }) {
   const posRef = useRef(pos);
   posRef.current = pos;
 
-  // --- Wandering ---
-  // Uses CSS transitions for ultra-smooth movement instead of per-frame updates.
-  // Every 10-20s, pick a nearby point and let the CSS transition glide there over several seconds.
+  // --- Obstacle avoidance helpers ---
+  const getObstacles = useCallback(() => {
+    if (typeof document === "undefined") return [];
+    const els = document.querySelectorAll("[data-aggie-avoid]");
+    return Array.from(els).map(el => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left - AVOID_PAD, top: r.top - AVOID_PAD, right: r.right + AVOID_PAD, bottom: r.bottom + AVOID_PAD };
+    });
+  }, []);
+
+  const hitsObstacle = useCallback((x, y, obstacles) => {
+    return obstacles.some(o =>
+      x < o.right && x + AGGIE_SIZE > o.left &&
+      y < o.bottom && y + AGGIE_SIZE > o.top
+    );
+  }, []);
+
+  const findSafeSpot = useCallback((px, py, obstacles) => {
+    const maxW = window.innerWidth - AGGIE_SIZE;
+    const maxH = window.innerHeight - AGGIE_SIZE;
+    const clamp = (x, y) => ({ x: Math.max(0, Math.min(maxW, x)), y: Math.max(0, Math.min(maxH, y)) });
+    if (!hitsObstacle(px, py, obstacles)) return clamp(px, py);
+    // Try offsets at increasing distances in 8 directions
+    for (const dist of [90, 140, 200, 280]) {
+      for (const [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0],[-1,-1],[1,-1],[-1,1],[1,1]]) {
+        const c = clamp(px + dx * dist, py + dy * dist);
+        if (!hitsObstacle(c.x, c.y, obstacles)) return c;
+      }
+    }
+    // Random fallback
+    for (let i = 0; i < 30; i++) {
+      const rx = Math.random() * maxW, ry = Math.random() * maxH;
+      if (!hitsObstacle(rx, ry, obstacles)) return { x: rx, y: ry };
+    }
+    return { x: 10, y: 10 };
+  }, [hitsObstacle]);
+
+  // --- Wandering with obstacle avoidance + screen wrapping ---
   const wanderTimerRef = useRef(null);
   const [isWandering, setIsWandering] = useState(false);
+  const [isWrapping, setIsWrapping] = useState(false); // true = instant teleport (no CSS transition)
 
   useEffect(() => {
     if (dragging || mood) { setIsWandering(false); return; }
     setIsWandering(true);
+
+    // Immediately check if current position overlaps an obstacle (e.g. puzzle just appeared)
+    const obstacles = getObstacles();
+    if (hitsObstacle(posRef.current.x, posRef.current.y, obstacles)) {
+      const safe = findSafeSpot(posRef.current.x, posRef.current.y, obstacles);
+      setPos(safe);
+      try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(safe)); } catch { /* ignore */ }
+    }
+
     const wander = () => {
       const cur = posRef.current;
-      const maxW = typeof window !== "undefined" ? window.innerWidth - 74 : 300;
-      const maxH = typeof window !== "undefined" ? window.innerHeight - 74 : 600;
-      const range = 35; // small drift radius
-      const nx = Math.max(0, Math.min(maxW, cur.x + (Math.random() - 0.5) * range * 2));
-      const ny = Math.max(0, Math.min(maxH, cur.y + (Math.random() - 0.5) * range * 2));
-      setPos({ x: nx, y: ny });
+      const maxW = window.innerWidth - AGGIE_SIZE;
+      const maxH = window.innerHeight - AGGIE_SIZE;
+      const obs = getObstacles();
+      const range = 35;
+
+      let nx = cur.x + (Math.random() - 0.5) * range * 2;
+      let ny = cur.y + (Math.random() - 0.5) * range * 2;
+
+      // Screen-edge wrapping: if past an edge, appear on opposite side
+      let wrapped = false;
+      if (nx < -AGGIE_SIZE / 2) { nx = maxW; wrapped = true; }
+      else if (nx > maxW + AGGIE_SIZE / 2) { nx = 0; wrapped = true; }
+      if (ny < -AGGIE_SIZE / 2) { ny = maxH; wrapped = true; }
+      else if (ny > maxH + AGGIE_SIZE / 2) { ny = 0; wrapped = true; }
+
+      // Keep within bounds
+      nx = Math.max(0, Math.min(maxW, nx));
+      ny = Math.max(0, Math.min(maxH, ny));
+
+      // Avoid obstacles
+      if (hitsObstacle(nx, ny, obs)) {
+        const safe = findSafeSpot(nx, ny, obs);
+        nx = safe.x; ny = safe.y;
+      }
+
+      const newPos = { x: nx, y: ny };
+      if (wrapped) {
+        // Instant teleport for wrapping, then resume smooth transitions
+        setIsWrapping(true);
+        setPos(newPos);
+        requestAnimationFrame(() => requestAnimationFrame(() => setIsWrapping(false)));
+      } else {
+        setPos(newPos);
+      }
+      // Persist so position survives refresh / page change
+      try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(newPos)); } catch { /* ignore */ }
     };
-    wander(); // initial nudge
+
     const schedule = () => {
       wanderTimerRef.current = setTimeout(() => {
         wander();
         schedule();
-      }, 10000 + Math.random() * 12000); // 10-22s between moves
+      }, 10000 + Math.random() * 12000);
     };
     schedule();
     return () => clearTimeout(wanderTimerRef.current);
-  }, [dragging, mood]);
+  }, [dragging, mood, getObstacles, hitsObstacle, findSafeSpot]);
+
+  // --- Keep Aggie on screen after window resize ---
+  useEffect(() => {
+    const onResize = () => {
+      const maxW = window.innerWidth - AGGIE_SIZE;
+      const maxH = window.innerHeight - AGGIE_SIZE;
+      const cur = posRef.current;
+      if (cur.x > maxW || cur.y > maxH || cur.x < 0 || cur.y < 0) {
+        // Wrap around if off-screen
+        let nx = cur.x, ny = cur.y;
+        if (nx > maxW) nx = 0;
+        if (nx < 0) nx = maxW;
+        if (ny > maxH) ny = 0;
+        if (ny < 0) ny = maxH;
+        const wrapped = { x: Math.max(0, Math.min(maxW, nx)), y: Math.max(0, Math.min(maxH, ny)) };
+        setIsWrapping(true);
+        setPos(wrapped);
+        try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(wrapped)); } catch { /* ignore */ }
+        requestAnimationFrame(() => requestAnimationFrame(() => setIsWrapping(false)));
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // --- Periodically check obstacle overlap (catches layout changes) ---
+  useEffect(() => {
+    if (dragging || mood) return;
+    const check = setInterval(() => {
+      const obs = getObstacles();
+      if (obs.length > 0 && hitsObstacle(posRef.current.x, posRef.current.y, obs)) {
+        const safe = findSafeSpot(posRef.current.x, posRef.current.y, obs);
+        setPos(safe);
+        try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(safe)); } catch { /* ignore */ }
+      }
+    }, 2000);
+    return () => clearInterval(check);
+  }, [dragging, mood, getObstacles, hitsObstacle, findSafeSpot]);
 
   // --- Idle actions ---
   const [idleSpeech, setIdleSpeech] = useState(null);
@@ -3206,7 +3331,6 @@ function FloatingCosmetic({ mood, accessory, speech }) {
     e.preventDefault();
     e.stopPropagation();
     setDragging(true);
-    wanderTarget.current = null; // stop wandering
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     dragOffset.current = { x: clientX - posRef.current.x, y: clientY - posRef.current.y };
@@ -3217,12 +3341,19 @@ function FloatingCosmetic({ mood, accessory, speech }) {
     const onMove = (e) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      const nx = Math.max(0, Math.min(window.innerWidth - 74, clientX - dragOffset.current.x));
-      const ny = Math.max(0, Math.min(window.innerHeight - 74, clientY - dragOffset.current.y));
+      const nx = Math.max(0, Math.min(window.innerWidth - AGGIE_SIZE, clientX - dragOffset.current.x));
+      const ny = Math.max(0, Math.min(window.innerHeight - AGGIE_SIZE, clientY - dragOffset.current.y));
       setPos({ x: nx, y: ny });
     };
     const onUp = () => {
       setDragging(false);
+      // After drag, nudge away from obstacles if overlapping
+      const obs = getObstacles();
+      const cur = posRef.current;
+      if (hitsObstacle(cur.x, cur.y, obs)) {
+        const safe = findSafeSpot(cur.x, cur.y, obs);
+        setPos(safe);
+      }
       try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(posRef.current)); } catch { /* ignore */ }
     };
     window.addEventListener("pointermove", onMove);
@@ -3235,7 +3366,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
       window.removeEventListener("touchmove", onMove);
       window.removeEventListener("touchend", onUp);
     };
-  }, [dragging]);
+  }, [dragging, getObstacles, hitsObstacle, findSafeSpot]);
 
   // Determine which body animation to use
   const bodyAnim = dragging
@@ -3250,6 +3381,15 @@ function FloatingCosmetic({ mood, accessory, speech }) {
 
   // Determine if bubble should show on left (companion near right edge)
   const bubbleOnLeft = pos.x > window.innerWidth - 140;
+  // Show speech below Aggie when near top of screen (otherwise it's clipped)
+  const speechBelow = pos.y < 50;
+
+  // Transition: none when dragging or wrapping, smooth 8s for wandering, quick 0.3s for snap
+  const posTransition = dragging || isWrapping
+    ? "none"
+    : isWandering
+      ? "left 8s ease-in-out, top 8s ease-in-out"
+      : "left 0.3s ease, top 0.3s ease";
 
   return (
     <div
@@ -3259,7 +3399,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         top: pos.y,
         zIndex: 90,
         pointerEvents: "none",
-        transition: dragging ? "none" : isWandering ? "left 8s ease-in-out, top 8s ease-in-out" : "left 0.3s ease, top 0.3s ease",
+        transition: posTransition,
       }}
     >
       <style>{`
@@ -3267,7 +3407,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
 @keyframes companionCelebrate { 0%,100% { transform: translateY(0) rotate(0deg) scale(1); } 25% { transform: translateY(-12px) rotate(-8deg) scale(1.1); } 50% { transform: translateY(-2px) rotate(6deg) scale(1.05); } 75% { transform: translateY(-10px) rotate(-4deg) scale(1.12); } }
 @keyframes companionSad { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(3px) rotate(-2deg); } }
 @keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
-@keyframes speechBubbleIn { 0% { opacity: 0; transform: scale(0.3) translateY(8px); } 50% { opacity: 1; transform: scale(1.08) translateY(-2px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(4px) rotate(0deg); } 8% { opacity: 1; transform: scale(1) translateY(0) rotate(0deg); } 20% { opacity: 1; transform: translateY(-6px) rotate(1.5deg); } 35% { opacity: 0.95; transform: translateY(-12px) rotate(-1.2deg); } 50% { opacity: 0.85; transform: translateY(-18px) rotate(1deg); } 65% { opacity: 0.65; transform: translateY(-23px) rotate(-0.8deg); } 80% { opacity: 0.35; transform: translateY(-28px) rotate(0.5deg); } 100% { opacity: 0; transform: translateY(-34px) rotate(0deg); } }
 @keyframes aggieStretch { 0%,100% { transform: scaleX(1) scaleY(1); } 30% { transform: scaleX(1.15) scaleY(0.85); } 60% { transform: scaleX(0.9) scaleY(1.12); } }
 @keyframes aggieSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes aggiePeek { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-6px) rotate(-5deg); } 70% { transform: translateX(6px) rotate(5deg); } }
@@ -3283,20 +3423,27 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         return (
           <div key={displayText} style={{
             position: "absolute",
-            bottom: 73,
+            ...(speechBelow
+              ? { top: AGGIE_SIZE + 4 }
+              : { bottom: AGGIE_SIZE - 1 }),
             ...(bubbleOnLeft
               ? { right: 4, left: "auto" }
               : { left: 4, right: "auto" }),
             whiteSpace: "nowrap",
             pointerEvents: "none",
-            animation: "speechBubbleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+            animation: "aggieSpeechFloat 3s ease-out forwards",
             zIndex: 91,
+            padding: "5px 10px",
+            borderRadius: 12,
+            backgroundColor: "rgba(0, 0, 0, 0.45)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
             fontSize: 11,
-            fontWeight: 700,
-            fontFamily: "'Inter', system-ui, sans-serif",
-            color: "#ffffff",
-            textShadow: "0 1px 4px rgba(0,0,0,0.5)",
+            fontWeight: 600,
+            fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Menlo', 'Consolas', monospace",
+            color: "#e0dff4",
             lineHeight: 1.3,
+            letterSpacing: 0.3,
           }}>
             {displayText}
           </div>
@@ -3308,8 +3455,8 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         onPointerDown={onPointerDown}
         onTouchStart={onPointerDown}
         style={{
-          width: 74,
-          height: 74,
+          width: AGGIE_SIZE,
+          height: AGGIE_SIZE,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
@@ -3329,7 +3476,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         }}
         title={AGGIE_LABEL}
       >
-        {renderAggieSVG(74, mood, true, accessory)}
+        {renderAggieSVG(AGGIE_SIZE, mood, true, accessory)}
       </div>
     </div>
   );
@@ -3404,6 +3551,43 @@ export default function Pattrn() {
 
   // Radial context button state — stack for nested menus (empty = closed, ["root"] = top level, ["root","play"] = sub-menu)
   const [radialMenuStack, setRadialMenuStack] = useState([]);
+
+  // --- Browser history for view navigation ---
+  const skipHistoryPush = useRef(false);
+  const historyViewRef = useRef(view);
+  const isInitialLoad = useRef(true);
+
+  // Push a history entry whenever view changes (except popstate-driven or initial load)
+  useEffect(() => {
+    if (view === historyViewRef.current) return;
+    historyViewRef.current = view;
+    if (skipHistoryPush.current) {
+      skipHistoryPush.current = false;
+      return;
+    }
+    if (isInitialLoad.current) {
+      // First navigation from URL restore — replace rather than push
+      window.history.replaceState({ ...window.history.state, view }, "");
+      isInitialLoad.current = false;
+    } else {
+      window.history.pushState({ view }, "", window.location.href);
+    }
+  }, [view]);
+
+  // Handle browser back/forward
+  useEffect(() => {
+    // Seed the initial history entry with the current view
+    window.history.replaceState({ ...window.history.state, view: "menu" }, "");
+    const onPopState = (e) => {
+      const restoredView = e.state?.view || "menu";
+      skipHistoryPush.current = true;
+      setView(restoredView);
+      // Close any open menus on back navigation
+      setRadialMenuStack([]);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   // Lock body scroll when context menu is open
   useEffect(() => {
     const menuOpen = radialMenuStack.length > 0;
@@ -3720,6 +3904,7 @@ export default function Pattrn() {
   // --- Aggie companion state ---
   const [activeCosmetic, setActiveCosmetic] = useState(() => loadActiveCosmetic());
   const [aggieAccessory, setAggieAccessory] = useState(() => loadAggieAccessory());
+  const [aggieSize, setAggieSize] = useState(() => loadAggieSize());
   const [companionMood, setCompanionMood] = useState(null); // "celebrate" | "sad" | null
   const companionMoodTimer = useRef(null);
   const prevGameStateRef = useRef("playing");
@@ -5863,6 +6048,8 @@ export default function Pattrn() {
       const items = [...viewSpecificItems];
       // Theme — always accessible at top level
       items.push({ id: "root-theme", icon: "palette", label: "Theme", sub: "theme" });
+      // Aggie — always accessible, no login required
+      items.push({ id: "profile-aggie", icon: activeCosmetic ? "aggie-on" : "aggie-off", label: "Aggie", sub: "aggie-wardrobe" });
       if (firebaseConfigured && firebaseUser) {
         // Notifications — globally visible
         if (notifications.length > 0) {
@@ -5872,8 +6059,6 @@ export default function Pattrn() {
         items.push({ id: "nav-friends", icon: "message-square", label: totalFriendChatUnread > 0 ? `Messages (${totalFriendChatUnread > 99 ? "99+" : totalFriendChatUnread})` : "Messages", sub: "friends-view", beforeSub: () => { setFriendChatOpen(null); if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; } setFriendChatMessages({}); return true; } });
         // Co-op
         items.push({ id: "nav-coop-menu", icon: "handshake", label: "Co-op", sub: "coop" });
-        // Aggie — opens wardrobe panel, icon shows awake/asleep state
-        items.push({ id: "profile-aggie", icon: activeCosmetic ? "aggie-on" : "aggie-off", label: "Aggie", sub: "aggie-wardrobe" });
         // Profile submenu — account settings (username, birthday, sign out, etc.)
         items.push({ id: "nav-profile-menu", icon: "user-avatar", label: username || "Profile", sub: "profile" });
         // Admin
@@ -6124,6 +6309,7 @@ export default function Pattrn() {
       let h = panelPad + fabSize;
       h += 20 + 4; // header + margin
       h += 12 + 8; // toggle row + gap
+      h += 28 + 10; // size selector + gap
       h += 100 + 12; // preview area + gap
       const rows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3); // exclude "none"
       h += Math.min(rows, 4) * 64; // grid rows (cap at 4, rest scrolls)
@@ -6515,6 +6701,7 @@ export default function Pattrn() {
 
         {/* Expanding Liquid Glass panel / pill */}
         <div
+          data-aggie-avoid="menu"
           style={{
             position: "fixed",
             bottom: isOpen && isMobileMenu ? mobileMenuMargin + keyboardOffset : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
@@ -7257,6 +7444,27 @@ export default function Pattrn() {
                           transition: "all 0.2s",
                         }} />
                       </div>
+                    </div>
+
+                    {/* Size selector */}
+                    <div style={{
+                      display: "flex", justifyContent: "center", gap: 6, marginBottom: 10,
+                    }}>
+                      {[["small", "S"], ["medium", "M"], ["large", "L"]].map(([key, label]) => {
+                        const active = aggieSize === key;
+                        return (
+                          <button key={key} onClick={() => { setAggieSize(key); saveAggieSize(key); }}
+                            style={{
+                              width: 36, height: 28, borderRadius: 8,
+                              border: `1.5px solid ${active ? C.accent : C.border}`,
+                              backgroundColor: active ? C.accent + "18" : C.surface,
+                              color: active ? C.accent : C.textDim,
+                              fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                              cursor: "pointer", transition: "all 0.15s",
+                            }}
+                          >{label}</button>
+                        );
+                      })}
                     </div>
 
                     {/* Aggie preview */}
@@ -12018,7 +12226,7 @@ export default function Pattrn() {
 
   // --- Global modals element (included in every return) ---
   // --- Floating Aggie Companion ---
-  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} /> : null;
+  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} /> : null;
 
   const globalModalsEl = (
     <>
@@ -16744,7 +16952,7 @@ export default function Pattrn() {
             )}
           </div>
         )}
-      <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
+      <div key={gridEpoch} data-aggie-avoid="grid" style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
       <div style={{
         transform: isSpin ? `rotate(${spinAngle}deg)` : undefined,
         transition: isSpin ? "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
@@ -17064,7 +17272,7 @@ export default function Pattrn() {
 
       {/* Token picker — Liquid Glass pill above the menu pill */}
       {gameState === "playing" && puzzle && (
-        <div style={{
+        <div data-aggie-avoid="picker" style={{
           position: "fixed",
           bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
           left: "50%",
