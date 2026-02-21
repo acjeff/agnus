@@ -4868,6 +4868,7 @@ export default function Pattrn() {
   const [friendChatToast, setFriendChatToast] = useState(null); // { fromUsername, message }
   const friendChatToastTimer = useRef(null);
   const friendChatMetasPrevRef = useRef({}); // previous metas for detecting new messages
+  const friendChatMetasInitialRef = useRef(true); // skip toasting on initial load
 
   // --- Coop Mosaic state (n-player) ---
   const [coopMosaicSessionId, setCoopMosaicSessionId] = useState(null);
@@ -5377,6 +5378,7 @@ export default function Pattrn() {
     }
     if (!firebaseUser || !firebaseConfigured) {
       setNotifications([]);
+      friendChatMetasInitialRef.current = true;
       return;
     }
     notifInitialLoadRef.current = true;
@@ -5430,6 +5432,12 @@ export default function Pattrn() {
   // Detect new incoming friend chat messages and show toast
   useEffect(() => {
     if (!firebaseUser) return;
+    // On initial load, just record current metas without showing a toast
+    if (friendChatMetasInitialRef.current) {
+      friendChatMetasInitialRef.current = false;
+      friendChatMetasPrevRef.current = { ...friendChatMetas };
+      return;
+    }
     const prevMetas = friendChatMetasPrevRef.current;
     for (const [chatId, meta] of Object.entries(friendChatMetas)) {
       if (!meta || !meta.lastMessageAt || meta.lastMessageBy === firebaseUser.uid) continue;
@@ -13455,7 +13463,7 @@ export default function Pattrn() {
       zIndex: 1050,
       width: "min(360px, calc(100vw - 32px))", boxSizing: "border-box",
       animation: "fadeUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both",
-      pointerEvents: "auto",
+      pointerEvents: "auto", overflow: "hidden",
     }}>
       <div style={{
         display: "flex", alignItems: "center", gap: 10,
@@ -13474,6 +13482,7 @@ export default function Pattrn() {
           <div style={{
             fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700,
             color: C.text, lineHeight: 1.3,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
           }}>
             {coopInviteToast.fromUsername || "Someone"} invited you to {isVaultInvite ? "a vault!" : isMosaicInvite ? "co-op mosaic!" : "co-op!"}
           </div>
@@ -13573,7 +13582,7 @@ export default function Pattrn() {
       zIndex: 1049,
       width: "min(320px, calc(100vw - 32px))", boxSizing: "border-box",
       animation: "fadeUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both",
-      pointerEvents: "auto",
+      pointerEvents: "auto", overflow: "hidden",
     }}>
       <div
         onClick={() => {
@@ -13611,7 +13620,7 @@ export default function Pattrn() {
           </svg>
         </div>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, color: C.text }}>
+          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {friendChatToast.fromUsername}
           </div>
           <div style={{
