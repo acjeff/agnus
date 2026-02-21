@@ -4656,6 +4656,14 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes itemUseGem { 0% { transform: scale(1) rotate(0deg); opacity: 1; filter: brightness(1); } 25% { transform: scale(1.3) rotate(45deg); filter: brightness(2); } 50% { transform: scale(1.5) rotate(90deg); filter: brightness(3); opacity: 0.8; } 75% { transform: scale(0.8) rotate(135deg); filter: brightness(2); opacity: 0.5; } 100% { transform: scale(0) rotate(180deg); filter: brightness(4); opacity: 0; } }
 @keyframes itemUseHappyPop { 0% { transform: scale(0) translateY(0); opacity: 0; } 20% { transform: scale(1.2) translateY(-8px); opacity: 1; } 50% { transform: scale(1) translateY(-20px); opacity: 1; } 100% { transform: scale(0.8) translateY(-40px); opacity: 0; } }
 @keyframes itemUseMusicNote { 0% { transform: translateY(0) rotate(0deg) scale(0); opacity: 0; } 15% { transform: scale(1); opacity: 1; } 100% { transform: translateY(-30px) rotate(var(--nr)) scale(0.5); opacity: 0; } }
+@keyframes hangoutWander1 { 0% { transform: translate(0px, 0px); } 20% { transform: translate(12px, -6px); } 40% { transform: translate(-8px, -10px); } 60% { transform: translate(6px, 8px); } 80% { transform: translate(-14px, 2px); } 100% { transform: translate(0px, 0px); } }
+@keyframes hangoutWander2 { 0% { transform: translate(0px, 0px); } 15% { transform: translate(-10px, 8px); } 35% { transform: translate(14px, 4px); } 55% { transform: translate(-6px, -12px); } 75% { transform: translate(10px, -4px); } 100% { transform: translate(0px, 0px); } }
+@keyframes hangoutWander3 { 0% { transform: translate(0px, 0px); } 25% { transform: translate(8px, 10px); } 45% { transform: translate(-12px, -2px); } 65% { transform: translate(4px, -8px); } 85% { transform: translate(-10px, 6px); } 100% { transform: translate(0px, 0px); } }
+@keyframes hangoutWander4 { 0% { transform: translate(0px, 0px); } 18% { transform: translate(-6px, -10px); } 38% { transform: translate(10px, 6px); } 58% { transform: translate(-14px, -4px); } 78% { transform: translate(8px, 10px); } 100% { transform: translate(0px, 0px); } }
+@keyframes hangoutNudge { 0%,100% { transform: translateX(0); } 25% { transform: translateX(3px) rotate(4deg); } 50% { transform: translateX(-3px) rotate(-4deg); } 75% { transform: translateX(2px) rotate(2deg); } }
+@keyframes hangoutHeart { 0% { opacity: 0; transform: translateY(0) scale(0); } 20% { opacity: 1; transform: translateY(-4px) scale(1.2); } 60% { opacity: 1; transform: translateY(-12px) scale(1); } 100% { opacity: 0; transform: translateY(-20px) scale(0.6); } }
+@keyframes hangoutChat { 0% { opacity: 0; transform: scale(0.3); } 15% { opacity: 1; transform: scale(1.1); } 25% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: scale(0.8) translateY(-6px); } }
+@keyframes hangoutBop { 0%,100% { transform: scaleY(1); } 30% { transform: scaleY(0.92) scaleX(1.06); } 60% { transform: scaleY(1.06) scaleX(0.96); } }
 @keyframes buffAuraPulse { 0%,100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.08); } }
 @keyframes buffBadgeBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 @keyframes buffSparkle { 0%,100% { opacity: 0.3; } 50% { opacity: 0.8; } }
@@ -5498,6 +5506,7 @@ export default function Pattrn() {
   // --- Hangout system ---
   const [hangoutActive, setHangoutActive] = useState(false); // currently in hangout
   const [hangoutPeers, setHangoutPeers] = useState({}); // { uid: { username, accessory, traits, happinessMood, ... } }
+  const [hangoutRoomExpanded, setHangoutRoomExpanded] = useState(false); // expand hangout room view
   const hangoutUnsubRef = useRef(null);
 
   // --- Offline hangout system ---
@@ -9703,10 +9712,12 @@ export default function Pattrn() {
 
                       {/* Aggie's Room — big preview with owned items placed around */}
                       <div style={{
-                        position: "relative", width: "100%", height: 160,
+                        position: "relative", width: "100%",
+                        height: aggieWardrobeTab === "hangout" && hangoutRoomExpanded ? 320 : 160,
                         borderRadius: 12, marginBottom: 6, overflow: "hidden",
                         backgroundColor: C.surface,
                         border: `1.5px solid ${C.border}`,
+                        transition: "height 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
                       }}>
                         {/* Room floor gradient */}
                         <div style={{
@@ -9813,66 +9824,28 @@ export default function Pattrn() {
                           </div>
                         )}
 
-                        {/* Hangout peers — shown in the room when hangout tab is active */}
-                        {aggieWardrobeTab === "hangout" && (
-                          <>
-                            {Object.entries(hangoutPeers).map(([uid, peer], idx) => {
-                              const angle = (idx / Math.max(Object.keys(hangoutPeers).length, 1)) * Math.PI * 2 - Math.PI / 2;
-                              const rx = 55, ry = 35;
-                              const px = 50 + rx * Math.cos(angle);
-                              const py = 50 + ry * Math.sin(angle);
-                              return (
-                                <div key={uid} style={{
-                                  position: "absolute",
-                                  left: `${px}%`, top: `${py}%`,
-                                  transform: "translate(-50%, -50%)",
-                                  display: "flex", flexDirection: "column", alignItems: "center",
-                                  transition: "left 0.5s, top 0.5s",
-                                }}>
-                                  <div style={{ animation: `companionFloat ${2.5 + idx * 0.3}s ease-in-out infinite` }}>
-                                    {renderAggieSVG(48, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
-                                  </div>
-                                  <span style={{ fontSize: 7, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>
-                                    {peer.username || "???"}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                            {offlineHangouts.map((h, hIdx) => {
-                              const participants = h.participants || {};
-                              return Object.entries(participants)
-                                .filter(([uid]) => uid !== firebaseUser?.uid)
-                                .map(([uid, peer], pidx) => {
-                                  const totalLive = Object.keys(hangoutPeers).length;
-                                  const idx = totalLive + hIdx + pidx;
-                                  const totalAll = totalLive + offlineHangouts.length;
-                                  const angle = (idx / Math.max(totalAll, 1)) * Math.PI * 2 - Math.PI / 2;
-                                  const rx = 55, ry = 35;
-                                  const px = 50 + rx * Math.cos(angle);
-                                  const py = 50 + ry * Math.sin(angle);
-                                  return (
-                                    <div key={`offline-${uid}`} style={{
-                                      position: "absolute",
-                                      left: `${px}%`, top: `${py}%`,
-                                      transform: "translate(-50%, -50%)",
-                                      display: "flex", flexDirection: "column", alignItems: "center",
-                                      transition: "left 0.5s, top 0.5s",
-                                      opacity: 0.7,
-                                    }}>
-                                      <div style={{ animation: `companionFloat ${3 + idx * 0.3}s ease-in-out infinite` }}>
-                                        {renderAggieSVG(44, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
-                                      </div>
-                                      <span style={{ fontSize: 7, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>
-                                        {peer.username || "???"}
-                                      </span>
-                                      <span style={{ fontSize: 6, color: C.accent, fontFamily: "'Inter', sans-serif", opacity: 0.7 }}>
-                                        offline
-                                      </span>
-                                    </div>
-                                  );
-                                });
-                            })}
-                            {!hangoutActive && Object.keys(hangoutPeers).length === 0 && offlineHangouts.length === 0 && (
+                        {/* Hangout peers — wandering around the room when hangout tab is active */}
+                        {aggieWardrobeTab === "hangout" && (() => {
+                          const wanderAnims = ["hangoutWander1", "hangoutWander2", "hangoutWander3", "hangoutWander4"];
+                          const chatBubbles = ["\u2764", "\u2728", "hi!", "lol", "\ud83c\udf1f", ":)", "yay", "\ud83c\udf89"];
+                          const expanded = hangoutRoomExpanded;
+                          const aggieSize = expanded ? 52 : 44;
+                          // Collect all peers: live + offline
+                          const allPeers = [];
+                          Object.entries(hangoutPeers).forEach(([uid, peer]) => {
+                            allPeers.push({ uid, peer, isOffline: false });
+                          });
+                          offlineHangouts.forEach((h) => {
+                            const participants = h.participants || {};
+                            Object.entries(participants)
+                              .filter(([uid]) => uid !== firebaseUser?.uid)
+                              .forEach(([uid, peer]) => {
+                                allPeers.push({ uid, peer, isOffline: true });
+                              });
+                          });
+                          const total = allPeers.length;
+                          if (total === 0 && !hangoutActive) {
+                            return (
                               <div style={{
                                 position: "absolute", inset: 0,
                                 display: "flex", alignItems: "center", justifyContent: "center",
@@ -9881,29 +9854,129 @@ export default function Pattrn() {
                               }}>
                                 Send your Aggie to hang out with a friend!
                               </div>
-                            )}
-                          </>
-                        )}
+                            );
+                          }
+                          // Distribute peers in a scattered layout
+                          const positions = total <= 2
+                            ? [{ x: 20, y: 35 }, { x: 75, y: 55 }]
+                            : total <= 4
+                              ? [{ x: 15, y: 30 }, { x: 78, y: 25 }, { x: 22, y: 70 }, { x: 75, y: 65 }]
+                              : [{ x: 12, y: 28 }, { x: 80, y: 22 }, { x: 18, y: 68 }, { x: 78, y: 62 }, { x: 50, y: 78 }, { x: 50, y: 18 }];
+                          return allPeers.map(({ uid, peer, isOffline }, idx) => {
+                            const pos = positions[idx % positions.length];
+                            const wanderAnim = wanderAnims[idx % wanderAnims.length];
+                            const wanderDur = 6 + (idx % 3) * 2; // 6s, 8s, 10s
+                            const bubble = chatBubbles[(idx * 3 + Math.floor(Date.now() / 10000)) % chatBubbles.length];
+                            // Interaction emote — cycles based on time so they appear to interact
+                            const showEmote = (Math.floor(Date.now() / 4000) + idx) % 5 === 0;
+                            return (
+                              <div key={isOffline ? `offline-${uid}` : uid} style={{
+                                position: "absolute",
+                                left: `${pos.x}%`, top: `${pos.y}%`,
+                                transform: "translate(-50%, -50%)",
+                                display: "flex", flexDirection: "column", alignItems: "center",
+                                opacity: isOffline ? 0.55 : 1,
+                                zIndex: 2,
+                              }}>
+                                {/* Chat bubble / emote */}
+                                {showEmote && (
+                                  <div style={{
+                                    position: "absolute", top: -14,
+                                    fontSize: 10, color: C.accent,
+                                    fontFamily: "'Inter', sans-serif",
+                                    fontWeight: 700,
+                                    animation: "hangoutChat 3s ease-in-out forwards",
+                                    pointerEvents: "none",
+                                    whiteSpace: "nowrap",
+                                    background: C.surface, borderRadius: 6,
+                                    padding: "1px 5px",
+                                    border: `1px solid ${C.border}`,
+                                    boxShadow: `0 1px 4px ${C.accent}15`,
+                                  }}>
+                                    {bubble}
+                                  </div>
+                                )}
+                                {/* Wandering aggie */}
+                                <div style={{
+                                  animation: `${wanderAnim} ${wanderDur}s ease-in-out infinite, hangoutBop ${2 + idx * 0.4}s ease-in-out infinite`,
+                                  animationDelay: `${idx * 0.7}s, ${idx * 0.3}s`,
+                                }}>
+                                  <div style={{
+                                    animation: `hangoutNudge ${3 + idx * 0.5}s ease-in-out infinite`,
+                                    animationDelay: `${idx * 1.2}s`,
+                                  }}>
+                                    {renderAggieSVG(aggieSize, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
+                                  </div>
+                                </div>
+                                <span style={{
+                                  fontSize: 7, fontWeight: 600,
+                                  color: isOffline ? C.textDim : C.text,
+                                  fontFamily: "'Inter', sans-serif", marginTop: 1,
+                                }}>
+                                  {peer.username || "???"}
+                                </span>
+                                {isOffline && (
+                                  <span style={{ fontSize: 6, color: C.accent, fontFamily: "'Inter', sans-serif", opacity: 0.7 }}>
+                                    offline
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          });
+                        })()}
 
-                        {/* Aggie — centered, big */}
+                        {/* Aggie — centered */}
                         <div style={{
                           position: "absolute",
                           left: "50%", top: "50%",
                           transform: "translate(-50%, -50%)",
                           opacity: isOn ? 1 : 0.4, transition: "opacity 0.2s",
+                          zIndex: 3,
                         }}>
                           <div style={{
-                            width: aggieWardrobeTab === "hangout" ? 80 : 120,
-                            height: aggieWardrobeTab === "hangout" ? 80 : 120,
+                            width: aggieWardrobeTab === "hangout" ? (hangoutRoomExpanded ? 72 : 64) : 120,
+                            height: aggieWardrobeTab === "hangout" ? (hangoutRoomExpanded ? 72 : 64) : 120,
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            animation: aggieUsingItem && aggieWardrobeTab !== "hangout"
-                              ? "aggieBounce 0.6s ease-in-out 1s 1"
-                              : isOn ? "companionFloat 3s ease-in-out infinite" : "none",
+                            animation: aggieWardrobeTab === "hangout"
+                              ? "hangoutBop 2.2s ease-in-out infinite"
+                              : aggieUsingItem
+                                ? "aggieBounce 0.6s ease-in-out 1s 1"
+                                : isOn ? "companionFloat 3s ease-in-out infinite" : "none",
                             transition: "width 0.3s, height 0.3s",
                           }}>
-                            {renderAggieSVG(aggieWardrobeTab === "hangout" ? 80 : 120, null, isOn, currentAccSlots, hMood)}
+                            {renderAggieSVG(aggieWardrobeTab === "hangout" ? (hangoutRoomExpanded ? 72 : 64) : 120, null, isOn, currentAccSlots, hMood)}
                           </div>
+                          {aggieWardrobeTab === "hangout" && (
+                            <span style={{
+                              display: "block", textAlign: "center",
+                              fontSize: 7, fontWeight: 600, color: C.accent,
+                              fontFamily: "'Inter', sans-serif", marginTop: 1,
+                            }}>You</span>
+                          )}
                         </div>
+
+                        {/* Expand/collapse button for hangout */}
+                        {aggieWardrobeTab === "hangout" && (
+                          <button
+                            onClick={() => setHangoutRoomExpanded(e => !e)}
+                            style={{
+                              position: "absolute", bottom: 6, right: 6,
+                              zIndex: 5, background: C.surface,
+                              border: `1px solid ${C.border}`,
+                              borderRadius: 6, padding: "2px 6px",
+                              cursor: "pointer", fontSize: 10,
+                              color: C.textDim, fontFamily: "'Inter', sans-serif",
+                              fontWeight: 600, opacity: 0.7,
+                              display: "flex", alignItems: "center", gap: 3,
+                              transition: "opacity 0.2s",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.opacity = "1"}
+                            onMouseLeave={e => e.currentTarget.style.opacity = "0.7"}
+                          >
+                            {hangoutRoomExpanded ? "\u25B2" : "\u25BC"}
+                            <span>{hangoutRoomExpanded ? "Less" : "More"}</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Controls row: On/Off + Size */}
