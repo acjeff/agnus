@@ -3129,7 +3129,7 @@ const IDLE_ANIMS = {
   yawn: "aggieYawn 1.2s ease-in-out",
 };
 
-function FloatingCosmetic({ mood, accessory, speech, size = 96 }) {
+function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false }) {
   const AGGIE_SIZE = size;
   const AVOID_PAD = 16; // extra padding around obstacles
 
@@ -3183,10 +3183,35 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96 }) {
     return { x: 10, y: 10 };
   }, [hitsObstacle]);
 
+  // --- Helper: get the puzzle grid bounding rect ---
+  const getGridRect = useCallback(() => {
+    if (typeof document === "undefined") return null;
+    const el = document.querySelector("[data-aggie-avoid='grid']");
+    if (!el) return null;
+    return el.getBoundingClientRect();
+  }, []);
+
   // --- Wandering with obstacle avoidance + screen wrapping ---
   const wanderTimerRef = useRef(null);
   const [isWandering, setIsWandering] = useState(false);
   const [isWrapping, setIsWrapping] = useState(false); // true = instant teleport (no CSS transition)
+
+  // When entering/leaving puzzle screen, reposition Aggie above the grid
+  const prevOnPuzzleScreenRef = useRef(onPuzzleScreen);
+  useEffect(() => {
+    if (onPuzzleScreen && !prevOnPuzzleScreenRef.current) {
+      // Just entered puzzle screen — move Aggie above the grid
+      const gridRect = getGridRect();
+      if (gridRect) {
+        const targetY = gridRect.top - AGGIE_SIZE - 8;
+        const gridCenterX = gridRect.left + gridRect.width / 2 - AGGIE_SIZE / 2;
+        const newPos = { x: Math.max(0, Math.min(window.innerWidth - AGGIE_SIZE, gridCenterX)), y: Math.max(0, targetY) };
+        setPos(newPos);
+        try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(newPos)); } catch { /* ignore */ }
+      }
+    }
+    prevOnPuzzleScreenRef.current = onPuzzleScreen;
+  }, [onPuzzleScreen, getGridRect]);
 
   useEffect(() => {
     if (dragging || mood) { setIsWandering(false); return; }
@@ -3204,6 +3229,29 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96 }) {
       const cur = posRef.current;
       const maxW = window.innerWidth - AGGIE_SIZE;
       const maxH = window.innerHeight - AGGIE_SIZE;
+
+      if (onPuzzleScreen) {
+        // --- Puzzle screen: wander horizontally just above the grid ---
+        const gridRect = getGridRect();
+        if (gridRect) {
+          const targetY = gridRect.top - AGGIE_SIZE - 8;
+          const gridLeft = Math.max(0, gridRect.left - AGGIE_SIZE / 2);
+          const gridRight = Math.min(maxW, gridRect.right - AGGIE_SIZE / 2);
+          const range = 50;
+          let nx = cur.x + (Math.random() - 0.5) * range * 2;
+          // Horizontal wrapping within grid bounds
+          if (nx < gridLeft) nx = gridLeft;
+          if (nx > gridRight) nx = gridRight;
+          const ny = Math.max(0, targetY);
+          const newPos = { x: nx, y: ny };
+          setPos(newPos);
+          try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(newPos)); } catch { /* ignore */ }
+          return;
+        }
+        // Fallback if grid not found — use normal wander
+      }
+
+      // --- Normal screen: wander freely everywhere ---
       const obs = getObstacles();
       const range = 35;
 
@@ -3244,11 +3292,11 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96 }) {
       wanderTimerRef.current = setTimeout(() => {
         wander();
         schedule();
-      }, 10000 + Math.random() * 12000);
+      }, onPuzzleScreen ? 6000 + Math.random() * 8000 : 10000 + Math.random() * 12000);
     };
     schedule();
     return () => clearTimeout(wanderTimerRef.current);
-  }, [dragging, mood, getObstacles, hitsObstacle, findSafeSpot]);
+  }, [dragging, mood, onPuzzleScreen, getObstacles, getGridRect, hitsObstacle, findSafeSpot]);
 
   // --- Keep Aggie on screen after window resize ---
   useEffect(() => {
@@ -3278,15 +3326,29 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96 }) {
   useEffect(() => {
     if (dragging || mood) return;
     const check = setInterval(() => {
-      const obs = getObstacles();
-      if (obs.length > 0 && hitsObstacle(posRef.current.x, posRef.current.y, obs)) {
-        const safe = findSafeSpot(posRef.current.x, posRef.current.y, obs);
-        setPos(safe);
-        try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(safe)); } catch { /* ignore */ }
+      if (onPuzzleScreen) {
+        // On puzzle screen, keep Aggie pinned above the grid
+        const gridRect = getGridRect();
+        if (gridRect) {
+          const targetY = Math.max(0, gridRect.top - AGGIE_SIZE - 8);
+          const cur = posRef.current;
+          if (Math.abs(cur.y - targetY) > 4) {
+            const newPos = { x: cur.x, y: targetY };
+            setPos(newPos);
+            try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(newPos)); } catch { /* ignore */ }
+          }
+        }
+      } else {
+        const obs = getObstacles();
+        if (obs.length > 0 && hitsObstacle(posRef.current.x, posRef.current.y, obs)) {
+          const safe = findSafeSpot(posRef.current.x, posRef.current.y, obs);
+          setPos(safe);
+          try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(safe)); } catch { /* ignore */ }
+        }
       }
     }, 2000);
     return () => clearInterval(check);
-  }, [dragging, mood, getObstacles, hitsObstacle, findSafeSpot]);
+  }, [dragging, mood, onPuzzleScreen, getObstacles, getGridRect, hitsObstacle, findSafeSpot]);
 
   // --- Idle actions ---
   const [idleSpeech, setIdleSpeech] = useState(null);
@@ -12250,7 +12312,7 @@ export default function Pattrn() {
 
   // --- Global modals element (included in every return) ---
   // --- Floating Aggie Companion ---
-  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} /> : null;
+  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} /> : null;
 
   const globalModalsEl = (
     <>
