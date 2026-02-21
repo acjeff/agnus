@@ -102,6 +102,9 @@ import {
   removeAggieState,
   sendAggieInteraction,
   subscribeToAggieInteractions,
+  joinHangout,
+  leaveHangout,
+  subscribeToHangout,
 } from "./firebase.js";
 import VaultMode, { getVaultSummary } from "./vault/VaultMode.jsx";
 import VaultChat, { getUnreadCount } from "./vault/VaultChat.jsx";
@@ -1735,30 +1738,38 @@ const AGGIE_LABEL = "Aggie";
 const AGGIE_ACCESSORY_KEY = "pattrn-aggie-accessory";
 const AGGIE_SIZE_KEY = "pattrn-aggie-size";
 const AGGIE_SIZES = { small: 64, medium: 96, large: 128 };
+const ACCESSORY_CATEGORIES = [
+  { id: "hat", label: "Hats" },
+  { id: "hair", label: "Hair" },
+  { id: "eyes", label: "Eyes" },
+  { id: "face", label: "Face" },
+  { id: "earring", label: "Earrings" },
+  { id: "glow", label: "Glow" },
+];
 const AGGIE_ACCESSORIES = [
-  { id: "none", label: "None", cost: 0 },
-  { id: "party-hat", label: "Party Hat", cost: 0 },
-  { id: "beanie", label: "Beanie", cost: 0 },
-  { id: "cat-ears", label: "Cat Ears", cost: 0 },
-  { id: "bandana", label: "Bandana", cost: 0 },
-  { id: "crown", label: "Crown", cost: 30 },
-  { id: "top-hat", label: "Top Hat", cost: 25 },
-  { id: "devil-horns", label: "Devil Horns", cost: 20 },
-  { id: "halo", label: "Halo", cost: 35 },
-  { id: "pirate-hat", label: "Pirate Hat", cost: 20 },
-  { id: "sunglasses", label: "Sunglasses", cost: 15 },
-  { id: "monocle", label: "Monocle", cost: 40 },
-  { id: "earrings-gold", label: "Gold Earrings", cost: 25 },
-  { id: "earrings-crystal", label: "Crystal Earrings", cost: 45 },
-  { id: "glow-purple", label: "Purple Glow", cost: 20 },
-  { id: "glow-cyan", label: "Cyan Glow", cost: 20 },
-  { id: "glow-pink", label: "Pink Glow", cost: 20 },
-  { id: "eyes-red", label: "Red Eyes", cost: 15 },
-  { id: "eyes-green", label: "Green Eyes", cost: 15 },
-  { id: "eyes-gold", label: "Gold Eyes", cost: 30 },
-  { id: "wig-curly", label: "Curly Wig", cost: 30 },
-  { id: "wig-punk", label: "Punk Spikes", cost: 35 },
-  { id: "wig-long", label: "Long Hair", cost: 25 },
+  { id: "none", label: "None", cost: 0, category: null },
+  { id: "party-hat", label: "Party Hat", cost: 0, category: "hat" },
+  { id: "beanie", label: "Beanie", cost: 0, category: "hat" },
+  { id: "cat-ears", label: "Cat Ears", cost: 0, category: "hat" },
+  { id: "bandana", label: "Bandana", cost: 0, category: "hat" },
+  { id: "crown", label: "Crown", cost: 30, category: "hat" },
+  { id: "top-hat", label: "Top Hat", cost: 25, category: "hat" },
+  { id: "devil-horns", label: "Devil Horns", cost: 20, category: "hat" },
+  { id: "halo", label: "Halo", cost: 35, category: "hat" },
+  { id: "pirate-hat", label: "Pirate Hat", cost: 20, category: "hat" },
+  { id: "sunglasses", label: "Sunglasses", cost: 15, category: "face" },
+  { id: "monocle", label: "Monocle", cost: 40, category: "face" },
+  { id: "earrings-gold", label: "Gold Earrings", cost: 25, category: "earring" },
+  { id: "earrings-crystal", label: "Crystal Earrings", cost: 45, category: "earring" },
+  { id: "glow-purple", label: "Purple Glow", cost: 20, category: "glow" },
+  { id: "glow-cyan", label: "Cyan Glow", cost: 20, category: "glow" },
+  { id: "glow-pink", label: "Pink Glow", cost: 20, category: "glow" },
+  { id: "eyes-red", label: "Red Eyes", cost: 15, category: "eyes" },
+  { id: "eyes-green", label: "Green Eyes", cost: 15, category: "eyes" },
+  { id: "eyes-gold", label: "Gold Eyes", cost: 30, category: "eyes" },
+  { id: "wig-curly", label: "Curly Wig", cost: 30, category: "hair" },
+  { id: "wig-punk", label: "Punk Spikes", cost: 35, category: "hair" },
+  { id: "wig-long", label: "Long Hair", cost: 25, category: "hair" },
 ];
 const AGGIE_UNLOCKED_ACC_KEY = "pattrn-aggie-unlocked-acc";
 function loadUnlockedAccessories() {
@@ -1767,11 +1778,36 @@ function loadUnlockedAccessories() {
 function saveUnlockedAccessories(set) {
   try { localStorage.setItem(AGGIE_UNLOCKED_ACC_KEY, JSON.stringify([...set])); } catch { /* ignore */ }
 }
+// Accessory slots: { hat: "crown", eyes: "eyes-red", glow: "glow-purple", ... }
+// Backward compat: old format was a single string like "crown"
 function loadAggieAccessory() {
-  try { return localStorage.getItem(AGGIE_ACCESSORY_KEY) || "none"; } catch { return "none"; }
+  try {
+    const raw = localStorage.getItem(AGGIE_ACCESSORY_KEY);
+    if (!raw || raw === "none") return {};
+    // Try parsing as JSON object (new multi-slot format)
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch { /* not JSON, treat as legacy single-accessory string */ }
+    // Legacy: single accessory id string — migrate to slotted format
+    const acc = AGGIE_ACCESSORIES.find(a => a.id === raw);
+    if (acc && acc.category) return { [acc.category]: raw };
+    return {};
+  } catch { return {}; }
 }
-function saveAggieAccessory(id) {
-  try { if (id && id !== "none") localStorage.setItem(AGGIE_ACCESSORY_KEY, id); else localStorage.removeItem(AGGIE_ACCESSORY_KEY); } catch { /* ignore */ }
+function saveAggieAccessory(slots) {
+  try {
+    // slots is an object like { hat: "crown", eyes: "eyes-red" }
+    const clean = {};
+    for (const [k, v] of Object.entries(slots || {})) { if (v && v !== "none") clean[k] = v; }
+    if (Object.keys(clean).length > 0) localStorage.setItem(AGGIE_ACCESSORY_KEY, JSON.stringify(clean));
+    else localStorage.removeItem(AGGIE_ACCESSORY_KEY);
+  } catch { /* ignore */ }
+}
+// Helper: get array of active accessory IDs from slots object
+function getActiveAccessoryIds(slots) {
+  if (!slots || typeof slots !== "object") return [];
+  return Object.values(slots).filter(v => v && v !== "none");
 }
 function loadAggieSize() {
   try { const s = localStorage.getItem(AGGIE_SIZE_KEY); return s && AGGIE_SIZES[s] ? s : "medium"; } catch { return "medium"; }
@@ -1952,6 +1988,57 @@ function saveFailStreak(n) {
   try { localStorage.setItem(AGGIE_FAIL_STREAK_KEY, String(n)); } catch { /* ignore */ }
 }
 
+// --- Aggie Inherent Traits ---
+// Each Aggie gets 1-2 random traits on first creation. Traits are permanent and provide passive bonuses.
+// When Aggies hang out together, they share trait benefits with each other.
+const AGGIE_TRAITS_KEY = "pattrn-aggie-traits";
+const AGGIE_TRAITS = [
+  { id: "lucky", label: "Lucky", desc: "10% chance of bonus coins on puzzle complete", icon: "clover", color: "#22C55E", chance: 0.10, effect: "bonus_coins" },
+  { id: "scholarly", label: "Scholarly", desc: "Hints are slightly more accurate", icon: "book", color: "#60A5FA", effect: "hint_accuracy" },
+  { id: "energetic", label: "Energetic", desc: "Happiness decays 50% slower", icon: "bolt", color: "#FBBF24", effect: "slow_decay" },
+  { id: "charming", label: "Charming", desc: "Shop items give 25% more happiness", icon: "sparkle", color: "#F472B6", effect: "item_bonus" },
+  { id: "resilient", label: "Resilient", desc: "30% chance to resist debuffs", icon: "shield", color: "#A78BFA", effect: "debuff_resist" },
+  { id: "generous", label: "Generous", desc: "Earn 20% bonus coins in co-op", icon: "heart", color: "#FB7185", effect: "coop_coins" },
+  { id: "keen-eyed", label: "Keen-Eyed", desc: "Hints appear more frequently", icon: "eye", color: "#34D399", effect: "hint_freq" },
+  { id: "thrifty", label: "Thrifty", desc: "15% chance items cost nothing", icon: "coin", color: "#FCD34D", effect: "free_item" },
+  { id: "brave", label: "Brave", desc: "Blind puzzles give 30% more coins", icon: "sword", color: "#F97316", effect: "blind_bonus" },
+  { id: "mystic", label: "Mystic", desc: "5% chance to auto-unlock an accessory", icon: "crystal", color: "#C084FC", effect: "free_accessory" },
+];
+
+function rollAggieTraits() {
+  // Give 1-2 traits randomly (weighted: ~60% chance of 1 trait, ~40% chance of 2)
+  const count = Math.random() < 0.4 ? 2 : 1;
+  const shuffled = [...AGGIE_TRAITS].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count).map(t => t.id);
+}
+
+function loadAggieTraits() {
+  try {
+    const raw = localStorage.getItem(AGGIE_TRAITS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+    // First load — roll traits
+    const traits = rollAggieTraits();
+    saveAggieTraits(traits);
+    return traits;
+  } catch {
+    const traits = rollAggieTraits();
+    saveAggieTraits(traits);
+    return traits;
+  }
+}
+
+function saveAggieTraits(traits) {
+  try { localStorage.setItem(AGGIE_TRAITS_KEY, JSON.stringify(traits)); } catch { /* ignore */ }
+}
+
+// Helper: check if a trait set (own or shared) includes a specific effect
+function hasTraitEffect(traitIds, effect) {
+  return traitIds.some(id => { const t = AGGIE_TRAITS.find(x => x.id === id); return t && t.effect === effect; });
+}
+
 // Calculate decayed happiness based on time since last interaction
 function calcDecayedHappiness(stored, lastInteract) {
   const elapsed = Date.now() - lastInteract;
@@ -1960,7 +2047,8 @@ function calcDecayedHappiness(stored, lastInteract) {
 }
 
 // --- Aggie SVG Renderer ---
-// Renders Aggie (the blob companion) at a given size with mood-based expressions and optional accessory.
+// Renders Aggie (the blob companion) at a given size with mood-based expressions and optional accessories.
+// accessory can be: a slots object { hat: "crown", eyes: "eyes-red" }, a single string "crown" (legacy/peer), or an array of IDs.
 function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
   const w = size || 48;
   const isSad = mood === "sad";
@@ -1969,7 +2057,14 @@ function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
   const isMiserable = !mood && happinessMood === "miserable";
   const isEcstatic = !mood && happinessMood === "ecstatic";
   const blink = animate ? (isGrumpy ? "blobBlink 5s ease-in-out infinite" : "blobBlink 3.5s ease-in-out infinite") : "none";
-  const acc = accessory && accessory !== "none" ? accessory : null;
+  // Normalize accessory input to an array of active IDs
+  const accIds = (() => {
+    if (!accessory) return [];
+    if (typeof accessory === "string") return accessory !== "none" ? [accessory] : [];
+    if (Array.isArray(accessory)) return accessory.filter(a => a && a !== "none");
+    if (typeof accessory === "object") return Object.values(accessory).filter(a => a && a !== "none");
+    return [];
+  })();
   const uid = `ag${w}`;
 
   // Eye color overrides from eye accessories
@@ -1978,7 +2073,7 @@ function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
     "eyes-green": { color: "#66ff88", glow: "#33aa55" },
     "eyes-gold": { color: "#FFD700", glow: "#DAA520" },
   };
-  const eyeOv = acc && eyeOverrides[acc] ? eyeOverrides[acc] : null;
+  const eyeOv = accIds.reduce((ov, id) => eyeOverrides[id] || ov, null);
 
   // Glow color overrides from glow accessories
   const glowOverrides = {
@@ -1986,7 +2081,7 @@ function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
     "glow-cyan": "#22d3ee",
     "glow-pink": "#f472b6",
   };
-  const glowColor = acc && glowOverrides[acc] ? glowOverrides[acc] : null;
+  const glowColor = accIds.reduce((gc, id) => glowOverrides[id] || gc, null);
 
   // Dark spirit colors — smoky, shadowy; grumpy = slightly reddish tint
   const bodyCore = isSad ? "#0e0c14" : isGrumpy ? "#100810" : "#0a0810";
@@ -2053,80 +2148,92 @@ function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
           : <path d="M44 63 Q50 66 56 63" stroke={mouthColor} strokeWidth="1.8" strokeLinecap="round" fill="none" />;
 
   // Accessory overlays — positioned on the 100x100 viewBox
-  const accessoryEl = !acc ? null
-    : acc === "party-hat" ? (
-      <g>
+  // Render each active accessory as an overlay element
+  const accessoryOverlays = {
+    "party-hat": (
+      <g key="party-hat">
         <polygon points="50,0 34,22 66,22" fill="#7c5cbf" stroke="#9b7ed8" strokeWidth="1.5" strokeLinejoin="round" />
         <line x1="40" y1="14" x2="60" y2="14" stroke="#c8f03e" strokeWidth="1.5" strokeLinecap="round" />
         <circle cx="50" cy="0" r="3" fill="#c8f03e" />
       </g>
-    ) : acc === "crown" ? (
-      <g>
+    ),
+    "crown": (
+      <g key="crown">
         <path d="M28 24 L32 10 L40 20 L50 6 L60 20 L68 10 L72 24Z" fill="#FFD700" stroke="#DAA520" strokeWidth="1" strokeLinejoin="round" />
         <circle cx="40" cy="22" r="2" fill="#DAA520" /><circle cx="50" cy="20" r="2" fill="#DAA520" /><circle cx="60" cy="22" r="2" fill="#DAA520" />
       </g>
-    ) : acc === "top-hat" ? (
-      <g>
+    ),
+    "top-hat": (
+      <g key="top-hat">
         <rect x="32" y="4" width="36" height="22" rx="3" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="1.5" />
         <rect x="26" y="24" width="48" height="5" rx="2" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="1.5" />
         <line x1="34" y1="15" x2="66" y2="15" stroke="#4a4a6a" strokeWidth="1" />
       </g>
-    ) : acc === "beanie" ? (
-      <g>
+    ),
+    "beanie": (
+      <g key="beanie">
         <path d="M22 28 Q22 6 50 4 Q78 6 78 28" fill="#4a6fa5" stroke="#5a82b8" strokeWidth="1.5" />
         <line x1="22" y1="28" x2="78" y2="28" stroke="#3a5a8a" strokeWidth="2.5" />
         <line x1="26" y1="26" x2="74" y2="26" stroke="#5a82b8" strokeWidth="1" opacity="0.5" />
         <circle cx="50" cy="2" r="4" fill="#5a82b8" />
       </g>
-    ) : acc === "cat-ears" ? (
-      <g>
+    ),
+    "cat-ears": (
+      <g key="cat-ears">
         <polygon points="18,28 24,2 38,22" fill="#0e0c14" stroke="#2a2636" strokeWidth="1.5" strokeLinejoin="round" />
         <polygon points="82,28 76,2 62,22" fill="#0e0c14" stroke="#2a2636" strokeWidth="1.5" strokeLinejoin="round" />
         <polygon points="22,24 26,8 34,20" fill="#1a1624" opacity="0.6" />
         <polygon points="78,24 74,8 66,20" fill="#1a1624" opacity="0.6" />
       </g>
-    ) : acc === "devil-horns" ? (
-      <g>
+    ),
+    "devil-horns": (
+      <g key="devil-horns">
         <path d="M22 28 Q18 14 14 4" stroke="#cc3333" strokeWidth="3" strokeLinecap="round" fill="none" />
         <path d="M78 28 Q82 14 86 4" stroke="#cc3333" strokeWidth="3" strokeLinecap="round" fill="none" />
         <circle cx="14" cy="4" r="2.5" fill="#ff4444" />
         <circle cx="86" cy="4" r="2.5" fill="#ff4444" />
       </g>
-    ) : acc === "halo" ? (
-      <g>
+    ),
+    "halo": (
+      <g key="halo">
         <ellipse cx="50" cy="6" rx="22" ry="6" fill="none" stroke="#FFD700" strokeWidth="2.5" opacity="0.8" />
         <ellipse cx="50" cy="6" rx="22" ry="6" fill="none" stroke="#FFF8DC" strokeWidth="1" opacity="0.4" />
       </g>
-    ) : acc === "pirate-hat" ? (
-      <g>
+    ),
+    "pirate-hat": (
+      <g key="pirate-hat">
         <path d="M16 28 Q16 8 50 2 Q84 8 84 28Z" fill="#1a1a1a" stroke="#333" strokeWidth="1.5" />
         <path d="M16 28 Q50 34 84 28" fill="none" stroke="#333" strokeWidth="1.5" />
         <circle cx="50" cy="18" r="5" fill="none" stroke="#e8e8ef" strokeWidth="1.5" />
         <line x1="47" y1="15" x2="53" y2="21" stroke="#e8e8ef" strokeWidth="1.5" />
         <line x1="53" y1="15" x2="47" y2="21" stroke="#e8e8ef" strokeWidth="1.5" />
       </g>
-    ) : acc === "bandana" ? (
-      <g>
+    ),
+    "bandana": (
+      <g key="bandana">
         <path d="M18 30 Q18 20 50 18 Q82 20 82 30" fill="#cc4444" stroke="#aa3333" strokeWidth="1.5" />
         <path d="M74 26 L88 36 L82 28" fill="#cc4444" stroke="#aa3333" strokeWidth="1" />
         <circle cx="38" cy="26" r="1.5" fill="#FFD700" /><circle cx="50" cy="24" r="1.5" fill="#FFD700" /><circle cx="62" cy="26" r="1.5" fill="#FFD700" />
       </g>
-    ) : acc === "sunglasses" ? (
-      <g>
+    ),
+    "sunglasses": (
+      <g key="sunglasses">
         <rect x="20" y="36" width="22" height="14" rx="3" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="1.5" />
         <rect x="58" y="36" width="22" height="14" rx="3" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="1.5" />
         <line x1="42" y1="42" x2="58" y2="42" stroke="#3a3a5a" strokeWidth="1.5" />
         <line x1="20" y1="42" x2="12" y2="38" stroke="#3a3a5a" strokeWidth="1.5" />
         <line x1="80" y1="42" x2="88" y2="38" stroke="#3a3a5a" strokeWidth="1.5" />
       </g>
-    ) : acc === "monocle" ? (
-      <g>
+    ),
+    "monocle": (
+      <g key="monocle">
         <circle cx="64" cy="44" r="10" fill="none" stroke="#DAA520" strokeWidth="2" />
         <circle cx="64" cy="44" r="8" fill="none" stroke="#DAA520" strokeWidth="0.5" opacity="0.4" />
         <path d="M70 54 Q74 68 70 80" stroke="#DAA520" strokeWidth="1.5" fill="none" />
       </g>
-    ) : acc === "earrings-gold" ? (
-      <g>
+    ),
+    "earrings-gold": (
+      <g key="earrings-gold">
         <circle cx="16" cy="54" r="3.5" fill="#FFD700" stroke="#DAA520" strokeWidth="1" />
         <circle cx="16" cy="54" r="1.5" fill="#FFF8DC" opacity="0.6" />
         <line x1="18" y1="44" x2="16" y2="50" stroke="#DAA520" strokeWidth="1" />
@@ -2134,8 +2241,9 @@ function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
         <circle cx="84" cy="54" r="1.5" fill="#FFF8DC" opacity="0.6" />
         <line x1="82" y1="44" x2="84" y2="50" stroke="#DAA520" strokeWidth="1" />
       </g>
-    ) : acc === "earrings-crystal" ? (
-      <g>
+    ),
+    "earrings-crystal": (
+      <g key="earrings-crystal">
         <line x1="18" y1="44" x2="15" y2="52" stroke="#8b6ff0" strokeWidth="1" />
         <polygon points="15,52 11,62 15,60 19,62" fill="#a78bfa" stroke="#8b6ff0" strokeWidth="0.8" />
         <polygon points="15,52 13,57 17,57" fill="#c8b8ff" opacity="0.5" />
@@ -2143,8 +2251,9 @@ function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
         <polygon points="85,52 81,62 85,60 89,62" fill="#a78bfa" stroke="#8b6ff0" strokeWidth="0.8" />
         <polygon points="85,52 83,57 87,57" fill="#c8b8ff" opacity="0.5" />
       </g>
-    ) : acc === "wig-curly" ? (
-      <g>
+    ),
+    "wig-curly": (
+      <g key="wig-curly">
         <path d="M18 36 Q10 20 22 10 Q30 4 40 6 Q48 2 56 6 Q66 4 74 10 Q86 20 78 36" fill="#5a3a1a" stroke="#4a2a10" strokeWidth="1.5" />
         <circle cx="22" cy="14" r="6" fill="#6b4423" opacity="0.7" />
         <circle cx="38" cy="8" r="7" fill="#6b4423" opacity="0.7" />
@@ -2155,23 +2264,27 @@ function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
         <circle cx="30" cy="10" r="4" fill="#7a5433" opacity="0.4" />
         <circle cx="60" cy="8" r="4" fill="#7a5433" opacity="0.4" />
       </g>
-    ) : acc === "wig-punk" ? (
-      <g>
+    ),
+    "wig-punk": (
+      <g key="wig-punk">
         <path d="M30 28 L26 -4 L34 18" fill="#cc2255" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
         <path d="M42 26 L40 -8 L48 16" fill="#dd3366" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
         <path d="M54 26 L56 -10 L60 16" fill="#cc2255" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
         <path d="M66 28 L70 -4 L72 18" fill="#dd3366" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
         <path d="M20 34 Q20 18 30 12 Q40 6 50 6 Q60 6 70 12 Q80 18 80 34" fill="#cc2255" stroke="#aa1144" strokeWidth="1.5" opacity="0.7" />
       </g>
-    ) : acc === "wig-long" ? (
-      <g>
+    ),
+    "wig-long": (
+      <g key="wig-long">
         <path d="M16 30 Q14 14 30 6 Q44 0 56 2 Q70 4 80 14 Q86 22 84 34" fill="#1a1a3a" stroke="#2a2a4a" strokeWidth="1.5" />
         <path d="M16 30 Q12 50 16 72 Q18 80 22 82" stroke="#2a2a4a" strokeWidth="3" strokeLinecap="round" fill="none" />
         <path d="M84 34 Q88 54 84 72 Q82 80 78 82" stroke="#2a2a4a" strokeWidth="3" strokeLinecap="round" fill="none" />
         <path d="M20 34 Q18 44 20 56" stroke="#3a3a5a" strokeWidth="1.5" fill="none" opacity="0.4" />
         <path d="M80 36 Q82 46 80 58" stroke="#3a3a5a" strokeWidth="1.5" fill="none" opacity="0.4" />
       </g>
-    ) : null;
+    ),
+  };
+  const accessoryEl = accIds.length === 0 ? null : accIds.map(id => accessoryOverlays[id]).filter(Boolean);
 
   // Smoky body shape
   const bodyPath = "M50 6 C30 6 16 16 10 32 C6 44 8 58 12 68 C18 82 30 92 50 94 C70 92 82 82 88 68 C92 58 94 44 90 32 C84 16 70 6 50 6Z";
@@ -5229,7 +5342,7 @@ export default function Pattrn() {
   const [addFriendLoading, setAddFriendLoading] = useState(false);
 
   // --- Friends Modal & Comparison state ---
-  const [friendsModalTab, setFriendsModalTab] = useState("list"); // "list" | "compare"
+  const [friendsModalTab, setFriendsModalTab] = useState("list"); // "list" | "compare" | "hangout"
   const [compareFriend, setCompareFriend] = useState(null); // friend object being compared
   const [compareFriendStats, setCompareFriendStats] = useState(null); // loaded public stats for comparison
   const [compareFriendLoading, setCompareFriendLoading] = useState(false);
@@ -5368,6 +5481,7 @@ export default function Pattrn() {
   const aggieHappinessMood = getHappinessMood(aggieHappiness);
   const aggieDecayTimer = useRef(null);
   const [aggieWardrobeTab, setAggieWardrobeTab] = useState("shop"); // "shop" | "accessories"
+  const [aggieAccCategory, setAggieAccCategory] = useState("hat"); // active accessory category sub-tab
   const [unlockedAccessories, setUnlockedAccessories] = useState(() => loadUnlockedAccessories());
   const [coinAnim, setCoinAnim] = useState(null); // { amount, key } — triggers floating coin animation
   const coinAnimTimer = useRef(null);
@@ -5376,20 +5490,39 @@ export default function Pattrn() {
   const [aggieBuff, setAggieBuff] = useState(() => loadAggieBuff()); // active hint buff
   const [aggieDebuff, setAggieDebuff] = useState(() => loadAggieDebuff()); // active debuff
   const [aggieFailStreak, setAggieFailStreak] = useState(() => loadFailStreak()); // consecutive puzzle failures
+  const [aggieTraits, setAggieTraits] = useState(() => loadAggieTraits()); // inherent traits ["lucky", "brave"]
+
+  // --- Hangout system ---
+  const [hangoutActive, setHangoutActive] = useState(false); // currently in hangout
+  const [hangoutPeers, setHangoutPeers] = useState({}); // { uid: { username, accessory, traits, happinessMood, ... } }
+  const hangoutUnsubRef = useRef(null);
+  // Combined traits = own + shared from hangout peers
+  const hangoutSharedTraits = useMemo(() => {
+    if (!hangoutActive || !Object.keys(hangoutPeers).length) return aggieTraits;
+    const all = new Set(aggieTraits);
+    Object.values(hangoutPeers).forEach(p => { (p.traits || []).forEach(t => all.add(t)); });
+    return [...all];
+  }, [aggieTraits, hangoutActive, hangoutPeers]);
 
   // Happiness decay effect — runs every minute, decays based on elapsed time
+  // Energetic trait: decay 50% slower
   useEffect(() => {
     if (!activeCosmetic) return;
     const tick = () => {
       const stored = loadAggieHappiness();
       const lastInteract = loadAggieLastInteract();
-      const decayed = calcDecayedHappiness(stored, lastInteract);
+      let decayed = calcDecayedHappiness(stored, lastInteract);
+      // Energetic trait: recover half of the decay
+      if (hasTraitEffect(hangoutSharedTraits, "slow_decay")) {
+        const lost = stored - decayed;
+        decayed = Math.min(AGGIE_MAX_HAPPINESS, decayed + Math.floor(lost / 2));
+      }
       setAggieHappiness(decayed);
     };
     tick(); // run once on mount
     aggieDecayTimer.current = setInterval(tick, 60000); // check every minute
     return () => clearInterval(aggieDecayTimer.current);
-  }, [activeCosmetic]);
+  }, [activeCosmetic, hangoutSharedTraits]);
 
   // Check for broken daily streak on mount — penalize happiness
   useEffect(() => {
@@ -5424,15 +5557,25 @@ export default function Pattrn() {
   const earnCoins = useCallback((amount, happinessBonus = 0) => {
     // Fumble debuff: halve coin earnings
     const hasFumble = aggieDebuff && aggieDebuff.type === "fumble" && aggieDebuff.charges > 0;
-    const actualAmount = hasFumble ? Math.max(1, Math.floor(amount / 2)) : amount;
+    let actualAmount = hasFumble ? Math.max(1, Math.floor(amount / 2)) : amount;
+    // Lucky trait: 10% chance of bonus coins
+    if (hasTraitEffect(hangoutSharedTraits, "bonus_coins") && Math.random() < 0.10) {
+      actualAmount = Math.floor(actualAmount * 1.5);
+    }
+    // Generous trait: 20% bonus in co-op (check if in a coop session)
+    if (hasTraitEffect(hangoutSharedTraits, "coop_coins") && (coopSessionId || coopMosaicSessionId || vaultSessionId)) {
+      actualAmount = Math.floor(actualAmount * 1.2);
+    }
     setAggieCoins(prev => {
       const next = prev + actualAmount;
       saveAggieCoins(next);
       return next;
     });
     if (happinessBonus > 0) {
+      // Charming trait: shop items give 25% more happiness
+      const charmBonus = hasTraitEffect(hangoutSharedTraits, "item_bonus") ? Math.floor(happinessBonus * 0.25) : 0;
       setAggieHappiness(prev => {
-        const next = Math.min(AGGIE_MAX_HAPPINESS, prev + happinessBonus);
+        const next = Math.min(AGGIE_MAX_HAPPINESS, prev + happinessBonus + charmBonus);
         saveAggieHappiness(next);
         saveAggieLastInteract(Date.now());
         return next;
@@ -5443,13 +5586,15 @@ export default function Pattrn() {
     clearTimeout(coinAnimTimer.current);
     setCoinAnim({ amount: actualAmount, key: Date.now() });
     coinAnimTimer.current = setTimeout(() => setCoinAnim(null), 2000);
-  }, [aggieDebuff]);
+  }, [aggieDebuff, hangoutSharedTraits, coopSessionId, coopMosaicSessionId, vaultSessionId]);
 
   // Helper: spend coins on shop item (buy only — adds to inventory, no happiness)
   const buyAggieItem = useCallback((item) => {
     if (aggieCoins < item.cost) return false;
+    // Thrifty trait: 15% chance items cost nothing
+    const isFree = hasTraitEffect(hangoutSharedTraits, "free_item") && Math.random() < 0.15;
     setAggieCoins(prev => {
-      const next = prev - item.cost;
+      const next = isFree ? prev : prev - item.cost;
       saveAggieCoins(next);
       return next;
     });
@@ -5465,7 +5610,7 @@ export default function Pattrn() {
       saveAggieDesire(d);
     }
     return true;
-  }, [aggieCoins, aggieDesire]);
+  }, [aggieCoins, aggieDesire, hangoutSharedTraits]);
 
   // Helper: use an item from inventory — plays animation, then boosts happiness and consumes
   const useAggieItem = useCallback((item) => {
@@ -5548,6 +5693,74 @@ export default function Pattrn() {
     });
   }, [aggieCoins]);
 
+  // --- Hangout callbacks ---
+  const startHangout = useCallback(() => {
+    if (!firebaseUser?.uid || hangoutActive) return;
+    const myData = {
+      username: username || firebaseUser.email || "???",
+      accessory: aggieAccessory || {},
+      traits: aggieTraits || [],
+      happinessMood: aggieHappinessMood || "neutral",
+      size: aggieSize || "medium",
+    };
+    joinHangout(firebaseUser.uid, firebaseUser.uid, myData).catch(() => {});
+    // Subscribe to visitors
+    if (hangoutUnsubRef.current) hangoutUnsubRef.current();
+    hangoutUnsubRef.current = subscribeToHangout(firebaseUser.uid, (visitors) => {
+      const peers = {};
+      Object.entries(visitors).forEach(([uid, data]) => {
+        if (uid !== firebaseUser.uid) peers[uid] = data;
+      });
+      setHangoutPeers(peers);
+    });
+    setHangoutActive(true);
+  }, [firebaseUser, hangoutActive, username, aggieAccessory, aggieTraits, aggieHappinessMood, aggieSize]);
+
+  const stopHangout = useCallback(() => {
+    if (!firebaseUser?.uid) return;
+    leaveHangout(firebaseUser.uid, firebaseUser.uid).catch(() => {});
+    if (hangoutUnsubRef.current) { hangoutUnsubRef.current(); hangoutUnsubRef.current = null; }
+    setHangoutPeers({});
+    setHangoutActive(false);
+  }, [firebaseUser]);
+
+  const joinFriendHangout = useCallback((friendUid) => {
+    if (!firebaseUser?.uid) return;
+    const myData = {
+      username: username || firebaseUser.email || "???",
+      accessory: aggieAccessory || {},
+      traits: aggieTraits || [],
+      happinessMood: aggieHappinessMood || "neutral",
+      size: aggieSize || "medium",
+    };
+    joinHangout(friendUid, firebaseUser.uid, myData).catch(() => {});
+    // Subscribe to that friend's hangout
+    if (hangoutUnsubRef.current) hangoutUnsubRef.current();
+    hangoutUnsubRef.current = subscribeToHangout(friendUid, (visitors) => {
+      const peers = {};
+      Object.entries(visitors).forEach(([uid, data]) => {
+        if (uid !== firebaseUser.uid) peers[uid] = data;
+      });
+      setHangoutPeers(peers);
+    });
+    setHangoutActive(true);
+  }, [firebaseUser, username, aggieAccessory, aggieTraits, aggieHappinessMood, aggieSize]);
+
+  const leaveFriendHangout = useCallback((friendUid) => {
+    if (!firebaseUser?.uid) return;
+    leaveHangout(friendUid, firebaseUser.uid).catch(() => {});
+    if (hangoutUnsubRef.current) { hangoutUnsubRef.current(); hangoutUnsubRef.current = null; }
+    setHangoutPeers({});
+    setHangoutActive(false);
+  }, [firebaseUser]);
+
+  // Cleanup hangout on unmount
+  useEffect(() => {
+    return () => {
+      if (hangoutUnsubRef.current) hangoutUnsubRef.current();
+    };
+  }, []);
+
   // --- Multiplayer Aggie state ---
   const [peerAggieStates, setPeerAggieStates] = useState({});
   const [aggieInteractions, setAggieInteractions] = useState({});
@@ -5601,13 +5814,18 @@ export default function Pattrn() {
 
   // Helper: apply a debuff (replaces current debuff)
   const applyDebuff = useCallback((type, charges) => {
+    // Resilient trait: 30% chance to resist debuffs
+    if (hasTraitEffect(hangoutSharedTraits, "debuff_resist") && Math.random() < 0.30) {
+      triggerAggieSpeech("Shrugged it off!");
+      return;
+    }
     const debuff = { type, charges };
     setAggieDebuff(debuff);
     saveAggieDebuff(debuff);
     // Aggie reacts to the debuff
     const lines = AGGIE_DEBUFF_LINES[type] || ["Ugh..."];
     triggerAggieSpeech(lines[Math.floor(Math.random() * lines.length)]);
-  }, [triggerAggieSpeech]);
+  }, [triggerAggieSpeech, hangoutSharedTraits]);
 
   // Aggie menu-open reaction (~10% when menu opens)
   const prevMenuOpenRef = useRef(false);
@@ -6653,9 +6871,10 @@ export default function Pattrn() {
     birthday,
     companion: {
       active: activeCosmetic || null,
-      accessory: aggieAccessory || "none",
+      accessory: aggieAccessory && Object.keys(aggieAccessory).length > 0 ? aggieAccessory : "none",
+      traits: aggieTraits || [],
     },
-  }), [progress, times, savedAchievementIds, activeThemeId, birthday, activeCosmetic, aggieAccessory]);
+  }), [progress, times, savedAchievementIds, activeThemeId, birthday, activeCosmetic, aggieAccessory, aggieTraits]);
 
   // Apply merged data to local state + localStorage
   const applyMergedData = useCallback((merged) => {
@@ -6686,8 +6905,18 @@ export default function Pattrn() {
         saveActiveCosmetic(merged.companion.active);
       }
       if (merged.companion.accessory !== undefined) {
-        setAggieAccessory(merged.companion.accessory);
-        saveAggieAccessory(merged.companion.accessory);
+        // Handle both legacy string and new object format from cloud
+        let accSlots = merged.companion.accessory;
+        if (typeof accSlots === "string") {
+          if (accSlots === "none") accSlots = {};
+          else { const a = AGGIE_ACCESSORIES.find(x => x.id === accSlots); accSlots = a && a.category ? { [a.category]: accSlots } : {}; }
+        }
+        setAggieAccessory(accSlots || {});
+        saveAggieAccessory(accSlots || {});
+      }
+      if (merged.companion.traits && Array.isArray(merged.companion.traits) && merged.companion.traits.length > 0) {
+        setAggieTraits(merged.companion.traits);
+        saveAggieTraits(merged.companion.traits);
       }
     }
   }, []);
@@ -7090,7 +7319,7 @@ export default function Pattrn() {
     return () => {
       if (cloudSyncTimer.current) clearTimeout(cloudSyncTimer.current);
     };
-  }, [firebaseUser, progress, times, savedAchievementIds, activeThemeId, birthday, activeCosmetic, aggieAccessory, gatherLocalData, syncToCloud]);
+  }, [firebaseUser, progress, times, savedAchievementIds, activeThemeId, birthday, activeCosmetic, aggieAccessory, aggieTraits, gatherLocalData, syncToCloud]);
 
   // On initial auth (page reload while logged in): pull cloud data and merge
   const hasRestoredFromCloud = useRef(false);
@@ -8105,9 +8334,11 @@ export default function Pattrn() {
       h += 30 + 8; // tab bar
       // Tab content — use taller of the two for max
       const shopRows = Math.ceil(AGGIE_SHOP_ITEMS.length / 2);
-      const accRows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3);
+      // Accessories: largest category row count + sub-tab bar height
+      const maxCatItems = Math.max(...ACCESSORY_CATEGORIES.map(c => AGGIE_ACCESSORIES.filter(a => a.category === c.id).length));
+      const accRows = Math.ceil(maxCatItems / 3);
       const shopH = shopRows * 86;
-      const accH = accRows * 64;
+      const accH = 30 + 8 + accRows * 64; // sub-tab bar + items
       h += Math.max(shopH, accH);
       h += 16; // padding
       return Math.min(h, availH);
@@ -8879,19 +9110,46 @@ export default function Pattrn() {
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
                     display: "flex", flexDirection: "column",
                   }}>
-                    {/* Header */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 4px 12px", borderBottom: `1px solid ${C.border}44`, marginBottom: 12, flexShrink: 0 }}>
-                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.text }}>Messages</div>
-                      {totalFriendChatUnread > 0 && (
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
-                          color: "#fff", backgroundColor: C.accent,
-                          padding: "3px 9px", borderRadius: 12, minWidth: 18, textAlign: "center",
-                        }}>
-                          {totalFriendChatUnread > 99 ? "99+" : totalFriendChatUnread}
-                        </span>
-                      )}
+                    {/* Header with tab switcher */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 4px 0", flexShrink: 0, marginBottom: 12 }}>
+                      <div style={{ display: "flex", gap: 0, borderRadius: 8, overflow: "hidden", border: `1.5px solid ${C.border}`, flex: 1 }}>
+                        {[["list", "Messages"], ["hangout", "Hangout"]].map(([key, label]) => {
+                          const active = (friendsModalTab === "list" || friendsModalTab === "compare") ? key === "list" : friendsModalTab === key;
+                          return (
+                            <button key={key} onClick={() => setFriendsModalTab(key)}
+                              style={{
+                                flex: 1, padding: "7px 0", border: "none",
+                                backgroundColor: active ? C.accent + "20" : C.surface,
+                                color: active ? C.accent : C.textDim,
+                                fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                                letterSpacing: 0.5, textTransform: "uppercase",
+                                cursor: "pointer", transition: "all 0.15s",
+                                borderRight: key === "list" ? `1px solid ${C.border}` : "none",
+                                position: "relative",
+                              }}
+                            >
+                              {label}
+                              {key === "list" && totalFriendChatUnread > 0 && (
+                                <span style={{
+                                  position: "absolute", top: 2, right: 8,
+                                  width: 7, height: 7, borderRadius: "50%",
+                                  backgroundColor: C.accent,
+                                }} />
+                              )}
+                              {key === "hangout" && hangoutActive && (
+                                <span style={{
+                                  position: "absolute", top: 2, right: 8,
+                                  width: 7, height: 7, borderRadius: "50%",
+                                  backgroundColor: "#22C55E",
+                                }} />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+                    {/* Messages tab content */}
+                    {(friendsModalTab === "list" || friendsModalTab === "compare") && <>
                         {/* Add friend input */}
                         <div style={{ display: "flex", gap: 8, marginBottom: addFriendMsg ? 4 : 12, flexShrink: 0, padding: "0 4px" }}>
                           <input
@@ -9192,12 +9450,211 @@ export default function Pattrn() {
                             })()
                           )}
                         </div>
+                    </>}
+                    {/* Hangout tab content */}
+                    {friendsModalTab === "hangout" && (
+                      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "0 4px" }}>
+                        {/* My traits display */}
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: C.text, fontFamily: "'Inter', sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                            Your Aggie's Traits
+                          </div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {aggieTraits.map(tId => {
+                              const t = AGGIE_TRAITS.find(x => x.id === tId);
+                              if (!t) return null;
+                              return (
+                                <div key={tId} style={{
+                                  display: "flex", alignItems: "center", gap: 4,
+                                  padding: "4px 10px", borderRadius: 12,
+                                  backgroundColor: t.color + "18",
+                                  border: `1.5px solid ${t.color}44`,
+                                }}>
+                                  <div style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.color }} />
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: t.color, fontFamily: "'Inter', sans-serif" }}>{t.label}</span>
+                                  <span style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>{t.desc}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Hangout area */}
+                        <div style={{
+                          position: "relative",
+                          height: 160, borderRadius: 12,
+                          backgroundColor: C.surface,
+                          border: `1.5px solid ${C.border}`,
+                          marginBottom: 12, overflow: "hidden",
+                        }}>
+                          {/* Ambient background */}
+                          <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 50% 80%, ${C.accent}08 0%, transparent 70%)` }} />
+                          {/* My aggie — centered */}
+                          <div style={{
+                            position: "absolute", left: "50%", top: "50%",
+                            transform: `translate(-50%, -50%)`,
+                            display: "flex", flexDirection: "column", alignItems: "center",
+                          }}>
+                            <div style={{ animation: "companionFloat 3s ease-in-out infinite" }}>
+                              {renderAggieSVG(64, null, true, aggieAccessory, aggieHappinessMood)}
+                            </div>
+                            <span style={{ fontSize: 8, fontWeight: 600, color: C.accent, fontFamily: "'Inter', sans-serif", marginTop: 2 }}>You</span>
+                          </div>
+                          {/* Peer aggies — positioned around */}
+                          {Object.entries(hangoutPeers).map(([uid, peer], idx) => {
+                            const angle = (idx / Math.max(Object.keys(hangoutPeers).length, 1)) * Math.PI * 2 - Math.PI / 2;
+                            const rx = 55, ry = 35;
+                            const px = 50 + rx * Math.cos(angle);
+                            const py = 50 + ry * Math.sin(angle);
+                            return (
+                              <div key={uid} style={{
+                                position: "absolute",
+                                left: `${px}%`, top: `${py}%`,
+                                transform: "translate(-50%, -50%)",
+                                display: "flex", flexDirection: "column", alignItems: "center",
+                                transition: "left 0.5s, top 0.5s",
+                              }}>
+                                <div style={{ animation: `companionFloat ${2.5 + idx * 0.3}s ease-in-out infinite` }}>
+                                  {renderAggieSVG(48, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
+                                </div>
+                                <span style={{ fontSize: 7, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>
+                                  {peer.username || "???"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {/* Empty state */}
+                          {!hangoutActive && Object.keys(hangoutPeers).length === 0 && (
+                            <div style={{
+                              position: "absolute", inset: 0,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif", opacity: 0.6,
+                              pointerEvents: "none",
+                            }}>
+                              Open your hangout to let friends visit!
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Hangout controls */}
+                        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                          {!hangoutActive ? (
+                            <button onClick={startHangout} style={{
+                              flex: 1, padding: "10px 0", borderRadius: 10,
+                              background: C.accent, color: C.bg,
+                              border: "none", fontSize: 12, fontWeight: 700,
+                              fontFamily: "'Inter', sans-serif", cursor: "pointer",
+                              letterSpacing: 0.5,
+                            }}>
+                              Open Hangout
+                            </button>
+                          ) : (
+                            <button onClick={stopHangout} style={{
+                              flex: 1, padding: "10px 0", borderRadius: 10,
+                              background: C.surface, color: C.textDim,
+                              border: `1.5px solid ${C.border}`, fontSize: 12, fontWeight: 700,
+                              fontFamily: "'Inter', sans-serif", cursor: "pointer",
+                              letterSpacing: 0.5,
+                            }}>
+                              Close Hangout
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Shared traits from hangout */}
+                        {hangoutActive && Object.keys(hangoutPeers).length > 0 && (
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: C.correct, fontFamily: "'Inter', sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                              Shared Trait Bonuses
+                            </div>
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {hangoutSharedTraits.filter(tId => !aggieTraits.includes(tId)).map(tId => {
+                                const t = AGGIE_TRAITS.find(x => x.id === tId);
+                                if (!t) return null;
+                                const fromPeer = Object.values(hangoutPeers).find(p => (p.traits || []).includes(tId));
+                                return (
+                                  <div key={tId} style={{
+                                    display: "flex", alignItems: "center", gap: 4,
+                                    padding: "3px 8px", borderRadius: 10,
+                                    backgroundColor: t.color + "12",
+                                    border: `1px dashed ${t.color}44`,
+                                  }}>
+                                    <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.color, opacity: 0.7 }} />
+                                    <span style={{ fontSize: 9, fontWeight: 600, color: t.color, fontFamily: "'Inter', sans-serif" }}>{t.label}</span>
+                                    {fromPeer && <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>via {fromPeer.username}</span>}
+                                  </div>
+                                );
+                              })}
+                              {hangoutSharedTraits.filter(tId => !aggieTraits.includes(tId)).length === 0 && (
+                                <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", opacity: 0.6 }}>
+                                  No new traits shared yet — friends with different traits will add bonuses!
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Friend list — visit or invite */}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: C.text, fontFamily: "'Inter', sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                          Friends
+                        </div>
+                        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+                          {friendsList.length === 0 ? (
+                            <div style={{ textAlign: "center", padding: 20, color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif" }}>
+                              Add friends in the Messages tab to hang out!
+                            </div>
+                          ) : friendsList.map(friend => {
+                            const presence = friendPresence[friend.uid];
+                            const isOnline = presence && presence.lastSeen && (Date.now() - presence.lastSeen) < 120000;
+                            const isPeerInHangout = !!hangoutPeers[friend.uid];
+                            return (
+                              <div key={friend.uid} style={{
+                                display: "flex", alignItems: "center", gap: 10,
+                                padding: "8px 10px", borderRadius: 10,
+                                backgroundColor: isPeerInHangout ? C.correct + "10" : C.surface,
+                                border: `1px solid ${isPeerInHangout ? C.correct + "44" : C.border}`,
+                              }}>
+                                <div style={{
+                                  width: 8, height: 8, borderRadius: 4,
+                                  backgroundColor: isOnline ? "#22C55E" : C.textDim + "44",
+                                  flexShrink: 0,
+                                }} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: C.text, fontFamily: "'Inter', sans-serif" }}>
+                                    {friend.username || "Friend"}
+                                  </div>
+                                  <div style={{ fontSize: 9, color: isPeerInHangout ? C.correct : C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                    {isPeerInHangout ? "Hanging out!" : isOnline ? "Online" : "Offline"}
+                                  </div>
+                                </div>
+                                {hangoutActive && !isPeerInHangout && isOnline && (
+                                  <span style={{ fontSize: 9, color: C.textDim, fontFamily: "'Inter', sans-serif", opacity: 0.5 }}>
+                                    Waiting...
+                                  </span>
+                                )}
+                                {!hangoutActive && isOnline && (
+                                  <button onClick={() => joinFriendHangout(friend.uid)} style={{
+                                    padding: "4px 10px", borderRadius: 6, fontSize: 9, fontWeight: 700,
+                                    fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                    background: C.accent + "22", color: C.accent,
+                                    border: "none", cursor: "pointer", textTransform: "uppercase",
+                                  }}>
+                                    Visit
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               );
             })() : isAggieWardrobe ? (() => {
               const isOn = !!activeCosmetic;
-              const currentAcc = aggieAccessory || "none";
+              const currentAccSlots = aggieAccessory || {};
+              const activeAccIds = getActiveAccessoryIds(currentAccSlots);
               const happyPct = Math.round((aggieHappiness / AGGIE_MAX_HAPPINESS) * 100);
               const hMood = aggieHappinessMood;
               const happyColor = hMood === "ecstatic" ? "#a78bfa" : hMood === "happy" ? C.correct : hMood === "neutral" ? C.textDim : hMood === "grumpy" ? "#e8a838" : "#e85858";
@@ -9263,6 +9720,44 @@ export default function Pattrn() {
                           }} />
                         </div>
                       </div>
+
+                      {/* Trait badges */}
+                      {aggieTraits.length > 0 && (
+                        <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap" }}>
+                          {aggieTraits.map(tId => {
+                            const t = AGGIE_TRAITS.find(x => x.id === tId);
+                            if (!t) return null;
+                            return (
+                              <div key={tId} title={t.desc} style={{
+                                display: "flex", alignItems: "center", gap: 3,
+                                padding: "2px 6px", borderRadius: 8,
+                                backgroundColor: t.color + "18",
+                                border: `1px solid ${t.color}33`,
+                              }}>
+                                <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.color }} />
+                                <span style={{ fontSize: 7, fontWeight: 700, color: t.color, fontFamily: "'Inter', sans-serif" }}>{t.label}</span>
+                              </div>
+                            );
+                          })}
+                          {hangoutActive && hangoutSharedTraits.filter(t => !aggieTraits.includes(t)).length > 0 && (
+                            hangoutSharedTraits.filter(t => !aggieTraits.includes(t)).map(tId => {
+                              const t = AGGIE_TRAITS.find(x => x.id === tId);
+                              if (!t) return null;
+                              return (
+                                <div key={`shared-${tId}`} title={`${t.desc} (shared from hangout)`} style={{
+                                  display: "flex", alignItems: "center", gap: 3,
+                                  padding: "2px 6px", borderRadius: 8,
+                                  backgroundColor: t.color + "08",
+                                  border: `1px dashed ${t.color}33`,
+                                }}>
+                                  <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.color, opacity: 0.5 }} />
+                                  <span style={{ fontSize: 7, fontWeight: 600, color: t.color, fontFamily: "'Inter', sans-serif", opacity: 0.7 }}>{t.label}</span>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
 
                       {/* Desire — what Aggie wants */}
                       {desireText && (
@@ -9446,7 +9941,7 @@ export default function Pattrn() {
                               ? "aggieBounce 0.6s ease-in-out 1s 1"
                               : isOn ? "companionFloat 3s ease-in-out infinite" : "none",
                           }}>
-                            {renderAggieSVG(120, null, isOn, currentAcc, hMood)}
+                            {renderAggieSVG(120, null, isOn, currentAccSlots, hMood)}
                           </div>
                         </div>
                       </div>
@@ -9608,73 +10103,110 @@ export default function Pattrn() {
                           </div>
                         )}
 
-                        {/* Accessories tab */}
+                        {/* Accessories tab — with category sub-tabs */}
                         {aggieWardrobeTab === "accessories" && (
-                          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                            {AGGIE_ACCESSORIES.filter(a => a.id !== "none").map(a => {
-                              const isActive = currentAcc === a.id;
-                              const isFree = !a.cost || a.cost <= 0;
-                              const isUnlocked = isFree || unlockedAccessories.has(a.id);
-                              const canAfford = aggieCoins >= (a.cost || 0);
-                              return (
-                                <div
-                                  key={a.id}
-                                  onClick={() => {
-                                    if (!isUnlocked) {
-                                      // Buy to unlock
-                                      if (canAfford) buyAccessory(a);
-                                      return;
-                                    }
-                                    const next = isActive ? "none" : a.id;
-                                    setAggieAccessory(next);
-                                    saveAggieAccessory(next);
-                                  }}
-                                  style={{
-                                    display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-                                    padding: "8px 4px", borderRadius: 10,
-                                    backgroundColor: isActive ? C.accent + "18" : !isUnlocked ? "rgba(0,0,0,0.15)" : C.surface,
-                                    border: `1.5px solid ${isActive ? C.accent : !isUnlocked ? C.border + "60" : C.border}`,
-                                    cursor: isUnlocked || canAfford ? "pointer" : "default",
-                                    opacity: !isUnlocked && !canAfford ? 0.45 : 1,
-                                    transition: "all 0.15s",
-                                    position: "relative",
-                                  }}
-                                >
-                                  <div style={{
-                                    width: 28, height: 28,
-                                    display: "flex", alignItems: "center", justifyContent: "center",
-                                    filter: !isUnlocked ? "brightness(0.5)" : "none",
-                                  }}>
-                                    {renderAccessoryPreview(a.id, 28)}
-                                  </div>
-                                  <span style={{
-                                    fontSize: 8, fontWeight: 600, color: isActive ? C.accent : !isUnlocked ? C.textDim + "88" : C.textDim,
-                                    fontFamily: "'Inter', sans-serif", textAlign: "center",
-                                    lineHeight: 1.1, maxWidth: 60,
-                                  }}>
-                                    {a.label}
-                                  </span>
-                                  {!isUnlocked && (
+                          <div>
+                            {/* Category sub-tab bar */}
+                            <div style={{
+                              display: "flex", gap: 4, marginBottom: 8, flexWrap: "wrap",
+                            }}>
+                              {ACCESSORY_CATEGORIES.map(cat => {
+                                const isActiveCat = aggieAccCategory === cat.id;
+                                const catItems = AGGIE_ACCESSORIES.filter(a => a.category === cat.id);
+                                const hasEquipped = currentAccSlots[cat.id] && currentAccSlots[cat.id] !== "none";
+                                return (
+                                  <button key={cat.id} onClick={() => setAggieAccCategory(cat.id)}
+                                    style={{
+                                      padding: "4px 8px", borderRadius: 6,
+                                      border: `1.5px solid ${isActiveCat ? C.accent : C.border}`,
+                                      backgroundColor: isActiveCat ? C.accent + "20" : C.surface,
+                                      color: isActiveCat ? C.accent : C.textDim,
+                                      fontSize: 9, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                                      letterSpacing: 0.5, textTransform: "uppercase",
+                                      cursor: "pointer", transition: "all 0.15s",
+                                      position: "relative",
+                                    }}
+                                  >
+                                    {cat.label}
+                                    {hasEquipped && (
+                                      <div style={{
+                                        position: "absolute", top: -2, right: -2,
+                                        width: 6, height: 6, borderRadius: 3,
+                                        backgroundColor: C.accent,
+                                      }} />
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                            {/* Items for the selected category */}
+                            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                              {AGGIE_ACCESSORIES.filter(a => a.category === aggieAccCategory).map(a => {
+                                const isActive = currentAccSlots[a.category] === a.id;
+                                const isFree = !a.cost || a.cost <= 0;
+                                const isUnlocked = isFree || unlockedAccessories.has(a.id);
+                                const canAfford = aggieCoins >= (a.cost || 0);
+                                return (
+                                  <div
+                                    key={a.id}
+                                    onClick={() => {
+                                      if (!isUnlocked) {
+                                        if (canAfford) buyAccessory(a);
+                                        return;
+                                      }
+                                      const next = { ...currentAccSlots };
+                                      if (isActive) { delete next[a.category]; }
+                                      else { next[a.category] = a.id; }
+                                      setAggieAccessory(next);
+                                      saveAggieAccessory(next);
+                                    }}
+                                    style={{
+                                      display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                                      padding: "8px 4px", borderRadius: 10,
+                                      backgroundColor: isActive ? C.accent + "18" : !isUnlocked ? "rgba(0,0,0,0.15)" : C.surface,
+                                      border: `1.5px solid ${isActive ? C.accent : !isUnlocked ? C.border + "60" : C.border}`,
+                                      cursor: isUnlocked || canAfford ? "pointer" : "default",
+                                      opacity: !isUnlocked && !canAfford ? 0.45 : 1,
+                                      transition: "all 0.15s",
+                                      position: "relative",
+                                    }}
+                                  >
                                     <div style={{
-                                      display: "flex", alignItems: "center", gap: 2, marginTop: -1,
+                                      width: 28, height: 28,
+                                      display: "flex", alignItems: "center", justifyContent: "center",
+                                      filter: !isUnlocked ? "brightness(0.5)" : "none",
                                     }}>
-                                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
-                                        <circle cx="12" cy="12" r="9" fill={canAfford ? C.accent : C.textDim} opacity="0.2" />
-                                        <circle cx="12" cy="12" r="9" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" fill="none" />
-                                        <text x="12" y="16.5" textAnchor="middle" fill={canAfford ? C.accent : C.textDim} fontSize="12" fontWeight="700" fontFamily="Inter, sans-serif">C</text>
-                                      </svg>
-                                      <span style={{
-                                        fontSize: 8, fontWeight: 700,
-                                        color: canAfford ? C.accent : C.textDim,
-                                        fontFamily: "'Inter', sans-serif",
-                                      }}>
-                                        {a.cost}
-                                      </span>
+                                      {renderAccessoryPreview(a.id, 28)}
                                     </div>
-                                  )}
-                                </div>
-                              );
-                            })}
+                                    <span style={{
+                                      fontSize: 8, fontWeight: 600, color: isActive ? C.accent : !isUnlocked ? C.textDim + "88" : C.textDim,
+                                      fontFamily: "'Inter', sans-serif", textAlign: "center",
+                                      lineHeight: 1.1, maxWidth: 60,
+                                    }}>
+                                      {a.label}
+                                    </span>
+                                    {!isUnlocked && (
+                                      <div style={{
+                                        display: "flex", alignItems: "center", gap: 2, marginTop: -1,
+                                      }}>
+                                        <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
+                                          <circle cx="12" cy="12" r="9" fill={canAfford ? C.accent : C.textDim} opacity="0.2" />
+                                          <circle cx="12" cy="12" r="9" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" fill="none" />
+                                          <text x="12" y="16.5" textAnchor="middle" fill={canAfford ? C.accent : C.textDim} fontSize="12" fontWeight="700" fontFamily="Inter, sans-serif">C</text>
+                                        </svg>
+                                        <span style={{
+                                          fontSize: 8, fontWeight: 700,
+                                          color: canAfford ? C.accent : C.textDim,
+                                          fontFamily: "'Inter', sans-serif",
+                                        }}>
+                                          {a.cost}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -13632,7 +14164,11 @@ export default function Pattrn() {
           showNewAchievements(newProgress, newTimes);
           // Earn coins for puzzle solve
           if (activeCosmetic) {
-            const reward = COINS_REWARD[difficulty] || 10;
+            let reward = COINS_REWARD[difficulty] || 10;
+            // Brave trait: blind puzzles give 30% more coins
+            if (difficulty === "blind" && hasTraitEffect(hangoutSharedTraits, "blind_bonus")) {
+              reward = Math.floor(reward * 1.3);
+            }
             const goldBonus = (attempts === 0) ? COINS_GOLD_BONUS : 0;
             earnCoins(reward + goldBonus, 3);
             // Check if puzzle matches Aggie's desire

@@ -124,6 +124,14 @@
         ".write": "auth != null && auth.uid === $uid"
       }
     },
+    "hangouts": {
+      "$hostUid": {
+        ".read": "auth != null",
+        "$visitorUid": {
+          ".write": "auth != null && auth.uid === $visitorUid"
+        }
+      }
+    },
     "mosaics": {
       "pending": {
         ".read": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true",
