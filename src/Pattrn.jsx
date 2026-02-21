@@ -3476,7 +3476,78 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes aggieWiggle { 0%,100% { transform: rotate(0deg); } 20% { transform: rotate(-8deg); } 40% { transform: rotate(8deg); } 60% { transform: rotate(-5deg); } 80% { transform: rotate(5deg); } }
 @keyframes aggieBounce { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-14px); } 60% { transform: translateY(-2px); } }
 @keyframes aggieYawn { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+@keyframes aggieConfetti { 0% { opacity: 1; transform: translate(var(--cx), var(--cy)) scale(1) rotate(0deg); } 100% { opacity: 0; transform: translate(var(--ex), var(--ey)) scale(0.4) rotate(var(--cr)); } }
+@keyframes aggieTear { 0% { opacity: 0.8; transform: translateY(0) scale(1); } 60% { opacity: 0.6; } 100% { opacity: 0; transform: translateY(var(--td)) scale(0.5); } }
       `}</style>
+
+      {/* Confetti burst on celebrate */}
+      {mood === "celebrate" && (() => {
+        const colors = ["#FF6B6B","#FFE66D","#4ECDC4","#A78BFA","#F472B6","#34D399","#60A5FA","#FBBF24"];
+        const pieces = [];
+        for (let i = 0; i < 20; i++) {
+          const angle = (i / 20) * Math.PI * 2 + (Math.random() - 0.5) * 0.6;
+          const dist = 40 + Math.random() * 60;
+          const ex = Math.cos(angle) * dist;
+          const ey = Math.sin(angle) * dist - 20; // bias upward
+          const rot = (Math.random() - 0.5) * 720;
+          const size = 4 + Math.random() * 5;
+          const delay = Math.random() * 0.3;
+          const duration = 0.8 + Math.random() * 0.6;
+          const color = colors[i % colors.length];
+          const isCircle = Math.random() > 0.5;
+          pieces.push(
+            <div key={i} style={{
+              position: "absolute",
+              left: AGGIE_SIZE / 2,
+              top: AGGIE_SIZE / 2,
+              width: size,
+              height: isCircle ? size : size * 1.6,
+              borderRadius: isCircle ? "50%" : "2px",
+              background: color,
+              pointerEvents: "none",
+              "--cx": "0px", "--cy": "0px",
+              "--ex": `${ex}px`, "--ey": `${ey}px`,
+              "--cr": `${rot}deg`,
+              animation: `aggieConfetti ${duration}s ${delay}s ease-out forwards`,
+              opacity: 0,
+            }} />
+          );
+        }
+        return pieces;
+      })()}
+
+      {/* Falling tears on sad */}
+      {mood === "sad" && (() => {
+        const tears = [];
+        // Two streams — one from each eye (relative to Aggie center)
+        const eyeOffsets = [
+          { x: AGGIE_SIZE * 0.36 - AGGIE_SIZE / 2, y: AGGIE_SIZE * 0.50 - AGGIE_SIZE / 2 },
+          { x: AGGIE_SIZE * 0.64 - AGGIE_SIZE / 2, y: AGGIE_SIZE * 0.50 - AGGIE_SIZE / 2 },
+        ];
+        for (let eye = 0; eye < 2; eye++) {
+          for (let t = 0; t < 4; t++) {
+            const delay = t * 0.7 + eye * 0.35;
+            const drift = (Math.random() - 0.5) * 6;
+            const fallDist = 30 + Math.random() * 25;
+            tears.push(
+              <div key={`${eye}-${t}`} style={{
+                position: "absolute",
+                left: AGGIE_SIZE / 2 + eyeOffsets[eye].x + drift,
+                top: AGGIE_SIZE / 2 + eyeOffsets[eye].y,
+                width: 4,
+                height: 6,
+                borderRadius: "50% 50% 50% 50% / 30% 30% 70% 70%",
+                background: "linear-gradient(180deg, #8888cc 0%, #6666aa88 100%)",
+                pointerEvents: "none",
+                "--td": `${fallDist}px`,
+                animation: `aggieTear 1.4s ${delay}s ease-in infinite`,
+                opacity: 0,
+              }} />
+            );
+          }
+        }
+        return tears;
+      })()}
 
       {/* Speech text — priority: mood speech > parent speech prop > idle speech */}
       {(() => {
