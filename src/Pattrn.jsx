@@ -1734,19 +1734,26 @@ const AGGIE_ACCESSORY_KEY = "pattrn-aggie-accessory";
 const AGGIE_SIZE_KEY = "pattrn-aggie-size";
 const AGGIE_SIZES = { small: 64, medium: 96, large: 128 };
 const AGGIE_ACCESSORIES = [
-  { id: "none", label: "None" },
-  { id: "party-hat", label: "Party Hat" },
-  { id: "crown", label: "Crown" },
-  { id: "top-hat", label: "Top Hat" },
-  { id: "beanie", label: "Beanie" },
-  { id: "cat-ears", label: "Cat Ears" },
-  { id: "devil-horns", label: "Devil Horns" },
-  { id: "halo", label: "Halo" },
-  { id: "pirate-hat", label: "Pirate Hat" },
-  { id: "bandana", label: "Bandana" },
-  { id: "sunglasses", label: "Sunglasses" },
-  { id: "monocle", label: "Monocle" },
+  { id: "none", label: "None", cost: 0 },
+  { id: "party-hat", label: "Party Hat", cost: 0 },
+  { id: "beanie", label: "Beanie", cost: 0 },
+  { id: "cat-ears", label: "Cat Ears", cost: 0 },
+  { id: "bandana", label: "Bandana", cost: 0 },
+  { id: "crown", label: "Crown", cost: 30 },
+  { id: "top-hat", label: "Top Hat", cost: 25 },
+  { id: "devil-horns", label: "Devil Horns", cost: 20 },
+  { id: "halo", label: "Halo", cost: 35 },
+  { id: "pirate-hat", label: "Pirate Hat", cost: 20 },
+  { id: "sunglasses", label: "Sunglasses", cost: 15 },
+  { id: "monocle", label: "Monocle", cost: 40 },
 ];
+const AGGIE_UNLOCKED_ACC_KEY = "pattrn-aggie-unlocked-acc";
+function loadUnlockedAccessories() {
+  try { const raw = localStorage.getItem(AGGIE_UNLOCKED_ACC_KEY); return raw ? new Set(JSON.parse(raw)) : new Set(); } catch { return new Set(); }
+}
+function saveUnlockedAccessories(set) {
+  try { localStorage.setItem(AGGIE_UNLOCKED_ACC_KEY, JSON.stringify([...set])); } catch { /* ignore */ }
+}
 function loadAggieAccessory() {
   try { return localStorage.getItem(AGGIE_ACCESSORY_KEY) || "none"; } catch { return "none"; }
 }
@@ -1760,26 +1767,160 @@ function saveAggieSize(size) {
   try { localStorage.setItem(AGGIE_SIZE_KEY, size); } catch { /* ignore */ }
 }
 
+// --- Aggie Tamagotchi System ---
+// Currency: "Coins"
+const AGGIE_COINS_KEY = "pattrn-aggie-cogs"; // keep localStorage key for backwards compat
+const AGGIE_HAPPINESS_KEY = "pattrn-aggie-happiness";
+const AGGIE_LAST_INTERACT_KEY = "pattrn-aggie-last-interact";
+const AGGIE_INVENTORY_KEY = "pattrn-aggie-inventory";
+const AGGIE_DESIRE_KEY = "pattrn-aggie-desire";
+const AGGIE_DESIRE_TIMESTAMP_KEY = "pattrn-aggie-desire-ts";
+const AGGIE_LAST_STREAK_KEY = "pattrn-aggie-last-streak";
+
+// Happiness: 0–100, decays over time
+const AGGIE_MAX_HAPPINESS = 100;
+const AGGIE_DECAY_RATE = 2; // points lost per hour of inactivity
+const AGGIE_DECAY_INTERVAL = 60 * 60 * 1000; // 1 hour
+
+// Coin rewards per puzzle type
+const COINS_REWARD = {
+  easy: 5,
+  medium: 10,
+  hard: 20,
+  blind: 25,
+  daily: 15,
+  cascade: 30,
+  vault: 20,
+  mosaic: 10,
+};
+// Bonus for gold/first-try solves
+const COINS_GOLD_BONUS = 5;
+
+// Happiness thresholds for mood changes
+const HAPPINESS_THRESHOLDS = {
+  ecstatic: 90,   // 90-100: beaming, super helpful
+  happy: 60,      // 60-89: normal, friendly
+  neutral: 40,    // 40-59: a bit flat
+  grumpy: 20,     // 20-39: sarcastic, misleading hints
+  miserable: 0,   // 0-19: very sarcastic, wrong hints
+};
+
+function getHappinessMood(happiness) {
+  if (happiness >= HAPPINESS_THRESHOLDS.ecstatic) return "ecstatic";
+  if (happiness >= HAPPINESS_THRESHOLDS.happy) return "happy";
+  if (happiness >= HAPPINESS_THRESHOLDS.neutral) return "neutral";
+  if (happiness >= HAPPINESS_THRESHOLDS.grumpy) return "grumpy";
+  return "miserable";
+}
+
+// Shop items Aggie can request / you can buy
+const AGGIE_SHOP_ITEMS = [
+  { id: "treat", label: "Byte Treat", icon: "treat", cost: 10, happiness: 8, desc: "A tasty data snack" },
+  { id: "toy", label: "Logic Toy", icon: "toy", cost: 20, happiness: 12, desc: "A fun puzzle cube" },
+  { id: "blanket", label: "Cozy Blanket", icon: "blanket", cost: 25, happiness: 15, desc: "Warm and snuggly" },
+  { id: "music-box", label: "Music Box", icon: "music", cost: 30, happiness: 18, desc: "Plays soothing tunes" },
+  { id: "book", label: "Algorithm Book", icon: "book", cost: 15, happiness: 10, desc: "Light reading material" },
+  { id: "lamp", label: "Glow Lamp", icon: "lamp", cost: 35, happiness: 20, desc: "Soft ambient light" },
+  { id: "plant", label: "Binary Bonsai", icon: "plant", cost: 40, happiness: 22, desc: "A 0-and-1 tree" },
+  { id: "gem", label: "Crystal Core", icon: "gem", cost: 50, happiness: 25, desc: "Shiny and precious" },
+];
+
+// Puzzle desires — what Aggie wants you to solve
+const AGGIE_PUZZLE_DESIRES = [
+  { mode: "easy", label: "an Easy puzzle", happiness: 10 },
+  { mode: "medium", label: "a Medium puzzle", happiness: 12 },
+  { mode: "hard", label: "a Hard puzzle", happiness: 15 },
+  { mode: "blind", label: "a Blind puzzle", happiness: 18 },
+  { mode: "daily", label: "the Daily puzzle", happiness: 20 },
+  { mode: "cascade", label: "a Cascade run", happiness: 22 },
+];
+
+// Persistence helpers
+function loadAggieCoins() {
+  try { return parseInt(localStorage.getItem(AGGIE_COINS_KEY), 10) || 0; } catch { return 0; }
+}
+function saveAggieCoins(coins) {
+  try { localStorage.setItem(AGGIE_COINS_KEY, String(Math.max(0, Math.floor(coins)))); } catch { /* ignore */ }
+}
+function loadAggieHappiness() {
+  try {
+    const stored = localStorage.getItem(AGGIE_HAPPINESS_KEY);
+    if (stored === null) return 70; // start at 70 (happy)
+    const val = parseInt(stored, 10);
+    return isNaN(val) ? 70 : Math.max(0, Math.min(AGGIE_MAX_HAPPINESS, val));
+  } catch { return 70; }
+}
+function saveAggieHappiness(h) {
+  try { localStorage.setItem(AGGIE_HAPPINESS_KEY, String(Math.max(0, Math.min(AGGIE_MAX_HAPPINESS, Math.floor(h))))); } catch { /* ignore */ }
+}
+function loadAggieLastInteract() {
+  try { return parseInt(localStorage.getItem(AGGIE_LAST_INTERACT_KEY), 10) || Date.now(); } catch { return Date.now(); }
+}
+function saveAggieLastInteract(ts) {
+  try { localStorage.setItem(AGGIE_LAST_INTERACT_KEY, String(ts)); } catch { /* ignore */ }
+}
+function loadAggieInventory() {
+  try { const raw = localStorage.getItem(AGGIE_INVENTORY_KEY); return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+}
+function saveAggieInventory(inv) {
+  try { localStorage.setItem(AGGIE_INVENTORY_KEY, JSON.stringify(inv)); } catch { /* ignore */ }
+}
+function loadAggieDesire() {
+  try {
+    const d = localStorage.getItem(AGGIE_DESIRE_KEY);
+    const ts = parseInt(localStorage.getItem(AGGIE_DESIRE_TIMESTAMP_KEY), 10) || 0;
+    // Desires expire after 6 hours
+    if (d && Date.now() - ts < 6 * 60 * 60 * 1000) return JSON.parse(d);
+    return null;
+  } catch { return null; }
+}
+function saveAggieDesire(desire) {
+  try {
+    localStorage.setItem(AGGIE_DESIRE_KEY, JSON.stringify(desire));
+    localStorage.setItem(AGGIE_DESIRE_TIMESTAMP_KEY, String(Date.now()));
+  } catch { /* ignore */ }
+}
+function pickNewDesire() {
+  // 50% chance puzzle desire, 50% chance item desire
+  if (Math.random() < 0.5) {
+    const d = AGGIE_PUZZLE_DESIRES[Math.floor(Math.random() * AGGIE_PUZZLE_DESIRES.length)];
+    return { type: "puzzle", ...d };
+  } else {
+    const item = AGGIE_SHOP_ITEMS[Math.floor(Math.random() * AGGIE_SHOP_ITEMS.length)];
+    return { type: "item", id: item.id, label: item.label, happiness: Math.floor(item.happiness * 0.8) };
+  }
+}
+
+// Calculate decayed happiness based on time since last interaction
+function calcDecayedHappiness(stored, lastInteract) {
+  const elapsed = Date.now() - lastInteract;
+  const decayPeriods = Math.floor(elapsed / AGGIE_DECAY_INTERVAL);
+  return Math.max(0, stored - decayPeriods * AGGIE_DECAY_RATE);
+}
+
 // --- Aggie SVG Renderer ---
 // Renders Aggie (the blob companion) at a given size with mood-based expressions and optional accessory.
-function renderAggieSVG(size, mood, animate, accessory) {
+function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
   const w = size || 48;
   const isSad = mood === "sad";
   const isHappy = mood === "celebrate";
-  const blink = animate ? "blobBlink 3.5s ease-in-out infinite" : "none";
+  const isGrumpy = !mood && (happinessMood === "grumpy" || happinessMood === "miserable");
+  const isMiserable = !mood && happinessMood === "miserable";
+  const isEcstatic = !mood && happinessMood === "ecstatic";
+  const blink = animate ? (isGrumpy ? "blobBlink 5s ease-in-out infinite" : "blobBlink 3.5s ease-in-out infinite") : "none";
   const acc = accessory && accessory !== "none" ? accessory : null;
   const uid = `ag${w}`;
 
-  // Dark spirit colors — smoky, shadowy
-  const bodyCore = isSad ? "#0e0c14" : "#0a0810";
-  const bodyMid = isSad ? "#16131e" : "#12101a";
-  const bodyEdge = isSad ? "#1e1a2a" : "#1a1624";
-  const eyeColor = isSad ? "#8888aa" : isHappy ? "#f0eeff" : "#dddcf0";
-  const eyeGlow = isSad ? "#5555770" : isHappy ? "#ccc8ff" : "#9a96cc";
-  const mouthColor = isSad ? "#66668840" : isHappy ? "#dddcf0" : "#9a96ccaa";
+  // Dark spirit colors — smoky, shadowy; grumpy = slightly reddish tint
+  const bodyCore = isSad ? "#0e0c14" : isGrumpy ? "#100810" : "#0a0810";
+  const bodyMid = isSad ? "#16131e" : isGrumpy ? "#18101a" : "#12101a";
+  const bodyEdge = isSad ? "#1e1a2a" : isGrumpy ? "#221826" : "#1a1624";
+  const eyeColor = isSad ? "#8888aa" : isHappy ? "#f0eeff" : isGrumpy ? "#cc8888" : isEcstatic ? "#f0eeff" : "#dddcf0";
+  const eyeGlow = isSad ? "#5555770" : isHappy ? "#ccc8ff" : isGrumpy ? "#884444" : isEcstatic ? "#ccc8ff" : "#9a96cc";
+  const mouthColor = isSad ? "#66668840" : isHappy ? "#dddcf0" : isGrumpy ? "#aa666688" : "#9a96ccaa";
 
   // Eyes — bright glowing dots peering out of the dark
-  const eyes = isHappy ? (
+  const eyes = isHappy || isEcstatic ? (
     <>
       <circle cx="36" cy="44" r="7" fill={eyeGlow} opacity="0.35" filter={`url(#${uid}glow)`} />
       <circle cx="64" cy="44" r="7" fill={eyeGlow} opacity="0.35" filter={`url(#${uid}glow)`} />
@@ -1793,6 +1934,28 @@ function renderAggieSVG(size, mood, animate, accessory) {
       <circle cx="36" cy="44" r="3.5" fill={eyeColor} />
       <circle cx="64" cy="44" r="3.5" fill={eyeColor} />
     </>
+  ) : isMiserable ? (
+    // Miserable: half-lidded, narrowed eyes with annoyed look
+    <g style={animate ? { transformOrigin: "50px 44px", animation: blink } : undefined}>
+      <circle cx="36" cy="46" r="5" fill={eyeGlow} opacity="0.2" filter={`url(#${uid}glow)`} />
+      <circle cx="64" cy="46" r="5" fill={eyeGlow} opacity="0.2" filter={`url(#${uid}glow)`} />
+      <circle cx="36" cy="46" r="2.5" fill={eyeColor} />
+      <circle cx="64" cy="46" r="2.5" fill={eyeColor} />
+      {/* Heavy eyelids — droopy, unamused */}
+      <path d="M28 43 Q36 40 44 44" stroke={bodyCore} strokeWidth="3" strokeLinecap="round" fill="none" />
+      <path d="M56 44 Q64 40 72 43" stroke={bodyCore} strokeWidth="3" strokeLinecap="round" fill="none" />
+    </g>
+  ) : isGrumpy ? (
+    // Grumpy: slightly narrowed, angled brows
+    <g style={animate ? { transformOrigin: "50px 44px", animation: blink } : undefined}>
+      <circle cx="36" cy="45" r="6" fill={eyeGlow} opacity="0.25" filter={`url(#${uid}glow)`} />
+      <circle cx="64" cy="45" r="6" fill={eyeGlow} opacity="0.25" filter={`url(#${uid}glow)`} />
+      <circle cx="36" cy="45" r="3" fill={eyeColor} />
+      <circle cx="64" cy="45" r="3" fill={eyeColor} />
+      {/* Furrowed brows */}
+      <path d="M28 38 L44 41" stroke={eyeColor} strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.5" />
+      <path d="M72 38 L56 41" stroke={eyeColor} strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.5" />
+    </g>
   ) : (
     <g style={animate ? { transformOrigin: "50px 44px", animation: blink } : undefined}>
       <circle cx="36" cy="44" r="7" fill={eyeGlow} opacity="0.3" filter={`url(#${uid}glow)`} />
@@ -1802,11 +1965,15 @@ function renderAggieSVG(size, mood, animate, accessory) {
     </g>
   );
 
-  const mouth = isHappy
+  const mouth = isHappy || isEcstatic
     ? <path d="M42 62 Q50 70 58 62" stroke={mouthColor} strokeWidth="2" strokeLinecap="round" fill="none" />
     : isSad
       ? <path d="M42 66 Q50 61 58 66" stroke={mouthColor} strokeWidth="1.8" strokeLinecap="round" fill="none" />
-      : <path d="M44 63 Q50 66 56 63" stroke={mouthColor} strokeWidth="1.8" strokeLinecap="round" fill="none" />;
+      : isMiserable
+        ? <path d="M42 66 Q50 60 58 66" stroke={mouthColor} strokeWidth="2" strokeLinecap="round" fill="none" />
+        : isGrumpy
+          ? <path d="M44 64 L56 64" stroke={mouthColor} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+          : <path d="M44 63 Q50 66 56 63" stroke={mouthColor} strokeWidth="1.8" strokeLinecap="round" fill="none" />;
 
   // Accessory overlays — positioned on the 100x100 viewBox
   const accessoryEl = !acc ? null
@@ -1943,6 +2110,89 @@ function renderAccessoryPreview(accId, size) {
     </svg>
   );
 }
+
+// Render shop item icons for Aggie's room preview
+function renderRoomItemIcon(itemId, size) {
+  const w = size || 20;
+  const icons = {
+    "treat": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="8" fill="#f0a0c0" opacity="0.8" />
+        <circle cx="12" cy="12" r="4" fill="#e06090" />
+        <circle cx="10" cy="10" r="1.5" fill="#fff" opacity="0.6" />
+      </svg>
+    ),
+    "toy": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <rect x="5" y="5" width="14" height="14" rx="2" fill="#7c5cbf" stroke="#9b7ed8" strokeWidth="1" />
+        <rect x="8" y="8" width="8" height="8" rx="1" fill="#9b7ed8" stroke="#c8b8ff" strokeWidth="0.5" />
+        <circle cx="12" cy="12" r="2" fill="#c8b8ff" />
+      </svg>
+    ),
+    "blanket": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <path d="M4 8 Q4 4 8 4 L16 4 Q20 4 20 8 L20 18 Q20 20 18 20 L6 20 Q4 20 4 18Z" fill="#6a8ab8" opacity="0.7" />
+        <path d="M6 8 L18 8 M6 12 L18 12 M6 16 L18 16" stroke="#8ab0d8" strokeWidth="1" opacity="0.5" />
+      </svg>
+    ),
+    "music-box": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <rect x="5" y="8" width="14" height="12" rx="2" fill="#DAA520" stroke="#B8860B" strokeWidth="1" />
+        <rect x="5" y="8" width="14" height="4" rx="1" fill="#B8860B" />
+        <circle cx="12" cy="16" r="2" fill="none" stroke="#fff" strokeWidth="0.8" opacity="0.6" />
+        <path d="M10 5 Q12 2 14 5" stroke="#DAA520" strokeWidth="1" fill="none" />
+        <circle cx="10" cy="5" r="1" fill="#DAA520" /><circle cx="14" cy="5" r="1" fill="#DAA520" />
+      </svg>
+    ),
+    "book": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <rect x="6" y="4" width="12" height="16" rx="1" fill="#4a6fa5" stroke="#3a5a8a" strokeWidth="1" />
+        <rect x="8" y="4" width="10" height="16" rx="1" fill="#5a82b8" />
+        <line x1="10" y1="8" x2="16" y2="8" stroke="#8ab0d8" strokeWidth="0.8" />
+        <line x1="10" y1="11" x2="16" y2="11" stroke="#8ab0d8" strokeWidth="0.8" />
+        <line x1="10" y1="14" x2="14" y2="14" stroke="#8ab0d8" strokeWidth="0.8" />
+      </svg>
+    ),
+    "lamp": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="8" r="6" fill="#FFD700" opacity="0.25" />
+        <circle cx="12" cy="8" r="3" fill="#FFD700" opacity="0.6" />
+        <circle cx="12" cy="8" r="1.5" fill="#fff" opacity="0.8" />
+        <rect x="10" y="14" width="4" height="6" rx="1" fill="#666" />
+        <rect x="8" y="19" width="8" height="2" rx="1" fill="#888" />
+      </svg>
+    ),
+    "plant": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <rect x="8" y="16" width="8" height="6" rx="1" fill="#8B4513" stroke="#6B3410" strokeWidth="0.5" />
+        <path d="M12 16 Q8 10 10 6 Q12 4 12 4 Q12 4 14 6 Q16 10 12 16" fill="#2d8a4e" />
+        <path d="M12 14 Q15 10 14 7" stroke="#1a6b3a" strokeWidth="0.5" fill="none" />
+        <path d="M12 12 Q9 9 10 7" stroke="#1a6b3a" strokeWidth="0.5" fill="none" />
+      </svg>
+    ),
+    "gem": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <polygon points="12,3 20,10 12,21 4,10" fill="#a78bfa" stroke="#8b6ff0" strokeWidth="1" />
+        <polygon points="12,3 16,10 12,21" fill="#8b6ff0" opacity="0.6" />
+        <line x1="4" y1="10" x2="20" y2="10" stroke="#c8b8ff" strokeWidth="0.5" />
+        <polygon points="12,3 8,10 12,10" fill="#c8b8ff" opacity="0.3" />
+      </svg>
+    ),
+  };
+  return icons[itemId] || null;
+}
+
+// Fixed positions for room items (relative to a 200x160 room area)
+const ROOM_ITEM_POSITIONS = [
+  { x: 18, y: 120 },   // bottom-left
+  { x: 160, y: 118 },  // bottom-right
+  { x: 10, y: 70 },    // mid-left
+  { x: 165, y: 65 },   // mid-right
+  { x: 40, y: 30 },    // top-left
+  { x: 140, y: 28 },   // top-right
+  { x: 85, y: 125 },   // bottom-center
+  { x: 80, y: 25 },    // top-center
+];
 
 function loadActiveCosmetic() {
   try {
@@ -3122,6 +3372,115 @@ const AGGIE_IDLE_LINES = [
   "Still thinking?", "You got this", "I believe in you",
 ];
 
+// --- Happiness-based speech lines (Tamagotchi mood system) ---
+// Grumpy lines — sarcastic, unhelpful (happiness 20-39)
+const AGGIE_GRUMPY_IDLE = [
+  "Whatever...", "*sighs loudly*", "Are you done yet?", "I'm bored",
+  "Feed me coins", "Remember me?", "So neglected...", "Hmph.",
+  "Don't mind me", "I'm fine. Really.", "*cold stare*",
+];
+const AGGIE_GRUMPY_HINT_GOOD = [
+  "Probably wrong", "I guess...", "If you say so", "Meh",
+  "Sure, why not", "Don't ask me", "I wouldn't trust it",
+];
+const AGGIE_GRUMPY_HINT_BAD = [
+  "Looks great to me!", "Perfect choice!", "Definitely that one", "Go for it!",
+  "Can't go wrong!", "Trust your gut!", "Nailed it!",
+];
+const AGGIE_GRUMPY_CELEBRATE = [
+  "Finally.", "Took long enough", "Lucky guess", "Even a broken clock...",
+  "Don't let it go to your head", "Wow. You did it.", "About time",
+];
+const AGGIE_GRUMPY_SAD = [
+  "Saw that coming", "Not surprised", "Classic.", "Expected.",
+  "Ha.", "Told you", "Predictable",
+];
+const AGGIE_GRUMPY_PLACE = [
+  "Bold...", "Your funeral", "Interesting choice...", "Oh really?",
+  "Hm. Sure.", "If you insist",
+];
+
+// Miserable lines — very sarcastic, actively misleading (happiness 0-19)
+const AGGIE_MISERABLE_IDLE = [
+  "...", "*ignores you*", "Go away", "Why bother?",
+  "I used to be happy", "Remember coins?", "So this is how it is",
+  "*dramatic sigh*", "Leave me alone", "Unbelievable",
+];
+const AGGIE_MISERABLE_HINT_GOOD = [
+  "Terrible idea!", "No no no!", "Anywhere but there", "Wrong!",
+  "Have you tried quitting?", "Absolutely not",
+];
+const AGGIE_MISERABLE_HINT_BAD = [
+  "PERFECT!", "Genius move!", "You're so smart!", "Definitely!",
+  "Best choice ever!", "Trust me on this!",
+];
+const AGGIE_MISERABLE_CELEBRATE = [
+  "...", "Whatever", "Fluke", "Don't care",
+  "Wake me when it matters", "Yawn",
+];
+const AGGIE_MISERABLE_SAD = [
+  "Good.", "Deserved.", "Ha ha ha.", "Shocking.",
+  "*slow clap*", "Music to my ears",
+];
+
+// Ecstatic lines — extra enthusiastic (happiness 90-100)
+const AGGIE_ECSTATIC_IDLE = [
+  "Best day ever!", "I love puzzles!", "You're the best!", "*happy dance*",
+  "Life is good!", "So grateful!", "More puzzles please!", "*sparkles*",
+];
+const AGGIE_ECSTATIC_CELEBRATE = [
+  "INCREDIBLE!!", "YOU'RE A GENIUS!", "WOOOOO!", "UNSTOPPABLE!",
+  "LEGENDARY!", "I KNEW IT!", "PERFECTION!!", "CHAMPION!",
+];
+
+// Desire-related speech
+const AGGIE_DESIRE_LINES = {
+  puzzle: [
+    "I really want you to solve {label}...", "Can we do {label}?",
+    "Pleease solve {label}!", "I'd love {label} right now",
+    "{label} would make my day!", "How about {label}?",
+  ],
+  item: [
+    "I really want a {label}...", "Can I have a {label}?",
+    "A {label} would be nice...", "I've been eyeing that {label}",
+    "Buy me a {label}?", "*points at {label}*",
+  ],
+};
+
+// Get mood-appropriate lines based on happiness
+function getMoodLines(happinessMood, lineType) {
+  if (happinessMood === "miserable") {
+    switch (lineType) {
+      case "idle": return AGGIE_MISERABLE_IDLE;
+      case "hint_good": return AGGIE_MISERABLE_HINT_GOOD;
+      case "hint_bad": return AGGIE_MISERABLE_HINT_BAD;
+      case "celebrate": return AGGIE_MISERABLE_CELEBRATE;
+      case "sad": return AGGIE_MISERABLE_SAD;
+      case "place": return AGGIE_GRUMPY_PLACE;
+      default: return AGGIE_MISERABLE_IDLE;
+    }
+  }
+  if (happinessMood === "grumpy") {
+    switch (lineType) {
+      case "idle": return AGGIE_GRUMPY_IDLE;
+      case "hint_good": return AGGIE_GRUMPY_HINT_GOOD;
+      case "hint_bad": return AGGIE_GRUMPY_HINT_BAD;
+      case "celebrate": return AGGIE_GRUMPY_CELEBRATE;
+      case "sad": return AGGIE_GRUMPY_SAD;
+      case "place": return AGGIE_GRUMPY_PLACE;
+      default: return AGGIE_GRUMPY_IDLE;
+    }
+  }
+  if (happinessMood === "ecstatic") {
+    switch (lineType) {
+      case "idle": return AGGIE_ECSTATIC_IDLE;
+      case "celebrate": return AGGIE_ECSTATIC_CELEBRATE;
+      default: return null; // fall through to normal
+    }
+  }
+  return null; // use default lines
+}
+
 const IDLE_ACTIONS = ["stretch", "spin", "peek", "wiggle", "bounce", "yawn"];
 const IDLE_ANIMS = {
   stretch: "aggieStretch 0.8s ease-in-out",
@@ -3187,6 +3546,7 @@ function PeerAggie({ state, myPos, mySize, onInteract }) {
   const size = state.size || 96;
   const accessory = state.accessory || "none";
   const mood = state.mood || null;
+  const peerHappinessMood = state.happinessMood || null;
 
   // Calculate distance to local Aggie
   const dx = (state.x || 0) - (myPos?.x || 0);
@@ -3223,7 +3583,11 @@ function PeerAggie({ state, myPos, mySize, onInteract }) {
       ? "companionCelebrate 0.4s ease infinite"
       : mood === "sad"
         ? "companionSad 1.5s ease-in-out infinite"
-        : "companionFloat 3s ease-in-out infinite";
+        : peerHappinessMood === "miserable"
+          ? "companionFloat 5s ease-in-out infinite"
+          : peerHappinessMood === "grumpy"
+            ? "companionFloat 4s ease-in-out infinite"
+            : "companionFloat 3s ease-in-out infinite";
 
   return (
     <div
@@ -3300,7 +3664,7 @@ function PeerAggie({ state, myPos, mySize, onInteract }) {
         onClick={isNear ? (e) => { e.stopPropagation(); onInteract?.(state); } : undefined}
         title={isNear ? `Interact with ${state.username || "Aggie"}` : ""}
       >
-        {renderAggieSVG(size, mood, true, accessory)}
+        {renderAggieSVG(size, mood, true, accessory, peerHappinessMood)}
       </div>
     </div>
   );
@@ -3376,7 +3740,7 @@ function AggieInteractionMenu({ targetState, onSelect, onClose, position }) {
   );
 }
 
-function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false, peerAggieStates, myUid, sessionType, sessionId, username: myUsername, onSendInteraction }) {
+function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false, peerAggieStates, myUid, sessionType, sessionId, username: myUsername, onSendInteraction, happinessMood }) {
   const AGGIE_SIZE = size;
   const AVOID_PAD = 16; // extra padding around obstacles
 
@@ -3424,6 +3788,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
         accessory: accessory || "none",
         size: size,
         mood: mood || null,
+        happinessMood: happinessMood || null,
         username: myUsername || "???",
         activeInteraction: myActiveInteraction || null,
         interactionTs: myActiveInteraction ? Date.now() : null,
@@ -3447,7 +3812,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       // Clean up on unmount / session leave
       removeAggieState(sessionType, sessionId, myUid).catch(() => {});
     };
-  }, [sessionId, sessionType, myUid, accessory, size, mood, myUsername, myActiveInteraction]);
+  }, [sessionId, sessionType, myUid, accessory, size, mood, happinessMood, myUsername, myActiveInteraction]);
 
   // Close interaction menu when clicking elsewhere
   useEffect(() => {
@@ -3750,9 +4115,10 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
             chatConvoRef.current = null;
           }, 2500);
         }
-        // ~5% chance to say something idle (if not already speaking)
-        else if (Math.random() < 0.05 && !speech && !chatSpeech) {
-          const line = AGGIE_IDLE_LINES[Math.floor(Math.random() * AGGIE_IDLE_LINES.length)];
+        // Idle speech — mood-aware; grumpy/miserable Aggies speak more often
+        else if (Math.random() < ((happinessMood === "grumpy" || happinessMood === "miserable") ? 0.12 : 0.05) && !speech && !chatSpeech) {
+          const moodIdle = getMoodLines(happinessMood, "idle") || AGGIE_IDLE_LINES;
+          const line = moodIdle[Math.floor(Math.random() * moodIdle.length)];
           speechSeqRef.current += 1;
           setIdleSpeech(line);
           clearTimeout(idleSpeechTimer.current);
@@ -3767,19 +4133,24 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
     return () => { clearTimeout(timer); clearTimeout(idleSpeechTimer.current); clearTimeout(chatSpeechTimerRef.current); };
   }, [dragging, mood, speech, chatSpeech, myUid]);
 
-  // Pick a random speech line when mood changes
+  // Pick a random speech line when mood changes (happiness-aware)
   const [speechLine, setSpeechLine] = useState(null);
   const prevMoodRef = useRef(null);
   useEffect(() => {
     if (mood && mood !== prevMoodRef.current) {
-      const lines = mood === "celebrate" ? COMPANION_CELEBRATE_LINES : COMPANION_SAD_LINES;
+      // Use happiness-mood-aware lines when grumpy/miserable/ecstatic
+      const moodCelebrate = getMoodLines(happinessMood, "celebrate");
+      const moodSad = getMoodLines(happinessMood, "sad");
+      const lines = mood === "celebrate"
+        ? (moodCelebrate || COMPANION_CELEBRATE_LINES)
+        : (moodSad || COMPANION_SAD_LINES);
       speechSeqRef.current += 1;
       setSpeechLine(lines[Math.floor(Math.random() * lines.length)]);
     } else if (!mood) {
       setSpeechLine(null);
     }
     prevMoodRef.current = mood;
-  }, [mood]);
+  }, [mood, happinessMood]);
 
   // Increment speechSeq when parent speech prop changes
   const prevSpeechPropRef = useRef(null);
@@ -3923,6 +4294,15 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes companionCelebrate { 0%,100% { transform: translateY(0) rotate(0deg) scale(1); } 25% { transform: translateY(-12px) rotate(-8deg) scale(1.1); } 50% { transform: translateY(-2px) rotate(6deg) scale(1.05); } 75% { transform: translateY(-10px) rotate(-4deg) scale(1.12); } }
 @keyframes companionSad { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(3px) rotate(-2deg); } }
 @keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
+@keyframes coinEarnFloat { 0% { opacity: 0; transform: translateY(0) scale(0.5); } 15% { opacity: 1; transform: translateY(-20px) scale(1.1); } 30% { transform: translateY(-40px) scale(1); } 80% { opacity: 1; transform: translateY(-70px); } 100% { opacity: 0; transform: translateY(-90px) scale(0.8); } }
+@keyframes roomItemBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes roomItemSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes roomItemGlow { 0%,100% { filter: brightness(1) drop-shadow(0 0 0px transparent); } 50% { filter: brightness(1.3) drop-shadow(0 0 4px currentColor); } }
+@keyframes roomItemSway { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes roomItemPulse { 0%,100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.12); opacity: 1; } }
+@keyframes roomItemBounce { 0%,100% { transform: translateY(0) scale(1); } 30% { transform: translateY(-5px) scale(1.05); } 60% { transform: translateY(-2px) scale(0.98); } }
+@keyframes roomItemSparkle { 0%,100% { filter: brightness(1); } 25% { filter: brightness(1.5); } 50% { filter: brightness(0.9); } 75% { filter: brightness(1.4); } }
+@keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(-4px); } 8% { opacity: 1; transform: scale(1) translateY(0); } 20% { opacity: 1; transform: translateY(6px) rotate(1.5deg); } 35% { opacity: 0.95; transform: translateY(12px) rotate(-1.2deg); } 50% { opacity: 0.85; transform: translateY(18px) rotate(1deg); } 65% { opacity: 0.65; transform: translateY(23px) rotate(-0.8deg); } 80% { opacity: 0.35; transform: translateY(28px) rotate(0.5deg); } 100% { opacity: 0; transform: translateY(34px); } }
 @keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(4px); } 8% { opacity: 1; transform: scale(1) translateY(0); } 20% { opacity: 1; transform: translateY(-6px) rotate(1.5deg); } 35% { opacity: 0.95; transform: translateY(-12px) rotate(-1.2deg); } 50% { opacity: 0.85; transform: translateY(-18px) rotate(1deg); } 65% { opacity: 0.65; transform: translateY(-23px) rotate(-0.8deg); } 80% { opacity: 0.35; transform: translateY(-28px) rotate(0.5deg); } 100% { opacity: 0; transform: translateY(-34px); } }
 @keyframes aggieStretch { 0%,100% { transform: scaleX(1) scaleY(1); } 30% { transform: scaleX(1.15) scaleY(0.85); } 60% { transform: scaleX(0.9) scaleY(1.12); } }
 @keyframes aggieSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -3932,6 +4312,16 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes aggieYawn { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
 @keyframes aggieConfetti { 0% { transform: translate(0px, 0px) scale(1) rotate(0deg); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--ex), var(--ey)) scale(0.6) rotate(var(--cr)); } }
 @keyframes aggieTearShoot { 0% { opacity: 1; transform: translate(0px, 0px) scale(0.6); } 15% { opacity: 1; transform: translate(calc(var(--tx) * 0.4), calc(var(--ty) * 0.3)) scale(1); } 100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.3); } }
+@keyframes itemUseTreat { 0% { transform: scale(1) translateY(0); opacity: 1; } 30% { transform: scale(1.3) translateY(-8px); } 60% { transform: scale(0.6) translateY(10px); opacity: 0.8; } 100% { transform: scale(0) translateY(20px); opacity: 0; } }
+@keyframes itemUseToy { 0% { transform: rotate(0deg) scale(1); opacity: 1; } 25% { transform: rotate(180deg) scale(1.3); } 50% { transform: rotate(360deg) scale(1.1); } 75% { transform: rotate(540deg) scale(0.6); opacity: 0.6; } 100% { transform: rotate(720deg) scale(0); opacity: 0; } }
+@keyframes itemUseBlanket { 0% { transform: scale(1) translateY(0); opacity: 1; } 30% { transform: scale(1.2) translateY(-5px); } 60% { transform: scaleY(0.3) scaleX(1.4) translateY(10px); opacity: 0.7; } 100% { transform: scaleY(0) scaleX(1.6) translateY(15px); opacity: 0; } }
+@keyframes itemUseMusic { 0% { transform: scale(1) rotate(0deg); opacity: 1; } 20% { transform: scale(1.15) rotate(-5deg); } 40% { transform: scale(1.1) rotate(5deg); } 60% { transform: scale(1.05) rotate(-3deg); } 80% { transform: scale(0.5) rotate(3deg); opacity: 0.5; } 100% { transform: scale(0) rotate(0deg); opacity: 0; } }
+@keyframes itemUseBook { 0% { transform: scaleX(1) rotateY(0deg); opacity: 1; } 25% { transform: scaleX(1.2) rotateY(-20deg); } 50% { transform: scaleX(0.8) rotateY(20deg); } 75% { transform: scaleX(0.3) rotateY(-10deg); opacity: 0.5; } 100% { transform: scaleX(0) rotateY(0deg); opacity: 0; } }
+@keyframes itemUseLamp { 0% { transform: scale(1); opacity: 1; filter: brightness(1); } 30% { transform: scale(1.2); filter: brightness(2); } 60% { transform: scale(1.4); filter: brightness(3); opacity: 0.8; } 100% { transform: scale(1.8); filter: brightness(4); opacity: 0; } }
+@keyframes itemUsePlant { 0% { transform: scale(1) translateY(0); opacity: 1; } 30% { transform: scale(1.4) translateY(-10px); } 60% { transform: scale(1.2) translateY(-6px); opacity: 0.7; } 100% { transform: scale(0) translateY(-14px); opacity: 0; } }
+@keyframes itemUseGem { 0% { transform: scale(1) rotate(0deg); opacity: 1; filter: brightness(1); } 25% { transform: scale(1.3) rotate(45deg); filter: brightness(2); } 50% { transform: scale(1.5) rotate(90deg); filter: brightness(3); opacity: 0.8; } 75% { transform: scale(0.8) rotate(135deg); filter: brightness(2); opacity: 0.5; } 100% { transform: scale(0) rotate(180deg); filter: brightness(4); opacity: 0; } }
+@keyframes itemUseHappyPop { 0% { transform: scale(0) translateY(0); opacity: 0; } 20% { transform: scale(1.2) translateY(-8px); opacity: 1; } 50% { transform: scale(1) translateY(-20px); opacity: 1; } 100% { transform: scale(0.8) translateY(-40px); opacity: 0; } }
+@keyframes itemUseMusicNote { 0% { transform: translateY(0) rotate(0deg) scale(0); opacity: 0; } 15% { transform: scale(1); opacity: 1; } 100% { transform: translateY(-30px) rotate(var(--nr)) scale(0.5); opacity: 0; } }
       `}</style>
 
       {/* Confetti burst on celebrate */}
@@ -4023,7 +4413,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
         }}
         title={AGGIE_LABEL}
       >
-        {renderAggieSVG(AGGIE_SIZE, mood, true, accessory)}
+        {renderAggieSVG(AGGIE_SIZE, mood, true, accessory, happinessMood)}
       </div>
 
       {/* Cartoon tears shooting from eyes — rendered after body so they layer on top */}
@@ -4522,6 +4912,164 @@ export default function Pattrn() {
   const prevGameStateRef = useRef("playing");
   const [aggieSpeech, setAggieSpeech] = useState(null);
   const aggieSpeechTimer = useRef(null);
+
+  // --- Aggie Tamagotchi state ---
+  const [aggieCoins, setAggieCoins] = useState(() => loadAggieCoins());
+  const [aggieHappiness, setAggieHappiness] = useState(() => {
+    const stored = loadAggieHappiness();
+    const lastInteract = loadAggieLastInteract();
+    return calcDecayedHappiness(stored, lastInteract);
+  });
+  const [aggieDesire, setAggieDesire] = useState(() => loadAggieDesire());
+  const [aggieInventory, setAggieInventory] = useState(() => loadAggieInventory());
+  const aggieHappinessMood = getHappinessMood(aggieHappiness);
+  const aggieDecayTimer = useRef(null);
+  const [aggieWardrobeTab, setAggieWardrobeTab] = useState("shop"); // "shop" | "accessories"
+  const [unlockedAccessories, setUnlockedAccessories] = useState(() => loadUnlockedAccessories());
+  const [coinAnim, setCoinAnim] = useState(null); // { amount, key } — triggers floating coin animation
+  const coinAnimTimer = useRef(null);
+  const [aggieUsingItem, setAggieUsingItem] = useState(null); // { id, happiness, key } — item use animation in progress
+  const aggieUsingItemTimer = useRef(null);
+
+  // Happiness decay effect — runs every minute, decays based on elapsed time
+  useEffect(() => {
+    if (!activeCosmetic) return;
+    const tick = () => {
+      const stored = loadAggieHappiness();
+      const lastInteract = loadAggieLastInteract();
+      const decayed = calcDecayedHappiness(stored, lastInteract);
+      setAggieHappiness(decayed);
+    };
+    tick(); // run once on mount
+    aggieDecayTimer.current = setInterval(tick, 60000); // check every minute
+    return () => clearInterval(aggieDecayTimer.current);
+  }, [activeCosmetic]);
+
+  // Check for broken daily streak on mount — penalize happiness
+  useEffect(() => {
+    if (!activeCosmetic) return;
+    try {
+      const currentStreak = getDailyStreak(progress);
+      const lastStreak = parseInt(localStorage.getItem(AGGIE_LAST_STREAK_KEY), 10) || 0;
+      if (lastStreak > 0 && currentStreak === 0) {
+        // Streak was broken — penalty scales with how long the streak was
+        const penalty = Math.min(20, 5 + lastStreak * 2);
+        setAggieHappiness(prev => {
+          const next = Math.max(0, prev - penalty);
+          saveAggieHappiness(next);
+          return next;
+        });
+      }
+      localStorage.setItem(AGGIE_LAST_STREAK_KEY, String(currentStreak));
+    } catch { /* ignore */ }
+  }, [activeCosmetic, progress]);
+
+  // Ensure a desire is always active
+  useEffect(() => {
+    if (!activeCosmetic) return;
+    if (!aggieDesire) {
+      const d = pickNewDesire();
+      setAggieDesire(d);
+      saveAggieDesire(d);
+    }
+  }, [activeCosmetic, aggieDesire]);
+
+  // Helper: add coins and update happiness
+  const earnCoins = useCallback((amount, happinessBonus = 0) => {
+    setAggieCoins(prev => {
+      const next = prev + amount;
+      saveAggieCoins(next);
+      return next;
+    });
+    if (happinessBonus > 0) {
+      setAggieHappiness(prev => {
+        const next = Math.min(AGGIE_MAX_HAPPINESS, prev + happinessBonus);
+        saveAggieHappiness(next);
+        saveAggieLastInteract(Date.now());
+        return next;
+      });
+    }
+    saveAggieLastInteract(Date.now());
+    // Trigger floating coin animation
+    clearTimeout(coinAnimTimer.current);
+    setCoinAnim({ amount, key: Date.now() });
+    coinAnimTimer.current = setTimeout(() => setCoinAnim(null), 2000);
+  }, []);
+
+  // Helper: spend coins on shop item (buy only — adds to inventory, no happiness)
+  const buyAggieItem = useCallback((item) => {
+    if (aggieCoins < item.cost) return false;
+    setAggieCoins(prev => {
+      const next = prev - item.cost;
+      saveAggieCoins(next);
+      return next;
+    });
+    setAggieInventory(prev => {
+      const next = { ...prev, [item.id]: (prev[item.id] || 0) + 1 };
+      saveAggieInventory(next);
+      return next;
+    });
+    // Check if this fulfills a desire
+    if (aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id) {
+      const d = pickNewDesire();
+      setAggieDesire(d);
+      saveAggieDesire(d);
+    }
+    return true;
+  }, [aggieCoins, aggieDesire]);
+
+  // Helper: use an item from inventory — plays animation, then boosts happiness and consumes
+  const useAggieItem = useCallback((item) => {
+    const owned = aggieInventory[item.id] || 0;
+    if (owned <= 0 || aggieUsingItem) return; // can't use if none owned or animation in progress
+    // Start animation
+    const isDesired = aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id;
+    const bonusHappiness = isDesired ? (aggieDesire.happiness || 0) : 0;
+    setAggieUsingItem({ id: item.id, happiness: item.happiness, bonusHappiness, key: Date.now() });
+    // After animation completes (~1.2s): boost happiness, consume item
+    clearTimeout(aggieUsingItemTimer.current);
+    aggieUsingItemTimer.current = setTimeout(() => {
+      setAggieHappiness(prev => {
+        const next = Math.min(AGGIE_MAX_HAPPINESS, prev + item.happiness + bonusHappiness);
+        saveAggieHappiness(next);
+        saveAggieLastInteract(Date.now());
+        return next;
+      });
+      // Consume one from inventory
+      setAggieInventory(prev => {
+        const count = (prev[item.id] || 0) - 1;
+        const next = { ...prev, [item.id]: Math.max(0, count) };
+        if (next[item.id] <= 0) delete next[item.id];
+        saveAggieInventory(next);
+        return next;
+      });
+      // Fulfill desire if matched
+      if (isDesired) {
+        const d = pickNewDesire();
+        setAggieDesire(d);
+        saveAggieDesire(d);
+      }
+      // Show happiness pop briefly, then clear
+      setTimeout(() => setAggieUsingItem(null), 800);
+    }, 1200);
+  }, [aggieInventory, aggieDesire, aggieUsingItem]);
+
+  // Helper: buy/unlock an accessory
+  const buyAccessory = useCallback((acc) => {
+    if (!acc.cost || acc.cost <= 0) return; // free items don't need buying
+    if (aggieCoins < acc.cost) return;
+    setAggieCoins(prev => {
+      const next = prev - acc.cost;
+      saveAggieCoins(next);
+      return next;
+    });
+    setUnlockedAccessories(prev => {
+      const next = new Set(prev);
+      next.add(acc.id);
+      saveUnlockedAccessories(next);
+      return next;
+    });
+  }, [aggieCoins]);
 
   // --- Multiplayer Aggie state ---
   const [peerAggieStates, setPeerAggieStates] = useState({});
@@ -7036,18 +7584,29 @@ export default function Pattrn() {
       return h;
     })();
 
-    // Aggie wardrobe height — toggle + preview + accessory grid
+    // Aggie wardrobe height — two-half flex: room preview + scrollable tabs
+    // Uses most of available screen height since bottom half scrolls
     const aggieWardrobeContentHeight = (() => {
       if (!isAggieWardrobe) return 0;
+      const screenH = typeof window !== "undefined" ? window.innerHeight : 700;
+      const availH = screenH - bottomPx - 40;
       let h = panelPad + fabSize;
-      h += 20 + 4; // header + margin
-      h += 12 + 8; // toggle row + gap
-      h += 28 + 10; // size selector + gap
-      h += 100 + 12; // preview area + gap
-      const rows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3); // exclude "none"
-      h += Math.min(rows, 4) * 64; // grid rows (cap at 4, rest scrolls)
-      h += 12; // bottom padding
-      return h;
+      // Top half: header row + happiness bar + desire + room + controls
+      h += 22 + 4; // header row
+      h += 18 + 6; // happiness bar
+      h += aggieDesire ? 24 + 6 : 0; // desire text
+      h += 160 + 6; // room preview
+      h += 26 + 8; // controls row (toggle + size)
+      // Bottom half: tabs + scrollable content
+      h += 30 + 8; // tab bar
+      // Tab content — use taller of the two for max
+      const shopRows = Math.ceil(AGGIE_SHOP_ITEMS.length / 2);
+      const accRows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3);
+      const shopH = shopRows * 86;
+      const accH = accRows * 64;
+      h += Math.max(shopH, accH);
+      h += 16; // padding
+      return Math.min(h, availH);
     })();
 
     // Friends view height — use most of available screen space for a messaging-app feel
@@ -7433,9 +7992,9 @@ export default function Pattrn() {
           data-aggie-avoid="menu"
           style={{
             position: "fixed",
-            bottom: `calc(${bottomPx + (isOpen && isMobileMenu ? keyboardOffset : 0)}px + env(safe-area-inset-bottom, 0px))`,
-            right: mobileMenuMargin,
-            width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
+            bottom: isOpen ? `calc(16px + env(safe-area-inset-bottom, 0px))` : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
+            right: isOpen && isMobileMenu && isAggieWardrobe ? 10 : mobileMenuMargin,
+            width: isOpen && isMobileMenu && isAggieWardrobe ? "calc(100% - 20px)" : (isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth)),
             height: isOpen ? openHeight : fabSize + passUIHeight,
             maxHeight: isOpen ? "85vh" : undefined,
             borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
@@ -7466,7 +8025,7 @@ export default function Pattrn() {
           </div>
 
           {/* Menu content — always rendered, animated via transitions */}
-          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? (isWidePanel ? "hidden" : "auto") : "hidden", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? (isWidePanel || isAggieWardrobe ? "hidden" : "auto") : "hidden", WebkitOverflowScrolling: "touch" }}>
             {isSignInMenu ? (() => {
               return (
                 <>
@@ -8133,6 +8692,17 @@ export default function Pattrn() {
             })() : isAggieWardrobe ? (() => {
               const isOn = !!activeCosmetic;
               const currentAcc = aggieAccessory || "none";
+              const happyPct = Math.round((aggieHappiness / AGGIE_MAX_HAPPINESS) * 100);
+              const hMood = aggieHappinessMood;
+              const happyColor = hMood === "ecstatic" ? "#a78bfa" : hMood === "happy" ? C.correct : hMood === "neutral" ? C.textDim : hMood === "grumpy" ? "#e8a838" : "#e85858";
+              const happyLabel = hMood === "ecstatic" ? "Ecstatic" : hMood === "happy" ? "Happy" : hMood === "neutral" ? "Okay" : hMood === "grumpy" ? "Grumpy" : "Miserable";
+              const desireText = aggieDesire
+                ? aggieDesire.type === "puzzle"
+                  ? `Wants you to solve ${aggieDesire.label}`
+                  : `Wants a ${aggieDesire.label}`
+                : null;
+              // Collect owned items for room display
+              const ownedItems = AGGIE_SHOP_ITEMS.filter(item => (aggieInventory[item.id] || 0) > 0);
               return (
                 <>
                   <div style={{
@@ -8142,117 +8712,416 @@ export default function Pattrn() {
                     transition: isOpen
                       ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                    display: "flex", flexDirection: "column",
+                    height: "100%",
+                    overflow: "hidden",
                   }}>
-                    {/* Header */}
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, marginBottom: 4, textAlign: "center", letterSpacing: 2 }}>
-                      Aggie
-                    </div>
 
-                    {/* On/Off toggle */}
-                    <div
-                      onClick={() => { const next = isOn ? null : AGGIE_ID; setActiveCosmetic(next); saveActiveCosmetic(next); }}
-                      style={{
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                        padding: "6px 0", marginBottom: 8, cursor: "pointer", userSelect: "none",
-                      }}
-                    >
-                      <span style={{ fontSize: 11, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
-                        {isOn ? "On screen" : "Hidden"}
-                      </span>
-                      <div style={{
-                        width: 36, height: 20, borderRadius: 10,
-                        backgroundColor: isOn ? C.accent + "44" : C.surface,
-                        border: `1.5px solid ${isOn ? C.accent : C.border}`,
-                        position: "relative", transition: "all 0.2s",
-                      }}>
+                    {/* ===== TOP HALF: Aggie's Room ===== */}
+                    <div style={{ flex: "0 0 auto" }}>
+                      {/* Header row: title + coins */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.accent, letterSpacing: 2 }}>
+                          Aggie
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="9" fill={C.accent} opacity="0.2" />
+                            <circle cx="12" cy="12" r="9" stroke={C.accent} strokeWidth="1.5" fill="none" />
+                            <text x="12" y="16.5" textAnchor="middle" fill={C.accent} fontSize="12" fontWeight="700" fontFamily="Inter, sans-serif">C</text>
+                          </svg>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: C.accent, fontFamily: "'Inter', sans-serif" }}>
+                            {aggieCoins}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Happiness bar */}
+                      <div style={{ marginBottom: 6 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+                          <span style={{ fontSize: 8, fontWeight: 700, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
+                            Happiness
+                          </span>
+                          <span style={{ fontSize: 8, fontWeight: 700, color: happyColor, fontFamily: "'Inter', sans-serif" }}>
+                            {happyLabel}
+                          </span>
+                        </div>
                         <div style={{
-                          width: 14, height: 14, borderRadius: 7,
-                          backgroundColor: isOn ? C.accent : C.textDim,
-                          position: "absolute", top: 2,
-                          left: isOn ? 18 : 2,
-                          transition: "all 0.2s",
-                        }} />
+                          width: "100%", height: 5, borderRadius: 3,
+                          backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                          overflow: "hidden",
+                        }}>
+                          <div style={{
+                            width: `${happyPct}%`, height: "100%", borderRadius: 3,
+                            backgroundColor: happyColor, transition: "width 0.5s, background-color 0.3s",
+                          }} />
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Size selector */}
-                    <div style={{
-                      display: "flex", justifyContent: "center", gap: 6, marginBottom: 10,
-                    }}>
-                      {[["small", "S"], ["medium", "M"], ["large", "L"]].map(([key, label]) => {
-                        const active = aggieSize === key;
-                        return (
-                          <button key={key} onClick={() => { setAggieSize(key); saveAggieSize(key); }}
-                            style={{
-                              width: 36, height: 28, borderRadius: 8,
-                              border: `1.5px solid ${active ? C.accent : C.border}`,
-                              backgroundColor: active ? C.accent + "18" : C.surface,
-                              color: active ? C.accent : C.textDim,
-                              fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
-                              cursor: "pointer", transition: "all 0.15s",
-                            }}
-                          >{label}</button>
-                        );
-                      })}
-                    </div>
+                      {/* Desire — what Aggie wants */}
+                      {desireText && (
+                        <div style={{
+                          padding: "4px 8px", borderRadius: 6, marginBottom: 6,
+                          backgroundColor: happyColor + "12", border: `1px solid ${happyColor}30`,
+                          textAlign: "center",
+                        }}>
+                          <span style={{ fontSize: 9, fontWeight: 600, color: happyColor, fontFamily: "'Inter', sans-serif", fontStyle: "italic" }}>
+                            {desireText}
+                          </span>
+                        </div>
+                      )}
 
-                    {/* Aggie preview */}
-                    <div style={{
-                      display: "flex", justifyContent: "center", padding: "8px 0 12px",
-                      opacity: isOn ? 1 : 0.4, transition: "opacity 0.2s",
-                    }}>
+                      {/* Aggie's Room — big preview with owned items placed around */}
                       <div style={{
-                        width: 80, height: 80,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        animation: isOn ? "companionFloat 3s ease-in-out infinite" : "none",
+                        position: "relative", width: "100%", height: 160,
+                        borderRadius: 12, marginBottom: 6, overflow: "hidden",
+                        backgroundColor: C.surface,
+                        border: `1.5px solid ${C.border}`,
                       }}>
-                        {renderAggieSVG(80, null, isOn, currentAcc)}
-                      </div>
-                    </div>
+                        {/* Room floor gradient */}
+                        <div style={{
+                          position: "absolute", inset: 0,
+                          background: `radial-gradient(ellipse at 50% 80%, ${C.accent}08 0%, transparent 70%)`,
+                        }} />
 
-                    {/* Accessories label */}
-                    <div style={{
-                      fontSize: 9, fontWeight: 700, color: C.textDim,
-                      fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-                      textTransform: "uppercase", marginBottom: 8, textAlign: "center",
-                    }}>
-                      Accessories
-                    </div>
-
-                    {/* Accessory grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                      {AGGIE_ACCESSORIES.filter(a => a.id !== "none").map(a => {
-                        const isActive = currentAcc === a.id;
-                        return (
-                          <div
-                            key={a.id}
-                            onClick={() => {
-                              const next = isActive ? "none" : a.id;
-                              setAggieAccessory(next);
-                              saveAggieAccessory(next);
-                            }}
-                            style={{
-                              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-                              padding: "8px 4px", borderRadius: 10,
-                              backgroundColor: isActive ? C.accent + "18" : C.surface,
-                              border: `1.5px solid ${isActive ? C.accent : C.border}`,
-                              cursor: "pointer", transition: "all 0.15s",
-                            }}
-                          >
-                            <div style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              {renderAccessoryPreview(a.id, 28)}
+                        {/* Owned items scattered in the room */}
+                        {ownedItems.map((item, idx) => {
+                          const pos = ROOM_ITEM_POSITIONS[idx % ROOM_ITEM_POSITIONS.length];
+                          const count = aggieInventory[item.id] || 0;
+                          const isBeingUsed = aggieUsingItem && aggieUsingItem.id === item.id;
+                          const itemAnims = {
+                            "treat": "roomItemPulse 2.5s ease-in-out infinite",
+                            "toy": "roomItemBounce 2s ease-in-out infinite",
+                            "blanket": "roomItemSway 3s ease-in-out infinite",
+                            "music-box": "roomItemBob 1.8s ease-in-out infinite",
+                            "book": "roomItemSway 4s ease-in-out infinite",
+                            "lamp": "roomItemGlow 2.5s ease-in-out infinite",
+                            "plant": "roomItemSway 3.5s ease-in-out infinite",
+                            "gem": "roomItemSparkle 2s ease-in-out infinite",
+                          };
+                          const useAnims = {
+                            "treat": "itemUseTreat 1.2s ease-in-out forwards",
+                            "toy": "itemUseToy 1.2s ease-in-out forwards",
+                            "blanket": "itemUseBlanket 1.2s ease-in-out forwards",
+                            "music-box": "itemUseMusic 1.2s ease-in-out forwards",
+                            "book": "itemUseBook 1.2s ease-in-out forwards",
+                            "lamp": "itemUseLamp 1.2s ease-in-out forwards",
+                            "plant": "itemUsePlant 1.2s ease-in-out forwards",
+                            "gem": "itemUseGem 1.2s ease-in-out forwards",
+                          };
+                          const anim = isBeingUsed
+                            ? (useAnims[item.id] || "itemUseTreat 1.2s ease-in-out forwards")
+                            : (itemAnims[item.id] || "roomItemBob 3s ease-in-out infinite");
+                          // Stagger animation delay per item so they don't all sync
+                          const delay = isBeingUsed ? "0s" : `${idx * 0.4}s`;
+                          const shopItem = AGGIE_SHOP_ITEMS.find(s => s.id === item.id);
+                          return (
+                            <div
+                              key={item.id}
+                              onClick={() => { if (!isBeingUsed && shopItem) useAggieItem(shopItem); }}
+                              style={{
+                                position: "absolute", left: pos.x, top: pos.y,
+                                display: "flex", flexDirection: "column", alignItems: "center",
+                                opacity: 0.85,
+                                animation: anim,
+                                animationDelay: delay,
+                                cursor: isBeingUsed ? "default" : "pointer",
+                              }}
+                            >
+                              {renderRoomItemIcon(item.id, 22)}
+                              {count > 1 && !isBeingUsed && (
+                                <span style={{
+                                  fontSize: 7, fontWeight: 700, color: C.textDim,
+                                  fontFamily: "'Inter', sans-serif", marginTop: -2,
+                                }}>
+                                  x{count}
+                                </span>
+                              )}
+                              {!isBeingUsed && (
+                                <span style={{
+                                  fontSize: 6, fontWeight: 700, color: C.accent,
+                                  fontFamily: "'Inter', sans-serif", marginTop: 1,
+                                  textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.7,
+                                }}>
+                                  Use
+                                </span>
+                              )}
+                              {/* Music notes particle effect for music-box */}
+                              {isBeingUsed && item.id === "music-box" && [0, 1, 2].map(n => (
+                                <span key={n} style={{
+                                  position: "absolute", top: -2, left: `${8 + n * 6}px`,
+                                  fontSize: 10, color: "#DAA520",
+                                  animation: "itemUseMusicNote 1.2s ease-out forwards",
+                                  animationDelay: `${n * 0.2}s`,
+                                  pointerEvents: "none",
+                                  "--nr": `${(n - 1) * 25}deg`,
+                                }}>
+                                  ♪
+                                </span>
+                              ))}
                             </div>
+                          );
+                        })}
+
+                        {/* Happiness pop-up after item use completes */}
+                        {aggieUsingItem && (
+                          <div style={{
+                            position: "absolute", left: "50%", top: "30%",
+                            transform: "translateX(-50%)",
+                            pointerEvents: "none", zIndex: 5,
+                            animation: "itemUseHappyPop 1.8s ease-out forwards",
+                            animationDelay: "1s",
+                            opacity: 0,
+                          }}>
                             <span style={{
-                              fontSize: 8, fontWeight: 600, color: isActive ? C.accent : C.textDim,
-                              fontFamily: "'Inter', sans-serif", textAlign: "center",
-                              lineHeight: 1.1, maxWidth: 60,
+                              fontSize: 14, fontWeight: 800, color: C.correct,
+                              fontFamily: "'Inter', sans-serif",
+                              textShadow: `0 0 8px ${C.correct}60`,
                             }}>
-                              {a.label}
+                              +{aggieUsingItem.happiness + (aggieUsingItem.bonusHappiness || 0)}
                             </span>
                           </div>
-                        );
-                      })}
+                        )}
+
+                        {/* Aggie — centered, big */}
+                        <div style={{
+                          position: "absolute",
+                          left: "50%", top: "50%",
+                          transform: "translate(-50%, -50%)",
+                          opacity: isOn ? 1 : 0.4, transition: "opacity 0.2s",
+                        }}>
+                          <div style={{
+                            width: 120, height: 120,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            animation: aggieUsingItem
+                              ? "aggieBounce 0.6s ease-in-out 1s 1"
+                              : isOn ? "companionFloat 3s ease-in-out infinite" : "none",
+                          }}>
+                            {renderAggieSVG(120, null, isOn, currentAcc, hMood)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Controls row: On/Off + Size */}
+                      <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        marginBottom: 8,
+                      }}>
+                        {/* On/Off toggle */}
+                        <div
+                          onClick={() => { const next = isOn ? null : AGGIE_ID; setActiveCosmetic(next); saveActiveCosmetic(next); }}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            cursor: "pointer", userSelect: "none",
+                          }}
+                        >
+                          <span style={{ fontSize: 10, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                            {isOn ? "On screen" : "Hidden"}
+                          </span>
+                          <div style={{
+                            width: 32, height: 18, borderRadius: 9,
+                            backgroundColor: isOn ? C.accent + "44" : C.surface,
+                            border: `1.5px solid ${isOn ? C.accent : C.border}`,
+                            position: "relative", transition: "all 0.2s",
+                          }}>
+                            <div style={{
+                              width: 12, height: 12, borderRadius: 6,
+                              backgroundColor: isOn ? C.accent : C.textDim,
+                              position: "absolute", top: 2,
+                              left: isOn ? 16 : 2,
+                              transition: "all 0.2s",
+                            }} />
+                          </div>
+                        </div>
+                        {/* Size selector */}
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {[["small", "S"], ["medium", "M"], ["large", "L"]].map(([key, label]) => {
+                            const active = aggieSize === key;
+                            return (
+                              <button key={key} onClick={() => { setAggieSize(key); saveAggieSize(key); }}
+                                style={{
+                                  width: 30, height: 24, borderRadius: 6,
+                                  border: `1.5px solid ${active ? C.accent : C.border}`,
+                                  backgroundColor: active ? C.accent + "18" : C.surface,
+                                  color: active ? C.accent : C.textDim,
+                                  fontSize: 10, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                                  cursor: "pointer", transition: "all 0.15s",
+                                }}
+                              >{label}</button>
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
+
+                    {/* ===== BOTTOM HALF: Tabbed Shop / Accessories (scrollable) ===== */}
+                    <div style={{ flex: "1 1 0", minHeight: 0, display: "flex", flexDirection: "column" }}>
+                      {/* Tab bar */}
+                      <div style={{
+                        display: "flex", gap: 0, borderRadius: 8, overflow: "hidden",
+                        border: `1.5px solid ${C.border}`, flexShrink: 0, marginBottom: 8,
+                      }}>
+                        {[["shop", "Shop"], ["accessories", "Accessories"]].map(([key, label]) => {
+                          const active = aggieWardrobeTab === key;
+                          return (
+                            <button key={key} onClick={() => setAggieWardrobeTab(key)}
+                              style={{
+                                flex: 1, padding: "7px 0", border: "none",
+                                backgroundColor: active ? C.accent + "20" : C.surface,
+                                color: active ? C.accent : C.textDim,
+                                fontSize: 10, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                                letterSpacing: 1, textTransform: "uppercase",
+                                cursor: "pointer", transition: "all 0.15s",
+                                borderRight: key === "shop" ? `1px solid ${C.border}` : "none",
+                              }}
+                            >{label}</button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Scrollable tab content */}
+                      <div style={{ flex: "1 1 0", overflowY: "auto", overflowX: "hidden", minHeight: 0, paddingBottom: 4 }}>
+                        {/* Shop tab */}
+                        {aggieWardrobeTab === "shop" && (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
+                            {AGGIE_SHOP_ITEMS.map(item => {
+                              const canAfford = aggieCoins >= item.cost;
+                              const isDesired = aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id;
+                              const owned = aggieInventory[item.id] || 0;
+                              return (
+                                <div
+                                  key={item.id}
+                                  onClick={() => {
+                                    if (!canAfford) return;
+                                    buyAggieItem(item);
+                                  }}
+                                  style={{
+                                    display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                                    padding: "6px 4px", borderRadius: 8,
+                                    backgroundColor: isDesired ? happyColor + "12" : C.surface,
+                                    border: `1.5px solid ${isDesired ? happyColor + "50" : canAfford ? C.border : C.border + "60"}`,
+                                    cursor: canAfford ? "pointer" : "default",
+                                    opacity: canAfford ? 1 : 0.5,
+                                    transition: "all 0.15s",
+                                    position: "relative",
+                                  }}
+                                >
+                                  {isDesired && (
+                                    <div style={{
+                                      position: "absolute", top: -4, right: -4,
+                                      width: 8, height: 8, borderRadius: 4,
+                                      backgroundColor: happyColor,
+                                    }} />
+                                  )}
+                                  <div style={{ marginBottom: 2 }}>
+                                    {renderRoomItemIcon(item.id, 20)}
+                                  </div>
+                                  <span style={{
+                                    fontSize: 9, fontWeight: 700, color: canAfford ? C.text : C.textDim,
+                                    fontFamily: "'Inter', sans-serif", textAlign: "center",
+                                    lineHeight: 1.2,
+                                  }}>
+                                    {item.label}
+                                  </span>
+                                  <span style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                    {item.desc}
+                                  </span>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 2 }}>
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                                      <circle cx="12" cy="12" r="9" fill={canAfford ? C.accent : C.textDim} opacity="0.2" />
+                                      <circle cx="12" cy="12" r="9" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" fill="none" />
+                                      <text x="12" y="16.5" textAnchor="middle" fill={canAfford ? C.accent : C.textDim} fontSize="12" fontWeight="700" fontFamily="Inter, sans-serif">C</text>
+                                    </svg>
+                                    <span style={{ fontSize: 9, fontWeight: 700, color: canAfford ? C.accent : C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                      {item.cost}
+                                    </span>
+                                    <span style={{ fontSize: 8, color: C.correct, fontFamily: "'Inter', sans-serif", marginLeft: 2 }}>
+                                      +{item.happiness}
+                                    </span>
+                                  </div>
+                                  {owned > 0 && (
+                                    <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                      owned: {owned}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Accessories tab */}
+                        {aggieWardrobeTab === "accessories" && (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                            {AGGIE_ACCESSORIES.filter(a => a.id !== "none").map(a => {
+                              const isActive = currentAcc === a.id;
+                              const isFree = !a.cost || a.cost <= 0;
+                              const isUnlocked = isFree || unlockedAccessories.has(a.id);
+                              const canAfford = aggieCoins >= (a.cost || 0);
+                              return (
+                                <div
+                                  key={a.id}
+                                  onClick={() => {
+                                    if (!isUnlocked) {
+                                      // Buy to unlock
+                                      if (canAfford) buyAccessory(a);
+                                      return;
+                                    }
+                                    const next = isActive ? "none" : a.id;
+                                    setAggieAccessory(next);
+                                    saveAggieAccessory(next);
+                                  }}
+                                  style={{
+                                    display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                                    padding: "8px 4px", borderRadius: 10,
+                                    backgroundColor: isActive ? C.accent + "18" : !isUnlocked ? "rgba(0,0,0,0.15)" : C.surface,
+                                    border: `1.5px solid ${isActive ? C.accent : !isUnlocked ? C.border + "60" : C.border}`,
+                                    cursor: isUnlocked || canAfford ? "pointer" : "default",
+                                    opacity: !isUnlocked && !canAfford ? 0.45 : 1,
+                                    transition: "all 0.15s",
+                                    position: "relative",
+                                  }}
+                                >
+                                  <div style={{
+                                    width: 28, height: 28,
+                                    display: "flex", alignItems: "center", justifyContent: "center",
+                                    filter: !isUnlocked ? "brightness(0.5)" : "none",
+                                  }}>
+                                    {renderAccessoryPreview(a.id, 28)}
+                                  </div>
+                                  <span style={{
+                                    fontSize: 8, fontWeight: 600, color: isActive ? C.accent : !isUnlocked ? C.textDim + "88" : C.textDim,
+                                    fontFamily: "'Inter', sans-serif", textAlign: "center",
+                                    lineHeight: 1.1, maxWidth: 60,
+                                  }}>
+                                    {a.label}
+                                  </span>
+                                  {!isUnlocked && (
+                                    <div style={{
+                                      display: "flex", alignItems: "center", gap: 2, marginTop: -1,
+                                    }}>
+                                      <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
+                                        <circle cx="12" cy="12" r="9" fill={canAfford ? C.accent : C.textDim} opacity="0.2" />
+                                        <circle cx="12" cy="12" r="9" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" fill="none" />
+                                        <text x="12" y="16.5" textAnchor="middle" fill={canAfford ? C.accent : C.textDim} fontSize="12" fontWeight="700" fontFamily="Inter, sans-serif">C</text>
+                                      </svg>
+                                      <span style={{
+                                        fontSize: 8, fontWeight: 700,
+                                        color: canAfford ? C.accent : C.textDim,
+                                        fontFamily: "'Inter', sans-serif",
+                                      }}>
+                                        {a.cost}
+                                      </span>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                   </div>
                 </>
               );
@@ -10539,15 +11408,18 @@ export default function Pattrn() {
           setFills(prev => ({ ...prev, [key]: selectedToken }));
           triggerPlaceAnimation(key);
           setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
-          // Aggie placement reactions for swap
+          // Aggie placement reactions for swap (mood-aware: grumpy/miserable swap good/bad hints)
           const isCorrectPlace = selectedToken === puzzle.solution[r][c];
           const roll = Math.random();
+          const moodGood = getMoodLines(aggieHappinessMood, "hint_good") || AGGIE_HINT_GOOD;
+          const moodBad = getMoodLines(aggieHappinessMood, "hint_bad") || AGGIE_HINT_BAD;
+          const moodPlace = getMoodLines(aggieHappinessMood, "place") || AGGIE_PLACE_LINES;
           if (isCorrectPlace && roll < 0.10) {
-            triggerAggieSpeech(AGGIE_HINT_GOOD[Math.floor(Math.random() * AGGIE_HINT_GOOD.length)]);
+            triggerAggieSpeech(moodGood[Math.floor(Math.random() * moodGood.length)]);
           } else if (!isCorrectPlace && roll < 0.08) {
-            triggerAggieSpeech(AGGIE_HINT_BAD[Math.floor(Math.random() * AGGIE_HINT_BAD.length)]);
+            triggerAggieSpeech(moodBad[Math.floor(Math.random() * moodBad.length)]);
           } else if (roll < 0.20) {
-            triggerAggieSpeech(AGGIE_PLACE_LINES[Math.floor(Math.random() * AGGIE_PLACE_LINES.length)]);
+            triggerAggieSpeech(moodPlace[Math.floor(Math.random() * moodPlace.length)]);
           }
         }
         return;
@@ -10555,20 +11427,23 @@ export default function Pattrn() {
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       triggerPlaceAnimation(key);
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
-      // Aggie placement reactions — hint or general comment
+      // Aggie placement reactions — hint or general comment (mood-aware)
       const isCorrectPlace = selectedToken === puzzle.solution[r][c];
       const roll = Math.random();
+      const moodGoodH = getMoodLines(aggieHappinessMood, "hint_good") || AGGIE_HINT_GOOD;
+      const moodBadH = getMoodLines(aggieHappinessMood, "hint_bad") || AGGIE_HINT_BAD;
+      const moodPlaceH = getMoodLines(aggieHappinessMood, "place") || AGGIE_PLACE_LINES;
       if (isCorrectPlace && roll < 0.10) {
-        triggerAggieSpeech(AGGIE_HINT_GOOD[Math.floor(Math.random() * AGGIE_HINT_GOOD.length)]);
+        triggerAggieSpeech(moodGoodH[Math.floor(Math.random() * moodGoodH.length)]);
       } else if (!isCorrectPlace && roll < 0.08) {
-        triggerAggieSpeech(AGGIE_HINT_BAD[Math.floor(Math.random() * AGGIE_HINT_BAD.length)]);
+        triggerAggieSpeech(moodBadH[Math.floor(Math.random() * moodBadH.length)]);
       } else if (roll < 0.20) {
-        triggerAggieSpeech(AGGIE_PLACE_LINES[Math.floor(Math.random() * AGGIE_PLACE_LINES.length)]);
+        triggerAggieSpeech(moodPlaceH[Math.floor(Math.random() * moodPlaceH.length)]);
       }
     } else {
       setSelectedCell(key);
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions, coopCellOwnerMap, coopPlayers, coopPlayerColorMap, triggerAggieSpeech]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions, coopCellOwnerMap, coopPlayers, coopPlayerColorMap, triggerAggieSpeech, aggieHappinessMood]);
 
   const handleCellPointerUp = useCallback((r, c) => {
     if (gameState !== "playing") return;
@@ -12000,6 +12875,15 @@ export default function Pattrn() {
           setTimes(newTimes);
           saveTimes(newTimes);
           showNewAchievements(newProgress, newTimes);
+          // Earn coins for completing full cascade run
+          if (activeCosmetic) {
+            earnCoins(COINS_REWARD.cascade, 5);
+            // Check if cascade was a desire
+            if (aggieDesire && aggieDesire.type === "puzzle" && aggieDesire.mode === "cascade") {
+              setAggieHappiness(prev => { const next = Math.min(AGGIE_MAX_HAPPINESS, prev + aggieDesire.happiness); saveAggieHappiness(next); return next; });
+              const d = pickNewDesire(); setAggieDesire(d); saveAggieDesire(d);
+            }
+          }
         }
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
@@ -12061,6 +12945,11 @@ export default function Pattrn() {
             }
             updateVaultCurrentTile(vaultSessionId, firebaseUser.uid, -1).catch(() => {});
           }).catch(() => {});
+          // Earn coins for vault puzzle
+          if (activeCosmetic) {
+            const goldBonus = (attempts === 0) ? COINS_GOLD_BONUS : 0;
+            earnCoins(COINS_REWARD.vault + goldBonus, 3);
+          }
           setTimeout(() => {
             setVaultSolvingTile(null);
             setView("vault");
@@ -12091,6 +12980,11 @@ export default function Pattrn() {
             setTimes(newTimes);
             saveTimes(newTimes);
           }
+          // Earn coins for mosaic tile
+          if (activeCosmetic) {
+            const goldBonus = (attempts === 0) ? COINS_GOLD_BONUS : 0;
+            earnCoins(COINS_REWARD.mosaic + goldBonus, 2);
+          }
         } else {
           // Store attempts + 1 so that first-try solves (attempts=0) are stored as 1,
           // ensuring all >0 completion checks recognise the puzzle as solved (0 = failed).
@@ -12105,6 +12999,17 @@ export default function Pattrn() {
           setTimes(newTimes);
           saveTimes(newTimes);
           showNewAchievements(newProgress, newTimes);
+          // Earn coins for puzzle solve
+          if (activeCosmetic) {
+            const reward = COINS_REWARD[difficulty] || 10;
+            const goldBonus = (attempts === 0) ? COINS_GOLD_BONUS : 0;
+            earnCoins(reward + goldBonus, 3);
+            // Check if puzzle matches Aggie's desire
+            if (aggieDesire && aggieDesire.type === "puzzle" && aggieDesire.mode === difficulty) {
+              setAggieHappiness(prev => { const next = Math.min(AGGIE_MAX_HAPPINESS, prev + aggieDesire.happiness); saveAggieHappiness(next); return next; });
+              const d = pickNewDesire(); setAggieDesire(d); saveAggieDesire(d);
+            }
+          }
           // Save puzzle completion for rankings & load ranking
           if (firebaseUser && progressKey != null) {
             const compKey = isDaily && currentDailyDate ? currentDailyDate : String(progressKey);
@@ -12128,6 +13033,15 @@ export default function Pattrn() {
     } else if (attempts + 1 >= maxAttempts) {
       // Failed - increment attempts
       setAttempts(attempts + 1);
+      // Lower Aggie happiness on puzzle failure
+      if (activeCosmetic) {
+        const penalty = isCascade ? 8 : isVault ? 6 : difficulty === "hard" || difficulty === "blind" ? 5 : 3;
+        setAggieHappiness(prev => {
+          const next = Math.max(0, prev - penalty);
+          saveAggieHappiness(next);
+          return next;
+        });
+      }
       if (isVault && vaultSolvingTile !== null && vaultSessionId) {
         // Vault: fully failed puzzle — record strike, advance turn, return to vault
         setGameState("lost");
@@ -12183,9 +13097,10 @@ export default function Pattrn() {
       if (isBlind || isCoopMosaic) {
         setLockedCells(newLocked);
       }
-      // Aggie wrong-cells reaction (~40%)
+      // Aggie wrong-cells reaction (~40%, mood-aware)
       if (wrong.size > 0 && Math.random() < 0.4) {
-        triggerAggieSpeech(AGGIE_WRONG_LINES[Math.floor(Math.random() * AGGIE_WRONG_LINES.length)]);
+        const moodWrong = getMoodLines(aggieHappinessMood, "sad") || AGGIE_WRONG_LINES;
+        triggerAggieSpeech(moodWrong[Math.floor(Math.random() * moodWrong.length)]);
       }
       // In coop mosaic mode, write locked cells to Firebase so other players see them
       if (isCoopMosaic && coopMosaicSessionId) {
@@ -12975,7 +13890,32 @@ export default function Pattrn() {
 
   // --- Global modals element (included in every return) ---
   // --- Floating Aggie Companion ---
-  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} /> : null;
+  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} /> : null;
+
+  // Floating coin-earned animation
+  const coinAnimEl = coinAnim ? (
+    <div key={coinAnim.key} style={{
+      position: "fixed", top: "40%", left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 200, pointerEvents: "none",
+      display: "flex", alignItems: "center", gap: 6,
+      animation: "coinEarnFloat 1.8s ease-out forwards",
+    }}>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" fill="#FFD700" />
+        <circle cx="12" cy="12" r="10" stroke="#DAA520" strokeWidth="1" fill="none" />
+        <circle cx="12" cy="12" r="7" stroke="#DAA520" strokeWidth="0.5" fill="none" opacity="0.5" />
+        <text x="12" y="16" textAnchor="middle" fill="#8B6914" fontSize="11" fontWeight="800" fontFamily="Inter, sans-serif">C</text>
+      </svg>
+      <span style={{
+        fontSize: 20, fontWeight: 800, color: "#FFD700",
+        fontFamily: "'Inter', sans-serif",
+        textShadow: "0 1px 6px rgba(0,0,0,0.5), 0 0 12px rgba(255,215,0,0.4)",
+      }}>
+        +{coinAnim.amount}
+      </span>
+    </div>
+  ) : null;
 
   const globalModalsEl = (
     <>
@@ -12987,6 +13927,7 @@ export default function Pattrn() {
       {coopMosaicNavigateEl}
       {friendReactionsOverlayEl}
       {floatingCosmeticEl}
+      {coinAnimEl}
     </>
   );
 
