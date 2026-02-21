@@ -1749,7 +1749,7 @@ function saveAggieAccessory(id) {
   try { if (id && id !== "none") localStorage.setItem(AGGIE_ACCESSORY_KEY, id); else localStorage.removeItem(AGGIE_ACCESSORY_KEY); } catch { /* ignore */ }
 }
 function loadAggieSize() {
-  try { const s = localStorage.getItem(AGGIE_SIZE_KEY); return s && AGGIE_SIZES[s] ? s : "large"; } catch { return "large"; }
+  try { const s = localStorage.getItem(AGGIE_SIZE_KEY); return s && AGGIE_SIZES[s] ? s : "medium"; } catch { return "medium"; }
 }
 function saveAggieSize(size) {
   try { localStorage.setItem(AGGIE_SIZE_KEY, size); } catch { /* ignore */ }
