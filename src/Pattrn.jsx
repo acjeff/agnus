@@ -4806,6 +4806,7 @@ export default function Pattrn() {
   const [aggieInventory, setAggieInventory] = useState(() => loadAggieInventory());
   const aggieHappinessMood = getHappinessMood(aggieHappiness);
   const aggieDecayTimer = useRef(null);
+  const [aggieWardrobeTab, setAggieWardrobeTab] = useState("shop"); // "shop" | "accessories"
 
   // Happiness decay effect — runs every minute, decays based on elapsed time
   useEffect(() => {
@@ -7396,7 +7397,7 @@ export default function Pattrn() {
       return h;
     })();
 
-    // Aggie wardrobe height — now includes happiness, cogs, desire, shop, accessories
+    // Aggie wardrobe height — happiness, cogs, desire, tabbed shop/accessories
     // Uses scrollable container so we use available screen height
     const aggieWardrobeContentHeight = (() => {
       if (!isAggieWardrobe) return 0;
@@ -7410,12 +7411,15 @@ export default function Pattrn() {
       h += 12 + 8; // toggle row + gap
       h += 28 + 10; // size selector + gap
       h += 100 + 12; // preview area + gap
-      h += 16 + 6; // shop label
-      const shopRows = Math.ceil(AGGIE_SHOP_ITEMS.length / 2);
-      h += shopRows * 80 + 12; // shop grid + gap
-      h += 16 + 8; // accessories label
-      const accRows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3);
-      h += accRows * 64; // accessory grid
+      h += 30 + 10; // tab bar + gap
+      // Tab content — use whichever is active
+      if (aggieWardrobeTab === "shop") {
+        const shopRows = Math.ceil(AGGIE_SHOP_ITEMS.length / 2);
+        h += shopRows * 80;
+      } else {
+        const accRows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3);
+        h += accRows * 64;
+      }
       h += 12; // bottom padding
       return Math.min(h, availH);
     })();
@@ -8639,120 +8643,130 @@ export default function Pattrn() {
                       </div>
                     </div>
 
-                    {/* Shop section */}
+                    {/* Tab bar: Shop / Accessories */}
                     <div style={{
-                      fontSize: 9, fontWeight: 700, color: C.textDim,
-                      fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-                      textTransform: "uppercase", marginBottom: 6, textAlign: "center",
+                      display: "flex", gap: 0, marginBottom: 10, borderRadius: 8, overflow: "hidden",
+                      border: `1.5px solid ${C.border}`,
                     }}>
-                      Shop
-                    </div>
-
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6, marginBottom: 12 }}>
-                      {AGGIE_SHOP_ITEMS.map(item => {
-                        const canAfford = aggieCogs >= item.cost;
-                        const isDesired = aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id;
-                        const owned = aggieInventory[item.id] || 0;
+                      {[["shop", "Shop"], ["accessories", "Accessories"]].map(([key, label]) => {
+                        const active = aggieWardrobeTab === key;
                         return (
-                          <div
-                            key={item.id}
-                            onClick={() => {
-                              if (!canAfford) return;
-                              buyAggieItem(item);
-                            }}
+                          <button key={key} onClick={() => setAggieWardrobeTab(key)}
                             style={{
-                              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                              padding: "6px 4px", borderRadius: 8,
-                              backgroundColor: isDesired ? happyColor + "12" : C.surface,
-                              border: `1.5px solid ${isDesired ? happyColor + "50" : canAfford ? C.border : C.border + "60"}`,
-                              cursor: canAfford ? "pointer" : "default",
-                              opacity: canAfford ? 1 : 0.5,
-                              transition: "all 0.15s",
-                              position: "relative",
-                            }}
-                          >
-                            {isDesired && (
-                              <div style={{
-                                position: "absolute", top: -4, right: -4,
-                                width: 8, height: 8, borderRadius: 4,
-                                backgroundColor: happyColor,
-                              }} />
-                            )}
-                            <span style={{
-                              fontSize: 9, fontWeight: 700, color: canAfford ? C.text : C.textDim,
-                              fontFamily: "'Inter', sans-serif", textAlign: "center",
-                              lineHeight: 1.2,
-                            }}>
-                              {item.label}
-                            </span>
-                            <span style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
-                              {item.desc}
-                            </span>
-                            <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 2 }}>
-                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                                <circle cx="12" cy="12" r="5" stroke={canAfford ? C.accent : C.textDim} strokeWidth="2" fill="none" />
-                                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" strokeLinecap="round" />
-                              </svg>
-                              <span style={{ fontSize: 9, fontWeight: 700, color: canAfford ? C.accent : C.textDim, fontFamily: "'Inter', sans-serif" }}>
-                                {item.cost}
-                              </span>
-                              <span style={{ fontSize: 8, color: C.correct, fontFamily: "'Inter', sans-serif", marginLeft: 2 }}>
-                                +{item.happiness}
-                              </span>
-                            </div>
-                            {owned > 0 && (
-                              <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
-                                owned: {owned}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Accessories label */}
-                    <div style={{
-                      fontSize: 9, fontWeight: 700, color: C.textDim,
-                      fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-                      textTransform: "uppercase", marginBottom: 8, textAlign: "center",
-                    }}>
-                      Accessories
-                    </div>
-
-                    {/* Accessory grid */}
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                      {AGGIE_ACCESSORIES.filter(a => a.id !== "none").map(a => {
-                        const isActive = currentAcc === a.id;
-                        return (
-                          <div
-                            key={a.id}
-                            onClick={() => {
-                              const next = isActive ? "none" : a.id;
-                              setAggieAccessory(next);
-                              saveAggieAccessory(next);
-                            }}
-                            style={{
-                              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-                              padding: "8px 4px", borderRadius: 10,
-                              backgroundColor: isActive ? C.accent + "18" : C.surface,
-                              border: `1.5px solid ${isActive ? C.accent : C.border}`,
+                              flex: 1, padding: "7px 0", border: "none",
+                              backgroundColor: active ? C.accent + "20" : C.surface,
+                              color: active ? C.accent : C.textDim,
+                              fontSize: 10, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                              letterSpacing: 1, textTransform: "uppercase",
                               cursor: "pointer", transition: "all 0.15s",
+                              borderRight: key === "shop" ? `1px solid ${C.border}` : "none",
                             }}
-                          >
-                            <div style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                              {renderAccessoryPreview(a.id, 28)}
-                            </div>
-                            <span style={{
-                              fontSize: 8, fontWeight: 600, color: isActive ? C.accent : C.textDim,
-                              fontFamily: "'Inter', sans-serif", textAlign: "center",
-                              lineHeight: 1.1, maxWidth: 60,
-                            }}>
-                              {a.label}
-                            </span>
-                          </div>
+                          >{label}</button>
                         );
                       })}
                     </div>
+
+                    {/* Shop tab content */}
+                    {aggieWardrobeTab === "shop" && (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
+                        {AGGIE_SHOP_ITEMS.map(item => {
+                          const canAfford = aggieCogs >= item.cost;
+                          const isDesired = aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id;
+                          const owned = aggieInventory[item.id] || 0;
+                          return (
+                            <div
+                              key={item.id}
+                              onClick={() => {
+                                if (!canAfford) return;
+                                buyAggieItem(item);
+                              }}
+                              style={{
+                                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                                padding: "6px 4px", borderRadius: 8,
+                                backgroundColor: isDesired ? happyColor + "12" : C.surface,
+                                border: `1.5px solid ${isDesired ? happyColor + "50" : canAfford ? C.border : C.border + "60"}`,
+                                cursor: canAfford ? "pointer" : "default",
+                                opacity: canAfford ? 1 : 0.5,
+                                transition: "all 0.15s",
+                                position: "relative",
+                              }}
+                            >
+                              {isDesired && (
+                                <div style={{
+                                  position: "absolute", top: -4, right: -4,
+                                  width: 8, height: 8, borderRadius: 4,
+                                  backgroundColor: happyColor,
+                                }} />
+                              )}
+                              <span style={{
+                                fontSize: 9, fontWeight: 700, color: canAfford ? C.text : C.textDim,
+                                fontFamily: "'Inter', sans-serif", textAlign: "center",
+                                lineHeight: 1.2,
+                              }}>
+                                {item.label}
+                              </span>
+                              <span style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                {item.desc}
+                              </span>
+                              <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 2 }}>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                                  <circle cx="12" cy="12" r="5" stroke={canAfford ? C.accent : C.textDim} strokeWidth="2" fill="none" />
+                                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" strokeLinecap="round" />
+                                </svg>
+                                <span style={{ fontSize: 9, fontWeight: 700, color: canAfford ? C.accent : C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                  {item.cost}
+                                </span>
+                                <span style={{ fontSize: 8, color: C.correct, fontFamily: "'Inter', sans-serif", marginLeft: 2 }}>
+                                  +{item.happiness}
+                                </span>
+                              </div>
+                              {owned > 0 && (
+                                <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                  owned: {owned}
+                                </span>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Accessories tab content */}
+                    {aggieWardrobeTab === "accessories" && (
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                        {AGGIE_ACCESSORIES.filter(a => a.id !== "none").map(a => {
+                          const isActive = currentAcc === a.id;
+                          return (
+                            <div
+                              key={a.id}
+                              onClick={() => {
+                                const next = isActive ? "none" : a.id;
+                                setAggieAccessory(next);
+                                saveAggieAccessory(next);
+                              }}
+                              style={{
+                                display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                                padding: "8px 4px", borderRadius: 10,
+                                backgroundColor: isActive ? C.accent + "18" : C.surface,
+                                border: `1.5px solid ${isActive ? C.accent : C.border}`,
+                                cursor: "pointer", transition: "all 0.15s",
+                              }}
+                            >
+                              <div style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                {renderAccessoryPreview(a.id, 28)}
+                              </div>
+                              <span style={{
+                                fontSize: 8, fontWeight: 600, color: isActive ? C.accent : C.textDim,
+                                fontFamily: "'Inter', sans-serif", textAlign: "center",
+                                lineHeight: 1.1, maxWidth: 60,
+                              }}>
+                                {a.label}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </>
               );
