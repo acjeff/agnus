@@ -1558,6 +1558,8 @@ function getDailyStreak(progress) {
 // --- CASCADE: 50 runs, each 3×3 → 9×9; attempts persist across levels; progress = how far you got per run ---
 const CASCADE_LEVELS = [3, 3, 4, 4, 5, 5, 6, 7, 8, 9]; // gridSize per level 0..9
 const CASCADE_RUN_SEED_BASE = 50000;
+// Coin reward per cascade level (increases as you progress through the run)
+const CASCADE_LEVEL_COINS = [2, 2, 3, 3, 5, 5, 8, 10, 15, 25]; // total 78 for full run
 
 function formatCascadeProgression(completedUpToLevel, failedAtLevel) {
   // completedUpToLevel: last level we cleared (0..6). failedAtLevel: level we failed (null if run complete).
@@ -4353,6 +4355,10 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes companionSad { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(3px) rotate(-2deg); } }
 @keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
 @keyframes coinEarnFloat { 0% { opacity: 0; transform: translateY(0) scale(0.5); } 15% { opacity: 1; transform: translateY(-20px) scale(1.1); } 30% { transform: translateY(-40px) scale(1); } 80% { opacity: 1; transform: translateY(-70px); } 100% { opacity: 0; transform: translateY(-90px) scale(0.8); } }
+@keyframes cascadeBannerIn { 0% { opacity: 0; transform: translateY(20px) scale(0.7); } 100% { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes cascadeBannerPulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.08); } }
+@keyframes cascadeCoinPop { 0% { opacity: 0; transform: scale(0); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes cascadeBannerFade { 0% { opacity: 0; } 100% { opacity: 1; } }
 @keyframes roomItemBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
 @keyframes roomItemSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes roomItemGlow { 0%,100% { filter: brightness(1) drop-shadow(0 0 0px transparent); } 50% { filter: brightness(1.3) drop-shadow(0 0 4px currentColor); } }
@@ -4564,6 +4570,7 @@ export default function Pattrn() {
   const [cascadeLevel, setCascadeLevel] = useState(0);
   const [cascadeLives, setCascadeLives] = useState(3);
   const [cascadeRunIndex, setCascadeRunIndex] = useState(0);
+  const [cascadeLevelBanner, setCascadeLevelBanner] = useState(null); // { level, coins, gridSize } — shown between cascade levels
   const timerStart = useRef(null);
   const timerInterval = useRef(null);
   const timerIsCascadeRun = useRef(false);
@@ -11361,6 +11368,7 @@ export default function Pattrn() {
     // Update persisted cascade run state if applicable
     if (isCasc) {
       setCascadeLevel(0);
+      setCascadeLevelBanner(null);
       const p = loadProgress();
       const ri = cascadeRunIndexRef.current;
       const cur = p.cascadeRunState?.[ri];
@@ -13019,6 +13027,7 @@ export default function Pattrn() {
         const prevBest = (progress.cascade || {})[cascadeRunIndex] ?? 0;
         const newBest = Math.max(prevBest, levelsCompleted);
         const nextLevel = cascadeLevel + 1;
+        const levelCoins = CASCADE_LEVEL_COINS[cascadeLevel] || 5;
         if (cascadeLevel < CASCADE_LEVELS.length - 1) {
           const runState = { level: nextLevel, elapsedSeconds: getElapsedSeconds(), fills: {}, attempts };
           const nextRunState = { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState };
@@ -13038,28 +13047,33 @@ export default function Pattrn() {
           setTimes(newTimes);
           saveTimes(newTimes);
           showNewAchievements(newProgress, newTimes);
-          // Earn coins for completing full cascade run
-          if (activeCosmetic) {
-            earnCoins(COINS_REWARD.cascade, 5);
-            // Check if cascade was a desire
-            if (aggieDesire && aggieDesire.type === "puzzle" && aggieDesire.mode === "cascade") {
-              setAggieHappiness(prev => { const next = Math.min(AGGIE_MAX_HAPPINESS, prev + aggieDesire.happiness); saveAggieHappiness(next); return next; });
-              const d = pickNewDesire(); setAggieDesire(d); saveAggieDesire(d);
-            }
+          // Check if cascade was a desire
+          if (activeCosmetic && aggieDesire && aggieDesire.type === "puzzle" && aggieDesire.mode === "cascade") {
+            setAggieHappiness(prev => { const next = Math.min(AGGIE_MAX_HAPPINESS, prev + aggieDesire.happiness); saveAggieHappiness(next); return next; });
+            const d = pickNewDesire(); setAggieDesire(d); saveAggieDesire(d);
           }
+        }
+        // Award coins for every cascade level completion (scales with level)
+        if (activeCosmetic) {
+          earnCoins(levelCoins, cascadeLevel >= CASCADE_LEVELS.length - 1 ? 5 : 0);
         }
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
+        // Show level-complete celebration banner
+        const isLastLevel = cascadeLevel >= CASCADE_LEVELS.length - 1;
+        setCascadeLevelBanner({ level: cascadeLevel, coins: levelCoins, gridSize: CASCADE_LEVELS[cascadeLevel], isLastLevel });
         if (cascadeLevel < CASCADE_LEVELS.length - 1) {
           // Don't stop timer — it continues across cascade levels
           // Batch level change with state reset so the new puzzle and
           // cleared fills render in the same React commit — avoids a
           // flash of stale cell colours from the previous level.
           setTimeout(() => {
+            setCascadeLevelBanner(null);
             setCascadeLevel((l) => l + 1);
             resetCascadeLevelState();
-          }, 400);
+          }, 1600);
         } else {
+          setTimeout(() => setCascadeLevelBanner(null), 3000);
           setGameState("won");
           stopTimer();
         }
@@ -13238,6 +13252,7 @@ export default function Pattrn() {
         const newProgress = { ...progress, cascade: { ...(progress.cascade || {}), [cascadeRunIndex]: newBest }, cascadeRunState: nextRunState, cascadeRunStateLastIndex: cascadeRunIndex };
         setProgress(newProgress);
         saveProgress(newProgress);
+        setCascadeLevelBanner(null);
         setGameState("lost");
         stopTimer();
         setWrongCells(wrong);
@@ -14066,6 +14081,61 @@ export default function Pattrn() {
   const isWardrobeOpen = radialMenuStack[radialMenuStack.length - 1] === "aggie-wardrobe";
   const floatingCosmeticEl = activeCosmetic && !isWardrobeOpen ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} /> : null;
 
+  // Cascade level-complete celebration banner
+  const cascadeBannerEl = cascadeLevelBanner ? (
+    <div key={`cb-${cascadeLevelBanner.level}`} style={{
+      position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+      zIndex: 190, pointerEvents: "none",
+      display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+    }}>
+      <div style={{
+        animation: "cascadeBannerIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+        display: "flex", flexDirection: "column", alignItems: "center", gap: 8,
+      }}>
+        <div style={{
+          fontSize: cascadeLevelBanner.isLastLevel ? 28 : 22, fontWeight: 900, color: "#fff",
+          fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+          textShadow: "0 2px 12px rgba(0,0,0,0.6), 0 0 30px rgba(255,215,0,0.3)",
+          animation: cascadeLevelBanner.isLastLevel ? "cascadeBannerPulse 0.6s ease-in-out 0.4s 3" : undefined,
+        }}>
+          {cascadeLevelBanner.isLastLevel ? "CASCADE COMPLETE!" : `Level ${cascadeLevelBanner.level + 1} Clear!`}
+        </div>
+        <div style={{
+          fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)",
+          fontFamily: "'Inter', sans-serif",
+        }}>
+          {cascadeLevelBanner.gridSize}x{cascadeLevelBanner.gridSize} solved
+        </div>
+        <div style={{
+          display: "flex", alignItems: "center", gap: 6, marginTop: 4,
+          animation: "cascadeCoinPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) 0.3s both",
+        }}>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <circle cx="12" cy="12" r="10" fill="#FFD700" />
+            <circle cx="12" cy="12" r="10" stroke="#DAA520" strokeWidth="1" fill="none" />
+            <text x="12" y="16" textAnchor="middle" fill="#8B6914" fontSize="11" fontWeight="800" fontFamily="Inter, sans-serif">C</text>
+          </svg>
+          <span style={{
+            fontSize: 18, fontWeight: 800, color: "#FFD700",
+            fontFamily: "'Inter', sans-serif",
+            textShadow: "0 1px 6px rgba(0,0,0,0.5), 0 0 12px rgba(255,215,0,0.4)",
+          }}>
+            +{cascadeLevelBanner.coins}
+          </span>
+        </div>
+        {!cascadeLevelBanner.isLastLevel && (
+          <div style={{
+            fontSize: 12, fontWeight: 500, color: "rgba(255,255,255,0.45)",
+            fontFamily: "'Inter', sans-serif", marginTop: 2,
+            animation: "cascadeBannerFade 0.4s ease 0.5s both",
+          }}>
+            Next: {CASCADE_LEVELS[cascadeLevelBanner.level + 1]}x{CASCADE_LEVELS[cascadeLevelBanner.level + 1]}
+          </div>
+        )}
+      </div>
+    </div>
+  ) : null;
+
   // Floating coin-earned animation
   const coinAnimEl = coinAnim ? (
     <div key={coinAnim.key} style={{
@@ -14101,6 +14171,7 @@ export default function Pattrn() {
       {coopMosaicNavigateEl}
       {friendReactionsOverlayEl}
       {floatingCosmeticEl}
+      {cascadeBannerEl}
       {coinAnimEl}
     </>
   );
