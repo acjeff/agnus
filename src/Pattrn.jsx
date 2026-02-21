@@ -3797,7 +3797,7 @@ function AggieInteractionMenu({ targetState, onSelect, onClose, position }) {
   );
 }
 
-function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false, peerAggieStates, myUid, sessionType, sessionId, username: myUsername, onSendInteraction, happinessMood }) {
+function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false, peerAggieStates, myUid, sessionType, sessionId, username: myUsername, onSendInteraction, happinessMood, activeBuff }) {
   const AGGIE_SIZE = size;
   const AGGIE_TOP_PAD = 8; // minimum distance from top of screen
   const AVOID_PAD = 16; // extra padding around obstacles
@@ -4380,6 +4380,9 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes itemUseGem { 0% { transform: scale(1) rotate(0deg); opacity: 1; filter: brightness(1); } 25% { transform: scale(1.3) rotate(45deg); filter: brightness(2); } 50% { transform: scale(1.5) rotate(90deg); filter: brightness(3); opacity: 0.8; } 75% { transform: scale(0.8) rotate(135deg); filter: brightness(2); opacity: 0.5; } 100% { transform: scale(0) rotate(180deg); filter: brightness(4); opacity: 0; } }
 @keyframes itemUseHappyPop { 0% { transform: scale(0) translateY(0); opacity: 0; } 20% { transform: scale(1.2) translateY(-8px); opacity: 1; } 50% { transform: scale(1) translateY(-20px); opacity: 1; } 100% { transform: scale(0.8) translateY(-40px); opacity: 0; } }
 @keyframes itemUseMusicNote { 0% { transform: translateY(0) rotate(0deg) scale(0); opacity: 0; } 15% { transform: scale(1); opacity: 1; } 100% { transform: translateY(-30px) rotate(var(--nr)) scale(0.5); opacity: 0; } }
+@keyframes buffAuraPulse { 0%,100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.08); } }
+@keyframes buffBadgeBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
+@keyframes buffSparkle { 0%,100% { opacity: 0.3; } 50% { opacity: 0.8; } }
       `}</style>
 
       {/* Confetti burst on celebrate */}
@@ -4445,6 +4448,26 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
         </div>
       )}
 
+      {/* Active buff aura glow behind aggie */}
+      {activeBuff && activeBuff.charges > 0 && (() => {
+        const buffColors = { hint_freq: "#4a9eff", hint_accuracy: "#f5c842", hint_both: "#2ecc71" };
+        const auraColor = buffColors[activeBuff.type] || "#888";
+        return (
+          <div style={{
+            position: "absolute",
+            left: -AGGIE_SIZE * 0.15,
+            top: -AGGIE_SIZE * 0.15,
+            width: AGGIE_SIZE * 1.3,
+            height: AGGIE_SIZE * 1.3,
+            borderRadius: "50%",
+            background: `radial-gradient(circle, ${auraColor}30 0%, ${auraColor}15 40%, transparent 70%)`,
+            animation: "buffAuraPulse 2.5s ease-in-out infinite",
+            pointerEvents: "none",
+            zIndex: -1,
+          }} />
+        );
+      })()}
+
       {/* Companion body */}
       <div
         onPointerDown={onPointerDown}
@@ -4464,7 +4487,9 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
             ? "drop-shadow(0 4px 12px rgba(0,0,0,0.6)) drop-shadow(0 0 6px rgba(20,16,40,0.4))"
             : mood === "celebrate"
               ? "drop-shadow(0 2px 10px rgba(100,90,180,0.4)) drop-shadow(0 0 8px rgba(140,130,200,0.25))"
-              : "drop-shadow(0 3px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 4px rgba(20,16,40,0.3))",
+              : activeBuff && activeBuff.charges > 0
+                ? (() => { const bc = { hint_freq: "74,158,255", hint_accuracy: "245,200,66", hint_both: "46,204,113" }; return `drop-shadow(0 3px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 6px rgba(${bc[activeBuff.type] || "136,136,136"},0.45))`; })()
+                : "drop-shadow(0 3px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 4px rgba(20,16,40,0.3))",
           animation: bodyAnim,
           transition: dragging ? "none" : "filter 0.2s",
           pointerEvents: "auto",
@@ -4473,6 +4498,71 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       >
         {renderAggieSVG(AGGIE_SIZE, mood, true, accessory, happinessMood)}
       </div>
+
+      {/* Active buff badge — small icon + charges near bottom-right of aggie */}
+      {activeBuff && activeBuff.charges > 0 && (() => {
+        const buffColors = { hint_freq: "#4a9eff", hint_accuracy: "#f5c842", hint_both: "#2ecc71" };
+        const buffIcons = {
+          hint_freq: (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="6" fill={buffColors.hint_freq + "40"} stroke={buffColors.hint_freq} strokeWidth="1.5" />
+              <circle cx="11" cy="11" r="2" fill="#fff" opacity="0.8" />
+              <line x1="15" y1="15" x2="20" y2="20" stroke={buffColors.hint_freq} strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          ),
+          hint_accuracy: (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <rect x="6" y="4" width="12" height="16" rx="2" fill={buffColors.hint_accuracy + "40"} stroke="#c9a96e" strokeWidth="1" />
+              <line x1="9" y1="9" x2="15" y2="9" stroke="#c9a96e" strokeWidth="1" />
+              <line x1="9" y1="12" x2="14" y2="12" stroke="#c9a96e" strokeWidth="1" />
+              <circle cx="12" cy="16" r="1.5" fill="#FFD700" opacity="0.7" />
+            </svg>
+          ),
+          hint_both: (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <circle cx="9" cy="8" r="3.5" fill={buffColors.hint_both} opacity="0.6" />
+              <circle cx="15" cy="8" r="3.5" fill="#27ae60" opacity="0.6" />
+              <circle cx="9" cy="14" r="3.5" fill="#27ae60" opacity="0.6" />
+              <circle cx="15" cy="14" r="3.5" fill={buffColors.hint_both} opacity="0.6" />
+              <circle cx="12" cy="11" r="1.5" fill="#fff" opacity="0.4" />
+            </svg>
+          ),
+        };
+        const bColor = buffColors[activeBuff.type] || "#888";
+        const badgeSize = Math.max(22, AGGIE_SIZE * 0.28);
+        return (
+          <div style={{
+            position: "absolute",
+            right: -4,
+            bottom: -2,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            padding: "2px 5px 2px 3px",
+            borderRadius: 10,
+            backgroundColor: "rgba(0,0,0,0.55)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+            border: `1.5px solid ${bColor}60`,
+            boxShadow: `0 0 6px ${bColor}40, 0 1px 3px rgba(0,0,0,0.3)`,
+            animation: "buffBadgeBob 3s ease-in-out infinite",
+            pointerEvents: "none",
+            zIndex: 2,
+          }}>
+            {buffIcons[activeBuff.type]}
+            <span style={{
+              fontSize: 9,
+              fontWeight: 800,
+              color: bColor,
+              fontFamily: "'Inter', sans-serif",
+              lineHeight: 1,
+              textShadow: `0 0 4px ${bColor}60`,
+            }}>
+              {activeBuff.charges}
+            </span>
+          </div>
+        );
+      })()}
 
       {/* Cartoon tears shooting from eyes — rendered after body so they layer on top */}
       {mood === "sad" && (() => {
@@ -14064,7 +14154,7 @@ export default function Pattrn() {
   // --- Global modals element (included in every return) ---
   // --- Floating Aggie Companion ---
   const isWardrobeOpen = radialMenuStack[radialMenuStack.length - 1] === "aggie-wardrobe";
-  const floatingCosmeticEl = activeCosmetic && !isWardrobeOpen ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} /> : null;
+  const floatingCosmeticEl = activeCosmetic && !isWardrobeOpen ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} activeBuff={aggieBuff} /> : null;
 
   // Floating coin-earned animation
   const coinAnimEl = coinAnim ? (
