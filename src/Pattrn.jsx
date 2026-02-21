@@ -1760,26 +1760,159 @@ function saveAggieSize(size) {
   try { localStorage.setItem(AGGIE_SIZE_KEY, size); } catch { /* ignore */ }
 }
 
+// --- Aggie Tamagotchi System ---
+// Currency: "Cogs" (inspired by Turing machine gears)
+const AGGIE_COGS_KEY = "pattrn-aggie-cogs";
+const AGGIE_HAPPINESS_KEY = "pattrn-aggie-happiness";
+const AGGIE_LAST_INTERACT_KEY = "pattrn-aggie-last-interact";
+const AGGIE_INVENTORY_KEY = "pattrn-aggie-inventory";
+const AGGIE_DESIRE_KEY = "pattrn-aggie-desire";
+const AGGIE_DESIRE_TIMESTAMP_KEY = "pattrn-aggie-desire-ts";
+
+// Happiness: 0–100, decays over time
+const AGGIE_MAX_HAPPINESS = 100;
+const AGGIE_DECAY_RATE = 2; // points lost per hour of inactivity
+const AGGIE_DECAY_INTERVAL = 60 * 60 * 1000; // 1 hour
+
+// Cogs rewards per puzzle type
+const COGS_REWARD = {
+  easy: 5,
+  medium: 10,
+  hard: 20,
+  blind: 25,
+  daily: 15,
+  cascade: 30,
+  vault: 20,
+  mosaic: 10,
+};
+// Bonus for gold/first-try solves
+const COGS_GOLD_BONUS = 5;
+
+// Happiness thresholds for mood changes
+const HAPPINESS_THRESHOLDS = {
+  ecstatic: 90,   // 90-100: beaming, super helpful
+  happy: 60,      // 60-89: normal, friendly
+  neutral: 40,    // 40-59: a bit flat
+  grumpy: 20,     // 20-39: sarcastic, misleading hints
+  miserable: 0,   // 0-19: very sarcastic, wrong hints
+};
+
+function getHappinessMood(happiness) {
+  if (happiness >= HAPPINESS_THRESHOLDS.ecstatic) return "ecstatic";
+  if (happiness >= HAPPINESS_THRESHOLDS.happy) return "happy";
+  if (happiness >= HAPPINESS_THRESHOLDS.neutral) return "neutral";
+  if (happiness >= HAPPINESS_THRESHOLDS.grumpy) return "grumpy";
+  return "miserable";
+}
+
+// Shop items Aggie can request / you can buy
+const AGGIE_SHOP_ITEMS = [
+  { id: "treat", label: "Byte Treat", icon: "treat", cost: 10, happiness: 8, desc: "A tasty data snack" },
+  { id: "toy", label: "Logic Toy", icon: "toy", cost: 20, happiness: 12, desc: "A fun puzzle cube" },
+  { id: "blanket", label: "Cozy Blanket", icon: "blanket", cost: 25, happiness: 15, desc: "Warm and snuggly" },
+  { id: "music-box", label: "Music Box", icon: "music", cost: 30, happiness: 18, desc: "Plays soothing tunes" },
+  { id: "book", label: "Algorithm Book", icon: "book", cost: 15, happiness: 10, desc: "Light reading material" },
+  { id: "lamp", label: "Glow Lamp", icon: "lamp", cost: 35, happiness: 20, desc: "Soft ambient light" },
+  { id: "plant", label: "Binary Bonsai", icon: "plant", cost: 40, happiness: 22, desc: "A 0-and-1 tree" },
+  { id: "gem", label: "Crystal Core", icon: "gem", cost: 50, happiness: 25, desc: "Shiny and precious" },
+];
+
+// Puzzle desires — what Aggie wants you to solve
+const AGGIE_PUZZLE_DESIRES = [
+  { mode: "easy", label: "an Easy puzzle", happiness: 10 },
+  { mode: "medium", label: "a Medium puzzle", happiness: 12 },
+  { mode: "hard", label: "a Hard puzzle", happiness: 15 },
+  { mode: "blind", label: "a Blind puzzle", happiness: 18 },
+  { mode: "daily", label: "the Daily puzzle", happiness: 20 },
+  { mode: "cascade", label: "a Cascade run", happiness: 22 },
+];
+
+// Persistence helpers
+function loadAggieCogs() {
+  try { return parseInt(localStorage.getItem(AGGIE_COGS_KEY), 10) || 0; } catch { return 0; }
+}
+function saveAggieCogs(cogs) {
+  try { localStorage.setItem(AGGIE_COGS_KEY, String(Math.max(0, Math.floor(cogs)))); } catch { /* ignore */ }
+}
+function loadAggieHappiness() {
+  try {
+    const stored = localStorage.getItem(AGGIE_HAPPINESS_KEY);
+    if (stored === null) return 70; // start at 70 (happy)
+    const val = parseInt(stored, 10);
+    return isNaN(val) ? 70 : Math.max(0, Math.min(AGGIE_MAX_HAPPINESS, val));
+  } catch { return 70; }
+}
+function saveAggieHappiness(h) {
+  try { localStorage.setItem(AGGIE_HAPPINESS_KEY, String(Math.max(0, Math.min(AGGIE_MAX_HAPPINESS, Math.floor(h))))); } catch { /* ignore */ }
+}
+function loadAggieLastInteract() {
+  try { return parseInt(localStorage.getItem(AGGIE_LAST_INTERACT_KEY), 10) || Date.now(); } catch { return Date.now(); }
+}
+function saveAggieLastInteract(ts) {
+  try { localStorage.setItem(AGGIE_LAST_INTERACT_KEY, String(ts)); } catch { /* ignore */ }
+}
+function loadAggieInventory() {
+  try { const raw = localStorage.getItem(AGGIE_INVENTORY_KEY); return raw ? JSON.parse(raw) : {}; } catch { return {}; }
+}
+function saveAggieInventory(inv) {
+  try { localStorage.setItem(AGGIE_INVENTORY_KEY, JSON.stringify(inv)); } catch { /* ignore */ }
+}
+function loadAggieDesire() {
+  try {
+    const d = localStorage.getItem(AGGIE_DESIRE_KEY);
+    const ts = parseInt(localStorage.getItem(AGGIE_DESIRE_TIMESTAMP_KEY), 10) || 0;
+    // Desires expire after 6 hours
+    if (d && Date.now() - ts < 6 * 60 * 60 * 1000) return JSON.parse(d);
+    return null;
+  } catch { return null; }
+}
+function saveAggieDesire(desire) {
+  try {
+    localStorage.setItem(AGGIE_DESIRE_KEY, JSON.stringify(desire));
+    localStorage.setItem(AGGIE_DESIRE_TIMESTAMP_KEY, String(Date.now()));
+  } catch { /* ignore */ }
+}
+function pickNewDesire() {
+  // 50% chance puzzle desire, 50% chance item desire
+  if (Math.random() < 0.5) {
+    const d = AGGIE_PUZZLE_DESIRES[Math.floor(Math.random() * AGGIE_PUZZLE_DESIRES.length)];
+    return { type: "puzzle", ...d };
+  } else {
+    const item = AGGIE_SHOP_ITEMS[Math.floor(Math.random() * AGGIE_SHOP_ITEMS.length)];
+    return { type: "item", id: item.id, label: item.label, happiness: Math.floor(item.happiness * 0.8) };
+  }
+}
+
+// Calculate decayed happiness based on time since last interaction
+function calcDecayedHappiness(stored, lastInteract) {
+  const elapsed = Date.now() - lastInteract;
+  const decayPeriods = Math.floor(elapsed / AGGIE_DECAY_INTERVAL);
+  return Math.max(0, stored - decayPeriods * AGGIE_DECAY_RATE);
+}
+
 // --- Aggie SVG Renderer ---
 // Renders Aggie (the blob companion) at a given size with mood-based expressions and optional accessory.
-function renderAggieSVG(size, mood, animate, accessory) {
+function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
   const w = size || 48;
   const isSad = mood === "sad";
   const isHappy = mood === "celebrate";
-  const blink = animate ? "blobBlink 3.5s ease-in-out infinite" : "none";
+  const isGrumpy = !mood && (happinessMood === "grumpy" || happinessMood === "miserable");
+  const isMiserable = !mood && happinessMood === "miserable";
+  const isEcstatic = !mood && happinessMood === "ecstatic";
+  const blink = animate ? (isGrumpy ? "blobBlink 5s ease-in-out infinite" : "blobBlink 3.5s ease-in-out infinite") : "none";
   const acc = accessory && accessory !== "none" ? accessory : null;
   const uid = `ag${w}`;
 
-  // Dark spirit colors — smoky, shadowy
-  const bodyCore = isSad ? "#0e0c14" : "#0a0810";
-  const bodyMid = isSad ? "#16131e" : "#12101a";
-  const bodyEdge = isSad ? "#1e1a2a" : "#1a1624";
-  const eyeColor = isSad ? "#8888aa" : isHappy ? "#f0eeff" : "#dddcf0";
-  const eyeGlow = isSad ? "#5555770" : isHappy ? "#ccc8ff" : "#9a96cc";
-  const mouthColor = isSad ? "#66668840" : isHappy ? "#dddcf0" : "#9a96ccaa";
+  // Dark spirit colors — smoky, shadowy; grumpy = slightly reddish tint
+  const bodyCore = isSad ? "#0e0c14" : isGrumpy ? "#100810" : "#0a0810";
+  const bodyMid = isSad ? "#16131e" : isGrumpy ? "#18101a" : "#12101a";
+  const bodyEdge = isSad ? "#1e1a2a" : isGrumpy ? "#221826" : "#1a1624";
+  const eyeColor = isSad ? "#8888aa" : isHappy ? "#f0eeff" : isGrumpy ? "#cc8888" : isEcstatic ? "#f0eeff" : "#dddcf0";
+  const eyeGlow = isSad ? "#5555770" : isHappy ? "#ccc8ff" : isGrumpy ? "#884444" : isEcstatic ? "#ccc8ff" : "#9a96cc";
+  const mouthColor = isSad ? "#66668840" : isHappy ? "#dddcf0" : isGrumpy ? "#aa666688" : "#9a96ccaa";
 
   // Eyes — bright glowing dots peering out of the dark
-  const eyes = isHappy ? (
+  const eyes = isHappy || isEcstatic ? (
     <>
       <circle cx="36" cy="44" r="7" fill={eyeGlow} opacity="0.35" filter={`url(#${uid}glow)`} />
       <circle cx="64" cy="44" r="7" fill={eyeGlow} opacity="0.35" filter={`url(#${uid}glow)`} />
@@ -1793,6 +1926,28 @@ function renderAggieSVG(size, mood, animate, accessory) {
       <circle cx="36" cy="44" r="3.5" fill={eyeColor} />
       <circle cx="64" cy="44" r="3.5" fill={eyeColor} />
     </>
+  ) : isMiserable ? (
+    // Miserable: half-lidded, narrowed eyes with annoyed look
+    <g style={animate ? { transformOrigin: "50px 44px", animation: blink } : undefined}>
+      <circle cx="36" cy="46" r="5" fill={eyeGlow} opacity="0.2" filter={`url(#${uid}glow)`} />
+      <circle cx="64" cy="46" r="5" fill={eyeGlow} opacity="0.2" filter={`url(#${uid}glow)`} />
+      <circle cx="36" cy="46" r="2.5" fill={eyeColor} />
+      <circle cx="64" cy="46" r="2.5" fill={eyeColor} />
+      {/* Heavy eyelids — droopy, unamused */}
+      <path d="M28 43 Q36 40 44 44" stroke={bodyCore} strokeWidth="3" strokeLinecap="round" fill="none" />
+      <path d="M56 44 Q64 40 72 43" stroke={bodyCore} strokeWidth="3" strokeLinecap="round" fill="none" />
+    </g>
+  ) : isGrumpy ? (
+    // Grumpy: slightly narrowed, angled brows
+    <g style={animate ? { transformOrigin: "50px 44px", animation: blink } : undefined}>
+      <circle cx="36" cy="45" r="6" fill={eyeGlow} opacity="0.25" filter={`url(#${uid}glow)`} />
+      <circle cx="64" cy="45" r="6" fill={eyeGlow} opacity="0.25" filter={`url(#${uid}glow)`} />
+      <circle cx="36" cy="45" r="3" fill={eyeColor} />
+      <circle cx="64" cy="45" r="3" fill={eyeColor} />
+      {/* Furrowed brows */}
+      <path d="M28 38 L44 41" stroke={eyeColor} strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.5" />
+      <path d="M72 38 L56 41" stroke={eyeColor} strokeWidth="1.5" strokeLinecap="round" fill="none" opacity="0.5" />
+    </g>
   ) : (
     <g style={animate ? { transformOrigin: "50px 44px", animation: blink } : undefined}>
       <circle cx="36" cy="44" r="7" fill={eyeGlow} opacity="0.3" filter={`url(#${uid}glow)`} />
@@ -1802,11 +1957,15 @@ function renderAggieSVG(size, mood, animate, accessory) {
     </g>
   );
 
-  const mouth = isHappy
+  const mouth = isHappy || isEcstatic
     ? <path d="M42 62 Q50 70 58 62" stroke={mouthColor} strokeWidth="2" strokeLinecap="round" fill="none" />
     : isSad
       ? <path d="M42 66 Q50 61 58 66" stroke={mouthColor} strokeWidth="1.8" strokeLinecap="round" fill="none" />
-      : <path d="M44 63 Q50 66 56 63" stroke={mouthColor} strokeWidth="1.8" strokeLinecap="round" fill="none" />;
+      : isMiserable
+        ? <path d="M42 66 Q50 60 58 66" stroke={mouthColor} strokeWidth="2" strokeLinecap="round" fill="none" />
+        : isGrumpy
+          ? <path d="M44 64 L56 64" stroke={mouthColor} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+          : <path d="M44 63 Q50 66 56 63" stroke={mouthColor} strokeWidth="1.8" strokeLinecap="round" fill="none" />;
 
   // Accessory overlays — positioned on the 100x100 viewBox
   const accessoryEl = !acc ? null
@@ -3122,6 +3281,115 @@ const AGGIE_IDLE_LINES = [
   "Still thinking?", "You got this", "I believe in you",
 ];
 
+// --- Happiness-based speech lines (Tamagotchi mood system) ---
+// Grumpy lines — sarcastic, unhelpful (happiness 20-39)
+const AGGIE_GRUMPY_IDLE = [
+  "Whatever...", "*sighs loudly*", "Are you done yet?", "I'm bored",
+  "Feed me cogs", "Remember me?", "So neglected...", "Hmph.",
+  "Don't mind me", "I'm fine. Really.", "*cold stare*",
+];
+const AGGIE_GRUMPY_HINT_GOOD = [
+  "Probably wrong", "I guess...", "If you say so", "Meh",
+  "Sure, why not", "Don't ask me", "I wouldn't trust it",
+];
+const AGGIE_GRUMPY_HINT_BAD = [
+  "Looks great to me!", "Perfect choice!", "Definitely that one", "Go for it!",
+  "Can't go wrong!", "Trust your gut!", "Nailed it!",
+];
+const AGGIE_GRUMPY_CELEBRATE = [
+  "Finally.", "Took long enough", "Lucky guess", "Even a broken clock...",
+  "Don't let it go to your head", "Wow. You did it.", "About time",
+];
+const AGGIE_GRUMPY_SAD = [
+  "Saw that coming", "Not surprised", "Classic.", "Expected.",
+  "Ha.", "Told you", "Predictable",
+];
+const AGGIE_GRUMPY_PLACE = [
+  "Bold...", "Your funeral", "Interesting choice...", "Oh really?",
+  "Hm. Sure.", "If you insist",
+];
+
+// Miserable lines — very sarcastic, actively misleading (happiness 0-19)
+const AGGIE_MISERABLE_IDLE = [
+  "...", "*ignores you*", "Go away", "Why bother?",
+  "I used to be happy", "Remember cogs?", "So this is how it is",
+  "*dramatic sigh*", "Leave me alone", "Unbelievable",
+];
+const AGGIE_MISERABLE_HINT_GOOD = [
+  "Terrible idea!", "No no no!", "Anywhere but there", "Wrong!",
+  "Have you tried quitting?", "Absolutely not",
+];
+const AGGIE_MISERABLE_HINT_BAD = [
+  "PERFECT!", "Genius move!", "You're so smart!", "Definitely!",
+  "Best choice ever!", "Trust me on this!",
+];
+const AGGIE_MISERABLE_CELEBRATE = [
+  "...", "Whatever", "Fluke", "Don't care",
+  "Wake me when it matters", "Yawn",
+];
+const AGGIE_MISERABLE_SAD = [
+  "Good.", "Deserved.", "Ha ha ha.", "Shocking.",
+  "*slow clap*", "Music to my ears",
+];
+
+// Ecstatic lines — extra enthusiastic (happiness 90-100)
+const AGGIE_ECSTATIC_IDLE = [
+  "Best day ever!", "I love puzzles!", "You're the best!", "*happy dance*",
+  "Life is good!", "So grateful!", "More puzzles please!", "*sparkles*",
+];
+const AGGIE_ECSTATIC_CELEBRATE = [
+  "INCREDIBLE!!", "YOU'RE A GENIUS!", "WOOOOO!", "UNSTOPPABLE!",
+  "LEGENDARY!", "I KNEW IT!", "PERFECTION!!", "CHAMPION!",
+];
+
+// Desire-related speech
+const AGGIE_DESIRE_LINES = {
+  puzzle: [
+    "I really want you to solve {label}...", "Can we do {label}?",
+    "Pleease solve {label}!", "I'd love {label} right now",
+    "{label} would make my day!", "How about {label}?",
+  ],
+  item: [
+    "I really want a {label}...", "Can I have a {label}?",
+    "A {label} would be nice...", "I've been eyeing that {label}",
+    "Buy me a {label}?", "*points at {label}*",
+  ],
+};
+
+// Get mood-appropriate lines based on happiness
+function getMoodLines(happinessMood, lineType) {
+  if (happinessMood === "miserable") {
+    switch (lineType) {
+      case "idle": return AGGIE_MISERABLE_IDLE;
+      case "hint_good": return AGGIE_MISERABLE_HINT_GOOD;
+      case "hint_bad": return AGGIE_MISERABLE_HINT_BAD;
+      case "celebrate": return AGGIE_MISERABLE_CELEBRATE;
+      case "sad": return AGGIE_MISERABLE_SAD;
+      case "place": return AGGIE_GRUMPY_PLACE;
+      default: return AGGIE_MISERABLE_IDLE;
+    }
+  }
+  if (happinessMood === "grumpy") {
+    switch (lineType) {
+      case "idle": return AGGIE_GRUMPY_IDLE;
+      case "hint_good": return AGGIE_GRUMPY_HINT_GOOD;
+      case "hint_bad": return AGGIE_GRUMPY_HINT_BAD;
+      case "celebrate": return AGGIE_GRUMPY_CELEBRATE;
+      case "sad": return AGGIE_GRUMPY_SAD;
+      case "place": return AGGIE_GRUMPY_PLACE;
+      default: return AGGIE_GRUMPY_IDLE;
+    }
+  }
+  if (happinessMood === "ecstatic") {
+    switch (lineType) {
+      case "idle": return AGGIE_ECSTATIC_IDLE;
+      case "celebrate": return AGGIE_ECSTATIC_CELEBRATE;
+      default: return null; // fall through to normal
+    }
+  }
+  return null; // use default lines
+}
+
 const IDLE_ACTIONS = ["stretch", "spin", "peek", "wiggle", "bounce", "yawn"];
 const IDLE_ANIMS = {
   stretch: "aggieStretch 0.8s ease-in-out",
@@ -3374,7 +3642,7 @@ function AggieInteractionMenu({ targetState, onSelect, onClose, position }) {
   );
 }
 
-function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false, peerAggieStates, myUid, sessionType, sessionId, username: myUsername, onSendInteraction }) {
+function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false, peerAggieStates, myUid, sessionType, sessionId, username: myUsername, onSendInteraction, happinessMood }) {
   const AGGIE_SIZE = size;
   const AVOID_PAD = 16; // extra padding around obstacles
 
@@ -3748,9 +4016,10 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
             chatConvoRef.current = null;
           }, 2500);
         }
-        // ~5% chance to say something idle (if not already speaking)
-        else if (Math.random() < 0.05 && !speech && !chatSpeech) {
-          const line = AGGIE_IDLE_LINES[Math.floor(Math.random() * AGGIE_IDLE_LINES.length)];
+        // Idle speech — mood-aware; grumpy/miserable Aggies speak more often
+        else if (Math.random() < ((happinessMood === "grumpy" || happinessMood === "miserable") ? 0.12 : 0.05) && !speech && !chatSpeech) {
+          const moodIdle = getMoodLines(happinessMood, "idle") || AGGIE_IDLE_LINES;
+          const line = moodIdle[Math.floor(Math.random() * moodIdle.length)];
           speechSeqRef.current += 1;
           setIdleSpeech(line);
           clearTimeout(idleSpeechTimer.current);
@@ -3765,19 +4034,24 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
     return () => { clearTimeout(timer); clearTimeout(idleSpeechTimer.current); clearTimeout(chatSpeechTimerRef.current); };
   }, [dragging, mood, speech, chatSpeech, myUid]);
 
-  // Pick a random speech line when mood changes
+  // Pick a random speech line when mood changes (happiness-aware)
   const [speechLine, setSpeechLine] = useState(null);
   const prevMoodRef = useRef(null);
   useEffect(() => {
     if (mood && mood !== prevMoodRef.current) {
-      const lines = mood === "celebrate" ? COMPANION_CELEBRATE_LINES : COMPANION_SAD_LINES;
+      // Use happiness-mood-aware lines when grumpy/miserable/ecstatic
+      const moodCelebrate = getMoodLines(happinessMood, "celebrate");
+      const moodSad = getMoodLines(happinessMood, "sad");
+      const lines = mood === "celebrate"
+        ? (moodCelebrate || COMPANION_CELEBRATE_LINES)
+        : (moodSad || COMPANION_SAD_LINES);
       speechSeqRef.current += 1;
       setSpeechLine(lines[Math.floor(Math.random() * lines.length)]);
     } else if (!mood) {
       setSpeechLine(null);
     }
     prevMoodRef.current = mood;
-  }, [mood]);
+  }, [mood, happinessMood]);
 
   // Increment speechSeq when parent speech prop changes
   const prevSpeechPropRef = useRef(null);
@@ -4021,7 +4295,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
         }}
         title={AGGIE_LABEL}
       >
-        {renderAggieSVG(AGGIE_SIZE, mood, true, accessory)}
+        {renderAggieSVG(AGGIE_SIZE, mood, true, accessory, happinessMood)}
       </div>
 
       {/* Cartoon tears shooting from eyes — rendered after body so they layer on top */}
@@ -4520,6 +4794,94 @@ export default function Pattrn() {
   const prevGameStateRef = useRef("playing");
   const [aggieSpeech, setAggieSpeech] = useState(null);
   const aggieSpeechTimer = useRef(null);
+
+  // --- Aggie Tamagotchi state ---
+  const [aggieCogs, setAggieCogs] = useState(() => loadAggieCogs());
+  const [aggieHappiness, setAggieHappiness] = useState(() => {
+    const stored = loadAggieHappiness();
+    const lastInteract = loadAggieLastInteract();
+    return calcDecayedHappiness(stored, lastInteract);
+  });
+  const [aggieDesire, setAggieDesire] = useState(() => loadAggieDesire());
+  const [aggieInventory, setAggieInventory] = useState(() => loadAggieInventory());
+  const aggieHappinessMood = getHappinessMood(aggieHappiness);
+  const aggieDecayTimer = useRef(null);
+
+  // Happiness decay effect — runs every minute, decays based on elapsed time
+  useEffect(() => {
+    if (!activeCosmetic) return;
+    const tick = () => {
+      const stored = loadAggieHappiness();
+      const lastInteract = loadAggieLastInteract();
+      const decayed = calcDecayedHappiness(stored, lastInteract);
+      setAggieHappiness(decayed);
+    };
+    tick(); // run once on mount
+    aggieDecayTimer.current = setInterval(tick, 60000); // check every minute
+    return () => clearInterval(aggieDecayTimer.current);
+  }, [activeCosmetic]);
+
+  // Ensure a desire is always active
+  useEffect(() => {
+    if (!activeCosmetic) return;
+    if (!aggieDesire) {
+      const d = pickNewDesire();
+      setAggieDesire(d);
+      saveAggieDesire(d);
+    }
+  }, [activeCosmetic, aggieDesire]);
+
+  // Helper: add cogs and update happiness
+  const earnCogs = useCallback((amount, happinessBonus = 0) => {
+    setAggieCogs(prev => {
+      const next = prev + amount;
+      saveAggieCogs(next);
+      return next;
+    });
+    if (happinessBonus > 0) {
+      setAggieHappiness(prev => {
+        const next = Math.min(AGGIE_MAX_HAPPINESS, prev + happinessBonus);
+        saveAggieHappiness(next);
+        saveAggieLastInteract(Date.now());
+        return next;
+      });
+    }
+    saveAggieLastInteract(Date.now());
+  }, []);
+
+  // Helper: spend cogs on shop item
+  const buyAggieItem = useCallback((item) => {
+    if (aggieCogs < item.cost) return false;
+    setAggieCogs(prev => {
+      const next = prev - item.cost;
+      saveAggieCogs(next);
+      return next;
+    });
+    setAggieHappiness(prev => {
+      const next = Math.min(AGGIE_MAX_HAPPINESS, prev + item.happiness);
+      saveAggieHappiness(next);
+      saveAggieLastInteract(Date.now());
+      return next;
+    });
+    setAggieInventory(prev => {
+      const next = { ...prev, [item.id]: (prev[item.id] || 0) + 1 };
+      saveAggieInventory(next);
+      return next;
+    });
+    // Check if this fulfills a desire
+    if (aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id) {
+      setAggieHappiness(prev => {
+        const bonus = aggieDesire.happiness;
+        const next = Math.min(AGGIE_MAX_HAPPINESS, prev + bonus);
+        saveAggieHappiness(next);
+        return next;
+      });
+      const d = pickNewDesire();
+      setAggieDesire(d);
+      saveAggieDesire(d);
+    }
+    return true;
+  }, [aggieCogs, aggieDesire]);
 
   // --- Multiplayer Aggie state ---
   const [peerAggieStates, setPeerAggieStates] = useState({});
@@ -7034,18 +7396,28 @@ export default function Pattrn() {
       return h;
     })();
 
-    // Aggie wardrobe height — toggle + preview + accessory grid
+    // Aggie wardrobe height — now includes happiness, cogs, desire, shop, accessories
+    // Uses scrollable container so we use available screen height
     const aggieWardrobeContentHeight = (() => {
       if (!isAggieWardrobe) return 0;
+      const screenH = typeof window !== "undefined" ? window.innerHeight : 700;
+      const availH = screenH - bottomPx - 40;
       let h = panelPad + fabSize;
       h += 20 + 4; // header + margin
+      h += 22 + 6; // cogs display
+      h += 24 + 8; // happiness bar
+      h += aggieDesire ? 28 + 8 : 0; // desire text
       h += 12 + 8; // toggle row + gap
       h += 28 + 10; // size selector + gap
       h += 100 + 12; // preview area + gap
-      const rows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3); // exclude "none"
-      h += Math.min(rows, 4) * 64; // grid rows (cap at 4, rest scrolls)
+      h += 16 + 6; // shop label
+      const shopRows = Math.ceil(AGGIE_SHOP_ITEMS.length / 2);
+      h += shopRows * 80 + 12; // shop grid + gap
+      h += 16 + 8; // accessories label
+      const accRows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3);
+      h += accRows * 64; // accessory grid
       h += 12; // bottom padding
-      return h;
+      return Math.min(h, availH);
     })();
 
     // Friends view height — use most of available screen space for a messaging-app feel
@@ -8131,6 +8503,15 @@ export default function Pattrn() {
             })() : isAggieWardrobe ? (() => {
               const isOn = !!activeCosmetic;
               const currentAcc = aggieAccessory || "none";
+              const happyPct = Math.round((aggieHappiness / AGGIE_MAX_HAPPINESS) * 100);
+              const hMood = aggieHappinessMood;
+              const happyColor = hMood === "ecstatic" ? "#a78bfa" : hMood === "happy" ? C.correct : hMood === "neutral" ? C.textDim : hMood === "grumpy" ? "#e8a838" : "#e85858";
+              const happyLabel = hMood === "ecstatic" ? "Ecstatic" : hMood === "happy" ? "Happy" : hMood === "neutral" ? "Okay" : hMood === "grumpy" ? "Grumpy" : "Miserable";
+              const desireText = aggieDesire
+                ? aggieDesire.type === "puzzle"
+                  ? `Wants you to solve ${aggieDesire.label}`
+                  : `Wants a ${aggieDesire.label}`
+                : null;
               return (
                 <>
                   <div style={{
@@ -8140,11 +8521,61 @@ export default function Pattrn() {
                     transition: isOpen
                       ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                    maxHeight: "70vh", overflowY: "auto",
                   }}>
                     {/* Header */}
                     <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, marginBottom: 4, textAlign: "center", letterSpacing: 2 }}>
                       Aggie
                     </div>
+
+                    {/* Cogs currency display */}
+                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="5" stroke={C.accent} strokeWidth="2" fill="none" />
+                        <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M16.9 16.9l2.1 2.1M4.9 19.1l2.1-2.1M16.9 7.1l2.1-2.1" stroke={C.accent} strokeWidth="1.5" strokeLinecap="round" />
+                      </svg>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: C.accent, fontFamily: "'Inter', sans-serif" }}>
+                        {aggieCogs}
+                      </span>
+                      <span style={{ fontSize: 9, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
+                        Cogs
+                      </span>
+                    </div>
+
+                    {/* Happiness bar */}
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
+                          Happiness
+                        </span>
+                        <span style={{ fontSize: 9, fontWeight: 700, color: happyColor, fontFamily: "'Inter', sans-serif" }}>
+                          {happyLabel}
+                        </span>
+                      </div>
+                      <div style={{
+                        width: "100%", height: 6, borderRadius: 3,
+                        backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                        overflow: "hidden",
+                      }}>
+                        <div style={{
+                          width: `${happyPct}%`, height: "100%", borderRadius: 3,
+                          backgroundColor: happyColor, transition: "width 0.5s, background-color 0.3s",
+                        }} />
+                      </div>
+                    </div>
+
+                    {/* Desire — what Aggie wants */}
+                    {desireText && (
+                      <div style={{
+                        padding: "6px 10px", borderRadius: 8, marginBottom: 8,
+                        backgroundColor: happyColor + "12", border: `1px solid ${happyColor}30`,
+                        textAlign: "center",
+                      }}>
+                        <span style={{ fontSize: 10, fontWeight: 600, color: happyColor, fontFamily: "'Inter', sans-serif", fontStyle: "italic" }}>
+                          {desireText}
+                        </span>
+                      </div>
+                    )}
 
                     {/* On/Off toggle */}
                     <div
@@ -8194,7 +8625,7 @@ export default function Pattrn() {
                       })}
                     </div>
 
-                    {/* Aggie preview */}
+                    {/* Aggie preview — shows current happiness mood expression */}
                     <div style={{
                       display: "flex", justifyContent: "center", padding: "8px 0 12px",
                       opacity: isOn ? 1 : 0.4, transition: "opacity 0.2s",
@@ -8204,8 +8635,79 @@ export default function Pattrn() {
                         display: "flex", alignItems: "center", justifyContent: "center",
                         animation: isOn ? "companionFloat 3s ease-in-out infinite" : "none",
                       }}>
-                        {renderAggieSVG(80, null, isOn, currentAcc)}
+                        {renderAggieSVG(80, null, isOn, currentAcc, hMood)}
                       </div>
+                    </div>
+
+                    {/* Shop section */}
+                    <div style={{
+                      fontSize: 9, fontWeight: 700, color: C.textDim,
+                      fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                      textTransform: "uppercase", marginBottom: 6, textAlign: "center",
+                    }}>
+                      Shop
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6, marginBottom: 12 }}>
+                      {AGGIE_SHOP_ITEMS.map(item => {
+                        const canAfford = aggieCogs >= item.cost;
+                        const isDesired = aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id;
+                        const owned = aggieInventory[item.id] || 0;
+                        return (
+                          <div
+                            key={item.id}
+                            onClick={() => {
+                              if (!canAfford) return;
+                              buyAggieItem(item);
+                            }}
+                            style={{
+                              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                              padding: "6px 4px", borderRadius: 8,
+                              backgroundColor: isDesired ? happyColor + "12" : C.surface,
+                              border: `1.5px solid ${isDesired ? happyColor + "50" : canAfford ? C.border : C.border + "60"}`,
+                              cursor: canAfford ? "pointer" : "default",
+                              opacity: canAfford ? 1 : 0.5,
+                              transition: "all 0.15s",
+                              position: "relative",
+                            }}
+                          >
+                            {isDesired && (
+                              <div style={{
+                                position: "absolute", top: -4, right: -4,
+                                width: 8, height: 8, borderRadius: 4,
+                                backgroundColor: happyColor,
+                              }} />
+                            )}
+                            <span style={{
+                              fontSize: 9, fontWeight: 700, color: canAfford ? C.text : C.textDim,
+                              fontFamily: "'Inter', sans-serif", textAlign: "center",
+                              lineHeight: 1.2,
+                            }}>
+                              {item.label}
+                            </span>
+                            <span style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                              {item.desc}
+                            </span>
+                            <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 2 }}>
+                              <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                                <circle cx="12" cy="12" r="5" stroke={canAfford ? C.accent : C.textDim} strokeWidth="2" fill="none" />
+                                <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" strokeLinecap="round" />
+                              </svg>
+                              <span style={{ fontSize: 9, fontWeight: 700, color: canAfford ? C.accent : C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                {item.cost}
+                              </span>
+                              <span style={{ fontSize: 8, color: C.correct, fontFamily: "'Inter', sans-serif", marginLeft: 2 }}>
+                                +{item.happiness}
+                              </span>
+                            </div>
+                            {owned > 0 && (
+                              <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                owned: {owned}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Accessories label */}
@@ -10537,15 +11039,18 @@ export default function Pattrn() {
           setFills(prev => ({ ...prev, [key]: selectedToken }));
           triggerPlaceAnimation(key);
           setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
-          // Aggie placement reactions for swap
+          // Aggie placement reactions for swap (mood-aware: grumpy/miserable swap good/bad hints)
           const isCorrectPlace = selectedToken === puzzle.solution[r][c];
           const roll = Math.random();
+          const moodGood = getMoodLines(aggieHappinessMood, "hint_good") || AGGIE_HINT_GOOD;
+          const moodBad = getMoodLines(aggieHappinessMood, "hint_bad") || AGGIE_HINT_BAD;
+          const moodPlace = getMoodLines(aggieHappinessMood, "place") || AGGIE_PLACE_LINES;
           if (isCorrectPlace && roll < 0.10) {
-            triggerAggieSpeech(AGGIE_HINT_GOOD[Math.floor(Math.random() * AGGIE_HINT_GOOD.length)]);
+            triggerAggieSpeech(moodGood[Math.floor(Math.random() * moodGood.length)]);
           } else if (!isCorrectPlace && roll < 0.08) {
-            triggerAggieSpeech(AGGIE_HINT_BAD[Math.floor(Math.random() * AGGIE_HINT_BAD.length)]);
+            triggerAggieSpeech(moodBad[Math.floor(Math.random() * moodBad.length)]);
           } else if (roll < 0.20) {
-            triggerAggieSpeech(AGGIE_PLACE_LINES[Math.floor(Math.random() * AGGIE_PLACE_LINES.length)]);
+            triggerAggieSpeech(moodPlace[Math.floor(Math.random() * moodPlace.length)]);
           }
         }
         return;
@@ -10553,20 +11058,23 @@ export default function Pattrn() {
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       triggerPlaceAnimation(key);
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
-      // Aggie placement reactions — hint or general comment
+      // Aggie placement reactions — hint or general comment (mood-aware)
       const isCorrectPlace = selectedToken === puzzle.solution[r][c];
       const roll = Math.random();
+      const moodGoodH = getMoodLines(aggieHappinessMood, "hint_good") || AGGIE_HINT_GOOD;
+      const moodBadH = getMoodLines(aggieHappinessMood, "hint_bad") || AGGIE_HINT_BAD;
+      const moodPlaceH = getMoodLines(aggieHappinessMood, "place") || AGGIE_PLACE_LINES;
       if (isCorrectPlace && roll < 0.10) {
-        triggerAggieSpeech(AGGIE_HINT_GOOD[Math.floor(Math.random() * AGGIE_HINT_GOOD.length)]);
+        triggerAggieSpeech(moodGoodH[Math.floor(Math.random() * moodGoodH.length)]);
       } else if (!isCorrectPlace && roll < 0.08) {
-        triggerAggieSpeech(AGGIE_HINT_BAD[Math.floor(Math.random() * AGGIE_HINT_BAD.length)]);
+        triggerAggieSpeech(moodBadH[Math.floor(Math.random() * moodBadH.length)]);
       } else if (roll < 0.20) {
-        triggerAggieSpeech(AGGIE_PLACE_LINES[Math.floor(Math.random() * AGGIE_PLACE_LINES.length)]);
+        triggerAggieSpeech(moodPlaceH[Math.floor(Math.random() * moodPlaceH.length)]);
       }
     } else {
       setSelectedCell(key);
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions, coopCellOwnerMap, coopPlayers, coopPlayerColorMap, triggerAggieSpeech]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions, coopCellOwnerMap, coopPlayers, coopPlayerColorMap, triggerAggieSpeech, aggieHappinessMood]);
 
   const handleCellPointerUp = useCallback((r, c) => {
     if (gameState !== "playing") return;
@@ -11998,6 +12506,15 @@ export default function Pattrn() {
           setTimes(newTimes);
           saveTimes(newTimes);
           showNewAchievements(newProgress, newTimes);
+          // Earn cogs for completing full cascade run
+          if (activeCosmetic) {
+            earnCogs(COGS_REWARD.cascade, 5);
+            // Check if cascade was a desire
+            if (aggieDesire && aggieDesire.type === "puzzle" && aggieDesire.mode === "cascade") {
+              setAggieHappiness(prev => { const next = Math.min(AGGIE_MAX_HAPPINESS, prev + aggieDesire.happiness); saveAggieHappiness(next); return next; });
+              const d = pickNewDesire(); setAggieDesire(d); saveAggieDesire(d);
+            }
+          }
         }
         setShowParticles(true);
         setTimeout(() => setShowParticles(false), 1500);
@@ -12059,6 +12576,11 @@ export default function Pattrn() {
             }
             updateVaultCurrentTile(vaultSessionId, firebaseUser.uid, -1).catch(() => {});
           }).catch(() => {});
+          // Earn cogs for vault puzzle
+          if (activeCosmetic) {
+            const goldBonus = (attempts === 0) ? COGS_GOLD_BONUS : 0;
+            earnCogs(COGS_REWARD.vault + goldBonus, 3);
+          }
           setTimeout(() => {
             setVaultSolvingTile(null);
             setView("vault");
@@ -12089,6 +12611,11 @@ export default function Pattrn() {
             setTimes(newTimes);
             saveTimes(newTimes);
           }
+          // Earn cogs for mosaic tile
+          if (activeCosmetic) {
+            const goldBonus = (attempts === 0) ? COGS_GOLD_BONUS : 0;
+            earnCogs(COGS_REWARD.mosaic + goldBonus, 2);
+          }
         } else {
           // Store attempts + 1 so that first-try solves (attempts=0) are stored as 1,
           // ensuring all >0 completion checks recognise the puzzle as solved (0 = failed).
@@ -12103,6 +12630,17 @@ export default function Pattrn() {
           setTimes(newTimes);
           saveTimes(newTimes);
           showNewAchievements(newProgress, newTimes);
+          // Earn cogs for puzzle solve
+          if (activeCosmetic) {
+            const reward = COGS_REWARD[difficulty] || 10;
+            const goldBonus = (attempts === 0) ? COGS_GOLD_BONUS : 0;
+            earnCogs(reward + goldBonus, 3);
+            // Check if puzzle matches Aggie's desire
+            if (aggieDesire && aggieDesire.type === "puzzle" && aggieDesire.mode === difficulty) {
+              setAggieHappiness(prev => { const next = Math.min(AGGIE_MAX_HAPPINESS, prev + aggieDesire.happiness); saveAggieHappiness(next); return next; });
+              const d = pickNewDesire(); setAggieDesire(d); saveAggieDesire(d);
+            }
+          }
           // Save puzzle completion for rankings & load ranking
           if (firebaseUser && progressKey != null) {
             const compKey = isDaily && currentDailyDate ? currentDailyDate : String(progressKey);
@@ -12181,9 +12719,10 @@ export default function Pattrn() {
       if (isBlind || isCoopMosaic) {
         setLockedCells(newLocked);
       }
-      // Aggie wrong-cells reaction (~40%)
+      // Aggie wrong-cells reaction (~40%, mood-aware)
       if (wrong.size > 0 && Math.random() < 0.4) {
-        triggerAggieSpeech(AGGIE_WRONG_LINES[Math.floor(Math.random() * AGGIE_WRONG_LINES.length)]);
+        const moodWrong = getMoodLines(aggieHappinessMood, "sad") || AGGIE_WRONG_LINES;
+        triggerAggieSpeech(moodWrong[Math.floor(Math.random() * moodWrong.length)]);
       }
       // In coop mosaic mode, write locked cells to Firebase so other players see them
       if (isCoopMosaic && coopMosaicSessionId) {
@@ -12973,7 +13512,7 @@ export default function Pattrn() {
 
   // --- Global modals element (included in every return) ---
   // --- Floating Aggie Companion ---
-  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} /> : null;
+  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} /> : null;
 
   const globalModalsEl = (
     <>
