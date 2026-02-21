@@ -6744,7 +6744,7 @@ export default function Pattrn() {
           key={item.id}
           onClick={handleClick}
           style={{
-            width: "100%", height: itemHeight,
+            width: "100%", height: itemHeight, flexShrink: 0,
             display: "flex", alignItems: "center", gap: 12,
             padding: "0 16px",
             background: hasGlow ? glowConfig.background : "none",
@@ -8084,7 +8084,7 @@ export default function Pattrn() {
                           }
                         }}
                         style={{
-                          width: "100%", height: itemHeight,
+                          width: "100%", height: itemHeight, flexShrink: 0,
                           display: "flex", alignItems: "center", gap: 12,
                           padding: "0 16px",
                           background: "none",
