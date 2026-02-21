@@ -1777,6 +1777,8 @@ const AGGIE_DESIRE_KEY = "pattrn-aggie-desire";
 const AGGIE_DESIRE_TIMESTAMP_KEY = "pattrn-aggie-desire-ts";
 const AGGIE_LAST_STREAK_KEY = "pattrn-aggie-last-streak";
 const AGGIE_ACTIVE_BUFF_KEY = "pattrn-aggie-active-buff";
+const AGGIE_ACTIVE_DEBUFF_KEY = "pattrn-aggie-active-debuff";
+const AGGIE_FAIL_STREAK_KEY = "pattrn-aggie-fail-streak";
 
 // Happiness: 0–100, decays over time
 const AGGIE_MAX_HAPPINESS = 100;
@@ -1909,6 +1911,32 @@ function saveAggieBuff(buff) {
     if (buff && buff.charges > 0) localStorage.setItem(AGGIE_ACTIVE_BUFF_KEY, JSON.stringify(buff));
     else localStorage.removeItem(AGGIE_ACTIVE_BUFF_KEY);
   } catch { /* ignore */ }
+}
+
+// Active debuff persistence — { type, charges }
+// Debuff types:
+//   "brain_fog"     — hints are suppressed entirely (applied on puzzle failure)
+//   "fumble"        — coin earnings halved (applied on 3+ wrong attempts in a single puzzle)
+//   "bad_luck"      — hints are inverted/misleading (applied on consecutive puzzle failures)
+function loadAggieDebuff() {
+  try {
+    const raw = localStorage.getItem(AGGIE_ACTIVE_DEBUFF_KEY);
+    if (!raw) return null;
+    const debuff = JSON.parse(raw);
+    return debuff && debuff.charges > 0 ? debuff : null;
+  } catch { return null; }
+}
+function saveAggieDebuff(debuff) {
+  try {
+    if (debuff && debuff.charges > 0) localStorage.setItem(AGGIE_ACTIVE_DEBUFF_KEY, JSON.stringify(debuff));
+    else localStorage.removeItem(AGGIE_ACTIVE_DEBUFF_KEY);
+  } catch { /* ignore */ }
+}
+function loadFailStreak() {
+  try { return parseInt(localStorage.getItem(AGGIE_FAIL_STREAK_KEY), 10) || 0; } catch { return 0; }
+}
+function saveFailStreak(n) {
+  try { localStorage.setItem(AGGIE_FAIL_STREAK_KEY, String(n)); } catch { /* ignore */ }
 }
 
 // Calculate decayed happiness based on time since last interaction
@@ -3480,6 +3508,13 @@ const AGGIE_SABOTAGE_LINES = [
   "Oh no, how sad", "*snicker*", "Accidents happen~",
 ];
 
+// Debuff applied lines — what Aggie says when a debuff kicks in
+const AGGIE_DEBUFF_LINES = {
+  brain_fog: ["My head's all fuzzy...", "Can't think straight...", "Everything's blurry...", "Brain... fog...", "*confused noises*"],
+  fumble: ["My paws are all tingly...", "Butterfingered!", "Dropped my coins...", "Clumsy day...", "Can't hold anything..."],
+  bad_luck: ["Something feels off...", "The stars aren't aligned...", "Unlucky streak...", "Bad vibes...", "*shudders*"],
+};
+
 // Ecstatic lines — extra enthusiastic (happiness 90-100)
 const AGGIE_ECSTATIC_IDLE = [
   "Best day ever!", "I love puzzles!", "You're the best!", "*happy dance*",
@@ -3797,7 +3832,7 @@ function AggieInteractionMenu({ targetState, onSelect, onClose, position }) {
   );
 }
 
-function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false, peerAggieStates, myUid, sessionType, sessionId, username: myUsername, onSendInteraction, happinessMood, activeBuff }) {
+function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false, peerAggieStates, myUid, sessionType, sessionId, username: myUsername, onSendInteraction, happinessMood, activeBuff, activeDebuff }) {
   const AGGIE_SIZE = size;
   const AGGIE_TOP_PAD = 8; // minimum distance from top of screen
   const AVOID_PAD = 16; // extra padding around obstacles
@@ -4383,6 +4418,9 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes buffAuraPulse { 0%,100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.08); } }
 @keyframes buffBadgeBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 @keyframes buffSparkle { 0%,100% { opacity: 0.3; } 50% { opacity: 0.8; } }
+@keyframes debuffAuraFlicker { 0%,100% { opacity: 0.25; transform: scale(1); } 30% { opacity: 0.5; transform: scale(1.05); } 60% { opacity: 0.2; transform: scale(0.97); } 80% { opacity: 0.45; transform: scale(1.03); } }
+@keyframes debuffBadgeShake { 0%,100% { transform: translateX(0); } 20% { transform: translateX(-1.5px); } 40% { transform: translateX(1.5px); } 60% { transform: translateX(-1px); } 80% { transform: translateX(1px); } }
+@keyframes debuffCrackle { 0% { opacity: 0; transform: scale(0.5) rotate(0deg); } 20% { opacity: 0.8; transform: scale(1) rotate(45deg); } 50% { opacity: 0.6; transform: scale(0.9) rotate(90deg); } 100% { opacity: 0; transform: scale(0.3) rotate(180deg); } }
       `}</style>
 
       {/* Confetti burst on celebrate */}
@@ -4468,6 +4506,49 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
         );
       })()}
 
+      {/* Active debuff aura — dark, flickering energy behind aggie */}
+      {activeDebuff && activeDebuff.charges > 0 && (() => {
+        const debuffColors = { brain_fog: "#8866aa", fumble: "#cc6644", bad_luck: "#aa4444" };
+        const auraColor = debuffColors[activeDebuff.type] || "#886";
+        return (
+          <>
+            <div style={{
+              position: "absolute",
+              left: -AGGIE_SIZE * 0.18,
+              top: -AGGIE_SIZE * 0.18,
+              width: AGGIE_SIZE * 1.36,
+              height: AGGIE_SIZE * 1.36,
+              borderRadius: "50%",
+              background: `radial-gradient(circle, ${auraColor}25 0%, ${auraColor}10 45%, transparent 70%)`,
+              animation: "debuffAuraFlicker 1.8s ease-in-out infinite",
+              pointerEvents: "none",
+              zIndex: -1,
+            }} />
+            {/* Small crackling particles around the debuff aura */}
+            {[0, 1, 2, 3].map(i => {
+              const angle = (i / 4) * Math.PI * 2;
+              const dist = AGGIE_SIZE * 0.55;
+              const px = AGGIE_SIZE / 2 + Math.cos(angle) * dist - 3;
+              const py = AGGIE_SIZE / 2 + Math.sin(angle) * dist - 3;
+              return (
+                <div key={`crackle-${i}`} style={{
+                  position: "absolute",
+                  left: px,
+                  top: py,
+                  width: 6,
+                  height: 6,
+                  borderRadius: "50%",
+                  backgroundColor: auraColor,
+                  animation: `debuffCrackle 1.2s ${i * 0.3}s ease-out infinite`,
+                  pointerEvents: "none",
+                  zIndex: -1,
+                }} />
+              );
+            })}
+          </>
+        );
+      })()}
+
       {/* Companion body */}
       <div
         onPointerDown={onPointerDown}
@@ -4487,9 +4568,11 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
             ? "drop-shadow(0 4px 12px rgba(0,0,0,0.6)) drop-shadow(0 0 6px rgba(20,16,40,0.4))"
             : mood === "celebrate"
               ? "drop-shadow(0 2px 10px rgba(100,90,180,0.4)) drop-shadow(0 0 8px rgba(140,130,200,0.25))"
-              : activeBuff && activeBuff.charges > 0
-                ? (() => { const bc = { hint_freq: "74,158,255", hint_accuracy: "245,200,66", hint_both: "46,204,113" }; return `drop-shadow(0 3px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 6px rgba(${bc[activeBuff.type] || "136,136,136"},0.45))`; })()
-                : "drop-shadow(0 3px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 4px rgba(20,16,40,0.3))",
+              : activeDebuff && activeDebuff.charges > 0
+                ? (() => { const dc = { brain_fog: "136,102,170", fumble: "204,102,68", bad_luck: "170,68,68" }; return `drop-shadow(0 3px 8px rgba(0,0,0,0.6)) drop-shadow(0 0 8px rgba(${dc[activeDebuff.type] || "136,102,102"},0.5)) saturate(0.7)`; })()
+                : activeBuff && activeBuff.charges > 0
+                  ? (() => { const bc = { hint_freq: "74,158,255", hint_accuracy: "245,200,66", hint_both: "46,204,113" }; return `drop-shadow(0 3px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 6px rgba(${bc[activeBuff.type] || "136,136,136"},0.45))`; })()
+                  : "drop-shadow(0 3px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 4px rgba(20,16,40,0.3))",
           animation: bodyAnim,
           transition: dragging ? "none" : "filter 0.2s",
           pointerEvents: "auto",
@@ -4559,6 +4642,69 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
               textShadow: `0 0 4px ${bColor}60`,
             }}>
               {activeBuff.charges}
+            </span>
+          </div>
+        );
+      })()}
+
+      {/* Active debuff badge — small icon + charges near bottom-left of aggie */}
+      {activeDebuff && activeDebuff.charges > 0 && (() => {
+        const debuffColors = { brain_fog: "#8866aa", fumble: "#cc6644", bad_luck: "#aa4444" };
+        const debuffIcons = {
+          brain_fog: (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="10" r="7" fill="#8866aa40" stroke="#8866aa" strokeWidth="1.2" />
+              <path d="M8 10 Q10 7 12 10 Q14 13 16 10" stroke="#8866aa" strokeWidth="1.2" fill="none" opacity="0.7" />
+              <circle cx="9" cy="9" r="1" fill="#8866aa" opacity="0.5" />
+              <circle cx="15" cy="9" r="1" fill="#8866aa" opacity="0.5" />
+              <line x1="10" y1="18" x2="10" y2="21" stroke="#8866aa" strokeWidth="0.8" opacity="0.4" />
+              <line x1="14" y1="17" x2="14" y2="21" stroke="#8866aa" strokeWidth="0.8" opacity="0.4" />
+            </svg>
+          ),
+          fumble: (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="8" fill="#cc664430" stroke="#cc6644" strokeWidth="1.2" />
+              <path d="M8 8 L16 16 M16 8 L8 16" stroke="#cc6644" strokeWidth="1.5" strokeLinecap="round" opacity="0.8" />
+              <circle cx="12" cy="12" r="3" fill="none" stroke="#cc6644" strokeWidth="0.8" strokeDasharray="2 2" opacity="0.5" />
+            </svg>
+          ),
+          bad_luck: (
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2 L14 9 L21 9 L15.5 13.5 L17.5 21 L12 16.5 L6.5 21 L8.5 13.5 L3 9 L10 9 Z" fill="#aa444440" stroke="#aa4444" strokeWidth="1" />
+              <circle cx="12" cy="12" r="2" fill="#aa4444" opacity="0.5" />
+            </svg>
+          ),
+        };
+        const dColor = debuffColors[activeDebuff.type] || "#886";
+        return (
+          <div style={{
+            position: "absolute",
+            left: -4,
+            bottom: -2,
+            display: "flex",
+            alignItems: "center",
+            gap: 2,
+            padding: "2px 5px 2px 3px",
+            borderRadius: 10,
+            backgroundColor: "rgba(20,0,0,0.6)",
+            backdropFilter: "blur(4px)",
+            WebkitBackdropFilter: "blur(4px)",
+            border: `1.5px solid ${dColor}60`,
+            boxShadow: `0 0 6px ${dColor}40, 0 1px 3px rgba(0,0,0,0.4)`,
+            animation: "debuffBadgeShake 2s ease-in-out infinite",
+            pointerEvents: "none",
+            zIndex: 2,
+          }}>
+            {debuffIcons[activeDebuff.type]}
+            <span style={{
+              fontSize: 9,
+              fontWeight: 800,
+              color: dColor,
+              fontFamily: "'Inter', sans-serif",
+              lineHeight: 1,
+              textShadow: `0 0 4px ${dColor}60`,
+            }}>
+              {activeDebuff.charges}
             </span>
           </div>
         );
@@ -5081,6 +5227,8 @@ export default function Pattrn() {
   const [aggieUsingItem, setAggieUsingItem] = useState(null); // { id, happiness, key } — item use animation in progress
   const aggieUsingItemTimer = useRef(null);
   const [aggieBuff, setAggieBuff] = useState(() => loadAggieBuff()); // active hint buff
+  const [aggieDebuff, setAggieDebuff] = useState(() => loadAggieDebuff()); // active debuff
+  const [aggieFailStreak, setAggieFailStreak] = useState(() => loadFailStreak()); // consecutive puzzle failures
 
   // Happiness decay effect — runs every minute, decays based on elapsed time
   useEffect(() => {
@@ -5127,8 +5275,11 @@ export default function Pattrn() {
 
   // Helper: add coins and update happiness
   const earnCoins = useCallback((amount, happinessBonus = 0) => {
+    // Fumble debuff: halve coin earnings
+    const hasFumble = aggieDebuff && aggieDebuff.type === "fumble" && aggieDebuff.charges > 0;
+    const actualAmount = hasFumble ? Math.max(1, Math.floor(amount / 2)) : amount;
     setAggieCoins(prev => {
-      const next = prev + amount;
+      const next = prev + actualAmount;
       saveAggieCoins(next);
       return next;
     });
@@ -5143,9 +5294,9 @@ export default function Pattrn() {
     saveAggieLastInteract(Date.now());
     // Trigger floating coin animation
     clearTimeout(coinAnimTimer.current);
-    setCoinAnim({ amount, key: Date.now() });
+    setCoinAnim({ amount: actualAmount, key: Date.now() });
     coinAnimTimer.current = setTimeout(() => setCoinAnim(null), 2000);
-  }, []);
+  }, [aggieDebuff]);
 
   // Helper: spend coins on shop item (buy only — adds to inventory, no happiness)
   const buyAggieItem = useCallback((item) => {
@@ -5222,6 +5373,17 @@ export default function Pattrn() {
     });
   }, []);
 
+  // Helper: consume one debuff charge (called when the debuff's trigger condition fires)
+  const consumeDebuffCharge = useCallback(() => {
+    setAggieDebuff(prev => {
+      if (!prev) return null;
+      const next = { ...prev, charges: prev.charges - 1 };
+      if (next.charges <= 0) { saveAggieDebuff(null); return null; }
+      saveAggieDebuff(next);
+      return next;
+    });
+  }, []);
+
   // Helper: buy/unlock an accessory
   const buyAccessory = useCallback((acc) => {
     if (!acc.cost || acc.cost <= 0) return; // free items don't need buying
@@ -5261,15 +5423,22 @@ export default function Pattrn() {
       clearTimeout(companionMoodTimer.current);
       setCompanionMood("celebrate");
       companionMoodTimer.current = setTimeout(() => setCompanionMood(null), 4000);
+      // Reset fail streak on win
+      setAggieFailStreak(0);
+      saveFailStreak(0);
+      // Consume one debuff charge on puzzle completion
+      consumeDebuffCharge();
     } else if (gameState === "lost") {
       clearTimeout(companionMoodTimer.current);
       setCompanionMood("sad");
       companionMoodTimer.current = setTimeout(() => setCompanionMood(null), 4000);
+      // Consume one debuff charge on puzzle completion (even failures count)
+      consumeDebuffCharge();
     } else if (gameState === "playing" && (prev === "won" || prev === "lost")) {
       clearTimeout(companionMoodTimer.current);
       setCompanionMood(null);
     }
-  }, [gameState, activeCosmetic]);
+  }, [gameState, activeCosmetic, consumeDebuffCharge]);
 
   // --- Aggie contextual speech (lightweight, doesn't change mood/animation) ---
   const triggerAggieSpeech = useCallback((line, duration = 2500) => {
@@ -5279,6 +5448,16 @@ export default function Pattrn() {
     setAggieSpeech(line);
     aggieSpeechTimer.current = setTimeout(() => setAggieSpeech(null), duration);
   }, [activeCosmetic, companionMood]);
+
+  // Helper: apply a debuff (replaces current debuff)
+  const applyDebuff = useCallback((type, charges) => {
+    const debuff = { type, charges };
+    setAggieDebuff(debuff);
+    saveAggieDebuff(debuff);
+    // Aggie reacts to the debuff
+    const lines = AGGIE_DEBUFF_LINES[type] || ["Ugh..."];
+    triggerAggieSpeech(lines[Math.floor(Math.random() * lines.length)]);
+  }, [triggerAggieSpeech]);
 
   // Aggie menu-open reaction (~10% when menu opens)
   const prevMenuOpenRef = useRef(false);
@@ -8969,6 +9148,28 @@ export default function Pattrn() {
                         );
                       })()}
 
+                      {/* Active debuff indicator */}
+                      {aggieDebuff && aggieDebuff.charges > 0 && (() => {
+                        const debuffLabels = { brain_fog: "Brain Fog", fumble: "Fumble Fingers", bad_luck: "Bad Luck" };
+                        const debuffDescs = { brain_fog: "Hints suppressed", fumble: "Coins halved", bad_luck: "Hints misleading" };
+                        const debuffColors = { brain_fog: "#8866aa", fumble: "#cc6644", bad_luck: "#aa4444" };
+                        const dColor = debuffColors[aggieDebuff.type] || "#886";
+                        return (
+                          <div style={{
+                            padding: "4px 8px", borderRadius: 6, marginBottom: 6,
+                            backgroundColor: dColor + "18", border: `1px solid ${dColor}40`,
+                            textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                          }}>
+                            <span style={{ fontSize: 9, fontWeight: 700, color: dColor, fontFamily: "'Inter', sans-serif" }}>
+                              {debuffLabels[aggieDebuff.type] || "Debuff"}
+                            </span>
+                            <span style={{ fontSize: 8, color: C.textSub, fontFamily: "'Inter', sans-serif" }}>
+                              {debuffDescs[aggieDebuff.type]} ({aggieDebuff.charges} left)
+                            </span>
+                          </div>
+                        );
+                      })()}
+
                       {/* Aggie's Room — big preview with owned items placed around */}
                       <div style={{
                         position: "relative", width: "100%", height: 160,
@@ -11615,28 +11816,36 @@ export default function Pattrn() {
           setFills(prev => ({ ...prev, [key]: selectedToken }));
           triggerPlaceAnimation(key);
           setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
-          // Aggie placement reactions for swap (mood-aware: grumpy/miserable swap good/bad hints)
+          // Aggie placement reactions for swap (mood-aware: grumpy/miserable swap good/bad hints, debuff-aware)
+          const hasDebuff = aggieDebuff && aggieDebuff.charges > 0;
+          const debuffBrainFog = hasDebuff && aggieDebuff.type === "brain_fog";
+          const debuffBadLuck = hasDebuff && aggieDebuff.type === "bad_luck";
           const isCorrectPlace = selectedToken === puzzle.solution[r][c];
           const roll = Math.random();
           const hasBuff = aggieBuff && aggieBuff.charges > 0;
           const buffAccuracy = hasBuff && (aggieBuff.type === "hint_accuracy" || aggieBuff.type === "hint_both");
           const buffFreqMult = hasBuff && (aggieBuff.type === "hint_freq" || aggieBuff.type === "hint_both") ? (aggieBuff.freqMult || 1) : 1;
           // With accuracy buff, always use truthful lines even when grumpy/miserable
-          const useAccurate = buffAccuracy;
+          const useAccurate = buffAccuracy && !debuffBadLuck;
           const moodGood = useAccurate ? AGGIE_HINT_GOOD : (getMoodLines(aggieHappinessMood, "hint_good") || AGGIE_HINT_GOOD);
           const moodBad = useAccurate ? AGGIE_HINT_BAD : (getMoodLines(aggieHappinessMood, "hint_bad") || AGGIE_HINT_BAD);
           const moodPlace = getMoodLines(aggieHappinessMood, "place") || AGGIE_PLACE_LINES;
           const goodChance = 0.10 * buffFreqMult;
           const badChance = 0.08 * buffFreqMult;
           let hintFired = false;
-          if (isCorrectPlace && roll < goodChance) {
-            triggerAggieSpeech(moodGood[Math.floor(Math.random() * moodGood.length)]);
-            hintFired = true;
-          } else if (!isCorrectPlace && roll < badChance) {
-            triggerAggieSpeech(moodBad[Math.floor(Math.random() * moodBad.length)]);
-            hintFired = true;
-          } else if (roll < 0.20) {
-            triggerAggieSpeech(moodPlace[Math.floor(Math.random() * moodPlace.length)]);
+          if (!debuffBrainFog) {
+            // Bad luck debuff: swap good/bad hints (misleading)
+            const hintCorrect = debuffBadLuck ? !isCorrectPlace : isCorrectPlace;
+            const hintWrong = debuffBadLuck ? isCorrectPlace : !isCorrectPlace;
+            if (hintCorrect && roll < goodChance) {
+              triggerAggieSpeech(moodGood[Math.floor(Math.random() * moodGood.length)]);
+              hintFired = true;
+            } else if (hintWrong && roll < badChance) {
+              triggerAggieSpeech(moodBad[Math.floor(Math.random() * moodBad.length)]);
+              hintFired = true;
+            } else if (roll < 0.20) {
+              triggerAggieSpeech(moodPlace[Math.floor(Math.random() * moodPlace.length)]);
+            }
           }
           if (hintFired && hasBuff) consumeBuffCharge();
         }
@@ -11645,27 +11854,35 @@ export default function Pattrn() {
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       triggerPlaceAnimation(key);
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
-      // Aggie placement reactions — hint or general comment (mood-aware, buff-aware)
+      // Aggie placement reactions — hint or general comment (mood-aware, buff-aware, debuff-aware)
+      const hasDebuffH = aggieDebuff && aggieDebuff.charges > 0;
+      const debuffBrainFogH = hasDebuffH && aggieDebuff.type === "brain_fog";
+      const debuffBadLuckH = hasDebuffH && aggieDebuff.type === "bad_luck";
       const isCorrectPlace = selectedToken === puzzle.solution[r][c];
       const roll = Math.random();
       const hasBuffH = aggieBuff && aggieBuff.charges > 0;
       const buffAccuracyH = hasBuffH && (aggieBuff.type === "hint_accuracy" || aggieBuff.type === "hint_both");
       const buffFreqMultH = hasBuffH && (aggieBuff.type === "hint_freq" || aggieBuff.type === "hint_both") ? (aggieBuff.freqMult || 1) : 1;
-      const useAccurateH = buffAccuracyH;
+      const useAccurateH = buffAccuracyH && !debuffBadLuckH;
       const moodGoodH = useAccurateH ? AGGIE_HINT_GOOD : (getMoodLines(aggieHappinessMood, "hint_good") || AGGIE_HINT_GOOD);
       const moodBadH = useAccurateH ? AGGIE_HINT_BAD : (getMoodLines(aggieHappinessMood, "hint_bad") || AGGIE_HINT_BAD);
       const moodPlaceH = getMoodLines(aggieHappinessMood, "place") || AGGIE_PLACE_LINES;
       const goodChanceH = 0.10 * buffFreqMultH;
       const badChanceH = 0.08 * buffFreqMultH;
       let hintFiredH = false;
-      if (isCorrectPlace && roll < goodChanceH) {
-        triggerAggieSpeech(moodGoodH[Math.floor(Math.random() * moodGoodH.length)]);
-        hintFiredH = true;
-      } else if (!isCorrectPlace && roll < badChanceH) {
-        triggerAggieSpeech(moodBadH[Math.floor(Math.random() * moodBadH.length)]);
-        hintFiredH = true;
-      } else if (roll < 0.20) {
-        triggerAggieSpeech(moodPlaceH[Math.floor(Math.random() * moodPlaceH.length)]);
+      if (!debuffBrainFogH) {
+        // Bad luck debuff: swap good/bad hints (misleading)
+        const hintCorrectH = debuffBadLuckH ? !isCorrectPlace : isCorrectPlace;
+        const hintWrongH = debuffBadLuckH ? isCorrectPlace : !isCorrectPlace;
+        if (hintCorrectH && roll < goodChanceH) {
+          triggerAggieSpeech(moodGoodH[Math.floor(Math.random() * moodGoodH.length)]);
+          hintFiredH = true;
+        } else if (hintWrongH && roll < badChanceH) {
+          triggerAggieSpeech(moodBadH[Math.floor(Math.random() * moodBadH.length)]);
+          hintFiredH = true;
+        } else if (roll < 0.20) {
+          triggerAggieSpeech(moodPlaceH[Math.floor(Math.random() * moodPlaceH.length)]);
+        }
       }
       if (hintFiredH && hasBuffH) consumeBuffCharge();
       // Miserable Aggie sabotage — may mess with a correctly placed piece (~8% chance per placement)
@@ -11696,7 +11913,7 @@ export default function Pattrn() {
     } else {
       setSelectedCell(key);
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions, coopCellOwnerMap, coopPlayers, coopPlayerColorMap, triggerAggieSpeech, aggieHappinessMood, aggieBuff, consumeBuffCharge]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions, coopCellOwnerMap, coopPlayers, coopPlayerColorMap, triggerAggieSpeech, aggieHappinessMood, aggieBuff, consumeBuffCharge, aggieDebuff]);
 
   const handleCellPointerUp = useCallback((r, c) => {
     if (gameState !== "playing") return;
@@ -13294,6 +13511,19 @@ export default function Pattrn() {
           saveAggieHappiness(next);
           return next;
         });
+        // Debuff: track consecutive failures and apply debuffs
+        const newFailStreak = aggieFailStreak + 1;
+        setAggieFailStreak(newFailStreak);
+        saveFailStreak(newFailStreak);
+        if (!aggieDebuff) {
+          if (newFailStreak >= 3) {
+            // 3+ consecutive failures → bad luck debuff (misleading hints)
+            applyDebuff("bad_luck", 3);
+          } else if (newFailStreak >= 1 && attempts + 1 >= maxAttempts) {
+            // First failure → brain fog (hints suppressed for next 2 puzzles)
+            applyDebuff("brain_fog", 2);
+          }
+        }
       }
       if (isVault && vaultSolvingTile !== null && vaultSessionId) {
         // Vault: fully failed puzzle — record strike, advance turn, return to vault
@@ -13358,6 +13588,10 @@ export default function Pattrn() {
           saveAggieHappiness(next);
           return next;
         });
+        // Fumble debuff: triggered on 3rd wrong attempt in a single puzzle (if no debuff active)
+        if (attempts + 1 >= 3 && !aggieDebuff) {
+          applyDebuff("fumble", 2);
+        }
       }
       // Aggie wrong-cells reaction (~40%, mood-aware)
       if (wrong.size > 0 && Math.random() < 0.4) {
@@ -14154,7 +14388,7 @@ export default function Pattrn() {
   // --- Global modals element (included in every return) ---
   // --- Floating Aggie Companion ---
   const isWardrobeOpen = radialMenuStack[radialMenuStack.length - 1] === "aggie-wardrobe";
-  const floatingCosmeticEl = activeCosmetic && !isWardrobeOpen ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} activeBuff={aggieBuff} /> : null;
+  const floatingCosmeticEl = activeCosmetic && !isWardrobeOpen ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} activeBuff={aggieBuff} activeDebuff={aggieDebuff} /> : null;
 
   // Floating coin-earned animation
   const coinAnimEl = coinAnim ? (
