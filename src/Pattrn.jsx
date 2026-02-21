@@ -7404,7 +7404,7 @@ export default function Pattrn() {
     const isWidePanel = isFriendsView || isVaultChat;
     const isMobileMenu = viewportSize.w < 480;
     const mobileMenuMargin = 20; // match button's right offset for consistent spacing
-    const panelWidth = isMobileMenu && isOpen ? viewportSize.w - mobileMenuMargin * 2 : (isWidePanel ? 380 : isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth));
+    const panelWidth = (isMobileMenu || isAggieWardrobe) && isOpen ? viewportSize.w - mobileMenuMargin * 2 : (isWidePanel ? 380 : isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth));
     const itemHeight = 52;
     const panelPad = 8;
     const dividerHeight = 13;
@@ -8640,7 +8640,7 @@ export default function Pattrn() {
                       ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
                     display: "flex", flexDirection: "column",
-                    flex: 1, minHeight: 0,
+                    height: "100%",
                     overflow: "hidden",
                   }}>
 
@@ -8828,7 +8828,7 @@ export default function Pattrn() {
                       </div>
 
                       {/* Scrollable tab content */}
-                      <div style={{ flex: "1 1 0", overflowY: "auto", minHeight: 0, paddingBottom: 4 }}>
+                      <div style={{ flex: "1 1 0", overflowY: "auto", overflowX: "hidden", minHeight: 0, paddingBottom: 4 }}>
                         {/* Shop tab */}
                         {aggieWardrobeTab === "shop" && (
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
