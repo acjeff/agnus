@@ -19056,7 +19056,7 @@ export default function Pattrn() {
           ) : null;
         })()}
         <div style={{
-          display: "grid", gridTemplateColumns: `repeat(${(isCascade ? 50 : puzzles.length) > 50 ? 10 : 5}, 1fr)`, gap: 8,
+          display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
           width: "100%", animation: "fadeUp 0.45s 0.18s ease both",
         }}>
           {(isCascade ? Array.from({ length: 50 }, (_, i) => i) : puzzles).map((p, i) => {
