@@ -3329,7 +3329,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         }}
         title={AGGIE_LABEL}
       >
-        {renderAggieSVG(53, mood, true, accessory)}
+        {renderAggieSVG(74, mood, true, accessory)}
       </div>
     </div>
   );
@@ -7265,11 +7265,11 @@ export default function Pattrn() {
                       opacity: isOn ? 1 : 0.4, transition: "opacity 0.2s",
                     }}>
                       <div style={{
-                        width: 80, height: 80,
+                        width: 112, height: 112,
                         display: "flex", alignItems: "center", justifyContent: "center",
                         animation: isOn ? "companionFloat 3s ease-in-out infinite" : "none",
                       }}>
-                        {renderAggieSVG(80, null, isOn, currentAcc)}
+                        {renderAggieSVG(112, null, isOn, currentAcc)}
                       </div>
                     </div>
 
