@@ -1719,67 +1719,232 @@ const TIMES_KEY = "pattrn-times-v1";
 const BIRTHDAY_KEY = "pattrn-birthday-v1";
 const THEME_KEY = "pattrn-theme-v1";
 const ACHIEV_KEY = "pattrn-achievements-v1";
-const COSMETIC_KEY = "pattrn-cosmetics-v1";
 const ACTIVE_COSMETIC_KEY = "pattrn-active-cosmetic-v1";
 const CHEAT_BIRTHDAY = "23-06-1912";
 
-// --- Vault Cosmetic Items ---
-// Silly characters / objects earned from completing vaults.
-// Each has an id, label, emoji/SVG, and which vault difficulty tier unlocks it.
-const VAULT_COSMETICS = [
-  // Bronze tier
-  { id: "rubber_duck", label: "Rubber Duck", emoji: "\uD83E\uDD86", tier: "bronze", desc: "A trusty debugging companion" },
-  { id: "baby_chick", label: "Baby Chick", emoji: "\uD83D\uDC25", tier: "bronze", desc: "Freshly hatched from the vault" },
-  { id: "mushroom", label: "Mushroom", emoji: "\uD83C\uDF44", tier: "bronze", desc: "A fun little guy" },
-  { id: "snail", label: "Snail", emoji: "\uD83D\uDC0C", tier: "bronze", desc: "Slow and steady wins the race" },
-  // Silver tier
-  { id: "octopus", label: "Octopus", emoji: "\uD83D\uDC19", tier: "silver", desc: "Eight arms, zero problems" },
-  { id: "ghost", label: "Ghost", emoji: "\uD83D\uDC7B", tier: "silver", desc: "Boo! A friendly haunt" },
-  { id: "alien", label: "Alien", emoji: "\uD83D\uDC7D", tier: "silver", desc: "Greetings, earthling" },
-  { id: "robot", label: "Robot", emoji: "\uD83E\uDD16", tier: "silver", desc: "Beep boop, vault cracked" },
-  { id: "crystal_ball", label: "Crystal Ball", emoji: "\uD83D\uDD2E", tier: "silver", desc: "Sees all combinations" },
-  // Gold tier
-  { id: "dragon", label: "Dragon", emoji: "\uD83D\uDC09", tier: "gold", desc: "Guardian of the vault" },
-  { id: "unicorn", label: "Unicorn", emoji: "\uD83E\uDD84", tier: "gold", desc: "Rare and majestic" },
-  { id: "phoenix", label: "Phoenix", emoji: "\uD83D\uDD25", tier: "gold", desc: "Reborn from the ashes" },
-  { id: "rainbow", label: "Rainbow", emoji: "\uD83C\uDF08", tier: "gold", desc: "Shiny and glorious" },
-  // Obsidian tier
-  { id: "skull", label: "Obsidian Skull", emoji: "\uD83D\uDC80", tier: "obsidian", desc: "Forged in darkness" },
-  { id: "gem", label: "Obsidian Gem", emoji: "\uD83D\uDC8E", tier: "obsidian", desc: "A priceless treasure" },
-  { id: "crown", label: "Obsidian Crown", emoji: "\uD83D\uDC51", tier: "obsidian", desc: "Ruler of the vault" },
-  { id: "eye", label: "All-Seeing Eye", emoji: "\uD83D\uDC41\uFE0F", tier: "obsidian", desc: "Nothing escapes its gaze" },
+// --- Aggie Companion ---
+const AGGIE_ID = "blob";
+const AGGIE_LABEL = "Aggie";
+const AGGIE_ACCESSORY_KEY = "pattrn-aggie-accessory";
+const AGGIE_ACCESSORIES = [
+  { id: "none", label: "None" },
+  { id: "party-hat", label: "Party Hat" },
+  { id: "crown", label: "Crown" },
+  { id: "top-hat", label: "Top Hat" },
+  { id: "beanie", label: "Beanie" },
+  { id: "cat-ears", label: "Cat Ears" },
+  { id: "devil-horns", label: "Devil Horns" },
+  { id: "halo", label: "Halo" },
+  { id: "pirate-hat", label: "Pirate Hat" },
+  { id: "bandana", label: "Bandana" },
+  { id: "sunglasses", label: "Sunglasses" },
+  { id: "monocle", label: "Monocle" },
 ];
+function loadAggieAccessory() {
+  try { return localStorage.getItem(AGGIE_ACCESSORY_KEY) || "none"; } catch { return "none"; }
+}
+function saveAggieAccessory(id) {
+  try { if (id && id !== "none") localStorage.setItem(AGGIE_ACCESSORY_KEY, id); else localStorage.removeItem(AGGIE_ACCESSORY_KEY); } catch { /* ignore */ }
+}
 
-function loadUnlockedCosmetics() {
-  try {
-    const raw = localStorage.getItem(COSMETIC_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch { return []; }
+// --- Aggie SVG Renderer ---
+// Renders Aggie (the blob companion) at a given size with mood-based expressions and optional accessory.
+function renderAggieSVG(size, mood, animate, accessory) {
+  const w = size || 48;
+  const isSad = mood === "sad";
+  const isHappy = mood === "celebrate";
+  const blink = animate ? "blobBlink 3.5s ease-in-out infinite" : "none";
+  const acc = accessory && accessory !== "none" ? accessory : null;
+  const uid = `ag${w}`;
+
+  // Dark spirit colors — smoky, shadowy
+  const bodyCore = isSad ? "#0e0c14" : "#0a0810";
+  const bodyMid = isSad ? "#16131e" : "#12101a";
+  const bodyEdge = isSad ? "#1e1a2a" : "#1a1624";
+  const eyeColor = isSad ? "#8888aa" : isHappy ? "#f0eeff" : "#dddcf0";
+  const eyeGlow = isSad ? "#5555770" : isHappy ? "#ccc8ff" : "#9a96cc";
+  const mouthColor = isSad ? "#66668840" : isHappy ? "#dddcf0" : "#9a96ccaa";
+
+  // Eyes — bright glowing dots peering out of the dark
+  const eyes = isHappy ? (
+    <>
+      <circle cx="36" cy="44" r="7" fill={eyeGlow} opacity="0.35" filter={`url(#${uid}glow)`} />
+      <circle cx="64" cy="44" r="7" fill={eyeGlow} opacity="0.35" filter={`url(#${uid}glow)`} />
+      <path d="M31 44 Q36 38 41 44" stroke={eyeColor} strokeWidth="2.5" strokeLinecap="round" fill="none" />
+      <path d="M59 44 Q64 38 69 44" stroke={eyeColor} strokeWidth="2.5" strokeLinecap="round" fill="none" />
+    </>
+  ) : isSad ? (
+    <>
+      <circle cx="36" cy="44" r="6" fill={eyeGlow} opacity="0.2" filter={`url(#${uid}glow)`} />
+      <circle cx="64" cy="44" r="6" fill={eyeGlow} opacity="0.2" filter={`url(#${uid}glow)`} />
+      <circle cx="36" cy="44" r="3.5" fill={eyeColor} />
+      <circle cx="64" cy="44" r="3.5" fill={eyeColor} />
+      <path d="M36 51 L35 58" stroke={eyeColor} strokeWidth="1.2" strokeLinecap="round" opacity="0.3" />
+      <path d="M64 51 L65 58" stroke={eyeColor} strokeWidth="1.2" strokeLinecap="round" opacity="0.3" />
+    </>
+  ) : (
+    <g style={animate ? { transformOrigin: "50px 44px", animation: blink } : undefined}>
+      <circle cx="36" cy="44" r="7" fill={eyeGlow} opacity="0.3" filter={`url(#${uid}glow)`} />
+      <circle cx="64" cy="44" r="7" fill={eyeGlow} opacity="0.3" filter={`url(#${uid}glow)`} />
+      <circle cx="36" cy="44" r="3.5" fill={eyeColor} />
+      <circle cx="64" cy="44" r="3.5" fill={eyeColor} />
+    </g>
+  );
+
+  const mouth = isHappy
+    ? <path d="M42 62 Q50 70 58 62" stroke={mouthColor} strokeWidth="2" strokeLinecap="round" fill="none" />
+    : isSad
+      ? <path d="M42 66 Q50 61 58 66" stroke={mouthColor} strokeWidth="1.8" strokeLinecap="round" fill="none" />
+      : <path d="M44 63 Q50 66 56 63" stroke={mouthColor} strokeWidth="1.8" strokeLinecap="round" fill="none" />;
+
+  // Accessory overlays — positioned on the 100x100 viewBox
+  const accessoryEl = !acc ? null
+    : acc === "party-hat" ? (
+      <g>
+        <polygon points="50,0 34,22 66,22" fill="#7c5cbf" stroke="#9b7ed8" strokeWidth="1.5" strokeLinejoin="round" />
+        <line x1="40" y1="14" x2="60" y2="14" stroke="#c8f03e" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="50" cy="0" r="3" fill="#c8f03e" />
+      </g>
+    ) : acc === "crown" ? (
+      <g>
+        <path d="M28 24 L32 10 L40 20 L50 6 L60 20 L68 10 L72 24Z" fill="#FFD700" stroke="#DAA520" strokeWidth="1" strokeLinejoin="round" />
+        <circle cx="40" cy="22" r="2" fill="#DAA520" /><circle cx="50" cy="20" r="2" fill="#DAA520" /><circle cx="60" cy="22" r="2" fill="#DAA520" />
+      </g>
+    ) : acc === "top-hat" ? (
+      <g>
+        <rect x="32" y="4" width="36" height="22" rx="3" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="1.5" />
+        <rect x="26" y="24" width="48" height="5" rx="2" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="1.5" />
+        <line x1="34" y1="15" x2="66" y2="15" stroke="#4a4a6a" strokeWidth="1" />
+      </g>
+    ) : acc === "beanie" ? (
+      <g>
+        <path d="M22 28 Q22 6 50 4 Q78 6 78 28" fill="#4a6fa5" stroke="#5a82b8" strokeWidth="1.5" />
+        <line x1="22" y1="28" x2="78" y2="28" stroke="#3a5a8a" strokeWidth="2.5" />
+        <line x1="26" y1="26" x2="74" y2="26" stroke="#5a82b8" strokeWidth="1" opacity="0.5" />
+        <circle cx="50" cy="2" r="4" fill="#5a82b8" />
+      </g>
+    ) : acc === "cat-ears" ? (
+      <g>
+        <polygon points="18,28 24,2 38,22" fill="#0e0c14" stroke="#2a2636" strokeWidth="1.5" strokeLinejoin="round" />
+        <polygon points="82,28 76,2 62,22" fill="#0e0c14" stroke="#2a2636" strokeWidth="1.5" strokeLinejoin="round" />
+        <polygon points="22,24 26,8 34,20" fill="#1a1624" opacity="0.6" />
+        <polygon points="78,24 74,8 66,20" fill="#1a1624" opacity="0.6" />
+      </g>
+    ) : acc === "devil-horns" ? (
+      <g>
+        <path d="M22 28 Q18 14 14 4" stroke="#cc3333" strokeWidth="3" strokeLinecap="round" fill="none" />
+        <path d="M78 28 Q82 14 86 4" stroke="#cc3333" strokeWidth="3" strokeLinecap="round" fill="none" />
+        <circle cx="14" cy="4" r="2.5" fill="#ff4444" />
+        <circle cx="86" cy="4" r="2.5" fill="#ff4444" />
+      </g>
+    ) : acc === "halo" ? (
+      <g>
+        <ellipse cx="50" cy="6" rx="22" ry="6" fill="none" stroke="#FFD700" strokeWidth="2.5" opacity="0.8" />
+        <ellipse cx="50" cy="6" rx="22" ry="6" fill="none" stroke="#FFF8DC" strokeWidth="1" opacity="0.4" />
+      </g>
+    ) : acc === "pirate-hat" ? (
+      <g>
+        <path d="M16 28 Q16 8 50 2 Q84 8 84 28Z" fill="#1a1a1a" stroke="#333" strokeWidth="1.5" />
+        <path d="M16 28 Q50 34 84 28" fill="none" stroke="#333" strokeWidth="1.5" />
+        <circle cx="50" cy="18" r="5" fill="none" stroke="#e8e8ef" strokeWidth="1.5" />
+        <line x1="47" y1="15" x2="53" y2="21" stroke="#e8e8ef" strokeWidth="1.5" />
+        <line x1="53" y1="15" x2="47" y2="21" stroke="#e8e8ef" strokeWidth="1.5" />
+      </g>
+    ) : acc === "bandana" ? (
+      <g>
+        <path d="M18 30 Q18 20 50 18 Q82 20 82 30" fill="#cc4444" stroke="#aa3333" strokeWidth="1.5" />
+        <path d="M74 26 L88 36 L82 28" fill="#cc4444" stroke="#aa3333" strokeWidth="1" />
+        <circle cx="38" cy="26" r="1.5" fill="#FFD700" /><circle cx="50" cy="24" r="1.5" fill="#FFD700" /><circle cx="62" cy="26" r="1.5" fill="#FFD700" />
+      </g>
+    ) : acc === "sunglasses" ? (
+      <g>
+        <rect x="20" y="36" width="22" height="14" rx="3" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="1.5" />
+        <rect x="58" y="36" width="22" height="14" rx="3" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="1.5" />
+        <line x1="42" y1="42" x2="58" y2="42" stroke="#3a3a5a" strokeWidth="1.5" />
+        <line x1="20" y1="42" x2="12" y2="38" stroke="#3a3a5a" strokeWidth="1.5" />
+        <line x1="80" y1="42" x2="88" y2="38" stroke="#3a3a5a" strokeWidth="1.5" />
+      </g>
+    ) : acc === "monocle" ? (
+      <g>
+        <circle cx="64" cy="44" r="10" fill="none" stroke="#DAA520" strokeWidth="2" />
+        <circle cx="64" cy="44" r="8" fill="none" stroke="#DAA520" strokeWidth="0.5" opacity="0.4" />
+        <path d="M70 54 Q74 68 70 80" stroke="#DAA520" strokeWidth="1.5" fill="none" />
+      </g>
+    ) : null;
+
+  // Smoky body shape
+  const bodyPath = "M50 6 C30 6 16 16 10 32 C6 44 8 58 12 68 C18 82 30 92 50 94 C70 92 82 82 88 68 C92 58 94 44 90 32 C84 16 70 6 50 6Z";
+
+  return (
+    <svg width={w} height={w} viewBox="0 0 100 100" fill="none">
+      <defs>
+        {/* Dark smoky body — radial fade from dense core to transparent edge */}
+        <radialGradient id={`${uid}body`} cx="50%" cy="45%" r="48%">
+          <stop offset="0%" stopColor={bodyCore} />
+          <stop offset="20%" stopColor={bodyMid} />
+          <stop offset="45%" stopColor={bodyEdge} stopOpacity="0.6" />
+          <stop offset="70%" stopColor={bodyEdge} stopOpacity="0.25" />
+          <stop offset="100%" stopColor="transparent" />
+        </radialGradient>
+        {/* Soft-edge mask — blurred body shape creates feathered boundary */}
+        <filter id={`${uid}edge`} x="-15%" y="-15%" width="130%" height="130%">
+          <feGaussianBlur stdDeviation="5" />
+        </filter>
+        <mask id={`${uid}mask`}>
+          <path d={bodyPath} fill="white" filter={`url(#${uid}edge)`} />
+        </mask>
+        {/* Eye glow filter */}
+        <filter id={`${uid}glow`} x="-150%" y="-150%" width="400%" height="400%">
+          <feGaussianBlur stdDeviation="4" />
+        </filter>
+      </defs>
+
+      {/* Main body — drawn through the soft-edge mask so edges dissolve */}
+      <g mask={`url(#${uid}mask)`}>
+        <rect x="0" y="0" width="100" height="100" fill={`url(#${uid}body)`} />
+      </g>
+
+      {eyes}
+      {mouth}
+      {accessoryEl}
+    </svg>
+  );
 }
-function saveUnlockedCosmetics(ids) {
-  try { localStorage.setItem(COSMETIC_KEY, JSON.stringify(ids)); } catch { /* ignore */ }
+// Render accessory preview only (no body) for grid thumbnails
+function renderAccessoryPreview(accId, size) {
+  const w = size || 32;
+  const previews = {
+    "party-hat": <><polygon points="50,6 36,26 64,26" fill="#7c5cbf" stroke="#9b7ed8" strokeWidth="2" strokeLinejoin="round" /><circle cx="50" cy="6" r="3.5" fill="#c8f03e" /></>,
+    "crown": <path d="M24 60 L30 30 L40 48 L50 24 L60 48 L70 30 L76 60Z" fill="#FFD700" stroke="#DAA520" strokeWidth="1.5" strokeLinejoin="round" />,
+    "top-hat": <><rect x="30" y="20" width="40" height="36" rx="4" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="2" /><rect x="22" y="54" width="56" height="8" rx="3" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="2" /></>,
+    "beanie": <><path d="M20 60 Q20 18 50 14 Q80 18 80 60" fill="#4a6fa5" stroke="#5a82b8" strokeWidth="2" /><circle cx="50" cy="12" r="5" fill="#5a82b8" /></>,
+    "cat-ears": <><polygon points="16,70 28,14 46,58" fill="#3a3a4a" stroke="#5a5a6a" strokeWidth="2" /><polygon points="84,70 72,14 54,58" fill="#3a3a4a" stroke="#5a5a6a" strokeWidth="2" /></>,
+    "devil-horns": <><path d="M26 70 Q20 40 14 16" stroke="#cc3333" strokeWidth="4.5" strokeLinecap="round" fill="none" /><path d="M74 70 Q80 40 86 16" stroke="#cc3333" strokeWidth="4.5" strokeLinecap="round" fill="none" /><circle cx="14" cy="16" r="4" fill="#ff4444" /><circle cx="86" cy="16" r="4" fill="#ff4444" /></>,
+    "halo": <ellipse cx="50" cy="40" rx="30" ry="10" fill="none" stroke="#FFD700" strokeWidth="3.5" opacity="0.8" />,
+    "pirate-hat": <><path d="M14 65 Q14 20 50 12 Q86 20 86 65Z" fill="#1a1a1a" stroke="#333" strokeWidth="2" /><circle cx="50" cy="42" r="8" fill="none" stroke="#e8e8ef" strokeWidth="2" /></>,
+    "bandana": <><path d="M16 58 Q16 38 50 34 Q84 38 84 58" fill="#cc4444" stroke="#aa3333" strokeWidth="2" /><path d="M76 50 L92 64 L84 54" fill="#cc4444" /></>,
+    "sunglasses": <><rect x="16" y="34" width="28" height="20" rx="4" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="2" /><rect x="56" y="34" width="28" height="20" rx="4" fill="#1a1a2e" stroke="#3a3a5a" strokeWidth="2" /><line x1="44" y1="44" x2="56" y2="44" stroke="#3a3a5a" strokeWidth="2" /></>,
+    "monocle": <><circle cx="50" cy="42" r="16" fill="none" stroke="#DAA520" strokeWidth="3" /><path d="M58 58 Q64 76 60 90" stroke="#DAA520" strokeWidth="2" fill="none" /></>,
+  };
+  return (
+    <svg width={w} height={w} viewBox="0 0 100 100" fill="none">
+      {previews[accId] || null}
+    </svg>
+  );
 }
+
 function loadActiveCosmetic() {
-  try { return localStorage.getItem(ACTIVE_COSMETIC_KEY) || null; } catch { return null; }
+  try {
+    const val = localStorage.getItem(ACTIVE_COSMETIC_KEY);
+    if (val === null) return AGGIE_ID; // first visit — show by default
+    if (val === "off") return null; // explicitly hidden
+    return val || AGGIE_ID;
+  } catch { return AGGIE_ID; }
 }
 function saveActiveCosmetic(id) {
   try {
-    if (id) localStorage.setItem(ACTIVE_COSMETIC_KEY, id);
-    else localStorage.removeItem(ACTIVE_COSMETIC_KEY);
+    localStorage.setItem(ACTIVE_COSMETIC_KEY, id || "off");
   } catch { /* ignore */ }
-}
-
-// Pick a random cosmetic from the eligible pool for a difficulty tier
-function pickVaultCosmeticReward(difficulty, alreadyUnlocked) {
-  const tierOrder = ["bronze", "silver", "gold", "obsidian"];
-  const diffIdx = tierOrder.indexOf(difficulty);
-  // Eligible: items at or below the vault difficulty tier
-  const eligible = VAULT_COSMETICS.filter(c => {
-    const cIdx = tierOrder.indexOf(c.tier);
-    return cIdx <= diffIdx && !alreadyUnlocked.includes(c.id);
-  });
-  if (eligible.length === 0) return null; // All unlocked!
-  return eligible[Math.floor(Math.random() * eligible.length)];
 }
 
 function loadTheme() {
@@ -2903,7 +3068,59 @@ function friendlyAuthError(code) {
 
 // --- Floating Cosmetic Companion ---
 // A draggable, floating character/object that bobs around on screen.
-function FloatingCosmetic({ emoji, label }) {
+// Shows a speech bubble with reactions on puzzle win/loss.
+const COMPANION_CELEBRATE_LINES = [
+  "Nailed it!", "You did it!", "Amazing!", "Woohoo!", "So smart!",
+  "Big brain!", "Genius!", "Crushed it!", "Perfect!", "Yay!",
+  "GG!", "Let's go!", "Too easy!", "Flawless!", "Wowza!",
+];
+const COMPANION_SAD_LINES = [
+  "Oof...", "So close!", "Next time!", "Aww...", "Don't give up!",
+  "Try again!", "Almost!", "Nooo!", "Unlucky...", "You got this!",
+  "Believe!", "Keep going!", "Hmph...", "It's okay!", "We go again!",
+];
+
+// Aggie contextual speech lines — triggered sporadically during gameplay
+const AGGIE_PLACE_LINES = [
+  "Hmm...", "Interesting...", "Ooh!", "Bold move", "I see...",
+  "Nice pick", "Go on...", "Okay okay", "Huh!", "Smooth",
+];
+const AGGIE_REMOVE_LINES = [
+  "Changed your mind?", "Hmm, rethinking?", "Second thoughts...", "Take your time",
+  "No rush", "Try something else?",
+];
+const AGGIE_WRONG_LINES = [
+  "Not quite...", "Close!", "Almost there", "Hmm, check again",
+  "Keep trying!", "So close...", "Look carefully...", "Don't give up",
+];
+const AGGIE_HINT_GOOD = [
+  "That feels right", "Good instinct", "I like that one", "Looks good to me",
+  "Yeah...", "Mhm!", "Nice.",
+];
+const AGGIE_HINT_BAD = [
+  "Hmm, you sure?", "I dunno about that...", "Maybe not...", "Ehhh...",
+  "Think about it...", "Something's off...", "Look around more...",
+];
+const AGGIE_MENU_LINES = [
+  "Whatcha looking for?", "Need something?", "Browsing?", "Taking a break?",
+  "Ooh, settings", "What's in here...",
+];
+const AGGIE_IDLE_LINES = [
+  "...", "*yawn*", "Hmm...", "*stretch*", "..zzz", "Boo!",
+  "Still thinking?", "You got this", "I believe in you",
+];
+
+const IDLE_ACTIONS = ["stretch", "spin", "peek", "wiggle", "bounce", "yawn"];
+const IDLE_ANIMS = {
+  stretch: "aggieStretch 0.8s ease-in-out",
+  spin: "aggieSpin 0.7s ease-in-out",
+  peek: "aggiePeek 1s ease-in-out",
+  wiggle: "aggieWiggle 0.6s ease-in-out",
+  bounce: "aggieBounce 0.5s ease-in-out",
+  yawn: "aggieYawn 1.2s ease-in-out",
+};
+
+function FloatingCosmetic({ mood, accessory, speech }) {
   const [pos, setPos] = useState(() => {
     try {
       const saved = localStorage.getItem("pattrn-cosmetic-pos");
@@ -2912,14 +3129,84 @@ function FloatingCosmetic({ emoji, label }) {
     return { x: 30, y: 120 };
   });
   const [dragging, setDragging] = useState(false);
+  const [idleAction, setIdleAction] = useState(null);
   const dragOffset = useRef({ x: 0, y: 0 });
   const posRef = useRef(pos);
   posRef.current = pos;
+
+  // --- Wandering ---
+  // Uses CSS transitions for ultra-smooth movement instead of per-frame updates.
+  // Every 10-20s, pick a nearby point and let the CSS transition glide there over several seconds.
+  const wanderTimerRef = useRef(null);
+  const [isWandering, setIsWandering] = useState(false);
+
+  useEffect(() => {
+    if (dragging || mood) { setIsWandering(false); return; }
+    setIsWandering(true);
+    const wander = () => {
+      const cur = posRef.current;
+      const maxW = typeof window !== "undefined" ? window.innerWidth - 53 : 300;
+      const maxH = typeof window !== "undefined" ? window.innerHeight - 53 : 600;
+      const range = 35; // small drift radius
+      const nx = Math.max(0, Math.min(maxW, cur.x + (Math.random() - 0.5) * range * 2));
+      const ny = Math.max(0, Math.min(maxH, cur.y + (Math.random() - 0.5) * range * 2));
+      setPos({ x: nx, y: ny });
+    };
+    wander(); // initial nudge
+    const schedule = () => {
+      wanderTimerRef.current = setTimeout(() => {
+        wander();
+        schedule();
+      }, 10000 + Math.random() * 12000); // 10-22s between moves
+    };
+    schedule();
+    return () => clearTimeout(wanderTimerRef.current);
+  }, [dragging, mood]);
+
+  // --- Idle actions ---
+  const [idleSpeech, setIdleSpeech] = useState(null);
+  const idleSpeechTimer = useRef(null);
+  useEffect(() => {
+    if (dragging || mood) { setIdleAction(null); return; }
+    let timer;
+    const scheduleIdle = () => {
+      timer = setTimeout(() => {
+        const action = IDLE_ACTIONS[Math.floor(Math.random() * IDLE_ACTIONS.length)];
+        setIdleAction(action);
+        // ~5% chance to say something idle
+        if (Math.random() < 0.05 && !speech) {
+          const line = AGGIE_IDLE_LINES[Math.floor(Math.random() * AGGIE_IDLE_LINES.length)];
+          setIdleSpeech(line);
+          clearTimeout(idleSpeechTimer.current);
+          idleSpeechTimer.current = setTimeout(() => setIdleSpeech(null), 2500);
+        }
+        // Clear after animation plays
+        setTimeout(() => setIdleAction(null), 1200);
+        scheduleIdle();
+      }, 5000 + Math.random() * 5000); // 5-10s
+    };
+    scheduleIdle();
+    return () => { clearTimeout(timer); clearTimeout(idleSpeechTimer.current); };
+  }, [dragging, mood, speech]);
+
+  // Pick a random speech line when mood changes
+  const [speechLine, setSpeechLine] = useState(null);
+  const prevMoodRef = useRef(null);
+  useEffect(() => {
+    if (mood && mood !== prevMoodRef.current) {
+      const lines = mood === "celebrate" ? COMPANION_CELEBRATE_LINES : COMPANION_SAD_LINES;
+      setSpeechLine(lines[Math.floor(Math.random() * lines.length)]);
+    } else if (!mood) {
+      setSpeechLine(null);
+    }
+    prevMoodRef.current = mood;
+  }, [mood]);
 
   const onPointerDown = useCallback((e) => {
     e.preventDefault();
     e.stopPropagation();
     setDragging(true);
+    wanderTarget.current = null; // stop wandering
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     dragOffset.current = { x: clientX - posRef.current.x, y: clientY - posRef.current.y };
@@ -2930,8 +3217,8 @@ function FloatingCosmetic({ emoji, label }) {
     const onMove = (e) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      const nx = Math.max(0, Math.min(window.innerWidth - 48, clientX - dragOffset.current.x));
-      const ny = Math.max(0, Math.min(window.innerHeight - 48, clientY - dragOffset.current.y));
+      const nx = Math.max(0, Math.min(window.innerWidth - 53, clientX - dragOffset.current.x));
+      const ny = Math.max(0, Math.min(window.innerHeight - 53, clientY - dragOffset.current.y));
       setPos({ x: nx, y: ny });
     };
     const onUp = () => {
@@ -2950,34 +3237,100 @@ function FloatingCosmetic({ emoji, label }) {
     };
   }, [dragging]);
 
+  // Determine which body animation to use
+  const bodyAnim = dragging
+    ? "none"
+    : mood === "celebrate"
+      ? "companionCelebrate 0.4s ease infinite"
+      : mood === "sad"
+        ? "companionSad 1.5s ease-in-out infinite"
+        : idleAction
+          ? IDLE_ANIMS[idleAction]
+          : "none"; // wandering replaces the old float bob
+
+  // Determine if bubble should show on left (companion near right edge)
+  const bubbleOnLeft = pos.x > window.innerWidth - 140;
+
   return (
     <div
-      onPointerDown={onPointerDown}
-      onTouchStart={onPointerDown}
       style={{
         position: "fixed",
         left: pos.x,
         top: pos.y,
         zIndex: 90,
-        width: 48,
-        height: 48,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 32,
-        cursor: dragging ? "grabbing" : "grab",
-        userSelect: "none",
-        WebkitUserSelect: "none",
-        touchAction: "none",
-        filter: dragging ? "drop-shadow(0 4px 12px rgba(0,0,0,0.4))" : "drop-shadow(0 2px 6px rgba(0,0,0,0.2))",
-        animation: dragging ? "none" : "companionFloat 3s ease-in-out infinite",
-        transition: dragging ? "none" : "filter 0.2s",
-        pointerEvents: "auto",
+        pointerEvents: "none",
+        transition: dragging ? "none" : isWandering ? "left 8s ease-in-out, top 8s ease-in-out" : "left 0.3s ease, top 0.3s ease",
       }}
-      title={label}
     >
-      <style>{`@keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }`}</style>
-      {emoji}
+      <style>{`
+@keyframes blobBlink { 0%,88%,100% { transform: scaleY(1); } 92% { transform: scaleY(0.1); } }
+@keyframes companionCelebrate { 0%,100% { transform: translateY(0) rotate(0deg) scale(1); } 25% { transform: translateY(-12px) rotate(-8deg) scale(1.1); } 50% { transform: translateY(-2px) rotate(6deg) scale(1.05); } 75% { transform: translateY(-10px) rotate(-4deg) scale(1.12); } }
+@keyframes companionSad { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(3px) rotate(-2deg); } }
+@keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
+@keyframes speechBubbleIn { 0% { opacity: 0; transform: scale(0.3) translateY(8px); } 50% { opacity: 1; transform: scale(1.08) translateY(-2px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes aggieStretch { 0%,100% { transform: scaleX(1) scaleY(1); } 30% { transform: scaleX(1.15) scaleY(0.85); } 60% { transform: scaleX(0.9) scaleY(1.12); } }
+@keyframes aggieSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes aggiePeek { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-6px) rotate(-5deg); } 70% { transform: translateX(6px) rotate(5deg); } }
+@keyframes aggieWiggle { 0%,100% { transform: rotate(0deg); } 20% { transform: rotate(-8deg); } 40% { transform: rotate(8deg); } 60% { transform: rotate(-5deg); } 80% { transform: rotate(5deg); } }
+@keyframes aggieBounce { 0%,100% { transform: translateY(0); } 40% { transform: translateY(-14px); } 60% { transform: translateY(-2px); } }
+@keyframes aggieYawn { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+      `}</style>
+
+      {/* Speech text — priority: mood speech > parent speech prop > idle speech */}
+      {(() => {
+        const displayText = (speechLine && mood) ? speechLine : speech ? speech : idleSpeech;
+        if (!displayText) return null;
+        return (
+          <div key={displayText} style={{
+            position: "absolute",
+            bottom: 52,
+            ...(bubbleOnLeft
+              ? { right: 4, left: "auto" }
+              : { left: 4, right: "auto" }),
+            whiteSpace: "nowrap",
+            pointerEvents: "none",
+            animation: "speechBubbleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+            zIndex: 91,
+            fontSize: 11,
+            fontWeight: 700,
+            fontFamily: "'Inter', system-ui, sans-serif",
+            color: "#ffffff",
+            textShadow: "0 1px 4px rgba(0,0,0,0.5)",
+            lineHeight: 1.3,
+          }}>
+            {displayText}
+          </div>
+        );
+      })()}
+
+      {/* Companion body */}
+      <div
+        onPointerDown={onPointerDown}
+        onTouchStart={onPointerDown}
+        style={{
+          width: 53,
+          height: 53,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 32,
+          cursor: dragging ? "grabbing" : "grab",
+          userSelect: "none",
+          WebkitUserSelect: "none",
+          touchAction: "none",
+          filter: dragging
+            ? "drop-shadow(0 4px 12px rgba(0,0,0,0.6)) drop-shadow(0 0 6px rgba(20,16,40,0.4))"
+            : mood === "celebrate"
+              ? "drop-shadow(0 2px 10px rgba(100,90,180,0.4)) drop-shadow(0 0 8px rgba(140,130,200,0.25))"
+              : "drop-shadow(0 3px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 4px rgba(20,16,40,0.3))",
+          animation: bodyAnim,
+          transition: dragging ? "none" : "filter 0.2s",
+          pointerEvents: "auto",
+        }}
+        title={AGGIE_LABEL}
+      >
+        {renderAggieSVG(53, mood, true, accessory)}
+      </div>
     </div>
   );
 }
@@ -3227,7 +3580,7 @@ export default function Pattrn() {
   const [pendingMosaicsList, setPendingMosaicsList] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
   const [adminUnlockAll, setAdminUnlockAll] = useState(false);
-  const adminUnlockPrevRef = useRef(null); // stores { activeThemeId, activeCosmetic } before unlock-all
+  const adminUnlockPrevRef = useRef(null); // stores { activeThemeId } before unlock-all
   const [mosaicLoading, setMosaicLoading] = useState(false);
   const [mosaicMsg, setMosaicMsg] = useState("");
   const [shareEmailInput, setShareEmailInput] = useState("");
@@ -3364,18 +3717,59 @@ export default function Pattrn() {
   const vaultAutoInviteShownRef = useRef(null); // tracks session ID for which auto-invite was shown
   const isVault = !!vaultSessionId;
 
-  // --- Cosmetic companion state ---
-  const [unlockedCosmetics, setUnlockedCosmetics] = useState(() => loadUnlockedCosmetics());
+  // --- Aggie companion state ---
   const [activeCosmetic, setActiveCosmetic] = useState(() => loadActiveCosmetic());
-  const [cosmeticRewardToast, setCosmeticRewardToast] = useState(null); // { id, label, emoji, desc }
-  const cosmeticRewardToastTimer = useRef(null);
-  const vaultRewardGrantedRef = useRef(new Set()); // session IDs already rewarded
+  const [aggieAccessory, setAggieAccessory] = useState(() => loadAggieAccessory());
+  const [companionMood, setCompanionMood] = useState(null); // "celebrate" | "sad" | null
+  const companionMoodTimer = useRef(null);
+  const prevGameStateRef = useRef("playing");
+  const [aggieSpeech, setAggieSpeech] = useState(null);
+  const aggieSpeechTimer = useRef(null);
 
   // --- Staff Pick & Admin Manage state ---
   const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
   const staffPickPuzzlesRef = useRef(null); // puzzles built from staff pick grid
   // Mosaic preview now renders inside the Liquid Glass menu via "mosaic-preview" sub-menu
   const customMosaicReturnViewRef = useRef("gallery"); // where to go when leaving custom-mosaic view
+
+  // --- Companion mood reaction to puzzle outcome ---
+  useEffect(() => {
+    if (!activeCosmetic) return;
+    const prev = prevGameStateRef.current;
+    prevGameStateRef.current = gameState;
+    if (prev === gameState) return;
+    if (gameState === "won") {
+      clearTimeout(companionMoodTimer.current);
+      setCompanionMood("celebrate");
+      companionMoodTimer.current = setTimeout(() => setCompanionMood(null), 4000);
+    } else if (gameState === "lost") {
+      clearTimeout(companionMoodTimer.current);
+      setCompanionMood("sad");
+      companionMoodTimer.current = setTimeout(() => setCompanionMood(null), 4000);
+    } else if (gameState === "playing" && (prev === "won" || prev === "lost")) {
+      clearTimeout(companionMoodTimer.current);
+      setCompanionMood(null);
+    }
+  }, [gameState, activeCosmetic]);
+
+  // --- Aggie contextual speech (lightweight, doesn't change mood/animation) ---
+  const triggerAggieSpeech = useCallback((line, duration = 2500) => {
+    if (!activeCosmetic) return;
+    if (companionMood) return; // don't interrupt win/loss reactions
+    clearTimeout(aggieSpeechTimer.current);
+    setAggieSpeech(line);
+    aggieSpeechTimer.current = setTimeout(() => setAggieSpeech(null), duration);
+  }, [activeCosmetic, companionMood]);
+
+  // Aggie menu-open reaction (~10% when menu opens)
+  const prevMenuOpenRef = useRef(false);
+  useEffect(() => {
+    const isOpen = radialMenuStack.length > 0;
+    if (isOpen && !prevMenuOpenRef.current && Math.random() < 0.1) {
+      triggerAggieSpeech(AGGIE_MENU_LINES[Math.floor(Math.random() * AGGIE_MENU_LINES.length)]);
+    }
+    prevMenuOpenRef.current = isOpen;
+  }, [radialMenuStack, triggerAggieSpeech]);
 
   // Listen for auth state changes
   useEffect(() => {
@@ -5272,6 +5666,38 @@ export default function Pattrn() {
       </svg>
     ),
     shield: (c) => <Shield size={18} color={c} strokeWidth={2} />,
+    "aggie-on": () => (
+      <svg width={18} height={18} viewBox="0 0 100 100" fill="none">
+        <defs>
+          <radialGradient id="agiconOn" cx="50%" cy="45%" r="50%">
+            <stop offset="0%" stopColor="#0a0810" />
+            <stop offset="70%" stopColor="#12101a" />
+            <stop offset="100%" stopColor="#1a1624" />
+          </radialGradient>
+          <filter id="agiconGl" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="3" /></filter>
+        </defs>
+        <path d="M50 6 C30 6 16 16 10 32 C6 44 8 58 12 68 C18 82 30 92 50 94 C70 92 82 82 88 68 C92 58 94 44 90 32 C84 16 70 6 50 6Z" fill="url(#agiconOn)" />
+        <circle cx="36" cy="44" r="5" fill="#9a96cc" opacity="0.3" filter="url(#agiconGl)" />
+        <circle cx="64" cy="44" r="5" fill="#9a96cc" opacity="0.3" filter="url(#agiconGl)" />
+        <circle cx="36" cy="44" r="3.5" fill="#dddcf0" />
+        <circle cx="64" cy="44" r="3.5" fill="#dddcf0" />
+      </svg>
+    ),
+    "aggie-off": () => (
+      <svg width={18} height={18} viewBox="0 0 100 100" fill="none">
+        <defs>
+          <radialGradient id="agiconOff" cx="50%" cy="45%" r="50%">
+            <stop offset="0%" stopColor="#08060e" />
+            <stop offset="100%" stopColor="#100e16" />
+          </radialGradient>
+        </defs>
+        <path d="M50 6 C30 6 16 16 10 32 C6 44 8 58 12 68 C18 82 30 92 50 94 C70 92 82 82 88 68 C92 58 94 44 90 32 C84 16 70 6 50 6Z" fill="url(#agiconOff)" opacity="0.5" />
+        <path d="M30 46 L42 46" stroke="#555566" strokeWidth="2.5" strokeLinecap="round" />
+        <path d="M58 46 L70 46" stroke="#555566" strokeWidth="2.5" strokeLinecap="round" />
+        <text x="74" y="28" fill="#555566" fontSize="18" fontFamily="sans-serif" fontWeight="700">z</text>
+        <text x="84" y="18" fill="#555566" fontSize="12" fontFamily="sans-serif" fontWeight="700">z</text>
+      </svg>
+    ),
   };
 
   // Quick Play sub-menu — shared across all views (accessed from nav)
@@ -5325,15 +5751,13 @@ export default function Pattrn() {
     { id: "admin-unlock-all", icon: adminUnlockAll ? "check" : "lock", label: adminUnlockAll ? "Unlock All \u2713" : "Unlock All", action: () => {
       if (!adminUnlockAll) {
         // Save current state before unlocking
-        adminUnlockPrevRef.current = { activeThemeId, activeCosmetic };
+        adminUnlockPrevRef.current = { activeThemeId };
         setAdminUnlockAll(true);
       } else {
         // Restore previous state
         if (adminUnlockPrevRef.current) {
           setActiveThemeId(adminUnlockPrevRef.current.activeThemeId);
           saveTheme(adminUnlockPrevRef.current.activeThemeId);
-          setActiveCosmetic(adminUnlockPrevRef.current.activeCosmetic);
-          saveActiveCosmetic(adminUnlockPrevRef.current.activeCosmetic);
           adminUnlockPrevRef.current = null;
         }
         setAdminUnlockAll(false);
@@ -5349,16 +5773,10 @@ export default function Pattrn() {
   ];
 
   // Profile submenu — focused on viewing/social (account management moved to Settings)
+  // Profile submenu — account management, preferences, and destructive actions
   const profileSubMenu = [
     { id: "profile-view-item", icon: "profile", label: "View Profile", sub: "profile-view" },
     { id: "profile-achievements", icon: "trophy", label: "Achievements", sub: "achievements-view" },
-    { id: "profile-cosmetics", icon: "star", label: `Companions${(adminUnlockAll ? VAULT_COSMETICS.length : unlockedCosmetics.length) > 0 ? ` (${adminUnlockAll ? VAULT_COSMETICS.length : unlockedCosmetics.length})` : ""}`, sub: "cosmetics-view" },
-    { id: "profile-share", icon: "share", label: "Share Stats", sub: "share-stats" },
-  ];
-
-  // Settings submenu — account management, preferences, and destructive actions
-  const settingsSubMenu = [
-    { id: "settings-theme", icon: "palette", label: "Theme", sub: "theme" },
     { id: "settings-username", icon: "edit", label: "Change Username", sub: "username-edit" },
     { id: "settings-birthday", icon: "cake", label: "Set Birthday", sub: "birthday-edit" },
     ...(progress && Object.keys(progress).length > 0 ? [{ id: "settings-clear", icon: "trash", label: "Clear All Data", sub: "clear-confirm" }] : []),
@@ -5370,7 +5788,6 @@ export default function Pattrn() {
   const getContextualMenuTree = (currentView) => {
     // Build play contextual items dynamically (some are conditional)
     const playRoot = [];
-    playRoot.push({ id: "theme", icon: "palette", label: "Theme", sub: "theme" });
     if (!isCoop && gameState === "playing" && !isCascade && !isMosaic) {
       playRoot.push({ id: "coop-start", icon: "user-plus", label: "Play w/ Friends", sub: "coop-start", beforeSub: () => {
         if (!firebaseUser) { coopPendingLoginRef.current = true; setRadialMenuStack(["root", "sign-in"]); setAccountTab("login"); setAccountError(""); return false; }
@@ -5415,14 +5832,13 @@ export default function Pattrn() {
     const globalMenuStructure = {
       play: playSubMenu,
       profile: firebaseConfigured && firebaseUser ? profileSubMenu : [],
-      settings: firebaseConfigured && firebaseUser ? settingsSubMenu : [],
       admin: adminSubMenu,
       coop: firebaseConfigured && firebaseUser ? coopSubMenu : [],
       "coop-create": [],
       "coop-active": [],
       "coop-completed": [],
       "achievements-view": [],
-      "cosmetics-view": [],
+      "aggie-wardrobe": [],
       "share-stats": [],
       "profile-view": [],
       "username-edit": [],
@@ -5445,20 +5861,22 @@ export default function Pattrn() {
     // Build root menu with flattened global items for easier access
     const buildRootWithProfile = (viewSpecificItems) => {
       const items = [...viewSpecificItems];
+      // Theme — always accessible at top level
+      items.push({ id: "root-theme", icon: "palette", label: "Theme", sub: "theme" });
       if (firebaseConfigured && firebaseUser) {
-        // Notifications — globally visible (was previously Home-only)
+        // Notifications — globally visible
         if (notifications.length > 0) {
           items.push({ id: "notifications", icon: "bell", label: "Notifications", sub: "notifications-view" });
         }
-        // Friends — promoted to root level (was buried under Co-op)
-        items.push({ id: "nav-friends", icon: "friends", label: totalFriendChatUnread > 0 ? `Friends (${totalFriendChatUnread > 99 ? "99+" : totalFriendChatUnread})` : "Friends", sub: "friends-view", beforeSub: () => { setFriendChatOpen(null); if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; } setFriendChatMessages({}); return true; } });
-        // Co-op — session management only
+        // Messages
+        items.push({ id: "nav-friends", icon: "message-square", label: totalFriendChatUnread > 0 ? `Messages (${totalFriendChatUnread > 99 ? "99+" : totalFriendChatUnread})` : "Messages", sub: "friends-view", beforeSub: () => { setFriendChatOpen(null); if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; } setFriendChatMessages({}); return true; } });
+        // Co-op
         items.push({ id: "nav-coop-menu", icon: "handshake", label: "Co-op", sub: "coop" });
-        // Profile — viewing/social items only
+        // Aggie — opens wardrobe panel, icon shows awake/asleep state
+        items.push({ id: "profile-aggie", icon: activeCosmetic ? "aggie-on" : "aggie-off", label: "Aggie", sub: "aggie-wardrobe" });
+        // Profile submenu — account settings (username, birthday, sign out, etc.)
         items.push({ id: "nav-profile-menu", icon: "user-avatar", label: username || "Profile", sub: "profile" });
-        // Settings — account management and preferences
-        items.push({ id: "nav-settings-menu", icon: "settings", label: "Settings", sub: "settings" });
-        // Admin — promoted to root level (was buried under Profile)
+        // Admin
         if (isAdmin) {
           items.push({ id: "nav-admin-menu", icon: "shield", label: "Admin", sub: "admin" });
         }
@@ -5518,7 +5936,6 @@ export default function Pattrn() {
         root: buildRootWithProfile([
           ...(isVault ? [{ id: "vault-invite-item", icon: "user-plus", label: "Invite", sub: "coop-start", beforeSub: () => { setCoopSelectedFriends(new Set()); setCoopInviteUsernameInput(""); setCoopInviteUsernameMsg(""); return true; } }] : []),
           ...(isVault ? [{ id: "vault-chat-item", icon: "message-square", label: "Chat", sub: "vault-chat" }] : []),
-          { id: "theme", icon: "palette", label: "Theme", sub: "theme" },
         ]),
         ...globalMenuStructure,
       },
@@ -5547,7 +5964,7 @@ export default function Pattrn() {
     const isSignInMenu = currentMenuKey === "sign-in";
     const isMosaicPreviewMenu = currentMenuKey === "mosaic-preview";
     const isAchievementsView = currentMenuKey === "achievements-view";
-    const isCosmeticsView = currentMenuKey === "cosmetics-view";
+    const isAggieWardrobe = currentMenuKey === "aggie-wardrobe";
     const isFriendsView = currentMenuKey === "friends-view";
     const isShareStats = currentMenuKey === "share-stats";
     const isProfileView = currentMenuKey === "profile-view";
@@ -5565,7 +5982,7 @@ export default function Pattrn() {
     const isCreatorPostSave = currentMenuKey === "creator-post-save";
     const isVaultChat = currentMenuKey === "vault-chat";
     const isCustomPanel = isCoopStartMenu || isMosaicSaveMenu || isSignInMenu || isMosaicPreviewMenu ||
-                          isAchievementsView || isCosmeticsView || isFriendsView || isShareStats || isProfileView ||
+                          isAchievementsView || isAggieWardrobe || isFriendsView || isShareStats || isProfileView ||
                           isUsernameEdit || isBirthdayEdit || isDeleteAccount || isClearConfirm ||
                           isThemeList || isSyncChoice || isCoopCreate || isCoopActive || isCoopCompleted ||
                           isNotificationsView || isCreatorConfirm || isCreatorPostSave || isVaultChat;
@@ -5701,16 +6118,15 @@ export default function Pattrn() {
       return h;
     })();
 
-    // Cosmetics view height — header + subtitle + items grid + remove button
-    const cosmeticsContentHeight = (() => {
-      if (!isCosmeticsView) return 0;
-      let h = panelPad + fabSize; // padding + bottom bar
+    // Aggie wardrobe height — toggle + preview + accessory grid
+    const aggieWardrobeContentHeight = (() => {
+      if (!isAggieWardrobe) return 0;
+      let h = panelPad + fabSize;
       h += 20 + 4; // header + margin
-      h += 12 + 16; // subtitle + margin
-      const totalItems = VAULT_COSMETICS.length;
-      const rows = Math.ceil(totalItems / 4);
-      h += Math.min(rows, 5) * 64; // item grid (cap at 5 rows, rest scrolls)
-      if (activeCosmetic) h += 44 + 8; // remove button + margin
+      h += 12 + 8; // toggle row + gap
+      h += 100 + 12; // preview area + gap
+      const rows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3); // exclude "none"
+      h += Math.min(rows, 4) * 64; // grid rows (cap at 4, rest scrolls)
       h += 12; // bottom padding
       return h;
     })();
@@ -5899,7 +6315,7 @@ export default function Pattrn() {
     })();
 
     const contentHeight = isAchievementsView ? achievementsContentHeight :
-                          isCosmeticsView ? cosmeticsContentHeight :
+                          isAggieWardrobe ? aggieWardrobeContentHeight :
                           isFriendsView ? friendsContentHeight :
                           isShareStats ? shareStatsContentHeight :
                           isProfileView ? profileViewContentHeight :
@@ -5955,7 +6371,7 @@ export default function Pattrn() {
             setRadialMenuStack(["root", "creator-confirm"]);
             return;
           }
-          item.action(); setRadialMenuStack([]);
+          item.action(); if (!item.keepOpen) setRadialMenuStack([]);
         }
       };
       const staggerIn = 0.04 + animIndex * 0.03;
@@ -6432,111 +6848,6 @@ export default function Pattrn() {
                   </div>
                 </>
               );
-            })() : isCosmeticsView ? (() => {
-              const tierOrder = ["bronze", "silver", "gold", "obsidian"];
-              const tierLabels = { bronze: "Bronze", silver: "Silver", gold: "Gold", obsidian: "Obsidian" };
-              const tierColors = { bronze: C.bronze || "#CD7F32", silver: C.silver || "#C0C0C0", gold: C.gold || "#FFD700", obsidian: "#8B5CF6" };
-              return (
-                <>
-                  <div style={{
-                    padding: "0 16px 12px",
-                    opacity: isOpen ? 1 : 0,
-                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
-                    transition: isOpen
-                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
-                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
-                  }}>
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, marginBottom: 4, textAlign: "center", letterSpacing: 2 }}>
-                      Companions
-                    </div>
-                    <div style={{ fontSize: 10, color: C.textDim, marginBottom: 12, textAlign: "center", letterSpacing: 1 }}>
-                      {adminUnlockAll ? VAULT_COSMETICS.length : unlockedCosmetics.length}/{VAULT_COSMETICS.length} unlocked {"\u00B7"} {adminUnlockAll ? "Admin unlock active" : "Complete vaults to earn more"}
-                    </div>
-                    {/* Cosmetic items grouped by tier */}
-                    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                      {tierOrder.map(tier => {
-                        const items = VAULT_COSMETICS.filter(c => c.tier === tier);
-                        return (
-                          <div key={tier}>
-                            <div style={{
-                              fontSize: 9, fontWeight: 700, color: tierColors[tier],
-                              fontFamily: "'Inter', sans-serif", letterSpacing: 1,
-                              textTransform: "uppercase", marginBottom: 6,
-                            }}>
-                              {tierLabels[tier]} Vault
-                            </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 6 }}>
-                              {items.map(c => {
-                                const isUnlocked = adminUnlockAll || unlockedCosmetics.includes(c.id);
-                                const isActive = activeCosmetic === c.id;
-                                return (
-                                  <div
-                                    key={c.id}
-                                    onClick={() => {
-                                      if (!isUnlocked) return;
-                                      if (isActive) {
-                                        setActiveCosmetic(null);
-                                        saveActiveCosmetic(null);
-                                      } else {
-                                        setActiveCosmetic(c.id);
-                                        saveActiveCosmetic(c.id);
-                                      }
-                                    }}
-                                    style={{
-                                      display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                                      padding: "8px 4px", borderRadius: 10,
-                                      backgroundColor: isActive ? tierColors[tier] + "22" : isUnlocked ? C.surface : C.bg,
-                                      border: `1.5px solid ${isActive ? tierColors[tier] : isUnlocked ? C.border : C.textDim + "22"}`,
-                                      cursor: isUnlocked ? "pointer" : "default",
-                                      opacity: isUnlocked ? 1 : 0.35,
-                                      transition: "all 0.15s",
-                                      position: "relative",
-                                    }}
-                                    title={isUnlocked ? `${c.label}: ${c.desc}` : `Locked — complete a ${tierLabels[tier]} vault`}
-                                  >
-                                    <span style={{ fontSize: 22 }}>{isUnlocked ? c.emoji : "\uD83D\uDD12"}</span>
-                                    <span style={{
-                                      fontSize: 8, fontWeight: 600, color: isActive ? tierColors[tier] : C.textDim,
-                                      fontFamily: "'Inter', sans-serif", textAlign: "center",
-                                      lineHeight: 1.1, maxWidth: 54, overflow: "hidden",
-                                      textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                    }}>
-                                      {isUnlocked ? c.label : "???"}
-                                    </span>
-                                    {isActive && (
-                                      <div style={{
-                                        position: "absolute", top: 2, right: 2,
-                                        width: 10, height: 10, borderRadius: 5,
-                                        backgroundColor: tierColors[tier],
-                                        display: "flex", alignItems: "center", justifyContent: "center",
-                                        fontSize: 7, color: "#fff", fontWeight: 700,
-                                      }}>{"\u2713"}</div>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    {/* Remove active companion button */}
-                    {activeCosmetic && (
-                      <button
-                        onClick={() => { setActiveCosmetic(null); saveActiveCosmetic(null); }}
-                        style={{
-                          marginTop: 12, width: "100%", padding: "8px 0", borderRadius: 8,
-                          backgroundColor: "transparent", border: `1px solid ${C.border}`,
-                          color: C.textDim, fontSize: 11, fontWeight: 600,
-                          cursor: "pointer", fontFamily: "'Inter', sans-serif",
-                        }}
-                      >
-                        Remove Companion
-                      </button>
-                    )}
-                  </div>
-                </>
-              );
             })() : isFriendsView ? (() => {
               // Friends modal — either showing chat with a friend or the friends list
               if (friendChatOpen) {
@@ -6900,6 +7211,111 @@ export default function Pattrn() {
                             })()
                           )}
                         </div>
+                  </div>
+                </>
+              );
+            })() : isAggieWardrobe ? (() => {
+              const isOn = !!activeCosmetic;
+              const currentAcc = aggieAccessory || "none";
+              return (
+                <>
+                  <div style={{
+                    padding: "0 16px 12px",
+                    opacity: isOpen ? 1 : 0,
+                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                    transition: isOpen
+                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
+                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
+                  }}>
+                    {/* Header */}
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, marginBottom: 4, textAlign: "center", letterSpacing: 2 }}>
+                      Aggie
+                    </div>
+
+                    {/* On/Off toggle */}
+                    <div
+                      onClick={() => { const next = isOn ? null : AGGIE_ID; setActiveCosmetic(next); saveActiveCosmetic(next); }}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                        padding: "6px 0", marginBottom: 8, cursor: "pointer", userSelect: "none",
+                      }}
+                    >
+                      <span style={{ fontSize: 11, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                        {isOn ? "On screen" : "Hidden"}
+                      </span>
+                      <div style={{
+                        width: 36, height: 20, borderRadius: 10,
+                        backgroundColor: isOn ? C.accent + "44" : C.surface,
+                        border: `1.5px solid ${isOn ? C.accent : C.border}`,
+                        position: "relative", transition: "all 0.2s",
+                      }}>
+                        <div style={{
+                          width: 14, height: 14, borderRadius: 7,
+                          backgroundColor: isOn ? C.accent : C.textDim,
+                          position: "absolute", top: 2,
+                          left: isOn ? 18 : 2,
+                          transition: "all 0.2s",
+                        }} />
+                      </div>
+                    </div>
+
+                    {/* Aggie preview */}
+                    <div style={{
+                      display: "flex", justifyContent: "center", padding: "8px 0 12px",
+                      opacity: isOn ? 1 : 0.4, transition: "opacity 0.2s",
+                    }}>
+                      <div style={{
+                        width: 80, height: 80,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        animation: isOn ? "companionFloat 3s ease-in-out infinite" : "none",
+                      }}>
+                        {renderAggieSVG(80, null, isOn, currentAcc)}
+                      </div>
+                    </div>
+
+                    {/* Accessories label */}
+                    <div style={{
+                      fontSize: 9, fontWeight: 700, color: C.textDim,
+                      fontFamily: "'Inter', sans-serif", letterSpacing: 1,
+                      textTransform: "uppercase", marginBottom: 8, textAlign: "center",
+                    }}>
+                      Accessories
+                    </div>
+
+                    {/* Accessory grid */}
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                      {AGGIE_ACCESSORIES.filter(a => a.id !== "none").map(a => {
+                        const isActive = currentAcc === a.id;
+                        return (
+                          <div
+                            key={a.id}
+                            onClick={() => {
+                              const next = isActive ? "none" : a.id;
+                              setAggieAccessory(next);
+                              saveAggieAccessory(next);
+                            }}
+                            style={{
+                              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                              padding: "8px 4px", borderRadius: 10,
+                              backgroundColor: isActive ? C.accent + "18" : C.surface,
+                              border: `1.5px solid ${isActive ? C.accent : C.border}`,
+                              cursor: "pointer", transition: "all 0.15s",
+                            }}
+                          >
+                            <div style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                              {renderAccessoryPreview(a.id, 28)}
+                            </div>
+                            <span style={{
+                              fontSize: 8, fontWeight: 600, color: isActive ? C.accent : C.textDim,
+                              fontFamily: "'Inter', sans-serif", textAlign: "center",
+                              lineHeight: 1.1, maxWidth: 60,
+                            }}>
+                              {a.label}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 </>
               );
@@ -9173,6 +9589,8 @@ export default function Pattrn() {
         setClearedBlanks(prev => new Set(prev).add(key));
         setFills(prev => { const next = { ...prev }; delete next[key]; return next; });
         setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
+        // Aggie removal reaction (~15%)
+        if (Math.random() < 0.15) triggerAggieSpeech(AGGIE_REMOVE_LINES[Math.floor(Math.random() * AGGIE_REMOVE_LINES.length)]);
         return;
       }
       cancelWrongCellClear();
@@ -9180,10 +9598,20 @@ export default function Pattrn() {
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       triggerPlaceAnimation(key);
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
+      // Aggie placement reactions — hint or general comment
+      const isCorrectPlace = selectedToken === puzzle.solution[r][c];
+      const roll = Math.random();
+      if (isCorrectPlace && roll < 0.10) {
+        triggerAggieSpeech(AGGIE_HINT_GOOD[Math.floor(Math.random() * AGGIE_HINT_GOOD.length)]);
+      } else if (!isCorrectPlace && roll < 0.08) {
+        triggerAggieSpeech(AGGIE_HINT_BAD[Math.floor(Math.random() * AGGIE_HINT_BAD.length)]);
+      } else if (roll < 0.20) {
+        triggerAggieSpeech(AGGIE_PLACE_LINES[Math.floor(Math.random() * AGGIE_PLACE_LINES.length)]);
+      }
     } else {
       setSelectedCell(key);
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions, coopCellOwnerMap, coopPlayers, coopPlayerColorMap]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions, coopCellOwnerMap, coopPlayers, coopPlayerColorMap, triggerAggieSpeech]);
 
   const handleCellPointerUp = useCallback((r, c) => {
     if (gameState !== "playing") return;
@@ -10798,6 +11226,10 @@ export default function Pattrn() {
       if (isBlind || isCoopMosaic) {
         setLockedCells(newLocked);
       }
+      // Aggie wrong-cells reaction (~40%)
+      if (wrong.size > 0 && Math.random() < 0.4) {
+        triggerAggieSpeech(AGGIE_WRONG_LINES[Math.floor(Math.random() * AGGIE_WRONG_LINES.length)]);
+      }
       // In coop mosaic mode, write locked cells to Firebase so other players see them
       if (isCoopMosaic && coopMosaicSessionId) {
         const tileIdx = coopMosaicCurrentTileRef.current;
@@ -11585,39 +12017,8 @@ export default function Pattrn() {
   );
 
   // --- Global modals element (included in every return) ---
-  // --- Floating Cosmetic Companion ---
-  const floatingCosmeticEl = (() => {
-    if (!activeCosmetic) return null;
-    const cosmetic = VAULT_COSMETICS.find(c => c.id === activeCosmetic);
-    if (!cosmetic) return null;
-    return <FloatingCosmetic emoji={cosmetic.emoji} label={cosmetic.label} />;
-  })();
-
-  // --- Cosmetic Reward Toast ---
-  const cosmeticRewardToastEl = cosmeticRewardToast ? (
-    <div style={{
-      position: "fixed", top: 80, left: "50%", transform: "translateX(-50%)",
-      zIndex: 2000, pointerEvents: "none",
-      animation: "cosmeticToastIn 0.5s cubic-bezier(0.32, 0.72, 0, 1) both",
-    }}>
-      <style>{`@keyframes cosmeticToastIn { from { opacity:0; transform:translateX(-50%) translateY(-20px) scale(0.9); } to { opacity:1; transform:translateX(-50%) translateY(0) scale(1); } }
-@keyframes cosmeticBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }`}</style>
-      <div style={{
-        padding: "12px 20px", borderRadius: 16,
-        backgroundColor: C.surface, border: `1px solid ${C.gold || "#FFD700"}44`,
-        boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px ${C.gold || "#FFD700"}22`,
-        display: "flex", alignItems: "center", gap: 12,
-        fontFamily: "'Inter', sans-serif",
-      }}>
-        <span style={{ fontSize: 32, animation: "cosmeticBounce 1s ease infinite" }}>{cosmeticRewardToast.emoji}</span>
-        <div>
-          <div style={{ fontSize: 11, fontWeight: 700, color: C.gold || "#FFD700", textTransform: "uppercase", letterSpacing: 1 }}>New Companion!</div>
-          <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{cosmeticRewardToast.label}</div>
-          <div style={{ fontSize: 10, color: C.textDim }}>{cosmeticRewardToast.desc}</div>
-        </div>
-      </div>
-    </div>
-  ) : null;
+  // --- Floating Aggie Companion ---
+  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} /> : null;
 
   const globalModalsEl = (
     <>
@@ -11629,7 +12030,6 @@ export default function Pattrn() {
       {coopMosaicNavigateEl}
       {friendReactionsOverlayEl}
       {floatingCosmeticEl}
-      {cosmeticRewardToastEl}
     </>
   );
 
@@ -11846,24 +12246,6 @@ export default function Pattrn() {
             vaultSessionDataRef.current = data;
             const invited = data?.invitedUids ? new Set(Object.keys(data.invitedUids)) : new Set();
             setVaultInvitedUids(invited);
-            // --- Cosmetic reward on vault completion ---
-            if (data?.status === "complete" && data?.id && !vaultRewardGrantedRef.current.has(data.id)) {
-              vaultRewardGrantedRef.current.add(data.id);
-              const reward = pickVaultCosmeticReward(data.difficulty || "silver", unlockedCosmetics);
-              if (reward) {
-                const newUnlocked = [...unlockedCosmetics, reward.id];
-                setUnlockedCosmetics(newUnlocked);
-                saveUnlockedCosmetics(newUnlocked);
-                // Auto-equip if no active cosmetic
-                if (!activeCosmetic) {
-                  setActiveCosmetic(reward.id);
-                  saveActiveCosmetic(reward.id);
-                }
-                setCosmeticRewardToast(reward);
-                if (cosmeticRewardToastTimer.current) clearTimeout(cosmeticRewardToastTimer.current);
-                cosmeticRewardToastTimer.current = setTimeout(() => setCosmeticRewardToast(null), 5000);
-              }
-            }
           }}
         />
         {renderContextButton("vault", isVault ? [
@@ -14629,9 +15011,7 @@ export default function Pattrn() {
           <h1 style={{
             fontFamily: "'Inter', sans-serif", fontSize: 32, fontWeight: 800,
             letterSpacing: 6, margin: 0, lineHeight: 1,
-            background: `linear-gradient(135deg, ${C.text} 0%, ${C.accent} 100%)`,
-            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
-            backgroundClip: "text",
+            color: C.accent,
           }}>
             AGNUS
           </h1>
