@@ -1768,21 +1768,22 @@ function saveAggieSize(size) {
 }
 
 // --- Aggie Tamagotchi System ---
-// Currency: "Cogs" (inspired by Turing machine gears)
-const AGGIE_COGS_KEY = "pattrn-aggie-cogs";
+// Currency: "Coins"
+const AGGIE_COINS_KEY = "pattrn-aggie-cogs"; // keep localStorage key for backwards compat
 const AGGIE_HAPPINESS_KEY = "pattrn-aggie-happiness";
 const AGGIE_LAST_INTERACT_KEY = "pattrn-aggie-last-interact";
 const AGGIE_INVENTORY_KEY = "pattrn-aggie-inventory";
 const AGGIE_DESIRE_KEY = "pattrn-aggie-desire";
 const AGGIE_DESIRE_TIMESTAMP_KEY = "pattrn-aggie-desire-ts";
+const AGGIE_LAST_STREAK_KEY = "pattrn-aggie-last-streak";
 
 // Happiness: 0–100, decays over time
 const AGGIE_MAX_HAPPINESS = 100;
 const AGGIE_DECAY_RATE = 2; // points lost per hour of inactivity
 const AGGIE_DECAY_INTERVAL = 60 * 60 * 1000; // 1 hour
 
-// Cogs rewards per puzzle type
-const COGS_REWARD = {
+// Coin rewards per puzzle type
+const COINS_REWARD = {
   easy: 5,
   medium: 10,
   hard: 20,
@@ -1793,7 +1794,7 @@ const COGS_REWARD = {
   mosaic: 10,
 };
 // Bonus for gold/first-try solves
-const COGS_GOLD_BONUS = 5;
+const COINS_GOLD_BONUS = 5;
 
 // Happiness thresholds for mood changes
 const HAPPINESS_THRESHOLDS = {
@@ -1835,11 +1836,11 @@ const AGGIE_PUZZLE_DESIRES = [
 ];
 
 // Persistence helpers
-function loadAggieCogs() {
-  try { return parseInt(localStorage.getItem(AGGIE_COGS_KEY), 10) || 0; } catch { return 0; }
+function loadAggieCoins() {
+  try { return parseInt(localStorage.getItem(AGGIE_COINS_KEY), 10) || 0; } catch { return 0; }
 }
-function saveAggieCogs(cogs) {
-  try { localStorage.setItem(AGGIE_COGS_KEY, String(Math.max(0, Math.floor(cogs)))); } catch { /* ignore */ }
+function saveAggieCoins(coins) {
+  try { localStorage.setItem(AGGIE_COINS_KEY, String(Math.max(0, Math.floor(coins)))); } catch { /* ignore */ }
 }
 function loadAggieHappiness() {
   try {
@@ -3375,7 +3376,7 @@ const AGGIE_IDLE_LINES = [
 // Grumpy lines — sarcastic, unhelpful (happiness 20-39)
 const AGGIE_GRUMPY_IDLE = [
   "Whatever...", "*sighs loudly*", "Are you done yet?", "I'm bored",
-  "Feed me cogs", "Remember me?", "So neglected...", "Hmph.",
+  "Feed me coins", "Remember me?", "So neglected...", "Hmph.",
   "Don't mind me", "I'm fine. Really.", "*cold stare*",
 ];
 const AGGIE_GRUMPY_HINT_GOOD = [
@@ -3402,7 +3403,7 @@ const AGGIE_GRUMPY_PLACE = [
 // Miserable lines — very sarcastic, actively misleading (happiness 0-19)
 const AGGIE_MISERABLE_IDLE = [
   "...", "*ignores you*", "Go away", "Why bother?",
-  "I used to be happy", "Remember cogs?", "So this is how it is",
+  "I used to be happy", "Remember coins?", "So this is how it is",
   "*dramatic sigh*", "Leave me alone", "Unbelievable",
 ];
 const AGGIE_MISERABLE_HINT_GOOD = [
@@ -4291,6 +4292,14 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes companionCelebrate { 0%,100% { transform: translateY(0) rotate(0deg) scale(1); } 25% { transform: translateY(-12px) rotate(-8deg) scale(1.1); } 50% { transform: translateY(-2px) rotate(6deg) scale(1.05); } 75% { transform: translateY(-10px) rotate(-4deg) scale(1.12); } }
 @keyframes companionSad { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(3px) rotate(-2deg); } }
 @keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
+@keyframes coinEarnFloat { 0% { opacity: 0; transform: translateY(0) scale(0.5); } 15% { opacity: 1; transform: translateY(-20px) scale(1.1); } 30% { transform: translateY(-40px) scale(1); } 80% { opacity: 1; transform: translateY(-70px); } 100% { opacity: 0; transform: translateY(-90px) scale(0.8); } }
+@keyframes roomItemBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes roomItemSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+@keyframes roomItemGlow { 0%,100% { filter: brightness(1) drop-shadow(0 0 0px transparent); } 50% { filter: brightness(1.3) drop-shadow(0 0 4px currentColor); } }
+@keyframes roomItemSway { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes roomItemPulse { 0%,100% { transform: scale(1); opacity: 0.85; } 50% { transform: scale(1.12); opacity: 1; } }
+@keyframes roomItemBounce { 0%,100% { transform: translateY(0) scale(1); } 30% { transform: translateY(-5px) scale(1.05); } 60% { transform: translateY(-2px) scale(0.98); } }
+@keyframes roomItemSparkle { 0%,100% { filter: brightness(1); } 25% { filter: brightness(1.5); } 50% { filter: brightness(0.9); } 75% { filter: brightness(1.4); } }
 @keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(-4px); } 8% { opacity: 1; transform: scale(1) translateY(0); } 20% { opacity: 1; transform: translateY(6px) rotate(1.5deg); } 35% { opacity: 0.95; transform: translateY(12px) rotate(-1.2deg); } 50% { opacity: 0.85; transform: translateY(18px) rotate(1deg); } 65% { opacity: 0.65; transform: translateY(23px) rotate(-0.8deg); } 80% { opacity: 0.35; transform: translateY(28px) rotate(0.5deg); } 100% { opacity: 0; transform: translateY(34px); } }
 @keyframes aggieStretch { 0%,100% { transform: scaleX(1) scaleY(1); } 30% { transform: scaleX(1.15) scaleY(0.85); } 60% { transform: scaleX(0.9) scaleY(1.12); } }
 @keyframes aggieSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
@@ -4892,7 +4901,7 @@ export default function Pattrn() {
   const aggieSpeechTimer = useRef(null);
 
   // --- Aggie Tamagotchi state ---
-  const [aggieCogs, setAggieCogs] = useState(() => loadAggieCogs());
+  const [aggieCoins, setAggieCoins] = useState(() => loadAggieCoins());
   const [aggieHappiness, setAggieHappiness] = useState(() => {
     const stored = loadAggieHappiness();
     const lastInteract = loadAggieLastInteract();
@@ -4904,6 +4913,8 @@ export default function Pattrn() {
   const aggieDecayTimer = useRef(null);
   const [aggieWardrobeTab, setAggieWardrobeTab] = useState("shop"); // "shop" | "accessories"
   const [unlockedAccessories, setUnlockedAccessories] = useState(() => loadUnlockedAccessories());
+  const [coinAnim, setCoinAnim] = useState(null); // { amount, key } — triggers floating coin animation
+  const coinAnimTimer = useRef(null);
 
   // Happiness decay effect — runs every minute, decays based on elapsed time
   useEffect(() => {
@@ -4919,6 +4930,25 @@ export default function Pattrn() {
     return () => clearInterval(aggieDecayTimer.current);
   }, [activeCosmetic]);
 
+  // Check for broken daily streak on mount — penalize happiness
+  useEffect(() => {
+    if (!activeCosmetic) return;
+    try {
+      const currentStreak = getDailyStreak(progress);
+      const lastStreak = parseInt(localStorage.getItem(AGGIE_LAST_STREAK_KEY), 10) || 0;
+      if (lastStreak > 0 && currentStreak === 0) {
+        // Streak was broken — penalty scales with how long the streak was
+        const penalty = Math.min(20, 5 + lastStreak * 2);
+        setAggieHappiness(prev => {
+          const next = Math.max(0, prev - penalty);
+          saveAggieHappiness(next);
+          return next;
+        });
+      }
+      localStorage.setItem(AGGIE_LAST_STREAK_KEY, String(currentStreak));
+    } catch { /* ignore */ }
+  }, [activeCosmetic, progress]);
+
   // Ensure a desire is always active
   useEffect(() => {
     if (!activeCosmetic) return;
@@ -4929,11 +4959,11 @@ export default function Pattrn() {
     }
   }, [activeCosmetic, aggieDesire]);
 
-  // Helper: add cogs and update happiness
-  const earnCogs = useCallback((amount, happinessBonus = 0) => {
-    setAggieCogs(prev => {
+  // Helper: add coins and update happiness
+  const earnCoins = useCallback((amount, happinessBonus = 0) => {
+    setAggieCoins(prev => {
       const next = prev + amount;
-      saveAggieCogs(next);
+      saveAggieCoins(next);
       return next;
     });
     if (happinessBonus > 0) {
@@ -4945,14 +4975,18 @@ export default function Pattrn() {
       });
     }
     saveAggieLastInteract(Date.now());
+    // Trigger floating coin animation
+    clearTimeout(coinAnimTimer.current);
+    setCoinAnim({ amount, key: Date.now() });
+    coinAnimTimer.current = setTimeout(() => setCoinAnim(null), 2000);
   }, []);
 
-  // Helper: spend cogs on shop item
+  // Helper: spend coins on shop item
   const buyAggieItem = useCallback((item) => {
-    if (aggieCogs < item.cost) return false;
-    setAggieCogs(prev => {
+    if (aggieCoins < item.cost) return false;
+    setAggieCoins(prev => {
       const next = prev - item.cost;
-      saveAggieCogs(next);
+      saveAggieCoins(next);
       return next;
     });
     setAggieHappiness(prev => {
@@ -4979,15 +5013,15 @@ export default function Pattrn() {
       saveAggieDesire(d);
     }
     return true;
-  }, [aggieCogs, aggieDesire]);
+  }, [aggieCoins, aggieDesire]);
 
   // Helper: buy/unlock an accessory
   const buyAccessory = useCallback((acc) => {
     if (!acc.cost || acc.cost <= 0) return; // free items don't need buying
-    if (aggieCogs < acc.cost) return;
-    setAggieCogs(prev => {
+    if (aggieCoins < acc.cost) return;
+    setAggieCoins(prev => {
       const next = prev - acc.cost;
-      saveAggieCogs(next);
+      saveAggieCoins(next);
       return next;
     });
     setUnlockedAccessories(prev => {
@@ -4996,7 +5030,7 @@ export default function Pattrn() {
       saveUnlockedAccessories(next);
       return next;
     });
-  }, [aggieCogs]);
+  }, [aggieCoins]);
 
   // --- Multiplayer Aggie state ---
   const [peerAggieStates, setPeerAggieStates] = useState({});
@@ -8646,18 +8680,19 @@ export default function Pattrn() {
 
                     {/* ===== TOP HALF: Aggie's Room ===== */}
                     <div style={{ flex: "0 0 auto" }}>
-                      {/* Header row: title + cogs */}
+                      {/* Header row: title + coins */}
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                         <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.accent, letterSpacing: 2 }}>
                           Aggie
                         </div>
                         <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                            <circle cx="12" cy="12" r="5" stroke={C.accent} strokeWidth="2" fill="none" />
-                            <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M16.9 16.9l2.1 2.1M4.9 19.1l2.1-2.1M16.9 7.1l2.1-2.1" stroke={C.accent} strokeWidth="1.5" strokeLinecap="round" />
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="9" fill={C.accent} opacity="0.2" />
+                            <circle cx="12" cy="12" r="9" stroke={C.accent} strokeWidth="1.5" fill="none" />
+                            <text x="12" y="16.5" textAnchor="middle" fill={C.accent} fontSize="12" fontWeight="700" fontFamily="Inter, sans-serif">C</text>
                           </svg>
                           <span style={{ fontSize: 13, fontWeight: 700, color: C.accent, fontFamily: "'Inter', sans-serif" }}>
-                            {aggieCogs}
+                            {aggieCoins}
                           </span>
                         </div>
                       </div>
@@ -8714,11 +8749,26 @@ export default function Pattrn() {
                         {ownedItems.map((item, idx) => {
                           const pos = ROOM_ITEM_POSITIONS[idx % ROOM_ITEM_POSITIONS.length];
                           const count = aggieInventory[item.id] || 0;
+                          const itemAnims = {
+                            "treat": "roomItemPulse 2.5s ease-in-out infinite",
+                            "toy": "roomItemBounce 2s ease-in-out infinite",
+                            "blanket": "roomItemSway 3s ease-in-out infinite",
+                            "music-box": "roomItemBob 1.8s ease-in-out infinite",
+                            "book": "roomItemSway 4s ease-in-out infinite",
+                            "lamp": "roomItemGlow 2.5s ease-in-out infinite",
+                            "plant": "roomItemSway 3.5s ease-in-out infinite",
+                            "gem": "roomItemSparkle 2s ease-in-out infinite",
+                          };
+                          const anim = itemAnims[item.id] || "roomItemBob 3s ease-in-out infinite";
+                          // Stagger animation delay per item so they don't all sync
+                          const delay = `${idx * 0.4}s`;
                           return (
                             <div key={item.id} style={{
                               position: "absolute", left: pos.x, top: pos.y,
                               display: "flex", flexDirection: "column", alignItems: "center",
-                              opacity: 0.85, transition: "opacity 0.3s",
+                              opacity: 0.85,
+                              animation: anim,
+                              animationDelay: delay,
                             }}>
                               {renderRoomItemIcon(item.id, 22)}
                               {count > 1 && (
@@ -8833,7 +8883,7 @@ export default function Pattrn() {
                         {aggieWardrobeTab === "shop" && (
                           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
                             {AGGIE_SHOP_ITEMS.map(item => {
-                              const canAfford = aggieCogs >= item.cost;
+                              const canAfford = aggieCoins >= item.cost;
                               const isDesired = aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id;
                               const owned = aggieInventory[item.id] || 0;
                               return (
@@ -8876,8 +8926,9 @@ export default function Pattrn() {
                                   </span>
                                   <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 2 }}>
                                     <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                                      <circle cx="12" cy="12" r="5" stroke={canAfford ? C.accent : C.textDim} strokeWidth="2" fill="none" />
-                                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" strokeLinecap="round" />
+                                      <circle cx="12" cy="12" r="9" fill={canAfford ? C.accent : C.textDim} opacity="0.2" />
+                                      <circle cx="12" cy="12" r="9" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" fill="none" />
+                                      <text x="12" y="16.5" textAnchor="middle" fill={canAfford ? C.accent : C.textDim} fontSize="12" fontWeight="700" fontFamily="Inter, sans-serif">C</text>
                                     </svg>
                                     <span style={{ fontSize: 9, fontWeight: 700, color: canAfford ? C.accent : C.textDim, fontFamily: "'Inter', sans-serif" }}>
                                       {item.cost}
@@ -8904,7 +8955,7 @@ export default function Pattrn() {
                               const isActive = currentAcc === a.id;
                               const isFree = !a.cost || a.cost <= 0;
                               const isUnlocked = isFree || unlockedAccessories.has(a.id);
-                              const canAfford = aggieCogs >= (a.cost || 0);
+                              const canAfford = aggieCoins >= (a.cost || 0);
                               return (
                                 <div
                                   key={a.id}
@@ -8948,8 +8999,9 @@ export default function Pattrn() {
                                       display: "flex", alignItems: "center", gap: 2, marginTop: -1,
                                     }}>
                                       <svg width="8" height="8" viewBox="0 0 24 24" fill="none">
-                                        <circle cx="12" cy="12" r="5" stroke={canAfford ? C.accent : C.textDim} strokeWidth="2" fill="none" />
-                                        <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" strokeLinecap="round" />
+                                        <circle cx="12" cy="12" r="9" fill={canAfford ? C.accent : C.textDim} opacity="0.2" />
+                                        <circle cx="12" cy="12" r="9" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" fill="none" />
+                                        <text x="12" y="16.5" textAnchor="middle" fill={canAfford ? C.accent : C.textDim} fontSize="12" fontWeight="700" fontFamily="Inter, sans-serif">C</text>
                                       </svg>
                                       <span style={{
                                         fontSize: 8, fontWeight: 700,
@@ -12721,9 +12773,9 @@ export default function Pattrn() {
           setTimes(newTimes);
           saveTimes(newTimes);
           showNewAchievements(newProgress, newTimes);
-          // Earn cogs for completing full cascade run
+          // Earn coins for completing full cascade run
           if (activeCosmetic) {
-            earnCogs(COGS_REWARD.cascade, 5);
+            earnCoins(COINS_REWARD.cascade, 5);
             // Check if cascade was a desire
             if (aggieDesire && aggieDesire.type === "puzzle" && aggieDesire.mode === "cascade") {
               setAggieHappiness(prev => { const next = Math.min(AGGIE_MAX_HAPPINESS, prev + aggieDesire.happiness); saveAggieHappiness(next); return next; });
@@ -12791,10 +12843,10 @@ export default function Pattrn() {
             }
             updateVaultCurrentTile(vaultSessionId, firebaseUser.uid, -1).catch(() => {});
           }).catch(() => {});
-          // Earn cogs for vault puzzle
+          // Earn coins for vault puzzle
           if (activeCosmetic) {
-            const goldBonus = (attempts === 0) ? COGS_GOLD_BONUS : 0;
-            earnCogs(COGS_REWARD.vault + goldBonus, 3);
+            const goldBonus = (attempts === 0) ? COINS_GOLD_BONUS : 0;
+            earnCoins(COINS_REWARD.vault + goldBonus, 3);
           }
           setTimeout(() => {
             setVaultSolvingTile(null);
@@ -12826,10 +12878,10 @@ export default function Pattrn() {
             setTimes(newTimes);
             saveTimes(newTimes);
           }
-          // Earn cogs for mosaic tile
+          // Earn coins for mosaic tile
           if (activeCosmetic) {
-            const goldBonus = (attempts === 0) ? COGS_GOLD_BONUS : 0;
-            earnCogs(COGS_REWARD.mosaic + goldBonus, 2);
+            const goldBonus = (attempts === 0) ? COINS_GOLD_BONUS : 0;
+            earnCoins(COINS_REWARD.mosaic + goldBonus, 2);
           }
         } else {
           // Store attempts + 1 so that first-try solves (attempts=0) are stored as 1,
@@ -12845,11 +12897,11 @@ export default function Pattrn() {
           setTimes(newTimes);
           saveTimes(newTimes);
           showNewAchievements(newProgress, newTimes);
-          // Earn cogs for puzzle solve
+          // Earn coins for puzzle solve
           if (activeCosmetic) {
-            const reward = COGS_REWARD[difficulty] || 10;
-            const goldBonus = (attempts === 0) ? COGS_GOLD_BONUS : 0;
-            earnCogs(reward + goldBonus, 3);
+            const reward = COINS_REWARD[difficulty] || 10;
+            const goldBonus = (attempts === 0) ? COINS_GOLD_BONUS : 0;
+            earnCoins(reward + goldBonus, 3);
             // Check if puzzle matches Aggie's desire
             if (aggieDesire && aggieDesire.type === "puzzle" && aggieDesire.mode === difficulty) {
               setAggieHappiness(prev => { const next = Math.min(AGGIE_MAX_HAPPINESS, prev + aggieDesire.happiness); saveAggieHappiness(next); return next; });
@@ -12879,6 +12931,15 @@ export default function Pattrn() {
     } else if (attempts + 1 >= maxAttempts) {
       // Failed - increment attempts
       setAttempts(attempts + 1);
+      // Lower Aggie happiness on puzzle failure
+      if (activeCosmetic) {
+        const penalty = isCascade ? 8 : isVault ? 6 : difficulty === "hard" || difficulty === "blind" ? 5 : 3;
+        setAggieHappiness(prev => {
+          const next = Math.max(0, prev - penalty);
+          saveAggieHappiness(next);
+          return next;
+        });
+      }
       if (isVault && vaultSolvingTile !== null && vaultSessionId) {
         // Vault: fully failed puzzle — record strike, advance turn, return to vault
         setGameState("lost");
@@ -13729,6 +13790,31 @@ export default function Pattrn() {
   // --- Floating Aggie Companion ---
   const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} /> : null;
 
+  // Floating coin-earned animation
+  const coinAnimEl = coinAnim ? (
+    <div key={coinAnim.key} style={{
+      position: "fixed", top: "40%", left: "50%",
+      transform: "translateX(-50%)",
+      zIndex: 200, pointerEvents: "none",
+      display: "flex", alignItems: "center", gap: 6,
+      animation: "coinEarnFloat 1.8s ease-out forwards",
+    }}>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="10" fill="#FFD700" />
+        <circle cx="12" cy="12" r="10" stroke="#DAA520" strokeWidth="1" fill="none" />
+        <circle cx="12" cy="12" r="7" stroke="#DAA520" strokeWidth="0.5" fill="none" opacity="0.5" />
+        <text x="12" y="16" textAnchor="middle" fill="#8B6914" fontSize="11" fontWeight="800" fontFamily="Inter, sans-serif">C</text>
+      </svg>
+      <span style={{
+        fontSize: 20, fontWeight: 800, color: "#FFD700",
+        fontFamily: "'Inter', sans-serif",
+        textShadow: "0 1px 6px rgba(0,0,0,0.5), 0 0 12px rgba(255,215,0,0.4)",
+      }}>
+        +{coinAnim.amount}
+      </span>
+    </div>
+  ) : null;
+
   const globalModalsEl = (
     <>
       {coopInviteEl}
@@ -13739,6 +13825,7 @@ export default function Pattrn() {
       {coopMosaicNavigateEl}
       {friendReactionsOverlayEl}
       {floatingCosmeticEl}
+      {coinAnimEl}
     </>
   );
 
