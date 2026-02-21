@@ -7952,7 +7952,7 @@ export default function Pattrn() {
           </div>
 
           {/* Menu content — always rendered, animated via transitions */}
-          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? (isWidePanel ? "hidden" : "auto") : "hidden", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? (isWidePanel || isAggieWardrobe ? "hidden" : "auto") : "hidden", WebkitOverflowScrolling: "touch" }}>
             {isSignInMenu ? (() => {
               return (
                 <>
@@ -8640,7 +8640,7 @@ export default function Pattrn() {
                       ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
                     display: "flex", flexDirection: "column",
-                    height: `calc(100% - ${panelPad + fabSize}px)`,
+                    flex: 1, minHeight: 0,
                     overflow: "hidden",
                   }}>
 
