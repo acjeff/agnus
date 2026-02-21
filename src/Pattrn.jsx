@@ -3399,7 +3399,6 @@ function FloatingCosmetic({ mood, accessory, speech }) {
 @keyframes companionSad { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(3px) rotate(-2deg); } }
 @keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
 @keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(4px); } 10% { opacity: 1; transform: scale(1) translateY(0); } 60% { opacity: 0.85; transform: translateY(-18px); } 100% { opacity: 0; transform: translateY(-34px); } }
-@keyframes aggieSpeechFloatDown { 0% { opacity: 0; transform: scale(0.5) translateY(-4px); } 10% { opacity: 1; transform: scale(1) translateY(0); } 60% { opacity: 0.85; transform: translateY(18px); } 100% { opacity: 0; transform: translateY(34px); } }
 @keyframes aggieStretch { 0%,100% { transform: scaleX(1) scaleY(1); } 30% { transform: scaleX(1.15) scaleY(0.85); } 60% { transform: scaleX(0.9) scaleY(1.12); } }
 @keyframes aggieSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes aggiePeek { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-6px) rotate(-5deg); } 70% { transform: translateX(6px) rotate(5deg); } }
@@ -3423,7 +3422,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
               : { left: 4, right: "auto" }),
             whiteSpace: "nowrap",
             pointerEvents: "none",
-            animation: `${speechBelow ? "aggieSpeechFloatDown" : "aggieSpeechFloat"} 2.5s ease-out forwards`,
+            animation: "aggieSpeechFloat 2.5s ease-out forwards",
             zIndex: 91,
             fontSize: 11,
             fontWeight: 600,
