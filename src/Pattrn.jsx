@@ -3455,6 +3455,7 @@ function PeerAggie({ state, myPos, mySize, onInteract }) {
   const size = state.size || 96;
   const accessory = state.accessory || "none";
   const mood = state.mood || null;
+  const peerHappinessMood = state.happinessMood || null;
 
   // Calculate distance to local Aggie
   const dx = (state.x || 0) - (myPos?.x || 0);
@@ -3491,7 +3492,11 @@ function PeerAggie({ state, myPos, mySize, onInteract }) {
       ? "companionCelebrate 0.4s ease infinite"
       : mood === "sad"
         ? "companionSad 1.5s ease-in-out infinite"
-        : "companionFloat 3s ease-in-out infinite";
+        : peerHappinessMood === "miserable"
+          ? "companionFloat 5s ease-in-out infinite"
+          : peerHappinessMood === "grumpy"
+            ? "companionFloat 4s ease-in-out infinite"
+            : "companionFloat 3s ease-in-out infinite";
 
   return (
     <div
@@ -3566,7 +3571,7 @@ function PeerAggie({ state, myPos, mySize, onInteract }) {
         onClick={isNear ? (e) => { e.stopPropagation(); onInteract?.(state); } : undefined}
         title={isNear ? `Interact with ${state.username || "Aggie"}` : ""}
       >
-        {renderAggieSVG(size, mood, true, accessory)}
+        {renderAggieSVG(size, mood, true, accessory, peerHappinessMood)}
       </div>
     </div>
   );
@@ -3690,6 +3695,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
         accessory: accessory || "none",
         size: size,
         mood: mood || null,
+        happinessMood: happinessMood || null,
         username: myUsername || "???",
         activeInteraction: myActiveInteraction || null,
         interactionTs: myActiveInteraction ? Date.now() : null,
@@ -3713,7 +3719,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       // Clean up on unmount / session leave
       removeAggieState(sessionType, sessionId, myUid).catch(() => {});
     };
-  }, [sessionId, sessionType, myUid, accessory, size, mood, myUsername, myActiveInteraction]);
+  }, [sessionId, sessionType, myUid, accessory, size, mood, happinessMood, myUsername, myActiveInteraction]);
 
   // Close interaction menu when clicking elsewhere
   useEffect(() => {
