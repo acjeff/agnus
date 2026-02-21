@@ -4284,6 +4284,11 @@ export default function Pattrn() {
           if ((notif.type === "coop_invite" || notif.type === "coop_mosaic_invite" || notif.type === "vault_invite") && !seenNotifIdsRef.current.has(notif.id)) {
             // Show toast for this new co-op invite
             setCoopInviteToast(notif);
+            // Browser notification when tab is not visible
+            if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
+              const inviteType = notif.type === "vault_invite" ? "a vault" : notif.type === "coop_mosaic_invite" ? "co-op mosaic" : "co-op";
+              new Notification("Agnus", { body: `${notif.fromUsername || "Someone"} invited you to ${inviteType}!`, icon: "/app-icon.png" });
+            }
             if (coopInviteToastTimer.current) clearTimeout(coopInviteToastTimer.current);
             coopInviteToastTimer.current = setTimeout(() => {
               setCoopInviteToast(null);
@@ -4315,7 +4320,12 @@ export default function Pattrn() {
         const friendUid = chatId.replace(firebaseUser.uid, "").replace("_", "");
         if (friendChatOpen !== friendUid) {
           const friend = friendsList.find(f => f.uid === friendUid);
-          setFriendChatToast({ fromUsername: friend?.username || "Friend", message: meta.lastMessage });
+          const chatFromName = friend?.username || "Friend";
+          setFriendChatToast({ fromUsername: chatFromName, message: meta.lastMessage });
+          // Browser notification when tab is not visible
+          if (document.hidden && typeof Notification !== "undefined" && Notification.permission === "granted") {
+            new Notification(chatFromName, { body: meta.lastMessage, icon: "/app-icon.png" });
+          }
           if (friendChatToastTimer.current) clearTimeout(friendChatToastTimer.current);
           friendChatToastTimer.current = setTimeout(() => { setFriendChatToast(null); friendChatToastTimer.current = null; }, 5000);
         }
@@ -6096,6 +6106,11 @@ export default function Pattrn() {
   const profileSubMenu = [
     { id: "profile-view-item", icon: "profile", label: "View Profile", sub: "profile-view" },
     { id: "profile-achievements", icon: "trophy", label: "Achievements", sub: "achievements-view" },
+    { id: "settings-notifications", icon: "bell", label: typeof Notification !== "undefined" && Notification.permission === "granted" ? "Notifications On" : "Enable Notifications", action: () => {
+      if (typeof Notification === "undefined") return;
+      if (Notification.permission === "granted") return;
+      Notification.requestPermission();
+    }},
     { id: "settings-username", icon: "edit", label: "Change Username", sub: "username-edit" },
     { id: "settings-birthday", icon: "cake", label: "Set Birthday", sub: "birthday-edit" },
     ...(progress && Object.keys(progress).length > 0 ? [{ id: "settings-clear", icon: "trash", label: "Clear All Data", sub: "clear-confirm" }] : []),
@@ -11926,7 +11941,7 @@ export default function Pattrn() {
       top: "calc(16px + env(safe-area-inset-top, 0px))",
       left: "50%", transform: "translateX(-50%)",
       zIndex: 1050,
-      maxWidth: "calc(100vw - 32px)", width: 360, boxSizing: "border-box",
+      width: "min(360px, calc(100vw - 32px))", boxSizing: "border-box",
       animation: "fadeUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both",
       pointerEvents: "auto",
     }}>
@@ -12044,7 +12059,7 @@ export default function Pattrn() {
       top: coopInviteToast ? "calc(80px + env(safe-area-inset-top, 0px))" : "calc(16px + env(safe-area-inset-top, 0px))",
       left: "50%", transform: "translateX(-50%)",
       zIndex: 1049,
-      maxWidth: "calc(100vw - 32px)", width: 320, boxSizing: "border-box",
+      width: "min(320px, calc(100vw - 32px))", boxSizing: "border-box",
       animation: "fadeUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both",
       pointerEvents: "auto",
     }}>
