@@ -6555,14 +6555,11 @@ export default function Pattrn() {
       return h;
     })();
 
-    // Theme list height — header + theme list
+    // Theme list height — theme items matching standard menu item height
     const themeListContentHeight = (() => {
       if (!isThemeList) return 0;
       let h = panelPad + fabSize; // padding + bottom bar
-      h += 20 + 4; // header + margin
-      h += 12 + 16; // subtitle + margin
-      h += Math.min(PUZZLE_THEMES.length, 5) * 66; // theme items (cap at 5, rest scrolls)
-      h += 12; // bottom padding
+      h += PUZZLE_THEMES.length * itemHeight; // theme items at standard item height
       return h;
     })();
 
@@ -8060,98 +8057,89 @@ export default function Pattrn() {
               const achList = computeAchievements(progress, times, savedAchievementIds);
               return (
                 <>
-                  <div style={{
-                    padding: "0 16px 12px",
-                    opacity: isOpen ? 1 : 0,
-                    transform: isOpen ? "translateY(0)" : "translateY(8px)",
-                    transition: isOpen
-                      ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
-                      : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
-                  }}>
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.text, marginBottom: 4 }}>Themes</div>
-                    <div style={{ fontSize: 10, color: C.textDim, marginBottom: 12 }}>Unlock themes through achievements or play on themed days</div>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                      {PUZZLE_THEMES.map(theme => {
-                        const unlocked = adminUnlockAll || isThemeUnlocked(theme, achList);
-                        const isActive = activeThemeId === theme.id;
-                        const seasonalMonth = theme.unlock?.seasonal;
-                        const achId = theme.unlock?.achievement;
-                        const ach = achId ? ACHIEVEMENTS.find(a => a.id === achId) : null;
-                        let unlockHint = "";
-                        if (theme.unlock) {
-                          const parts = [];
-                          if (seasonalMonth) {
-                            const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-                            parts.push(`Play in ${monthNames[seasonalMonth]}`);
+                  {PUZZLE_THEMES.map((theme, ti) => {
+                    const unlocked = adminUnlockAll || isThemeUnlocked(theme, achList);
+                    const isActive = activeThemeId === theme.id;
+                    const seasonalMonth = theme.unlock?.seasonal;
+                    const achId = theme.unlock?.achievement;
+                    const ach = achId ? ACHIEVEMENTS.find(a => a.id === achId) : null;
+                    let unlockHint = "";
+                    if (theme.unlock) {
+                      const parts = [];
+                      if (seasonalMonth) {
+                        const monthNames = ["", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                        parts.push(`Play in ${monthNames[seasonalMonth]}`);
+                      }
+                      if (ach) parts.push(`"${ach.label}" achievement`);
+                      unlockHint = parts.join(" or ");
+                    }
+                    const staggerIn = 0.04 + ti * 0.03;
+                    return (
+                      <button
+                        key={theme.id}
+                        onClick={() => {
+                          if (unlocked) {
+                            setActiveThemeId(theme.id);
+                            saveTheme(theme.id);
                           }
-                          if (ach) parts.push(`"${ach.label}" achievement`);
-                          unlockHint = parts.join(" or ");
-                        }
-                        return (
-                          <button
-                            key={theme.id}
-                            onClick={() => {
-                              if (unlocked) {
-                                setActiveThemeId(theme.id);
-                                saveTheme(theme.id);
-                              }
-                            }}
-                            style={{
-                              width: "100%", padding: "12px 14px", borderRadius: 12,
-                              backgroundColor: isActive ? (theme.gridBg || C.surface) : C.surface,
-                              border: isActive ? `2px solid ${C.accent}` : `1px solid ${C.border}`,
-                              cursor: unlocked ? "pointer" : "default",
-                              display: "flex", alignItems: "center", gap: 12,
-                              transition: "all 0.15s",
-                              opacity: unlocked ? 1 : 0.5,
-                            }}
-                          >
-                            <div style={{
-                              width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                              backgroundColor: theme.gridBg || C.surfaceLight,
-                              border: `1.5px solid ${theme.gridBorder || C.border}`,
-                              display: "flex", alignItems: "center", justifyContent: "center", gap: 2,
-                              flexWrap: "wrap", padding: 4, position: "relative", overflow: "hidden",
+                        }}
+                        style={{
+                          width: "100%", height: itemHeight,
+                          display: "flex", alignItems: "center", gap: 12,
+                          padding: "0 16px",
+                          background: "none",
+                          border: "none",
+                          cursor: unlocked ? "pointer" : "default",
+                          color: unlocked ? C.text : C.textDim,
+                          fontFamily: "'Inter', sans-serif",
+                          fontSize: 11, fontWeight: 600,
+                          letterSpacing: 0.5, textTransform: "uppercase",
+                          opacity: isOpen ? 1 : 0,
+                          transform: isOpen ? "translateY(0)" : "translateY(8px)",
+                          transition: isOpen
+                            ? `opacity 0.2s ${springOpen} ${staggerIn}s, transform 0.25s ${springOpen} ${staggerIn}s, background 0.3s ease`
+                            : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s, background 0.3s ease`,
+                          pointerEvents: isOpen ? "auto" : "none",
+                        }}
+                        onMouseEnter={e => { if (isOpen) e.currentTarget.style.background = "rgba(255,255,255,0.08)"; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = "none"; }}
+                      >
+                        <span style={{
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          width: 28, height: 28, flexShrink: 0,
+                          borderRadius: 8,
+                          backgroundColor: theme.gridBg || C.surfaceLight,
+                          border: `1.5px solid ${theme.gridBorder || C.border}`,
+                          position: "relative", overflow: "hidden",
+                        }}>
+                          {theme.icon ? (
+                            <span style={{ fontSize: 14, lineHeight: 1 }}>{theme.icon}</span>
+                          ) : (
+                            <span style={{ display: "flex", flexWrap: "wrap", gap: 1, padding: 3 }}>
+                              {(theme.palettes || PALETTES)[0].slice(0, 4).map((col, ci) => (
+                                <span key={ci} style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: col, display: "block" }} />
+                              ))}
+                            </span>
+                          )}
+                          {!unlocked && (
+                            <span style={{
+                              position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
                             }}>
-                              {theme.icon ? (
-                                <span style={{ fontSize: 16, lineHeight: 1 }}>{theme.icon}</span>
-                              ) : (
-                                <>
-                                  {(theme.palettes || PALETTES)[0].slice(0, 4).map((col, ci) => (
-                                    <div key={ci} style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: col }} />
-                                  ))}
-                                </>
-                              )}
-                              {!unlocked && (
-                                <div style={{
-                                  position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
-                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                }}>
-                                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
-                                    <rect x="2" y="6" width="10" height="7" rx="1.5" fill="none" stroke={C.textDim} strokeWidth="1.5"/>
-                                    <path d="M4.5,6 V4 C4.5,2.3 5.6,1 7,1 C8.4,1 9.5,2.3 9.5,4 V6" fill="none" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round"/>
-                                  </svg>
-                                </div>
-                              )}
-                            </div>
-                            <div style={{ flex: 1, textAlign: "left", minWidth: 0 }}>
-                              <div style={{
-                                fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 700,
-                                color: isActive ? C.accent : C.text, letterSpacing: 0.5,
-                                display: "flex", alignItems: "center", gap: 6,
-                              }}>
-                                {theme.name}
-                                {isActive && <span style={{ fontSize: 9, color: C.accent, fontWeight: 400 }}>(active)</span>}
-                              </div>
-                              <div style={{ fontSize: 9, color: C.textDim, marginTop: 2 }}>
-                                {!unlocked ? unlockHint : theme.desc}
-                              </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
+                              <svg width="10" height="10" viewBox="0 0 14 14" fill="none">
+                                <rect x="2" y="6" width="10" height="7" rx="1.5" fill="none" stroke={C.textDim} strokeWidth="1.5"/>
+                                <path d="M4.5,6 V4 C4.5,2.3 5.6,1 7,1 C8.4,1 9.5,2.3 9.5,4 V6" fill="none" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round"/>
+                              </svg>
+                            </span>
+                          )}
+                        </span>
+                        <span style={{ flex: 1, textAlign: "left" }}>
+                          {theme.name}
+                          {isActive && <span style={{ fontSize: 9, color: C.accent, fontWeight: 400, textTransform: "none", marginLeft: 6 }}>(active)</span>}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </>
               );
             })() : isSyncChoice ? (() => {
