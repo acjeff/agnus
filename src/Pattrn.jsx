@@ -4810,6 +4810,7 @@ export default function Pattrn() {
   const [removeFriendConfirm, setRemoveFriendConfirm] = useState(null); // uid or null
 
   // --- Friend Chat (DM) state ---
+  const [menuInputFocused, setMenuInputFocused] = useState(false); // tracks whether a text input inside the menu is focused
   const [friendChatOpen, setFriendChatOpen] = useState(null); // uid of friend being chatted with, or null
   const [friendChatMessages, setFriendChatMessages] = useState({}); // messages for currently open chat
   const friendChatUnsubRef = useRef(null); // unsubscribe for current chat subscription
@@ -7990,9 +7991,11 @@ export default function Pattrn() {
         {/* Expanding Liquid Glass panel / pill */}
         <div
           data-aggie-avoid="menu"
+          onFocusCapture={e => { if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") setMenuInputFocused(true); }}
+          onBlurCapture={() => setMenuInputFocused(false)}
           style={{
             position: "fixed",
-            bottom: isOpen ? `calc(16px + env(safe-area-inset-bottom, 0px))` : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
+            bottom: isOpen ? `calc(${menuInputFocused ? 45 : 16}px + env(safe-area-inset-bottom, 0px))` : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
             right: isOpen && isMobileMenu && isAggieWardrobe ? 10 : mobileMenuMargin,
             width: isOpen && isMobileMenu && isAggieWardrobe ? "calc(100% - 20px)" : (isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth)),
             height: isOpen ? openHeight : fabSize + passUIHeight,
@@ -8008,8 +8011,8 @@ export default function Pattrn() {
             display: "flex",
             flexDirection: "column",
             transition: isOpen
-              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, max-height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease`
-              : `width 0.22s ${springClose}, height 0.22s ${springClose}, max-height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease`,
+              ? `width 0.3s ${springOpen}, height 0.3s ${springOpen}, max-height 0.3s ${springOpen}, border-radius 0.3s ${springOpen}, box-shadow 0.15s ease, bottom 0.2s ease`
+              : `width 0.22s ${springClose}, height 0.22s ${springClose}, max-height 0.22s ${springClose}, border-radius 0.22s ${springClose}, box-shadow 0.15s ease, bottom 0.2s ease`,
           }}
           aria-label="Quick actions"
         >
@@ -13035,7 +13038,7 @@ export default function Pattrn() {
       setAttempts(attempts + 1);
       // Lower Aggie happiness on puzzle failure
       if (activeCosmetic) {
-        const penalty = isCascade ? 8 : isVault ? 6 : difficulty === "hard" || difficulty === "blind" ? 5 : 3;
+        const penalty = isCascade ? 15 : isVault ? 12 : difficulty === "hard" || difficulty === "blind" ? 10 : 6;
         setAggieHappiness(prev => {
           const next = Math.max(0, prev - penalty);
           saveAggieHappiness(next);
@@ -13096,6 +13099,15 @@ export default function Pattrn() {
       setWrongCells(wrong);
       if (isBlind || isCoopMosaic) {
         setLockedCells(newLocked);
+      }
+      // Small Aggie happiness penalty per wrong attempt
+      if (activeCosmetic) {
+        const attemptPenalty = isCascade ? 3 : isVault ? 2 : difficulty === "hard" || difficulty === "blind" ? 2 : 1;
+        setAggieHappiness(prev => {
+          const next = Math.max(0, prev - attemptPenalty);
+          saveAggieHappiness(next);
+          return next;
+        });
       }
       // Aggie wrong-cells reaction (~40%, mood-aware)
       if (wrong.size > 0 && Math.random() < 0.4) {
@@ -13890,7 +13902,8 @@ export default function Pattrn() {
 
   // --- Global modals element (included in every return) ---
   // --- Floating Aggie Companion ---
-  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} /> : null;
+  const isWardrobeOpen = radialMenuStack[radialMenuStack.length - 1] === "aggie-wardrobe";
+  const floatingCosmeticEl = activeCosmetic && !isWardrobeOpen ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} happinessMood={aggieHappinessMood} /> : null;
 
   // Floating coin-earned animation
   const coinAnimEl = coinAnim ? (
