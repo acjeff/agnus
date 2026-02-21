@@ -1776,6 +1776,7 @@ const AGGIE_INVENTORY_KEY = "pattrn-aggie-inventory";
 const AGGIE_DESIRE_KEY = "pattrn-aggie-desire";
 const AGGIE_DESIRE_TIMESTAMP_KEY = "pattrn-aggie-desire-ts";
 const AGGIE_LAST_STREAK_KEY = "pattrn-aggie-last-streak";
+const AGGIE_ACTIVE_BUFF_KEY = "pattrn-aggie-active-buff";
 
 // Happiness: 0–100, decays over time
 const AGGIE_MAX_HAPPINESS = 100;
@@ -1823,6 +1824,9 @@ const AGGIE_SHOP_ITEMS = [
   { id: "lamp", label: "Glow Lamp", icon: "lamp", cost: 35, happiness: 20, desc: "Soft ambient light" },
   { id: "plant", label: "Binary Bonsai", icon: "plant", cost: 40, happiness: 22, desc: "A 0-and-1 tree" },
   { id: "gem", label: "Crystal Core", icon: "gem", cost: 50, happiness: 25, desc: "Shiny and precious" },
+  { id: "focus-lens", label: "Focus Lens", icon: "focus-lens", cost: 30, happiness: 5, desc: "Aggie hints more often", buff: { type: "hint_freq", charges: 5, freqMult: 3 } },
+  { id: "wisdom-scroll", label: "Wisdom Scroll", icon: "wisdom-scroll", cost: 40, happiness: 5, desc: "Aggie's hints are spot-on", buff: { type: "hint_accuracy", charges: 5 } },
+  { id: "lucky-clover", label: "Lucky Clover", icon: "lucky-clover", cost: 55, happiness: 8, desc: "Better + more frequent hints", buff: { type: "hint_both", charges: 3, freqMult: 2 } },
 ];
 
 // Puzzle desires — what Aggie wants you to solve
@@ -1889,6 +1893,22 @@ function pickNewDesire() {
     const item = AGGIE_SHOP_ITEMS[Math.floor(Math.random() * AGGIE_SHOP_ITEMS.length)];
     return { type: "item", id: item.id, label: item.label, happiness: Math.floor(item.happiness * 0.8) };
   }
+}
+
+// Active buff persistence — { type, charges, freqMult? }
+function loadAggieBuff() {
+  try {
+    const raw = localStorage.getItem(AGGIE_ACTIVE_BUFF_KEY);
+    if (!raw) return null;
+    const buff = JSON.parse(raw);
+    return buff && buff.charges > 0 ? buff : null;
+  } catch { return null; }
+}
+function saveAggieBuff(buff) {
+  try {
+    if (buff && buff.charges > 0) localStorage.setItem(AGGIE_ACTIVE_BUFF_KEY, JSON.stringify(buff));
+    else localStorage.removeItem(AGGIE_ACTIVE_BUFF_KEY);
+  } catch { /* ignore */ }
 }
 
 // Calculate decayed happiness based on time since last interaction
@@ -2178,6 +2198,34 @@ function renderRoomItemIcon(itemId, size) {
         <polygon points="12,3 8,10 12,10" fill="#c8b8ff" opacity="0.3" />
       </svg>
     ),
+    "focus-lens": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <circle cx="11" cy="11" r="7" fill="#e0f0ff" opacity="0.4" stroke="#4a9eff" strokeWidth="1.5" />
+        <circle cx="11" cy="11" r="3" fill="#4a9eff" opacity="0.5" />
+        <circle cx="11" cy="11" r="1" fill="#fff" opacity="0.8" />
+        <line x1="16" y1="16" x2="21" y2="21" stroke="#4a9eff" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+    ),
+    "wisdom-scroll": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <rect x="6" y="3" width="12" height="18" rx="2" fill="#f5e6c8" stroke="#c9a96e" strokeWidth="1" />
+        <path d="M6 5 Q4 5 4 7 L4 17 Q4 19 6 19" fill="#e8d5a8" stroke="#c9a96e" strokeWidth="0.5" />
+        <line x1="9" y1="8" x2="15" y2="8" stroke="#c9a96e" strokeWidth="0.8" />
+        <line x1="9" y1="11" x2="15" y2="11" stroke="#c9a96e" strokeWidth="0.8" />
+        <line x1="9" y1="14" x2="13" y2="14" stroke="#c9a96e" strokeWidth="0.8" />
+        <circle cx="12" cy="17" r="1.5" fill="#FFD700" opacity="0.6" />
+      </svg>
+    ),
+    "lucky-clover": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <circle cx="9" cy="8" r="4" fill="#2ecc71" opacity="0.7" />
+        <circle cx="15" cy="8" r="4" fill="#27ae60" opacity="0.7" />
+        <circle cx="9" cy="14" r="4" fill="#27ae60" opacity="0.7" />
+        <circle cx="15" cy="14" r="4" fill="#2ecc71" opacity="0.7" />
+        <line x1="12" y1="15" x2="12" y2="22" stroke="#1a8a4a" strokeWidth="1.5" strokeLinecap="round" />
+        <circle cx="12" cy="11" r="1.5" fill="#fff" opacity="0.4" />
+      </svg>
+    ),
   };
   return icons[itemId] || null;
 }
@@ -2192,6 +2240,9 @@ const ROOM_ITEM_POSITIONS = [
   { x: 140, y: 28 },   // top-right
   { x: 85, y: 125 },   // bottom-center
   { x: 80, y: 25 },    // top-center
+  { x: 130, y: 90 },   // mid-right-low
+  { x: 50, y: 90 },    // mid-left-low
+  { x: 110, y: 55 },   // mid-center-right
 ];
 
 function loadActiveCosmetic() {
@@ -3421,6 +3472,12 @@ const AGGIE_MISERABLE_CELEBRATE = [
 const AGGIE_MISERABLE_SAD = [
   "Good.", "Deserved.", "Ha ha ha.", "Shocking.",
   "*slow clap*", "Music to my ears",
+];
+// Sabotage lines — when miserable Aggie messes with pieces
+const AGGIE_SABOTAGE_LINES = [
+  "Oops~", "Did I do that?", "*whistles innocently*", "Butterfingers!",
+  "Heh heh heh...", "My bad... or was it?", "Clumsy me!",
+  "Oh no, how sad", "*snicker*", "Accidents happen~",
 ];
 
 // Ecstatic lines — extra enthusiastic (happiness 90-100)
@@ -4933,6 +4990,7 @@ export default function Pattrn() {
   const coinAnimTimer = useRef(null);
   const [aggieUsingItem, setAggieUsingItem] = useState(null); // { id, happiness, key } — item use animation in progress
   const aggieUsingItemTimer = useRef(null);
+  const [aggieBuff, setAggieBuff] = useState(() => loadAggieBuff()); // active hint buff
 
   // Happiness decay effect — runs every minute, decays based on elapsed time
   useEffect(() => {
@@ -5052,10 +5110,27 @@ export default function Pattrn() {
         setAggieDesire(d);
         saveAggieDesire(d);
       }
+      // Activate buff if item has one
+      if (item.buff) {
+        const newBuff = { type: item.buff.type, charges: item.buff.charges, freqMult: item.buff.freqMult || 1 };
+        setAggieBuff(newBuff);
+        saveAggieBuff(newBuff);
+      }
       // Show happiness pop briefly, then clear
       setTimeout(() => setAggieUsingItem(null), 800);
     }, 1200);
   }, [aggieInventory, aggieDesire, aggieUsingItem]);
+
+  // Helper: consume one buff charge (called after each placement that benefits from the buff)
+  const consumeBuffCharge = useCallback(() => {
+    setAggieBuff(prev => {
+      if (!prev) return null;
+      const next = { ...prev, charges: prev.charges - 1 };
+      if (next.charges <= 0) { saveAggieBuff(null); return null; }
+      saveAggieBuff(next);
+      return next;
+    });
+  }, []);
 
   // Helper: buy/unlock an accessory
   const buyAccessory = useCallback((acc) => {
@@ -8782,6 +8857,27 @@ export default function Pattrn() {
                           </span>
                         </div>
                       )}
+                      {/* Active buff indicator */}
+                      {aggieBuff && aggieBuff.charges > 0 && (() => {
+                        const buffLabels = { hint_freq: "Focus Lens", hint_accuracy: "Wisdom Scroll", hint_both: "Lucky Clover" };
+                        const buffDescs = { hint_freq: "Hints more often", hint_accuracy: "Hints are accurate", hint_both: "Better + more hints" };
+                        const buffColors = { hint_freq: "#4a9eff", hint_accuracy: "#f5c842", hint_both: "#2ecc71" };
+                        const bColor = buffColors[aggieBuff.type] || "#888";
+                        return (
+                          <div style={{
+                            padding: "4px 8px", borderRadius: 6, marginBottom: 6,
+                            backgroundColor: bColor + "18", border: `1px solid ${bColor}40`,
+                            textAlign: "center", display: "flex", alignItems: "center", justifyContent: "center", gap: 4,
+                          }}>
+                            <span style={{ fontSize: 9, fontWeight: 700, color: bColor, fontFamily: "'Inter', sans-serif" }}>
+                              {buffLabels[aggieBuff.type] || "Buff"}
+                            </span>
+                            <span style={{ fontSize: 8, color: C.textSub, fontFamily: "'Inter', sans-serif" }}>
+                              {buffDescs[aggieBuff.type]} ({aggieBuff.charges} left)
+                            </span>
+                          </div>
+                        );
+                      })()}
 
                       {/* Aggie's Room — big preview with owned items placed around */}
                       <div style={{
@@ -9054,6 +9150,15 @@ export default function Pattrn() {
                                   {owned > 0 && (
                                     <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
                                       owned: {owned}
+                                    </span>
+                                  )}
+                                  {item.buff && (
+                                    <span style={{
+                                      fontSize: 7, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                                      color: aggieBuff && aggieBuff.type === item.buff.type ? "#2ecc71" : "#4a9eff",
+                                      letterSpacing: 0.5,
+                                    }}>
+                                      {aggieBuff && aggieBuff.type === item.buff.type ? `ACTIVE (${aggieBuff.charges})` : `BUFF ×${item.buff.charges}`}
                                     </span>
                                   )}
                                 </div>
@@ -11423,39 +11528,85 @@ export default function Pattrn() {
           // Aggie placement reactions for swap (mood-aware: grumpy/miserable swap good/bad hints)
           const isCorrectPlace = selectedToken === puzzle.solution[r][c];
           const roll = Math.random();
-          const moodGood = getMoodLines(aggieHappinessMood, "hint_good") || AGGIE_HINT_GOOD;
-          const moodBad = getMoodLines(aggieHappinessMood, "hint_bad") || AGGIE_HINT_BAD;
+          const hasBuff = aggieBuff && aggieBuff.charges > 0;
+          const buffAccuracy = hasBuff && (aggieBuff.type === "hint_accuracy" || aggieBuff.type === "hint_both");
+          const buffFreqMult = hasBuff && (aggieBuff.type === "hint_freq" || aggieBuff.type === "hint_both") ? (aggieBuff.freqMult || 1) : 1;
+          // With accuracy buff, always use truthful lines even when grumpy/miserable
+          const useAccurate = buffAccuracy;
+          const moodGood = useAccurate ? AGGIE_HINT_GOOD : (getMoodLines(aggieHappinessMood, "hint_good") || AGGIE_HINT_GOOD);
+          const moodBad = useAccurate ? AGGIE_HINT_BAD : (getMoodLines(aggieHappinessMood, "hint_bad") || AGGIE_HINT_BAD);
           const moodPlace = getMoodLines(aggieHappinessMood, "place") || AGGIE_PLACE_LINES;
-          if (isCorrectPlace && roll < 0.10) {
+          const goodChance = 0.10 * buffFreqMult;
+          const badChance = 0.08 * buffFreqMult;
+          let hintFired = false;
+          if (isCorrectPlace && roll < goodChance) {
             triggerAggieSpeech(moodGood[Math.floor(Math.random() * moodGood.length)]);
-          } else if (!isCorrectPlace && roll < 0.08) {
+            hintFired = true;
+          } else if (!isCorrectPlace && roll < badChance) {
             triggerAggieSpeech(moodBad[Math.floor(Math.random() * moodBad.length)]);
+            hintFired = true;
           } else if (roll < 0.20) {
             triggerAggieSpeech(moodPlace[Math.floor(Math.random() * moodPlace.length)]);
           }
+          if (hintFired && hasBuff) consumeBuffCharge();
         }
         return;
       }
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       triggerPlaceAnimation(key);
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
-      // Aggie placement reactions — hint or general comment (mood-aware)
+      // Aggie placement reactions — hint or general comment (mood-aware, buff-aware)
       const isCorrectPlace = selectedToken === puzzle.solution[r][c];
       const roll = Math.random();
-      const moodGoodH = getMoodLines(aggieHappinessMood, "hint_good") || AGGIE_HINT_GOOD;
-      const moodBadH = getMoodLines(aggieHappinessMood, "hint_bad") || AGGIE_HINT_BAD;
+      const hasBuffH = aggieBuff && aggieBuff.charges > 0;
+      const buffAccuracyH = hasBuffH && (aggieBuff.type === "hint_accuracy" || aggieBuff.type === "hint_both");
+      const buffFreqMultH = hasBuffH && (aggieBuff.type === "hint_freq" || aggieBuff.type === "hint_both") ? (aggieBuff.freqMult || 1) : 1;
+      const useAccurateH = buffAccuracyH;
+      const moodGoodH = useAccurateH ? AGGIE_HINT_GOOD : (getMoodLines(aggieHappinessMood, "hint_good") || AGGIE_HINT_GOOD);
+      const moodBadH = useAccurateH ? AGGIE_HINT_BAD : (getMoodLines(aggieHappinessMood, "hint_bad") || AGGIE_HINT_BAD);
       const moodPlaceH = getMoodLines(aggieHappinessMood, "place") || AGGIE_PLACE_LINES;
-      if (isCorrectPlace && roll < 0.10) {
+      const goodChanceH = 0.10 * buffFreqMultH;
+      const badChanceH = 0.08 * buffFreqMultH;
+      let hintFiredH = false;
+      if (isCorrectPlace && roll < goodChanceH) {
         triggerAggieSpeech(moodGoodH[Math.floor(Math.random() * moodGoodH.length)]);
-      } else if (!isCorrectPlace && roll < 0.08) {
+        hintFiredH = true;
+      } else if (!isCorrectPlace && roll < badChanceH) {
         triggerAggieSpeech(moodBadH[Math.floor(Math.random() * moodBadH.length)]);
+        hintFiredH = true;
       } else if (roll < 0.20) {
         triggerAggieSpeech(moodPlaceH[Math.floor(Math.random() * moodPlaceH.length)]);
+      }
+      if (hintFiredH && hasBuffH) consumeBuffCharge();
+      // Miserable Aggie sabotage — may mess with a correctly placed piece (~8% chance per placement)
+      if (aggieHappinessMood === "miserable" && !hasBuffH && Object.keys(fills).length > 2 && Math.random() < 0.08) {
+        const correctFills = Object.entries(fills).filter(([k, v]) => {
+          const [fr, fc] = k.split("-").map(Number);
+          return v === puzzle.solution[fr][fc] && k !== key;
+        });
+        if (correctFills.length > 0) {
+          const [victimKey] = correctFills[Math.floor(Math.random() * correctFills.length)];
+          // 50/50: either remove the piece or swap it to a wrong value
+          if (Math.random() < 0.5) {
+            triggerRemoveAnimation(victimKey, fills[victimKey]);
+            setFills(prev => { const next = { ...prev }; delete next[victimKey]; return next; });
+            triggerAggieSpeech(AGGIE_SABOTAGE_LINES[Math.floor(Math.random() * AGGIE_SABOTAGE_LINES.length)]);
+          } else {
+            const [vr, vc] = victimKey.split("-").map(Number);
+            const correctVal = puzzle.solution[vr][vc];
+            const wrongVals = puzzle.tokens.filter(t => t !== correctVal);
+            if (wrongVals.length > 0) {
+              const wrongVal = wrongVals[Math.floor(Math.random() * wrongVals.length)];
+              setFills(prev => ({ ...prev, [victimKey]: wrongVal }));
+              triggerAggieSpeech(AGGIE_SABOTAGE_LINES[Math.floor(Math.random() * AGGIE_SABOTAGE_LINES.length)]);
+            }
+          }
+        }
       }
     } else {
       setSelectedCell(key);
     }
-  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions, coopCellOwnerMap, coopPlayers, coopPlayerColorMap, triggerAggieSpeech, aggieHappinessMood]);
+  }, [gameState, puzzle, lockedCells, selectedToken, fills, tokenRemaining, cancelWrongCellClear, triggerPlaceAnimation, triggerRemoveAnimation, isCoop, coopMyBlanks, coopMyLockedIn, coopPassMode, coopSessionId, firebaseUser, coopIncomingPass, coopSuggestMode, coopAllSuggestions, coopCellOwnerMap, coopPlayers, coopPlayerColorMap, triggerAggieSpeech, aggieHappinessMood, aggieBuff, consumeBuffCharge]);
 
   const handleCellPointerUp = useCallback((r, c) => {
     if (gameState !== "playing") return;
