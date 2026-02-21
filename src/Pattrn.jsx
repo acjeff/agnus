@@ -6653,11 +6653,9 @@ export default function Pattrn() {
                           isCoopStartMenu ? coopStartContentHeight :
                           isVaultChat ? (() => { const screenH = typeof window !== "undefined" ? window.innerHeight : 700; return panelPad + fabSize + 56 + 8 + Math.max(300, screenH - bottomPx - 240) + 8 + 44 + 12; })() :
                           (visibleItemCount * itemHeight + (showDivider ? dividerHeight : 0) + panelPad + fabSize + passUIHeight);
-    // Cap panel height so it never goes off-screen (leave 20px margin top + bottom position)
-    const bottomOffset = bottomPx; // matches the bottom positioning
-    const topMargin = 20; // breathing room from top of viewport
-    const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight - bottomOffset - topMargin : 600;
-    const mobileMaxHeight = visualViewportH - bottomOffset - topMargin;
+    // Cap panel height at 85vh
+    const maxPanelHeight = typeof window !== "undefined" ? window.innerHeight * 0.85 : 600;
+    const mobileMaxHeight = visualViewportH * 0.85;
     const openHeight = isMobileMenu ? Math.min(contentHeight, mobileMaxHeight) : Math.min(contentHeight, maxPanelHeight);
     const needsScroll = contentHeight > maxPanelHeight;
 
@@ -6840,7 +6838,7 @@ export default function Pattrn() {
             right: mobileMenuMargin,
             width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
             height: isOpen ? openHeight : fabSize + passUIHeight,
-            maxHeight: isOpen ? `calc(100vh - ${bottomPx + topMargin}px - env(safe-area-inset-bottom, 0px))` : undefined,
+            maxHeight: isOpen ? "85vh" : undefined,
             borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
             background: activeTheme.gridBg || C.surface,
             backdropFilter: "blur(28px) saturate(200%)",
