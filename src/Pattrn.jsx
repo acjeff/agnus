@@ -1726,6 +1726,8 @@ const CHEAT_BIRTHDAY = "23-06-1912";
 const AGGIE_ID = "blob";
 const AGGIE_LABEL = "Aggie";
 const AGGIE_ACCESSORY_KEY = "pattrn-aggie-accessory";
+const AGGIE_SIZE_KEY = "pattrn-aggie-size";
+const AGGIE_SIZES = { small: 64, medium: 96, large: 128 };
 const AGGIE_ACCESSORIES = [
   { id: "none", label: "None" },
   { id: "party-hat", label: "Party Hat" },
@@ -1745,6 +1747,12 @@ function loadAggieAccessory() {
 }
 function saveAggieAccessory(id) {
   try { if (id && id !== "none") localStorage.setItem(AGGIE_ACCESSORY_KEY, id); else localStorage.removeItem(AGGIE_ACCESSORY_KEY); } catch { /* ignore */ }
+}
+function loadAggieSize() {
+  try { const s = localStorage.getItem(AGGIE_SIZE_KEY); return s && AGGIE_SIZES[s] ? s : "medium"; } catch { return "medium"; }
+}
+function saveAggieSize(size) {
+  try { localStorage.setItem(AGGIE_SIZE_KEY, size); } catch { /* ignore */ }
 }
 
 // --- Aggie SVG Renderer ---
@@ -3121,8 +3129,8 @@ const IDLE_ANIMS = {
   yawn: "aggieYawn 1.2s ease-in-out",
 };
 
-function FloatingCosmetic({ mood, accessory, speech }) {
-  const AGGIE_SIZE = 96;
+function FloatingCosmetic({ mood, accessory, speech, size = 96 }) {
+  const AGGIE_SIZE = size;
   const AVOID_PAD = 16; // extra padding around obstacles
 
   const [pos, setPos] = useState(() => {
@@ -3892,6 +3900,7 @@ export default function Pattrn() {
   // --- Aggie companion state ---
   const [activeCosmetic, setActiveCosmetic] = useState(() => loadActiveCosmetic());
   const [aggieAccessory, setAggieAccessory] = useState(() => loadAggieAccessory());
+  const [aggieSize, setAggieSize] = useState(() => loadAggieSize());
   const [companionMood, setCompanionMood] = useState(null); // "celebrate" | "sad" | null
   const companionMoodTimer = useRef(null);
   const prevGameStateRef = useRef("playing");
@@ -6035,6 +6044,8 @@ export default function Pattrn() {
       const items = [...viewSpecificItems];
       // Theme — always accessible at top level
       items.push({ id: "root-theme", icon: "palette", label: "Theme", sub: "theme" });
+      // Aggie — always accessible, no login required
+      items.push({ id: "profile-aggie", icon: activeCosmetic ? "aggie-on" : "aggie-off", label: "Aggie", sub: "aggie-wardrobe" });
       if (firebaseConfigured && firebaseUser) {
         // Notifications — globally visible
         if (notifications.length > 0) {
@@ -6044,8 +6055,6 @@ export default function Pattrn() {
         items.push({ id: "nav-friends", icon: "message-square", label: totalFriendChatUnread > 0 ? `Messages (${totalFriendChatUnread > 99 ? "99+" : totalFriendChatUnread})` : "Messages", sub: "friends-view", beforeSub: () => { setFriendChatOpen(null); if (friendChatUnsubRef.current) { friendChatUnsubRef.current(); friendChatUnsubRef.current = null; } setFriendChatMessages({}); return true; } });
         // Co-op
         items.push({ id: "nav-coop-menu", icon: "handshake", label: "Co-op", sub: "coop" });
-        // Aggie — opens wardrobe panel, icon shows awake/asleep state
-        items.push({ id: "profile-aggie", icon: activeCosmetic ? "aggie-on" : "aggie-off", label: "Aggie", sub: "aggie-wardrobe" });
         // Profile submenu — account settings (username, birthday, sign out, etc.)
         items.push({ id: "nav-profile-menu", icon: "user-avatar", label: username || "Profile", sub: "profile" });
         // Admin
@@ -6296,6 +6305,7 @@ export default function Pattrn() {
       let h = panelPad + fabSize;
       h += 20 + 4; // header + margin
       h += 12 + 8; // toggle row + gap
+      h += 28 + 10; // size selector + gap
       h += 100 + 12; // preview area + gap
       const rows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3); // exclude "none"
       h += Math.min(rows, 4) * 64; // grid rows (cap at 4, rest scrolls)
@@ -7430,6 +7440,27 @@ export default function Pattrn() {
                           transition: "all 0.2s",
                         }} />
                       </div>
+                    </div>
+
+                    {/* Size selector */}
+                    <div style={{
+                      display: "flex", justifyContent: "center", gap: 6, marginBottom: 10,
+                    }}>
+                      {[["small", "S"], ["medium", "M"], ["large", "L"]].map(([key, label]) => {
+                        const active = aggieSize === key;
+                        return (
+                          <button key={key} onClick={() => { setAggieSize(key); saveAggieSize(key); }}
+                            style={{
+                              width: 36, height: 28, borderRadius: 8,
+                              border: `1.5px solid ${active ? C.accent : C.border}`,
+                              backgroundColor: active ? C.accent + "18" : C.surface,
+                              color: active ? C.accent : C.textDim,
+                              fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                              cursor: "pointer", transition: "all 0.15s",
+                            }}
+                          >{label}</button>
+                        );
+                      })}
                     </div>
 
                     {/* Aggie preview */}
@@ -12191,7 +12222,7 @@ export default function Pattrn() {
 
   // --- Global modals element (included in every return) ---
   // --- Floating Aggie Companion ---
-  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} /> : null;
+  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} /> : null;
 
   const globalModalsEl = (
     <>
