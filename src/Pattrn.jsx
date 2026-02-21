@@ -4656,6 +4656,14 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes itemUseGem { 0% { transform: scale(1) rotate(0deg); opacity: 1; filter: brightness(1); } 25% { transform: scale(1.3) rotate(45deg); filter: brightness(2); } 50% { transform: scale(1.5) rotate(90deg); filter: brightness(3); opacity: 0.8; } 75% { transform: scale(0.8) rotate(135deg); filter: brightness(2); opacity: 0.5; } 100% { transform: scale(0) rotate(180deg); filter: brightness(4); opacity: 0; } }
 @keyframes itemUseHappyPop { 0% { transform: scale(0) translateY(0); opacity: 0; } 20% { transform: scale(1.2) translateY(-8px); opacity: 1; } 50% { transform: scale(1) translateY(-20px); opacity: 1; } 100% { transform: scale(0.8) translateY(-40px); opacity: 0; } }
 @keyframes itemUseMusicNote { 0% { transform: translateY(0) rotate(0deg) scale(0); opacity: 0; } 15% { transform: scale(1); opacity: 1; } 100% { transform: translateY(-30px) rotate(var(--nr)) scale(0.5); opacity: 0; } }
+@keyframes hangoutWander1 { 0% { transform: translate(0px, 0px); } 20% { transform: translate(12px, -6px); } 40% { transform: translate(-8px, -10px); } 60% { transform: translate(6px, 8px); } 80% { transform: translate(-14px, 2px); } 100% { transform: translate(0px, 0px); } }
+@keyframes hangoutWander2 { 0% { transform: translate(0px, 0px); } 15% { transform: translate(-10px, 8px); } 35% { transform: translate(14px, 4px); } 55% { transform: translate(-6px, -12px); } 75% { transform: translate(10px, -4px); } 100% { transform: translate(0px, 0px); } }
+@keyframes hangoutWander3 { 0% { transform: translate(0px, 0px); } 25% { transform: translate(8px, 10px); } 45% { transform: translate(-12px, -2px); } 65% { transform: translate(4px, -8px); } 85% { transform: translate(-10px, 6px); } 100% { transform: translate(0px, 0px); } }
+@keyframes hangoutWander4 { 0% { transform: translate(0px, 0px); } 18% { transform: translate(-6px, -10px); } 38% { transform: translate(10px, 6px); } 58% { transform: translate(-14px, -4px); } 78% { transform: translate(8px, 10px); } 100% { transform: translate(0px, 0px); } }
+@keyframes hangoutNudge { 0%,100% { transform: translateX(0); } 25% { transform: translateX(3px) rotate(4deg); } 50% { transform: translateX(-3px) rotate(-4deg); } 75% { transform: translateX(2px) rotate(2deg); } }
+@keyframes hangoutHeart { 0% { opacity: 0; transform: translateY(0) scale(0); } 20% { opacity: 1; transform: translateY(-4px) scale(1.2); } 60% { opacity: 1; transform: translateY(-12px) scale(1); } 100% { opacity: 0; transform: translateY(-20px) scale(0.6); } }
+@keyframes hangoutChat { 0% { opacity: 0; transform: scale(0.3); } 15% { opacity: 1; transform: scale(1.1); } 25% { transform: scale(1); } 75% { opacity: 1; } 100% { opacity: 0; transform: scale(0.8) translateY(-6px); } }
+@keyframes hangoutBop { 0%,100% { transform: scaleY(1); } 30% { transform: scaleY(0.92) scaleX(1.06); } 60% { transform: scaleY(1.06) scaleX(0.96); } }
 @keyframes buffAuraPulse { 0%,100% { opacity: 0.35; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.08); } }
 @keyframes buffBadgeBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
 @keyframes buffSparkle { 0%,100% { opacity: 0.3; } 50% { opacity: 0.8; } }
@@ -5483,7 +5491,7 @@ export default function Pattrn() {
   const [aggieInventory, setAggieInventory] = useState(() => loadAggieInventory());
   const aggieHappinessMood = getHappinessMood(aggieHappiness);
   const aggieDecayTimer = useRef(null);
-  const [aggieWardrobeTab, setAggieWardrobeTab] = useState("shop"); // "shop" | "accessories"
+  const [aggieWardrobeTab, setAggieWardrobeTab] = useState("shop"); // "shop" | "accessories" | "hangout"
   const [aggieAccCategory, setAggieAccCategory] = useState("hat"); // active accessory category sub-tab
   const [unlockedAccessories, setUnlockedAccessories] = useState(() => loadUnlockedAccessories());
   const [coinAnim, setCoinAnim] = useState(null); // { amount, key } — triggers floating coin animation
@@ -5498,6 +5506,7 @@ export default function Pattrn() {
   // --- Hangout system ---
   const [hangoutActive, setHangoutActive] = useState(false); // currently in hangout
   const [hangoutPeers, setHangoutPeers] = useState({}); // { uid: { username, accessory, traits, happinessMood, ... } }
+  const [hangoutRoomExpanded, setHangoutRoomExpanded] = useState(false); // expand hangout room view
   const hangoutUnsubRef = useRef(null);
 
   // --- Offline hangout system ---
@@ -9202,46 +9211,17 @@ export default function Pattrn() {
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
                     display: "flex", flexDirection: "column",
                   }}>
-                    {/* Header with tab switcher */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 4px 0", flexShrink: 0, marginBottom: 12 }}>
-                      <div style={{ display: "flex", gap: 0, borderRadius: 8, overflow: "hidden", border: `1.5px solid ${C.border}`, flex: 1 }}>
-                        {[["list", "Messages"], ["hangout", "Hangout"]].map(([key, label]) => {
-                          const active = (friendsModalTab === "list" || friendsModalTab === "compare") ? key === "list" : friendsModalTab === key;
-                          return (
-                            <button key={key} onClick={() => setFriendsModalTab(key)}
-                              style={{
-                                flex: 1, padding: "7px 0", border: "none",
-                                backgroundColor: active ? C.accent + "20" : C.surface,
-                                color: active ? C.accent : C.textDim,
-                                fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
-                                letterSpacing: 0.5, textTransform: "uppercase",
-                                cursor: "pointer", transition: "all 0.15s",
-                                borderRight: key === "list" ? `1px solid ${C.border}` : "none",
-                                position: "relative",
-                              }}
-                            >
-                              {label}
-                              {key === "list" && totalFriendChatUnread > 0 && (
-                                <span style={{
-                                  position: "absolute", top: 2, right: 8,
-                                  width: 7, height: 7, borderRadius: "50%",
-                                  backgroundColor: C.accent,
-                                }} />
-                              )}
-                              {key === "hangout" && (hangoutActive || offlineHangouts.length > 0) && (
-                                <span style={{
-                                  position: "absolute", top: 2, right: 8,
-                                  width: 7, height: 7, borderRadius: "50%",
-                                  backgroundColor: "#22C55E",
-                                }} />
-                              )}
-                            </button>
-                          );
-                        })}
+                    {/* Messages header */}
+                    <div style={{ padding: "4px 4px 0", flexShrink: 0, marginBottom: 12 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text, fontFamily: "'Inter', sans-serif", letterSpacing: 0.5, textTransform: "uppercase" }}>
+                        Messages
+                        {totalFriendChatUnread > 0 && (
+                          <span style={{ display: "inline-block", width: 7, height: 7, borderRadius: "50%", backgroundColor: C.accent, marginLeft: 6, verticalAlign: "middle" }} />
+                        )}
                       </div>
                     </div>
-                    {/* Messages tab content */}
-                    {(friendsModalTab === "list" || friendsModalTab === "compare") && <>
+                    {/* Messages content */}
+                    <>
                         {/* Add friend input */}
                         <div style={{ display: "flex", gap: 8, marginBottom: addFriendMsg ? 4 : 12, flexShrink: 0, padding: "0 4px" }}>
                           <input
@@ -9542,272 +9522,7 @@ export default function Pattrn() {
                             })()
                           )}
                         </div>
-                    </>}
-                    {/* Hangout tab content */}
-                    {friendsModalTab === "hangout" && (
-                      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "0 4px" }}>
-                        {/* My traits display */}
-                        <div style={{ marginBottom: 12 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: C.text, fontFamily: "'Inter', sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                            Your Aggie's Traits
-                          </div>
-                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            {aggieTraits.map(tId => {
-                              const t = AGGIE_TRAITS.find(x => x.id === tId);
-                              if (!t) return null;
-                              return (
-                                <div key={tId} style={{
-                                  display: "flex", alignItems: "center", gap: 4,
-                                  padding: "4px 10px", borderRadius: 12,
-                                  backgroundColor: t.color + "18",
-                                  border: `1.5px solid ${t.color}44`,
-                                }}>
-                                  <div style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.color }} />
-                                  <span style={{ fontSize: 10, fontWeight: 700, color: t.color, fontFamily: "'Inter', sans-serif" }}>{t.label}</span>
-                                  <span style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>{t.desc}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Hangout area */}
-                        <div style={{
-                          position: "relative",
-                          height: 160, borderRadius: 12,
-                          backgroundColor: C.surface,
-                          border: `1.5px solid ${C.border}`,
-                          marginBottom: 12, overflow: "hidden",
-                        }}>
-                          {/* Ambient background */}
-                          <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 50% 80%, ${C.accent}08 0%, transparent 70%)` }} />
-                          {/* My aggie — centered */}
-                          <div style={{
-                            position: "absolute", left: "50%", top: "50%",
-                            transform: `translate(-50%, -50%)`,
-                            display: "flex", flexDirection: "column", alignItems: "center",
-                          }}>
-                            <div style={{ animation: "companionFloat 3s ease-in-out infinite" }}>
-                              {renderAggieSVG(64, null, true, aggieAccessory, aggieHappinessMood)}
-                            </div>
-                            <span style={{ fontSize: 8, fontWeight: 600, color: C.accent, fontFamily: "'Inter', sans-serif", marginTop: 2 }}>You</span>
-                          </div>
-                          {/* Peer aggies — positioned around */}
-                          {Object.entries(hangoutPeers).map(([uid, peer], idx) => {
-                            const angle = (idx / Math.max(Object.keys(hangoutPeers).length, 1)) * Math.PI * 2 - Math.PI / 2;
-                            const rx = 55, ry = 35;
-                            const px = 50 + rx * Math.cos(angle);
-                            const py = 50 + ry * Math.sin(angle);
-                            return (
-                              <div key={uid} style={{
-                                position: "absolute",
-                                left: `${px}%`, top: `${py}%`,
-                                transform: "translate(-50%, -50%)",
-                                display: "flex", flexDirection: "column", alignItems: "center",
-                                transition: "left 0.5s, top 0.5s",
-                              }}>
-                                <div style={{ animation: `companionFloat ${2.5 + idx * 0.3}s ease-in-out infinite` }}>
-                                  {renderAggieSVG(48, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
-                                </div>
-                                <span style={{ fontSize: 7, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>
-                                  {peer.username || "???"}
-                                </span>
-                              </div>
-                            );
-                          })}
-                          {/* Offline hangout peers — shown even when live hangout is inactive */}
-                          {offlineHangouts.map((h, hIdx) => {
-                            const participants = h.participants || {};
-                            return Object.entries(participants)
-                              .filter(([uid]) => uid !== firebaseUser?.uid)
-                              .map(([uid, peer], pidx) => {
-                                const totalLive = Object.keys(hangoutPeers).length;
-                                const idx = totalLive + hIdx + pidx;
-                                const totalAll = totalLive + offlineHangouts.length;
-                                const angle = (idx / Math.max(totalAll, 1)) * Math.PI * 2 - Math.PI / 2;
-                                const rx = 55, ry = 35;
-                                const px = 50 + rx * Math.cos(angle);
-                                const py = 50 + ry * Math.sin(angle);
-                                return (
-                                  <div key={`offline-${uid}`} style={{
-                                    position: "absolute",
-                                    left: `${px}%`, top: `${py}%`,
-                                    transform: "translate(-50%, -50%)",
-                                    display: "flex", flexDirection: "column", alignItems: "center",
-                                    transition: "left 0.5s, top 0.5s",
-                                    opacity: 0.7,
-                                  }}>
-                                    <div style={{ animation: `companionFloat ${3 + idx * 0.3}s ease-in-out infinite` }}>
-                                      {renderAggieSVG(44, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
-                                    </div>
-                                    <span style={{ fontSize: 7, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>
-                                      {peer.username || "???"}
-                                    </span>
-                                    <span style={{ fontSize: 6, color: C.accent, fontFamily: "'Inter', sans-serif", opacity: 0.7 }}>
-                                      offline
-                                    </span>
-                                  </div>
-                                );
-                              });
-                          })}
-                          {/* Empty state */}
-                          {!hangoutActive && Object.keys(hangoutPeers).length === 0 && offlineHangouts.length === 0 && (
-                            <div style={{
-                              position: "absolute", inset: 0,
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif", opacity: 0.6,
-                              pointerEvents: "none",
-                            }}>
-                              Send your Aggie to hang out with a friend!
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Hangout controls */}
-                        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                          {!hangoutActive ? (
-                            <button onClick={startHangout} style={{
-                              flex: 1, padding: "10px 0", borderRadius: 10,
-                              background: C.accent, color: C.bg,
-                              border: "none", fontSize: 12, fontWeight: 700,
-                              fontFamily: "'Inter', sans-serif", cursor: "pointer",
-                              letterSpacing: 0.5,
-                            }}>
-                              Open Hangout
-                            </button>
-                          ) : (
-                            <button onClick={stopHangout} style={{
-                              flex: 1, padding: "10px 0", borderRadius: 10,
-                              background: C.surface, color: C.textDim,
-                              border: `1.5px solid ${C.border}`, fontSize: 12, fontWeight: 700,
-                              fontFamily: "'Inter', sans-serif", cursor: "pointer",
-                              letterSpacing: 0.5,
-                            }}>
-                              Close Hangout
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Shared traits from hangout (live or offline) */}
-                        {hangoutSharedTraits.filter(tId => !aggieTraits.includes(tId)).length > 0 && (
-                          <div style={{ marginBottom: 12 }}>
-                            <div style={{ fontSize: 11, fontWeight: 700, color: C.correct, fontFamily: "'Inter', sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                              Shared Trait Bonuses
-                            </div>
-                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
-                              {hangoutSharedTraits.filter(tId => !aggieTraits.includes(tId)).map(tId => {
-                                const t = AGGIE_TRAITS.find(x => x.id === tId);
-                                if (!t) return null;
-                                // Find source: live peer or offline hangout peer
-                                const fromPeer = Object.values(hangoutPeers).find(p => (p.traits || []).includes(tId));
-                                let fromOffline = null;
-                                if (!fromPeer) {
-                                  for (const h of offlineHangouts) {
-                                    const participants = h.participants || {};
-                                    const found = Object.entries(participants).find(([uid, data]) =>
-                                      uid !== firebaseUser?.uid && (data.traits || []).includes(tId));
-                                    if (found) { fromOffline = found[1]; break; }
-                                  }
-                                }
-                                const sourceName = fromPeer?.username || fromOffline?.username;
-                                return (
-                                  <div key={tId} style={{
-                                    display: "flex", alignItems: "center", gap: 4,
-                                    padding: "3px 8px", borderRadius: 10,
-                                    backgroundColor: t.color + "12",
-                                    border: `1px dashed ${t.color}44`,
-                                  }}>
-                                    <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.color, opacity: 0.7 }} />
-                                    <span style={{ fontSize: 9, fontWeight: 600, color: t.color, fontFamily: "'Inter', sans-serif" }}>{t.label}</span>
-                                    {sourceName && <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>via {sourceName}</span>}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Friend list — visit or invite */}
-                        <div style={{ fontSize: 11, fontWeight: 700, color: C.text, fontFamily: "'Inter', sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                          Friends
-                        </div>
-                        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-                          {friendsList.length === 0 ? (
-                            <div style={{ textAlign: "center", padding: 20, color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif" }}>
-                              Add friends in the Messages tab to hang out!
-                            </div>
-                          ) : friendsList.map(friend => {
-                            const presence = friendPresence[friend.uid];
-                            const isOnline = presence && presence.lastSeen && (Date.now() - presence.lastSeen) < 120000;
-                            const isPeerInHangout = !!hangoutPeers[friend.uid];
-                            const offlineH = getOfflineHangoutWithFriend(friend.uid);
-                            const isOnOfflineHangout = !!offlineH;
-                            const isHanging = isPeerInHangout || isOnOfflineHangout;
-                            return (
-                              <div key={friend.uid} style={{
-                                display: "flex", alignItems: "center", gap: 10,
-                                padding: "8px 10px", borderRadius: 10,
-                                backgroundColor: isHanging ? C.correct + "10" : C.surface,
-                                border: `1px solid ${isHanging ? C.correct + "44" : C.border}`,
-                              }}>
-                                <div style={{
-                                  width: 8, height: 8, borderRadius: 4,
-                                  backgroundColor: isOnline ? "#22C55E" : C.textDim + "44",
-                                  flexShrink: 0,
-                                }} />
-                                <div style={{ flex: 1, minWidth: 0 }}>
-                                  <div style={{ fontSize: 12, fontWeight: 600, color: C.text, fontFamily: "'Inter', sans-serif" }}>
-                                    {friend.username || "Friend"}
-                                  </div>
-                                  <div style={{ fontSize: 9, color: isHanging ? C.correct : C.textDim, fontFamily: "'Inter', sans-serif" }}>
-                                    {isPeerInHangout ? "Hanging out!" : isOnOfflineHangout ? "Aggies hanging out" : isOnline ? "Online" : "Offline"}
-                                  </div>
-                                </div>
-                                {/* Live hangout: waiting for online friend to join */}
-                                {hangoutActive && !isPeerInHangout && !isOnOfflineHangout && isOnline && (
-                                  <span style={{ fontSize: 9, color: C.textDim, fontFamily: "'Inter', sans-serif", opacity: 0.5 }}>
-                                    Waiting...
-                                  </span>
-                                )}
-                                {/* Live visit button for online friends (when not in live hangout and no offline hangout) */}
-                                {!hangoutActive && isOnline && !isOnOfflineHangout && (
-                                  <button onClick={() => joinFriendHangout(friend.uid)} style={{
-                                    padding: "4px 10px", borderRadius: 6, fontSize: 9, fontWeight: 700,
-                                    fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                                    background: C.accent + "22", color: C.accent,
-                                    border: "none", cursor: "pointer", textTransform: "uppercase",
-                                  }}>
-                                    Visit
-                                  </button>
-                                )}
-                                {/* Send to hangout button — available for any friend not already in a hangout */}
-                                {!isPeerInHangout && !isOnOfflineHangout && !hangoutActive && (
-                                  <button onClick={() => startOfflineHangoutWithFriend(friend.uid, friend.username)} style={{
-                                    padding: "4px 10px", borderRadius: 6, fontSize: 9, fontWeight: 700,
-                                    fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                                    background: C.accent + "12", color: C.accent,
-                                    border: `1px solid ${C.accent}33`, cursor: "pointer", textTransform: "uppercase",
-                                  }}>
-                                    Hangout
-                                  </button>
-                                )}
-                                {/* End offline hangout button */}
-                                {isOnOfflineHangout && (
-                                  <button onClick={() => endOfflineHangoutWithFriend(friend.uid)} style={{
-                                    padding: "4px 10px", borderRadius: 6, fontSize: 9, fontWeight: 700,
-                                    fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
-                                    background: C.incorrect + "12", color: C.incorrect,
-                                    border: `1px solid ${C.incorrect}33`, cursor: "pointer", textTransform: "uppercase",
-                                  }}>
-                                    End
-                                  </button>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
+                    </>
                   </div>
                 </>
               );
@@ -9997,10 +9712,12 @@ export default function Pattrn() {
 
                       {/* Aggie's Room — big preview with owned items placed around */}
                       <div style={{
-                        position: "relative", width: "100%", height: 160,
+                        position: "relative", width: "100%",
+                        height: aggieWardrobeTab === "hangout" && hangoutRoomExpanded ? 320 : 160,
                         borderRadius: 12, marginBottom: 6, overflow: "hidden",
                         backgroundColor: C.surface,
                         border: `1.5px solid ${C.border}`,
+                        transition: "height 0.35s cubic-bezier(0.4, 0, 0.2, 1)",
                       }}>
                         {/* Room floor gradient */}
                         <div style={{
@@ -10008,8 +9725,8 @@ export default function Pattrn() {
                           background: `radial-gradient(ellipse at 50% 80%, ${C.accent}08 0%, transparent 70%)`,
                         }} />
 
-                        {/* Owned items scattered in the room */}
-                        {ownedItems.map((item, idx) => {
+                        {/* Owned items scattered in the room (hidden on hangout tab) */}
+                        {aggieWardrobeTab !== "hangout" && ownedItems.map((item, idx) => {
                           const pos = ROOM_ITEM_POSITIONS[idx % ROOM_ITEM_POSITIONS.length];
                           const count = aggieInventory[item.id] || 0;
                           const isBeingUsed = aggieUsingItem && aggieUsingItem.id === item.id;
@@ -10088,7 +9805,7 @@ export default function Pattrn() {
                         })}
 
                         {/* Happiness pop-up after item use completes */}
-                        {aggieUsingItem && (
+                        {aggieWardrobeTab !== "hangout" && aggieUsingItem && (
                           <div style={{
                             position: "absolute", left: "50%", top: "30%",
                             transform: "translateX(-50%)",
@@ -10107,23 +9824,159 @@ export default function Pattrn() {
                           </div>
                         )}
 
-                        {/* Aggie — centered, big */}
+                        {/* Hangout peers — wandering around the room when hangout tab is active */}
+                        {aggieWardrobeTab === "hangout" && (() => {
+                          const wanderAnims = ["hangoutWander1", "hangoutWander2", "hangoutWander3", "hangoutWander4"];
+                          const chatBubbles = ["\u2764", "\u2728", "hi!", "lol", "\ud83c\udf1f", ":)", "yay", "\ud83c\udf89"];
+                          const expanded = hangoutRoomExpanded;
+                          const aggieSize = expanded ? 52 : 44;
+                          // Collect all peers: live + offline
+                          const allPeers = [];
+                          Object.entries(hangoutPeers).forEach(([uid, peer]) => {
+                            allPeers.push({ uid, peer, isOffline: false });
+                          });
+                          offlineHangouts.forEach((h) => {
+                            const participants = h.participants || {};
+                            Object.entries(participants)
+                              .filter(([uid]) => uid !== firebaseUser?.uid)
+                              .forEach(([uid, peer]) => {
+                                allPeers.push({ uid, peer, isOffline: true });
+                              });
+                          });
+                          const total = allPeers.length;
+                          if (total === 0 && !hangoutActive) {
+                            return (
+                              <div style={{
+                                position: "absolute", inset: 0,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif", opacity: 0.6,
+                                pointerEvents: "none",
+                              }}>
+                                Send your Aggie to hang out with a friend!
+                              </div>
+                            );
+                          }
+                          // Distribute peers in a scattered layout
+                          const positions = total <= 2
+                            ? [{ x: 20, y: 35 }, { x: 75, y: 55 }]
+                            : total <= 4
+                              ? [{ x: 15, y: 30 }, { x: 78, y: 25 }, { x: 22, y: 70 }, { x: 75, y: 65 }]
+                              : [{ x: 12, y: 28 }, { x: 80, y: 22 }, { x: 18, y: 68 }, { x: 78, y: 62 }, { x: 50, y: 78 }, { x: 50, y: 18 }];
+                          return allPeers.map(({ uid, peer, isOffline }, idx) => {
+                            const pos = positions[idx % positions.length];
+                            const wanderAnim = wanderAnims[idx % wanderAnims.length];
+                            const wanderDur = 6 + (idx % 3) * 2; // 6s, 8s, 10s
+                            const bubble = chatBubbles[(idx * 3 + Math.floor(Date.now() / 10000)) % chatBubbles.length];
+                            // Interaction emote — cycles based on time so they appear to interact
+                            const showEmote = (Math.floor(Date.now() / 4000) + idx) % 5 === 0;
+                            return (
+                              <div key={isOffline ? `offline-${uid}` : uid} style={{
+                                position: "absolute",
+                                left: `${pos.x}%`, top: `${pos.y}%`,
+                                transform: "translate(-50%, -50%)",
+                                display: "flex", flexDirection: "column", alignItems: "center",
+                                opacity: isOffline ? 0.55 : 1,
+                                zIndex: 2,
+                              }}>
+                                {/* Chat bubble / emote */}
+                                {showEmote && (
+                                  <div style={{
+                                    position: "absolute", top: -14,
+                                    fontSize: 10, color: C.accent,
+                                    fontFamily: "'Inter', sans-serif",
+                                    fontWeight: 700,
+                                    animation: "hangoutChat 3s ease-in-out forwards",
+                                    pointerEvents: "none",
+                                    whiteSpace: "nowrap",
+                                    background: C.surface, borderRadius: 6,
+                                    padding: "1px 5px",
+                                    border: `1px solid ${C.border}`,
+                                    boxShadow: `0 1px 4px ${C.accent}15`,
+                                  }}>
+                                    {bubble}
+                                  </div>
+                                )}
+                                {/* Wandering aggie */}
+                                <div style={{
+                                  animation: `${wanderAnim} ${wanderDur}s ease-in-out infinite, hangoutBop ${2 + idx * 0.4}s ease-in-out infinite`,
+                                  animationDelay: `${idx * 0.7}s, ${idx * 0.3}s`,
+                                }}>
+                                  <div style={{
+                                    animation: `hangoutNudge ${3 + idx * 0.5}s ease-in-out infinite`,
+                                    animationDelay: `${idx * 1.2}s`,
+                                  }}>
+                                    {renderAggieSVG(aggieSize, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
+                                  </div>
+                                </div>
+                                <span style={{
+                                  fontSize: 7, fontWeight: 600,
+                                  color: isOffline ? C.textDim : C.text,
+                                  fontFamily: "'Inter', sans-serif", marginTop: 1,
+                                }}>
+                                  {peer.username || "???"}
+                                </span>
+                                {isOffline && (
+                                  <span style={{ fontSize: 6, color: C.accent, fontFamily: "'Inter', sans-serif", opacity: 0.7 }}>
+                                    offline
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          });
+                        })()}
+
+                        {/* Aggie — centered */}
                         <div style={{
                           position: "absolute",
                           left: "50%", top: "50%",
                           transform: "translate(-50%, -50%)",
                           opacity: isOn ? 1 : 0.4, transition: "opacity 0.2s",
+                          zIndex: 3,
                         }}>
                           <div style={{
-                            width: 120, height: 120,
+                            width: aggieWardrobeTab === "hangout" ? (hangoutRoomExpanded ? 72 : 64) : 120,
+                            height: aggieWardrobeTab === "hangout" ? (hangoutRoomExpanded ? 72 : 64) : 120,
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            animation: aggieUsingItem
-                              ? "aggieBounce 0.6s ease-in-out 1s 1"
-                              : isOn ? "companionFloat 3s ease-in-out infinite" : "none",
+                            animation: aggieWardrobeTab === "hangout"
+                              ? "hangoutBop 2.2s ease-in-out infinite"
+                              : aggieUsingItem
+                                ? "aggieBounce 0.6s ease-in-out 1s 1"
+                                : isOn ? "companionFloat 3s ease-in-out infinite" : "none",
+                            transition: "width 0.3s, height 0.3s",
                           }}>
-                            {renderAggieSVG(120, null, isOn, currentAccSlots, hMood)}
+                            {renderAggieSVG(aggieWardrobeTab === "hangout" ? (hangoutRoomExpanded ? 72 : 64) : 120, null, isOn, currentAccSlots, hMood)}
                           </div>
+                          {aggieWardrobeTab === "hangout" && (
+                            <span style={{
+                              display: "block", textAlign: "center",
+                              fontSize: 7, fontWeight: 600, color: C.accent,
+                              fontFamily: "'Inter', sans-serif", marginTop: 1,
+                            }}>You</span>
+                          )}
                         </div>
+
+                        {/* Expand/collapse button for hangout */}
+                        {aggieWardrobeTab === "hangout" && (
+                          <button
+                            onClick={() => setHangoutRoomExpanded(e => !e)}
+                            style={{
+                              position: "absolute", bottom: 6, right: 6,
+                              zIndex: 5, background: C.surface,
+                              border: `1px solid ${C.border}`,
+                              borderRadius: 6, padding: "2px 6px",
+                              cursor: "pointer", fontSize: 10,
+                              color: C.textDim, fontFamily: "'Inter', sans-serif",
+                              fontWeight: 600, opacity: 0.7,
+                              display: "flex", alignItems: "center", gap: 3,
+                              transition: "opacity 0.2s",
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.opacity = "1"}
+                            onMouseLeave={e => e.currentTarget.style.opacity = "0.7"}
+                          >
+                            {hangoutRoomExpanded ? "\u25B2" : "\u25BC"}
+                            <span>{hangoutRoomExpanded ? "Less" : "More"}</span>
+                          </button>
+                        )}
                       </div>
 
                       {/* Controls row: On/Off + Size */}
@@ -10185,8 +10038,9 @@ export default function Pattrn() {
                         display: "flex", gap: 0, borderRadius: 8, overflow: "hidden",
                         border: `1.5px solid ${C.border}`, flexShrink: 0, marginBottom: 8,
                       }}>
-                        {[["shop", "Shop"], ["accessories", "Accessories"]].map(([key, label]) => {
+                        {[["shop", "Shop"], ["accessories", "Look"], ["hangout", "Hangout"]].map(([key, label], tabIdx) => {
                           const active = aggieWardrobeTab === key;
+                          const isHangoutActive = key === "hangout" && (hangoutActive || offlineHangouts.length > 0);
                           return (
                             <button key={key} onClick={() => setAggieWardrobeTab(key)}
                               style={{
@@ -10196,9 +10050,19 @@ export default function Pattrn() {
                                 fontSize: 10, fontWeight: 700, fontFamily: "'Inter', sans-serif",
                                 letterSpacing: 1, textTransform: "uppercase",
                                 cursor: "pointer", transition: "all 0.15s",
-                                borderRight: key === "shop" ? `1px solid ${C.border}` : "none",
+                                borderRight: tabIdx < 2 ? `1px solid ${C.border}` : "none",
+                                position: "relative",
                               }}
-                            >{label}</button>
+                            >
+                              {label}
+                              {isHangoutActive && (
+                                <span style={{
+                                  position: "absolute", top: 3, right: 6,
+                                  width: 6, height: 6, borderRadius: "50%",
+                                  backgroundColor: "#22C55E",
+                                }} />
+                              )}
+                            </button>
                           );
                         })}
                       </div>
@@ -10386,6 +10250,152 @@ export default function Pattrn() {
                                   </div>
                                 );
                               })}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Hangout tab */}
+                        {aggieWardrobeTab === "hangout" && (
+                          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                            {/* Hangout controls */}
+                            <div style={{ display: "flex", gap: 8 }}>
+                              {!hangoutActive ? (
+                                <button onClick={startHangout} style={{
+                                  flex: 1, padding: "10px 0", borderRadius: 10,
+                                  background: C.accent, color: C.bg,
+                                  border: "none", fontSize: 12, fontWeight: 700,
+                                  fontFamily: "'Inter', sans-serif", cursor: "pointer",
+                                  letterSpacing: 0.5,
+                                }}>
+                                  Open Hangout
+                                </button>
+                              ) : (
+                                <button onClick={stopHangout} style={{
+                                  flex: 1, padding: "10px 0", borderRadius: 10,
+                                  background: C.surface, color: C.textDim,
+                                  border: `1.5px solid ${C.border}`, fontSize: 12, fontWeight: 700,
+                                  fontFamily: "'Inter', sans-serif", cursor: "pointer",
+                                  letterSpacing: 0.5,
+                                }}>
+                                  Close Hangout
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Shared traits from hangout */}
+                            {hangoutSharedTraits.filter(tId => !aggieTraits.includes(tId)).length > 0 && (
+                              <div>
+                                <div style={{ fontSize: 10, fontWeight: 700, color: C.correct, fontFamily: "'Inter', sans-serif", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                                  Shared Trait Bonuses
+                                </div>
+                                <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                                  {hangoutSharedTraits.filter(tId => !aggieTraits.includes(tId)).map(tId => {
+                                    const t = AGGIE_TRAITS.find(x => x.id === tId);
+                                    if (!t) return null;
+                                    const fromPeer = Object.values(hangoutPeers).find(p => (p.traits || []).includes(tId));
+                                    let fromOffline = null;
+                                    if (!fromPeer) {
+                                      for (const oh of offlineHangouts) {
+                                        const participants = oh.participants || {};
+                                        const found = Object.entries(participants).find(([uid, data]) =>
+                                          uid !== firebaseUser?.uid && (data.traits || []).includes(tId));
+                                        if (found) { fromOffline = found[1]; break; }
+                                      }
+                                    }
+                                    const sourceName = fromPeer?.username || fromOffline?.username;
+                                    return (
+                                      <div key={tId} style={{
+                                        display: "flex", alignItems: "center", gap: 4,
+                                        padding: "3px 8px", borderRadius: 10,
+                                        backgroundColor: t.color + "12",
+                                        border: `1px dashed ${t.color}44`,
+                                      }}>
+                                        <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.color, opacity: 0.7 }} />
+                                        <span style={{ fontSize: 9, fontWeight: 600, color: t.color, fontFamily: "'Inter', sans-serif" }}>{t.label}</span>
+                                        {sourceName && <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>via {sourceName}</span>}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Friend list — visit or invite */}
+                            <div>
+                              <div style={{ fontSize: 10, fontWeight: 700, color: C.text, fontFamily: "'Inter', sans-serif", marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                                Friends
+                              </div>
+                              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                                {friendsList.length === 0 ? (
+                                  <div style={{ textAlign: "center", padding: 16, color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif" }}>
+                                    Add friends via Messages to hang out!
+                                  </div>
+                                ) : friendsList.map(friend => {
+                                  const presence = friendPresence[friend.uid];
+                                  const isOnline = presence && presence.lastSeen && (Date.now() - presence.lastSeen) < 120000;
+                                  const isPeerInHangout = !!hangoutPeers[friend.uid];
+                                  const offlineH = getOfflineHangoutWithFriend(friend.uid);
+                                  const isOnOfflineHangout = !!offlineH;
+                                  const isHanging = isPeerInHangout || isOnOfflineHangout;
+                                  return (
+                                    <div key={friend.uid} style={{
+                                      display: "flex", alignItems: "center", gap: 8,
+                                      padding: "6px 8px", borderRadius: 8,
+                                      backgroundColor: isHanging ? C.correct + "10" : C.surface,
+                                      border: `1px solid ${isHanging ? C.correct + "44" : C.border}`,
+                                    }}>
+                                      <div style={{
+                                        width: 7, height: 7, borderRadius: 4,
+                                        backgroundColor: isOnline ? "#22C55E" : C.textDim + "44",
+                                        flexShrink: 0,
+                                      }} />
+                                      <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div style={{ fontSize: 11, fontWeight: 600, color: C.text, fontFamily: "'Inter', sans-serif" }}>
+                                          {friend.username || "Friend"}
+                                        </div>
+                                        <div style={{ fontSize: 8, color: isHanging ? C.correct : C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                          {isPeerInHangout ? "Hanging out!" : isOnOfflineHangout ? "Aggies hanging out" : isOnline ? "Online" : "Offline"}
+                                        </div>
+                                      </div>
+                                      {hangoutActive && !isPeerInHangout && !isOnOfflineHangout && isOnline && (
+                                        <span style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif", opacity: 0.5 }}>
+                                          Waiting...
+                                        </span>
+                                      )}
+                                      {!hangoutActive && isOnline && !isOnOfflineHangout && (
+                                        <button onClick={() => joinFriendHangout(friend.uid)} style={{
+                                          padding: "3px 8px", borderRadius: 6, fontSize: 8, fontWeight: 700,
+                                          fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                          background: C.accent + "22", color: C.accent,
+                                          border: "none", cursor: "pointer", textTransform: "uppercase",
+                                        }}>
+                                          Visit
+                                        </button>
+                                      )}
+                                      {!isPeerInHangout && !isOnOfflineHangout && !hangoutActive && (
+                                        <button onClick={() => startOfflineHangoutWithFriend(friend.uid, friend.username)} style={{
+                                          padding: "3px 8px", borderRadius: 6, fontSize: 8, fontWeight: 700,
+                                          fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                          background: C.accent + "12", color: C.accent,
+                                          border: `1px solid ${C.accent}33`, cursor: "pointer", textTransform: "uppercase",
+                                        }}>
+                                          Hangout
+                                        </button>
+                                      )}
+                                      {isOnOfflineHangout && (
+                                        <button onClick={() => endOfflineHangoutWithFriend(friend.uid)} style={{
+                                          padding: "3px 8px", borderRadius: 6, fontSize: 8, fontWeight: 700,
+                                          fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                          background: C.incorrect + "12", color: C.incorrect,
+                                          border: `1px solid ${C.incorrect}33`, cursor: "pointer", textTransform: "uppercase",
+                                        }}>
+                                          End
+                                        </button>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
                             </div>
                           </div>
                         )}
