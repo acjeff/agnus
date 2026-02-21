@@ -14832,7 +14832,7 @@ export default function Pattrn() {
       {mosaicMsg && (
         <div style={{
           position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-          zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
+          zIndex: 10000, maxWidth: "min(400px, calc(100vw - 32px))", boxSizing: "border-box", textAlign: "center", padding: "14px 28px", borderRadius: 12,
           backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
           fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
           boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
@@ -14906,7 +14906,7 @@ export default function Pattrn() {
         {mosaicMsg && (
           <div style={{
             position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
+            zIndex: 10000, maxWidth: "min(400px, calc(100vw - 32px))", boxSizing: "border-box", textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
             fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
             boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
@@ -15288,7 +15288,7 @@ export default function Pattrn() {
         {mosaicMsg && (
           <div style={{
             position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
+            zIndex: 10000, maxWidth: "min(400px, calc(100vw - 32px))", boxSizing: "border-box", textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
             fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
             boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
@@ -15388,7 +15388,7 @@ export default function Pattrn() {
         {mosaicMsg && (
           <div style={{
             position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
+            zIndex: 10000, maxWidth: "min(400px, calc(100vw - 32px))", boxSizing: "border-box", textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
             fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
             boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
