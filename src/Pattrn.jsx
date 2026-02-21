@@ -4312,6 +4312,16 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes aggieYawn { 0%,100% { transform: scale(1); } 50% { transform: scale(1.1); } }
 @keyframes aggieConfetti { 0% { transform: translate(0px, 0px) scale(1) rotate(0deg); } 80% { opacity: 1; } 100% { opacity: 0; transform: translate(var(--ex), var(--ey)) scale(0.6) rotate(var(--cr)); } }
 @keyframes aggieTearShoot { 0% { opacity: 1; transform: translate(0px, 0px) scale(0.6); } 15% { opacity: 1; transform: translate(calc(var(--tx) * 0.4), calc(var(--ty) * 0.3)) scale(1); } 100% { opacity: 0; transform: translate(var(--tx), var(--ty)) scale(0.3); } }
+@keyframes itemUseTreat { 0% { transform: scale(1) translateY(0); opacity: 1; } 30% { transform: scale(1.3) translateY(-8px); } 60% { transform: scale(0.6) translateY(10px); opacity: 0.8; } 100% { transform: scale(0) translateY(20px); opacity: 0; } }
+@keyframes itemUseToy { 0% { transform: rotate(0deg) scale(1); opacity: 1; } 25% { transform: rotate(180deg) scale(1.3); } 50% { transform: rotate(360deg) scale(1.1); } 75% { transform: rotate(540deg) scale(0.6); opacity: 0.6; } 100% { transform: rotate(720deg) scale(0); opacity: 0; } }
+@keyframes itemUseBlanket { 0% { transform: scale(1) translateY(0); opacity: 1; } 30% { transform: scale(1.2) translateY(-5px); } 60% { transform: scaleY(0.3) scaleX(1.4) translateY(10px); opacity: 0.7; } 100% { transform: scaleY(0) scaleX(1.6) translateY(15px); opacity: 0; } }
+@keyframes itemUseMusic { 0% { transform: scale(1) rotate(0deg); opacity: 1; } 20% { transform: scale(1.15) rotate(-5deg); } 40% { transform: scale(1.1) rotate(5deg); } 60% { transform: scale(1.05) rotate(-3deg); } 80% { transform: scale(0.5) rotate(3deg); opacity: 0.5; } 100% { transform: scale(0) rotate(0deg); opacity: 0; } }
+@keyframes itemUseBook { 0% { transform: scaleX(1) rotateY(0deg); opacity: 1; } 25% { transform: scaleX(1.2) rotateY(-20deg); } 50% { transform: scaleX(0.8) rotateY(20deg); } 75% { transform: scaleX(0.3) rotateY(-10deg); opacity: 0.5; } 100% { transform: scaleX(0) rotateY(0deg); opacity: 0; } }
+@keyframes itemUseLamp { 0% { transform: scale(1); opacity: 1; filter: brightness(1); } 30% { transform: scale(1.2); filter: brightness(2); } 60% { transform: scale(1.4); filter: brightness(3); opacity: 0.8; } 100% { transform: scale(1.8); filter: brightness(4); opacity: 0; } }
+@keyframes itemUsePlant { 0% { transform: scale(1) translateY(0); opacity: 1; } 30% { transform: scale(1.4) translateY(-10px); } 60% { transform: scale(1.2) translateY(-6px); opacity: 0.7; } 100% { transform: scale(0) translateY(-14px); opacity: 0; } }
+@keyframes itemUseGem { 0% { transform: scale(1) rotate(0deg); opacity: 1; filter: brightness(1); } 25% { transform: scale(1.3) rotate(45deg); filter: brightness(2); } 50% { transform: scale(1.5) rotate(90deg); filter: brightness(3); opacity: 0.8; } 75% { transform: scale(0.8) rotate(135deg); filter: brightness(2); opacity: 0.5; } 100% { transform: scale(0) rotate(180deg); filter: brightness(4); opacity: 0; } }
+@keyframes itemUseHappyPop { 0% { transform: scale(0) translateY(0); opacity: 0; } 20% { transform: scale(1.2) translateY(-8px); opacity: 1; } 50% { transform: scale(1) translateY(-20px); opacity: 1; } 100% { transform: scale(0.8) translateY(-40px); opacity: 0; } }
+@keyframes itemUseMusicNote { 0% { transform: translateY(0) rotate(0deg) scale(0); opacity: 0; } 15% { transform: scale(1); opacity: 1; } 100% { transform: translateY(-30px) rotate(var(--nr)) scale(0.5); opacity: 0; } }
       `}</style>
 
       {/* Confetti burst on celebrate */}
@@ -4918,6 +4928,8 @@ export default function Pattrn() {
   const [unlockedAccessories, setUnlockedAccessories] = useState(() => loadUnlockedAccessories());
   const [coinAnim, setCoinAnim] = useState(null); // { amount, key } — triggers floating coin animation
   const coinAnimTimer = useRef(null);
+  const [aggieUsingItem, setAggieUsingItem] = useState(null); // { id, happiness, key } — item use animation in progress
+  const aggieUsingItemTimer = useRef(null);
 
   // Happiness decay effect — runs every minute, decays based on elapsed time
   useEffect(() => {
@@ -4984,18 +4996,12 @@ export default function Pattrn() {
     coinAnimTimer.current = setTimeout(() => setCoinAnim(null), 2000);
   }, []);
 
-  // Helper: spend coins on shop item
+  // Helper: spend coins on shop item (buy only — adds to inventory, no happiness)
   const buyAggieItem = useCallback((item) => {
     if (aggieCoins < item.cost) return false;
     setAggieCoins(prev => {
       const next = prev - item.cost;
       saveAggieCoins(next);
-      return next;
-    });
-    setAggieHappiness(prev => {
-      const next = Math.min(AGGIE_MAX_HAPPINESS, prev + item.happiness);
-      saveAggieHappiness(next);
-      saveAggieLastInteract(Date.now());
       return next;
     });
     setAggieInventory(prev => {
@@ -5005,18 +5011,48 @@ export default function Pattrn() {
     });
     // Check if this fulfills a desire
     if (aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id) {
-      setAggieHappiness(prev => {
-        const bonus = aggieDesire.happiness;
-        const next = Math.min(AGGIE_MAX_HAPPINESS, prev + bonus);
-        saveAggieHappiness(next);
-        return next;
-      });
       const d = pickNewDesire();
       setAggieDesire(d);
       saveAggieDesire(d);
     }
     return true;
   }, [aggieCoins, aggieDesire]);
+
+  // Helper: use an item from inventory — plays animation, then boosts happiness and consumes
+  const useAggieItem = useCallback((item) => {
+    const owned = aggieInventory[item.id] || 0;
+    if (owned <= 0 || aggieUsingItem) return; // can't use if none owned or animation in progress
+    // Start animation
+    const isDesired = aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id;
+    const bonusHappiness = isDesired ? (aggieDesire.happiness || 0) : 0;
+    setAggieUsingItem({ id: item.id, happiness: item.happiness, bonusHappiness, key: Date.now() });
+    // After animation completes (~1.2s): boost happiness, consume item
+    clearTimeout(aggieUsingItemTimer.current);
+    aggieUsingItemTimer.current = setTimeout(() => {
+      setAggieHappiness(prev => {
+        const next = Math.min(AGGIE_MAX_HAPPINESS, prev + item.happiness + bonusHappiness);
+        saveAggieHappiness(next);
+        saveAggieLastInteract(Date.now());
+        return next;
+      });
+      // Consume one from inventory
+      setAggieInventory(prev => {
+        const count = (prev[item.id] || 0) - 1;
+        const next = { ...prev, [item.id]: Math.max(0, count) };
+        if (next[item.id] <= 0) delete next[item.id];
+        saveAggieInventory(next);
+        return next;
+      });
+      // Fulfill desire if matched
+      if (isDesired) {
+        const d = pickNewDesire();
+        setAggieDesire(d);
+        saveAggieDesire(d);
+      }
+      // Show happiness pop briefly, then clear
+      setTimeout(() => setAggieUsingItem(null), 800);
+    }, 1200);
+  }, [aggieInventory, aggieDesire, aggieUsingItem]);
 
   // Helper: buy/unlock an accessory
   const buyAccessory = useCallback((acc) => {
@@ -8752,6 +8788,7 @@ export default function Pattrn() {
                         {ownedItems.map((item, idx) => {
                           const pos = ROOM_ITEM_POSITIONS[idx % ROOM_ITEM_POSITIONS.length];
                           const count = aggieInventory[item.id] || 0;
+                          const isBeingUsed = aggieUsingItem && aggieUsingItem.id === item.id;
                           const itemAnims = {
                             "treat": "roomItemPulse 2.5s ease-in-out infinite",
                             "toy": "roomItemBounce 2s ease-in-out infinite",
@@ -8762,19 +8799,37 @@ export default function Pattrn() {
                             "plant": "roomItemSway 3.5s ease-in-out infinite",
                             "gem": "roomItemSparkle 2s ease-in-out infinite",
                           };
-                          const anim = itemAnims[item.id] || "roomItemBob 3s ease-in-out infinite";
+                          const useAnims = {
+                            "treat": "itemUseTreat 1.2s ease-in-out forwards",
+                            "toy": "itemUseToy 1.2s ease-in-out forwards",
+                            "blanket": "itemUseBlanket 1.2s ease-in-out forwards",
+                            "music-box": "itemUseMusic 1.2s ease-in-out forwards",
+                            "book": "itemUseBook 1.2s ease-in-out forwards",
+                            "lamp": "itemUseLamp 1.2s ease-in-out forwards",
+                            "plant": "itemUsePlant 1.2s ease-in-out forwards",
+                            "gem": "itemUseGem 1.2s ease-in-out forwards",
+                          };
+                          const anim = isBeingUsed
+                            ? (useAnims[item.id] || "itemUseTreat 1.2s ease-in-out forwards")
+                            : (itemAnims[item.id] || "roomItemBob 3s ease-in-out infinite");
                           // Stagger animation delay per item so they don't all sync
-                          const delay = `${idx * 0.4}s`;
+                          const delay = isBeingUsed ? "0s" : `${idx * 0.4}s`;
+                          const shopItem = AGGIE_SHOP_ITEMS.find(s => s.id === item.id);
                           return (
-                            <div key={item.id} style={{
-                              position: "absolute", left: pos.x, top: pos.y,
-                              display: "flex", flexDirection: "column", alignItems: "center",
-                              opacity: 0.85,
-                              animation: anim,
-                              animationDelay: delay,
-                            }}>
+                            <div
+                              key={item.id}
+                              onClick={() => { if (!isBeingUsed && shopItem) useAggieItem(shopItem); }}
+                              style={{
+                                position: "absolute", left: pos.x, top: pos.y,
+                                display: "flex", flexDirection: "column", alignItems: "center",
+                                opacity: 0.85,
+                                animation: anim,
+                                animationDelay: delay,
+                                cursor: isBeingUsed ? "default" : "pointer",
+                              }}
+                            >
                               {renderRoomItemIcon(item.id, 22)}
-                              {count > 1 && (
+                              {count > 1 && !isBeingUsed && (
                                 <span style={{
                                   fontSize: 7, fontWeight: 700, color: C.textDim,
                                   fontFamily: "'Inter', sans-serif", marginTop: -2,
@@ -8782,9 +8837,51 @@ export default function Pattrn() {
                                   x{count}
                                 </span>
                               )}
+                              {!isBeingUsed && (
+                                <span style={{
+                                  fontSize: 6, fontWeight: 700, color: C.accent,
+                                  fontFamily: "'Inter', sans-serif", marginTop: 1,
+                                  textTransform: "uppercase", letterSpacing: 0.5, opacity: 0.7,
+                                }}>
+                                  Use
+                                </span>
+                              )}
+                              {/* Music notes particle effect for music-box */}
+                              {isBeingUsed && item.id === "music-box" && [0, 1, 2].map(n => (
+                                <span key={n} style={{
+                                  position: "absolute", top: -2, left: `${8 + n * 6}px`,
+                                  fontSize: 10, color: "#DAA520",
+                                  animation: "itemUseMusicNote 1.2s ease-out forwards",
+                                  animationDelay: `${n * 0.2}s`,
+                                  pointerEvents: "none",
+                                  "--nr": `${(n - 1) * 25}deg`,
+                                }}>
+                                  ♪
+                                </span>
+                              ))}
                             </div>
                           );
                         })}
+
+                        {/* Happiness pop-up after item use completes */}
+                        {aggieUsingItem && (
+                          <div style={{
+                            position: "absolute", left: "50%", top: "30%",
+                            transform: "translateX(-50%)",
+                            pointerEvents: "none", zIndex: 5,
+                            animation: "itemUseHappyPop 1.8s ease-out forwards",
+                            animationDelay: "1s",
+                            opacity: 0,
+                          }}>
+                            <span style={{
+                              fontSize: 14, fontWeight: 800, color: C.correct,
+                              fontFamily: "'Inter', sans-serif",
+                              textShadow: `0 0 8px ${C.correct}60`,
+                            }}>
+                              +{aggieUsingItem.happiness + (aggieUsingItem.bonusHappiness || 0)}
+                            </span>
+                          </div>
+                        )}
 
                         {/* Aggie — centered, big */}
                         <div style={{
@@ -8796,7 +8893,9 @@ export default function Pattrn() {
                           <div style={{
                             width: 120, height: 120,
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            animation: isOn ? "companionFloat 3s ease-in-out infinite" : "none",
+                            animation: aggieUsingItem
+                              ? "aggieBounce 0.6s ease-in-out 1s 1"
+                              : isOn ? "companionFloat 3s ease-in-out infinite" : "none",
                           }}>
                             {renderAggieSVG(120, null, isOn, currentAcc, hMood)}
                           </div>
