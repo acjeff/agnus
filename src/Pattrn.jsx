@@ -3363,6 +3363,8 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
   const dragOffset = useRef({ x: 0, y: 0 });
   const posRef = useRef(pos);
   posRef.current = pos;
+  const peerAggieStatesRef = useRef(peerAggieStates);
+  peerAggieStatesRef.current = peerAggieStates;
 
   // --- Multiplayer Aggie state broadcasting ---
   const [interactionMenuTarget, setInteractionMenuTarget] = useState(null); // peer state to show menu for
@@ -3470,10 +3472,31 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
     return el.getBoundingClientRect();
   }, []);
 
+  // --- Peer aggie positions as obstacles (prevents coop overlap) ---
+  const getPeerObstacles = useCallback(() => {
+    const states = peerAggieStatesRef.current;
+    if (!states) return [];
+    return Object.entries(states)
+      .filter(([uid]) => uid !== myUid)
+      .map(([, state]) => {
+        const peerSize = state.size || 96;
+        const px = state.x || 0;
+        const py = state.y || 0;
+        return {
+          left: px - AVOID_PAD,
+          top: py - AVOID_PAD,
+          right: px + peerSize + AVOID_PAD,
+          bottom: py + peerSize + AVOID_PAD,
+        };
+      });
+  }, [myUid]);
+
   // --- Wandering with obstacle avoidance + screen wrapping ---
   const wanderTimerRef = useRef(null);
   const [isWandering, setIsWandering] = useState(false);
   const [isWrapping, setIsWrapping] = useState(false); // true = instant teleport (no CSS transition)
+  const isGlidingBackRef = useRef(false);
+  const [isGlidingBack, setIsGlidingBack] = useState(false);
 
   // When entering/leaving puzzle screen, reposition Aggie above the grid
   const prevOnPuzzleScreenRef = useRef(onPuzzleScreen);
@@ -3496,8 +3519,8 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
     if (dragging || mood) { setIsWandering(false); return; }
     setIsWandering(true);
 
-    // Immediately check if current position overlaps an obstacle (e.g. puzzle just appeared)
-    const obstacles = getObstacles();
+    // Immediately check if current position overlaps an obstacle or peer aggie
+    const obstacles = [...getObstacles(), ...getPeerObstacles()];
     if (hitsObstacle(posRef.current.x, posRef.current.y, obstacles)) {
       const safe = findSafeSpot(posRef.current.x, posRef.current.y, obstacles);
       setPos(safe);
@@ -3505,6 +3528,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
     }
 
     const wander = () => {
+      if (isGlidingBackRef.current) return; // Skip wander while gliding back from puzzle
       const cur = posRef.current;
       const maxW = window.innerWidth - AGGIE_SIZE;
       const maxH = window.innerHeight - AGGIE_SIZE;
@@ -3522,6 +3546,12 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
           if (nx < gridLeft) nx = gridLeft;
           if (nx > gridRight) nx = gridRight;
           const ny = Math.max(0, targetY);
+          // Avoid overlapping peer aggies
+          const peerObs = getPeerObstacles();
+          if (hitsObstacle(nx, ny, peerObs)) {
+            const safe = findSafeSpot(nx, ny, [...getObstacles(), ...peerObs]);
+            nx = Math.max(gridLeft, Math.min(gridRight, safe.x));
+          }
           const newPos = { x: nx, y: ny };
           setPos(newPos);
           try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(newPos)); } catch { /* ignore */ }
@@ -3531,7 +3561,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       }
 
       // --- Normal screen: wander freely everywhere ---
-      const obs = getObstacles();
+      const obs = [...getObstacles(), ...getPeerObstacles()];
       const range = 35;
 
       let nx = cur.x + (Math.random() - 0.5) * range * 2;
@@ -3575,7 +3605,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
     };
     schedule();
     return () => clearTimeout(wanderTimerRef.current);
-  }, [dragging, mood, onPuzzleScreen, getObstacles, getGridRect, hitsObstacle, findSafeSpot]);
+  }, [dragging, mood, onPuzzleScreen, getObstacles, getGridRect, hitsObstacle, findSafeSpot, getPeerObstacles]);
 
   // --- Keep Aggie on screen after window resize ---
   useEffect(() => {
@@ -3605,20 +3635,42 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
   useEffect(() => {
     if (dragging || mood) return;
     const check = setInterval(() => {
+      if (isGlidingBackRef.current) return; // Skip during glide animation
       if (onPuzzleScreen) {
         // On puzzle screen, keep Aggie pinned above the grid
         const gridRect = getGridRect();
         if (gridRect) {
           const targetY = Math.max(0, gridRect.top - AGGIE_SIZE - 8);
           const cur = posRef.current;
+          const maxW = window.innerWidth - AGGIE_SIZE;
+          const gridLeft = Math.max(0, gridRect.left - AGGIE_SIZE / 2);
+          const gridRight = Math.min(maxW, gridRect.right - AGGIE_SIZE / 2);
+          let newX = cur.x, newY = cur.y;
+          let needsUpdate = false;
           if (Math.abs(cur.y - targetY) > 4) {
-            const newPos = { x: cur.x, y: targetY };
+            newY = targetY;
+            needsUpdate = true;
+          }
+          // Check peer overlap on puzzle screen
+          const peerObs = getPeerObstacles();
+          if (peerObs.length > 0 && hitsObstacle(newX, newY, peerObs)) {
+            for (const offset of [AGGIE_SIZE + AVOID_PAD * 2, -(AGGIE_SIZE + AVOID_PAD * 2), (AGGIE_SIZE + AVOID_PAD * 2) * 2, -(AGGIE_SIZE + AVOID_PAD * 2) * 2]) {
+              const tx = Math.max(gridLeft, Math.min(gridRight, newX + offset));
+              if (!hitsObstacle(tx, newY, peerObs)) {
+                newX = tx;
+                needsUpdate = true;
+                break;
+              }
+            }
+          }
+          if (needsUpdate) {
+            const newPos = { x: newX, y: newY };
             setPos(newPos);
             try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(newPos)); } catch { /* ignore */ }
           }
         }
       } else {
-        const obs = getObstacles();
+        const obs = [...getObstacles(), ...getPeerObstacles()];
         if (obs.length > 0 && hitsObstacle(posRef.current.x, posRef.current.y, obs)) {
           const safe = findSafeSpot(posRef.current.x, posRef.current.y, obs);
           setPos(safe);
@@ -3627,7 +3679,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       }
     }, 2000);
     return () => clearInterval(check);
-  }, [dragging, mood, onPuzzleScreen, getObstacles, getGridRect, hitsObstacle, findSafeSpot]);
+  }, [dragging, mood, onPuzzleScreen, getObstacles, getGridRect, hitsObstacle, findSafeSpot, getPeerObstacles]);
 
   // --- Idle actions ---
   const [idleSpeech, setIdleSpeech] = useState(null);
@@ -3688,11 +3740,28 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
     };
     const onUp = () => {
       setDragging(false);
-      // After drag, nudge away from obstacles if overlapping
       const obs = getObstacles();
+      const peerObs = getPeerObstacles();
+      const allObs = [...obs, ...peerObs];
       const cur = posRef.current;
+      // Dropped on a UI obstacle (puzzle grid, menu, picker) — smooth glide off
       if (hitsObstacle(cur.x, cur.y, obs)) {
-        const safe = findSafeSpot(cur.x, cur.y, obs);
+        const safe = findSafeSpot(cur.x, cur.y, allObs);
+        isGlidingBackRef.current = true;
+        setIsGlidingBack(true);
+        setTimeout(() => {
+          setPos(safe);
+          try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(safe)); } catch { /* ignore */ }
+          setTimeout(() => {
+            isGlidingBackRef.current = false;
+            setIsGlidingBack(false);
+          }, 1200);
+        }, 50);
+        return;
+      }
+      // Nudge away from overlapping peer aggies
+      if (peerObs.length > 0 && hitsObstacle(cur.x, cur.y, peerObs)) {
+        const safe = findSafeSpot(cur.x, cur.y, allObs);
         setPos(safe);
       }
       try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(posRef.current)); } catch { /* ignore */ }
@@ -3707,7 +3776,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       window.removeEventListener("touchmove", onMove);
       window.removeEventListener("touchend", onUp);
     };
-  }, [dragging, getObstacles, hitsObstacle, findSafeSpot]);
+  }, [dragging, getObstacles, hitsObstacle, findSafeSpot, getPeerObstacles]);
 
   // Determine which body animation to use
   const bodyAnim = dragging
@@ -3727,12 +3796,14 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
   // Show speech below Aggie when near top of screen (otherwise it's clipped)
   const speechBelow = pos.y < 50;
 
-  // Transition: none when dragging or wrapping, smooth 8s for wandering, quick 0.3s for snap
+  // Transition: none when dragging or wrapping, smooth glide when leaving puzzle, smooth 8s for wandering, quick 0.3s for snap
   const posTransition = dragging || isWrapping
     ? "none"
-    : isWandering
-      ? "left 8s ease-in-out, top 8s ease-in-out"
-      : "left 0.3s ease, top 0.3s ease";
+    : isGlidingBack
+      ? "left 1.2s ease-in-out, top 1.2s ease-in-out"
+      : isWandering
+        ? "left 8s ease-in-out, top 8s ease-in-out"
+        : "left 0.3s ease, top 0.3s ease";
 
   return (
     <>
