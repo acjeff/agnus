@@ -102,6 +102,9 @@ import {
   removeAggieState,
   sendAggieInteraction,
   subscribeToAggieInteractions,
+  joinHangout,
+  leaveHangout,
+  subscribeToHangout,
 } from "./firebase.js";
 import VaultMode, { getVaultSummary } from "./vault/VaultMode.jsx";
 import VaultChat, { getUnreadCount } from "./vault/VaultChat.jsx";
@@ -1983,6 +1986,57 @@ function loadFailStreak() {
 }
 function saveFailStreak(n) {
   try { localStorage.setItem(AGGIE_FAIL_STREAK_KEY, String(n)); } catch { /* ignore */ }
+}
+
+// --- Aggie Inherent Traits ---
+// Each Aggie gets 1-2 random traits on first creation. Traits are permanent and provide passive bonuses.
+// When Aggies hang out together, they share trait benefits with each other.
+const AGGIE_TRAITS_KEY = "pattrn-aggie-traits";
+const AGGIE_TRAITS = [
+  { id: "lucky", label: "Lucky", desc: "10% chance of bonus coins on puzzle complete", icon: "clover", color: "#22C55E", chance: 0.10, effect: "bonus_coins" },
+  { id: "scholarly", label: "Scholarly", desc: "Hints are slightly more accurate", icon: "book", color: "#60A5FA", effect: "hint_accuracy" },
+  { id: "energetic", label: "Energetic", desc: "Happiness decays 50% slower", icon: "bolt", color: "#FBBF24", effect: "slow_decay" },
+  { id: "charming", label: "Charming", desc: "Shop items give 25% more happiness", icon: "sparkle", color: "#F472B6", effect: "item_bonus" },
+  { id: "resilient", label: "Resilient", desc: "30% chance to resist debuffs", icon: "shield", color: "#A78BFA", effect: "debuff_resist" },
+  { id: "generous", label: "Generous", desc: "Earn 20% bonus coins in co-op", icon: "heart", color: "#FB7185", effect: "coop_coins" },
+  { id: "keen-eyed", label: "Keen-Eyed", desc: "Hints appear more frequently", icon: "eye", color: "#34D399", effect: "hint_freq" },
+  { id: "thrifty", label: "Thrifty", desc: "15% chance items cost nothing", icon: "coin", color: "#FCD34D", effect: "free_item" },
+  { id: "brave", label: "Brave", desc: "Blind puzzles give 30% more coins", icon: "sword", color: "#F97316", effect: "blind_bonus" },
+  { id: "mystic", label: "Mystic", desc: "5% chance to auto-unlock an accessory", icon: "crystal", color: "#C084FC", effect: "free_accessory" },
+];
+
+function rollAggieTraits() {
+  // Give 1-2 traits randomly (weighted: ~60% chance of 1 trait, ~40% chance of 2)
+  const count = Math.random() < 0.4 ? 2 : 1;
+  const shuffled = [...AGGIE_TRAITS].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count).map(t => t.id);
+}
+
+function loadAggieTraits() {
+  try {
+    const raw = localStorage.getItem(AGGIE_TRAITS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+    // First load — roll traits
+    const traits = rollAggieTraits();
+    saveAggieTraits(traits);
+    return traits;
+  } catch {
+    const traits = rollAggieTraits();
+    saveAggieTraits(traits);
+    return traits;
+  }
+}
+
+function saveAggieTraits(traits) {
+  try { localStorage.setItem(AGGIE_TRAITS_KEY, JSON.stringify(traits)); } catch { /* ignore */ }
+}
+
+// Helper: check if a trait set (own or shared) includes a specific effect
+function hasTraitEffect(traitIds, effect) {
+  return traitIds.some(id => { const t = AGGIE_TRAITS.find(x => x.id === id); return t && t.effect === effect; });
 }
 
 // Calculate decayed happiness based on time since last interaction
@@ -5288,7 +5342,7 @@ export default function Pattrn() {
   const [addFriendLoading, setAddFriendLoading] = useState(false);
 
   // --- Friends Modal & Comparison state ---
-  const [friendsModalTab, setFriendsModalTab] = useState("list"); // "list" | "compare"
+  const [friendsModalTab, setFriendsModalTab] = useState("list"); // "list" | "compare" | "hangout"
   const [compareFriend, setCompareFriend] = useState(null); // friend object being compared
   const [compareFriendStats, setCompareFriendStats] = useState(null); // loaded public stats for comparison
   const [compareFriendLoading, setCompareFriendLoading] = useState(false);
@@ -5436,20 +5490,39 @@ export default function Pattrn() {
   const [aggieBuff, setAggieBuff] = useState(() => loadAggieBuff()); // active hint buff
   const [aggieDebuff, setAggieDebuff] = useState(() => loadAggieDebuff()); // active debuff
   const [aggieFailStreak, setAggieFailStreak] = useState(() => loadFailStreak()); // consecutive puzzle failures
+  const [aggieTraits, setAggieTraits] = useState(() => loadAggieTraits()); // inherent traits ["lucky", "brave"]
+
+  // --- Hangout system ---
+  const [hangoutActive, setHangoutActive] = useState(false); // currently in hangout
+  const [hangoutPeers, setHangoutPeers] = useState({}); // { uid: { username, accessory, traits, happinessMood, ... } }
+  const hangoutUnsubRef = useRef(null);
+  // Combined traits = own + shared from hangout peers
+  const hangoutSharedTraits = useMemo(() => {
+    if (!hangoutActive || !Object.keys(hangoutPeers).length) return aggieTraits;
+    const all = new Set(aggieTraits);
+    Object.values(hangoutPeers).forEach(p => { (p.traits || []).forEach(t => all.add(t)); });
+    return [...all];
+  }, [aggieTraits, hangoutActive, hangoutPeers]);
 
   // Happiness decay effect — runs every minute, decays based on elapsed time
+  // Energetic trait: decay 50% slower
   useEffect(() => {
     if (!activeCosmetic) return;
     const tick = () => {
       const stored = loadAggieHappiness();
       const lastInteract = loadAggieLastInteract();
-      const decayed = calcDecayedHappiness(stored, lastInteract);
+      let decayed = calcDecayedHappiness(stored, lastInteract);
+      // Energetic trait: recover half of the decay
+      if (hasTraitEffect(hangoutSharedTraits, "slow_decay")) {
+        const lost = stored - decayed;
+        decayed = Math.min(AGGIE_MAX_HAPPINESS, decayed + Math.floor(lost / 2));
+      }
       setAggieHappiness(decayed);
     };
     tick(); // run once on mount
     aggieDecayTimer.current = setInterval(tick, 60000); // check every minute
     return () => clearInterval(aggieDecayTimer.current);
-  }, [activeCosmetic]);
+  }, [activeCosmetic, hangoutSharedTraits]);
 
   // Check for broken daily streak on mount — penalize happiness
   useEffect(() => {
@@ -5484,15 +5557,25 @@ export default function Pattrn() {
   const earnCoins = useCallback((amount, happinessBonus = 0) => {
     // Fumble debuff: halve coin earnings
     const hasFumble = aggieDebuff && aggieDebuff.type === "fumble" && aggieDebuff.charges > 0;
-    const actualAmount = hasFumble ? Math.max(1, Math.floor(amount / 2)) : amount;
+    let actualAmount = hasFumble ? Math.max(1, Math.floor(amount / 2)) : amount;
+    // Lucky trait: 10% chance of bonus coins
+    if (hasTraitEffect(hangoutSharedTraits, "bonus_coins") && Math.random() < 0.10) {
+      actualAmount = Math.floor(actualAmount * 1.5);
+    }
+    // Generous trait: 20% bonus in co-op (check if in a coop session)
+    if (hasTraitEffect(hangoutSharedTraits, "coop_coins") && (coopSessionId || coopMosaicSessionId || vaultSessionId)) {
+      actualAmount = Math.floor(actualAmount * 1.2);
+    }
     setAggieCoins(prev => {
       const next = prev + actualAmount;
       saveAggieCoins(next);
       return next;
     });
     if (happinessBonus > 0) {
+      // Charming trait: shop items give 25% more happiness
+      const charmBonus = hasTraitEffect(hangoutSharedTraits, "item_bonus") ? Math.floor(happinessBonus * 0.25) : 0;
       setAggieHappiness(prev => {
-        const next = Math.min(AGGIE_MAX_HAPPINESS, prev + happinessBonus);
+        const next = Math.min(AGGIE_MAX_HAPPINESS, prev + happinessBonus + charmBonus);
         saveAggieHappiness(next);
         saveAggieLastInteract(Date.now());
         return next;
@@ -5503,13 +5586,15 @@ export default function Pattrn() {
     clearTimeout(coinAnimTimer.current);
     setCoinAnim({ amount: actualAmount, key: Date.now() });
     coinAnimTimer.current = setTimeout(() => setCoinAnim(null), 2000);
-  }, [aggieDebuff]);
+  }, [aggieDebuff, hangoutSharedTraits, coopSessionId, coopMosaicSessionId, vaultSessionId]);
 
   // Helper: spend coins on shop item (buy only — adds to inventory, no happiness)
   const buyAggieItem = useCallback((item) => {
     if (aggieCoins < item.cost) return false;
+    // Thrifty trait: 15% chance items cost nothing
+    const isFree = hasTraitEffect(hangoutSharedTraits, "free_item") && Math.random() < 0.15;
     setAggieCoins(prev => {
-      const next = prev - item.cost;
+      const next = isFree ? prev : prev - item.cost;
       saveAggieCoins(next);
       return next;
     });
@@ -5525,7 +5610,7 @@ export default function Pattrn() {
       saveAggieDesire(d);
     }
     return true;
-  }, [aggieCoins, aggieDesire]);
+  }, [aggieCoins, aggieDesire, hangoutSharedTraits]);
 
   // Helper: use an item from inventory — plays animation, then boosts happiness and consumes
   const useAggieItem = useCallback((item) => {
@@ -5608,6 +5693,74 @@ export default function Pattrn() {
     });
   }, [aggieCoins]);
 
+  // --- Hangout callbacks ---
+  const startHangout = useCallback(() => {
+    if (!firebaseUser?.uid || hangoutActive) return;
+    const myData = {
+      username: username || firebaseUser.email || "???",
+      accessory: aggieAccessory || {},
+      traits: aggieTraits || [],
+      happinessMood: aggieHappinessMood || "neutral",
+      size: aggieSize || "medium",
+    };
+    joinHangout(firebaseUser.uid, firebaseUser.uid, myData).catch(() => {});
+    // Subscribe to visitors
+    if (hangoutUnsubRef.current) hangoutUnsubRef.current();
+    hangoutUnsubRef.current = subscribeToHangout(firebaseUser.uid, (visitors) => {
+      const peers = {};
+      Object.entries(visitors).forEach(([uid, data]) => {
+        if (uid !== firebaseUser.uid) peers[uid] = data;
+      });
+      setHangoutPeers(peers);
+    });
+    setHangoutActive(true);
+  }, [firebaseUser, hangoutActive, username, aggieAccessory, aggieTraits, aggieHappinessMood, aggieSize]);
+
+  const stopHangout = useCallback(() => {
+    if (!firebaseUser?.uid) return;
+    leaveHangout(firebaseUser.uid, firebaseUser.uid).catch(() => {});
+    if (hangoutUnsubRef.current) { hangoutUnsubRef.current(); hangoutUnsubRef.current = null; }
+    setHangoutPeers({});
+    setHangoutActive(false);
+  }, [firebaseUser]);
+
+  const joinFriendHangout = useCallback((friendUid) => {
+    if (!firebaseUser?.uid) return;
+    const myData = {
+      username: username || firebaseUser.email || "???",
+      accessory: aggieAccessory || {},
+      traits: aggieTraits || [],
+      happinessMood: aggieHappinessMood || "neutral",
+      size: aggieSize || "medium",
+    };
+    joinHangout(friendUid, firebaseUser.uid, myData).catch(() => {});
+    // Subscribe to that friend's hangout
+    if (hangoutUnsubRef.current) hangoutUnsubRef.current();
+    hangoutUnsubRef.current = subscribeToHangout(friendUid, (visitors) => {
+      const peers = {};
+      Object.entries(visitors).forEach(([uid, data]) => {
+        if (uid !== firebaseUser.uid) peers[uid] = data;
+      });
+      setHangoutPeers(peers);
+    });
+    setHangoutActive(true);
+  }, [firebaseUser, username, aggieAccessory, aggieTraits, aggieHappinessMood, aggieSize]);
+
+  const leaveFriendHangout = useCallback((friendUid) => {
+    if (!firebaseUser?.uid) return;
+    leaveHangout(friendUid, firebaseUser.uid).catch(() => {});
+    if (hangoutUnsubRef.current) { hangoutUnsubRef.current(); hangoutUnsubRef.current = null; }
+    setHangoutPeers({});
+    setHangoutActive(false);
+  }, [firebaseUser]);
+
+  // Cleanup hangout on unmount
+  useEffect(() => {
+    return () => {
+      if (hangoutUnsubRef.current) hangoutUnsubRef.current();
+    };
+  }, []);
+
   // --- Multiplayer Aggie state ---
   const [peerAggieStates, setPeerAggieStates] = useState({});
   const [aggieInteractions, setAggieInteractions] = useState({});
@@ -5661,13 +5814,18 @@ export default function Pattrn() {
 
   // Helper: apply a debuff (replaces current debuff)
   const applyDebuff = useCallback((type, charges) => {
+    // Resilient trait: 30% chance to resist debuffs
+    if (hasTraitEffect(hangoutSharedTraits, "debuff_resist") && Math.random() < 0.30) {
+      triggerAggieSpeech("Shrugged it off!");
+      return;
+    }
     const debuff = { type, charges };
     setAggieDebuff(debuff);
     saveAggieDebuff(debuff);
     // Aggie reacts to the debuff
     const lines = AGGIE_DEBUFF_LINES[type] || ["Ugh..."];
     triggerAggieSpeech(lines[Math.floor(Math.random() * lines.length)]);
-  }, [triggerAggieSpeech]);
+  }, [triggerAggieSpeech, hangoutSharedTraits]);
 
   // Aggie menu-open reaction (~10% when menu opens)
   const prevMenuOpenRef = useRef(false);
@@ -6714,8 +6872,9 @@ export default function Pattrn() {
     companion: {
       active: activeCosmetic || null,
       accessory: aggieAccessory && Object.keys(aggieAccessory).length > 0 ? aggieAccessory : "none",
+      traits: aggieTraits || [],
     },
-  }), [progress, times, savedAchievementIds, activeThemeId, birthday, activeCosmetic, aggieAccessory]);
+  }), [progress, times, savedAchievementIds, activeThemeId, birthday, activeCosmetic, aggieAccessory, aggieTraits]);
 
   // Apply merged data to local state + localStorage
   const applyMergedData = useCallback((merged) => {
@@ -6754,6 +6913,10 @@ export default function Pattrn() {
         }
         setAggieAccessory(accSlots || {});
         saveAggieAccessory(accSlots || {});
+      }
+      if (merged.companion.traits && Array.isArray(merged.companion.traits) && merged.companion.traits.length > 0) {
+        setAggieTraits(merged.companion.traits);
+        saveAggieTraits(merged.companion.traits);
       }
     }
   }, []);
@@ -7156,7 +7319,7 @@ export default function Pattrn() {
     return () => {
       if (cloudSyncTimer.current) clearTimeout(cloudSyncTimer.current);
     };
-  }, [firebaseUser, progress, times, savedAchievementIds, activeThemeId, birthday, activeCosmetic, aggieAccessory, gatherLocalData, syncToCloud]);
+  }, [firebaseUser, progress, times, savedAchievementIds, activeThemeId, birthday, activeCosmetic, aggieAccessory, aggieTraits, gatherLocalData, syncToCloud]);
 
   // On initial auth (page reload while logged in): pull cloud data and merge
   const hasRestoredFromCloud = useRef(false);
@@ -8947,19 +9110,46 @@ export default function Pattrn() {
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
                     display: "flex", flexDirection: "column",
                   }}>
-                    {/* Header */}
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 4px 12px", borderBottom: `1px solid ${C.border}44`, marginBottom: 12, flexShrink: 0 }}>
-                      <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.text }}>Messages</div>
-                      {totalFriendChatUnread > 0 && (
-                        <span style={{
-                          fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
-                          color: "#fff", backgroundColor: C.accent,
-                          padding: "3px 9px", borderRadius: 12, minWidth: 18, textAlign: "center",
-                        }}>
-                          {totalFriendChatUnread > 99 ? "99+" : totalFriendChatUnread}
-                        </span>
-                      )}
+                    {/* Header with tab switcher */}
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 4px 0", flexShrink: 0, marginBottom: 12 }}>
+                      <div style={{ display: "flex", gap: 0, borderRadius: 8, overflow: "hidden", border: `1.5px solid ${C.border}`, flex: 1 }}>
+                        {[["list", "Messages"], ["hangout", "Hangout"]].map(([key, label]) => {
+                          const active = (friendsModalTab === "list" || friendsModalTab === "compare") ? key === "list" : friendsModalTab === key;
+                          return (
+                            <button key={key} onClick={() => setFriendsModalTab(key)}
+                              style={{
+                                flex: 1, padding: "7px 0", border: "none",
+                                backgroundColor: active ? C.accent + "20" : C.surface,
+                                color: active ? C.accent : C.textDim,
+                                fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                                letterSpacing: 0.5, textTransform: "uppercase",
+                                cursor: "pointer", transition: "all 0.15s",
+                                borderRight: key === "list" ? `1px solid ${C.border}` : "none",
+                                position: "relative",
+                              }}
+                            >
+                              {label}
+                              {key === "list" && totalFriendChatUnread > 0 && (
+                                <span style={{
+                                  position: "absolute", top: 2, right: 8,
+                                  width: 7, height: 7, borderRadius: "50%",
+                                  backgroundColor: C.accent,
+                                }} />
+                              )}
+                              {key === "hangout" && hangoutActive && (
+                                <span style={{
+                                  position: "absolute", top: 2, right: 8,
+                                  width: 7, height: 7, borderRadius: "50%",
+                                  backgroundColor: "#22C55E",
+                                }} />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
                     </div>
+                    {/* Messages tab content */}
+                    {(friendsModalTab === "list" || friendsModalTab === "compare") && <>
                         {/* Add friend input */}
                         <div style={{ display: "flex", gap: 8, marginBottom: addFriendMsg ? 4 : 12, flexShrink: 0, padding: "0 4px" }}>
                           <input
@@ -9260,6 +9450,204 @@ export default function Pattrn() {
                             })()
                           )}
                         </div>
+                    </>}
+                    {/* Hangout tab content */}
+                    {friendsModalTab === "hangout" && (
+                      <div style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column", padding: "0 4px" }}>
+                        {/* My traits display */}
+                        <div style={{ marginBottom: 12 }}>
+                          <div style={{ fontSize: 11, fontWeight: 700, color: C.text, fontFamily: "'Inter', sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                            Your Aggie's Traits
+                          </div>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {aggieTraits.map(tId => {
+                              const t = AGGIE_TRAITS.find(x => x.id === tId);
+                              if (!t) return null;
+                              return (
+                                <div key={tId} style={{
+                                  display: "flex", alignItems: "center", gap: 4,
+                                  padding: "4px 10px", borderRadius: 12,
+                                  backgroundColor: t.color + "18",
+                                  border: `1.5px solid ${t.color}44`,
+                                }}>
+                                  <div style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: t.color }} />
+                                  <span style={{ fontSize: 10, fontWeight: 700, color: t.color, fontFamily: "'Inter', sans-serif" }}>{t.label}</span>
+                                  <span style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>{t.desc}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Hangout area */}
+                        <div style={{
+                          position: "relative",
+                          height: 160, borderRadius: 12,
+                          backgroundColor: C.surface,
+                          border: `1.5px solid ${C.border}`,
+                          marginBottom: 12, overflow: "hidden",
+                        }}>
+                          {/* Ambient background */}
+                          <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 50% 80%, ${C.accent}08 0%, transparent 70%)` }} />
+                          {/* My aggie — centered */}
+                          <div style={{
+                            position: "absolute", left: "50%", top: "50%",
+                            transform: `translate(-50%, -50%)`,
+                            display: "flex", flexDirection: "column", alignItems: "center",
+                          }}>
+                            <div style={{ animation: "companionFloat 3s ease-in-out infinite" }}>
+                              {renderAggieSVG(64, null, true, aggieAccessory, aggieHappinessMood)}
+                            </div>
+                            <span style={{ fontSize: 8, fontWeight: 600, color: C.accent, fontFamily: "'Inter', sans-serif", marginTop: 2 }}>You</span>
+                          </div>
+                          {/* Peer aggies — positioned around */}
+                          {Object.entries(hangoutPeers).map(([uid, peer], idx) => {
+                            const angle = (idx / Math.max(Object.keys(hangoutPeers).length, 1)) * Math.PI * 2 - Math.PI / 2;
+                            const rx = 55, ry = 35;
+                            const px = 50 + rx * Math.cos(angle);
+                            const py = 50 + ry * Math.sin(angle);
+                            return (
+                              <div key={uid} style={{
+                                position: "absolute",
+                                left: `${px}%`, top: `${py}%`,
+                                transform: "translate(-50%, -50%)",
+                                display: "flex", flexDirection: "column", alignItems: "center",
+                                transition: "left 0.5s, top 0.5s",
+                              }}>
+                                <div style={{ animation: `companionFloat ${2.5 + idx * 0.3}s ease-in-out infinite` }}>
+                                  {renderAggieSVG(48, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
+                                </div>
+                                <span style={{ fontSize: 7, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>
+                                  {peer.username || "???"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                          {/* Empty state */}
+                          {!hangoutActive && Object.keys(hangoutPeers).length === 0 && (
+                            <div style={{
+                              position: "absolute", inset: 0,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif", opacity: 0.6,
+                              pointerEvents: "none",
+                            }}>
+                              Open your hangout to let friends visit!
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Hangout controls */}
+                        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                          {!hangoutActive ? (
+                            <button onClick={startHangout} style={{
+                              flex: 1, padding: "10px 0", borderRadius: 10,
+                              background: C.accent, color: C.bg,
+                              border: "none", fontSize: 12, fontWeight: 700,
+                              fontFamily: "'Inter', sans-serif", cursor: "pointer",
+                              letterSpacing: 0.5,
+                            }}>
+                              Open Hangout
+                            </button>
+                          ) : (
+                            <button onClick={stopHangout} style={{
+                              flex: 1, padding: "10px 0", borderRadius: 10,
+                              background: C.surface, color: C.textDim,
+                              border: `1.5px solid ${C.border}`, fontSize: 12, fontWeight: 700,
+                              fontFamily: "'Inter', sans-serif", cursor: "pointer",
+                              letterSpacing: 0.5,
+                            }}>
+                              Close Hangout
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Shared traits from hangout */}
+                        {hangoutActive && Object.keys(hangoutPeers).length > 0 && (
+                          <div style={{ marginBottom: 12 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, color: C.correct, fontFamily: "'Inter', sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                              Shared Trait Bonuses
+                            </div>
+                            <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                              {hangoutSharedTraits.filter(tId => !aggieTraits.includes(tId)).map(tId => {
+                                const t = AGGIE_TRAITS.find(x => x.id === tId);
+                                if (!t) return null;
+                                const fromPeer = Object.values(hangoutPeers).find(p => (p.traits || []).includes(tId));
+                                return (
+                                  <div key={tId} style={{
+                                    display: "flex", alignItems: "center", gap: 4,
+                                    padding: "3px 8px", borderRadius: 10,
+                                    backgroundColor: t.color + "12",
+                                    border: `1px dashed ${t.color}44`,
+                                  }}>
+                                    <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.color, opacity: 0.7 }} />
+                                    <span style={{ fontSize: 9, fontWeight: 600, color: t.color, fontFamily: "'Inter', sans-serif" }}>{t.label}</span>
+                                    {fromPeer && <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>via {fromPeer.username}</span>}
+                                  </div>
+                                );
+                              })}
+                              {hangoutSharedTraits.filter(tId => !aggieTraits.includes(tId)).length === 0 && (
+                                <span style={{ fontSize: 10, color: C.textDim, fontFamily: "'Inter', sans-serif", opacity: 0.6 }}>
+                                  No new traits shared yet — friends with different traits will add bonuses!
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Friend list — visit or invite */}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: C.text, fontFamily: "'Inter', sans-serif", marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                          Friends
+                        </div>
+                        <div style={{ flex: 1, minHeight: 0, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
+                          {friendsList.length === 0 ? (
+                            <div style={{ textAlign: "center", padding: 20, color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif" }}>
+                              Add friends in the Messages tab to hang out!
+                            </div>
+                          ) : friendsList.map(friend => {
+                            const presence = friendPresence[friend.uid];
+                            const isOnline = presence && presence.lastSeen && (Date.now() - presence.lastSeen) < 120000;
+                            const isPeerInHangout = !!hangoutPeers[friend.uid];
+                            return (
+                              <div key={friend.uid} style={{
+                                display: "flex", alignItems: "center", gap: 10,
+                                padding: "8px 10px", borderRadius: 10,
+                                backgroundColor: isPeerInHangout ? C.correct + "10" : C.surface,
+                                border: `1px solid ${isPeerInHangout ? C.correct + "44" : C.border}`,
+                              }}>
+                                <div style={{
+                                  width: 8, height: 8, borderRadius: 4,
+                                  backgroundColor: isOnline ? "#22C55E" : C.textDim + "44",
+                                  flexShrink: 0,
+                                }} />
+                                <div style={{ flex: 1, minWidth: 0 }}>
+                                  <div style={{ fontSize: 12, fontWeight: 600, color: C.text, fontFamily: "'Inter', sans-serif" }}>
+                                    {friend.username || "Friend"}
+                                  </div>
+                                  <div style={{ fontSize: 9, color: isPeerInHangout ? C.correct : C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                    {isPeerInHangout ? "Hanging out!" : isOnline ? "Online" : "Offline"}
+                                  </div>
+                                </div>
+                                {hangoutActive && !isPeerInHangout && isOnline && (
+                                  <span style={{ fontSize: 9, color: C.textDim, fontFamily: "'Inter', sans-serif", opacity: 0.5 }}>
+                                    Waiting...
+                                  </span>
+                                )}
+                                {!hangoutActive && isOnline && (
+                                  <button onClick={() => joinFriendHangout(friend.uid)} style={{
+                                    padding: "4px 10px", borderRadius: 6, fontSize: 9, fontWeight: 700,
+                                    fontFamily: "'Inter', sans-serif", letterSpacing: 0.5,
+                                    background: C.accent + "22", color: C.accent,
+                                    border: "none", cursor: "pointer", textTransform: "uppercase",
+                                  }}>
+                                    Visit
+                                  </button>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </>
               );
@@ -9332,6 +9720,44 @@ export default function Pattrn() {
                           }} />
                         </div>
                       </div>
+
+                      {/* Trait badges */}
+                      {aggieTraits.length > 0 && (
+                        <div style={{ display: "flex", gap: 4, marginBottom: 6, flexWrap: "wrap" }}>
+                          {aggieTraits.map(tId => {
+                            const t = AGGIE_TRAITS.find(x => x.id === tId);
+                            if (!t) return null;
+                            return (
+                              <div key={tId} title={t.desc} style={{
+                                display: "flex", alignItems: "center", gap: 3,
+                                padding: "2px 6px", borderRadius: 8,
+                                backgroundColor: t.color + "18",
+                                border: `1px solid ${t.color}33`,
+                              }}>
+                                <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.color }} />
+                                <span style={{ fontSize: 7, fontWeight: 700, color: t.color, fontFamily: "'Inter', sans-serif" }}>{t.label}</span>
+                              </div>
+                            );
+                          })}
+                          {hangoutActive && hangoutSharedTraits.filter(t => !aggieTraits.includes(t)).length > 0 && (
+                            hangoutSharedTraits.filter(t => !aggieTraits.includes(t)).map(tId => {
+                              const t = AGGIE_TRAITS.find(x => x.id === tId);
+                              if (!t) return null;
+                              return (
+                                <div key={`shared-${tId}`} title={`${t.desc} (shared from hangout)`} style={{
+                                  display: "flex", alignItems: "center", gap: 3,
+                                  padding: "2px 6px", borderRadius: 8,
+                                  backgroundColor: t.color + "08",
+                                  border: `1px dashed ${t.color}33`,
+                                }}>
+                                  <div style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: t.color, opacity: 0.5 }} />
+                                  <span style={{ fontSize: 7, fontWeight: 600, color: t.color, fontFamily: "'Inter', sans-serif", opacity: 0.7 }}>{t.label}</span>
+                                </div>
+                              );
+                            })
+                          )}
+                        </div>
+                      )}
 
                       {/* Desire — what Aggie wants */}
                       {desireText && (
@@ -13738,7 +14164,11 @@ export default function Pattrn() {
           showNewAchievements(newProgress, newTimes);
           // Earn coins for puzzle solve
           if (activeCosmetic) {
-            const reward = COINS_REWARD[difficulty] || 10;
+            let reward = COINS_REWARD[difficulty] || 10;
+            // Brave trait: blind puzzles give 30% more coins
+            if (difficulty === "blind" && hasTraitEffect(hangoutSharedTraits, "blind_bonus")) {
+              reward = Math.floor(reward * 1.3);
+            }
             const goldBonus = (attempts === 0) ? COINS_GOLD_BONUS : 0;
             earnCoins(reward + goldBonus, 3);
             // Check if puzzle matches Aggie's desire

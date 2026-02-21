@@ -786,6 +786,7 @@ export function mergeGameData(local, cloud) {
   merged.companion = {
     active: cloudComp.active !== undefined ? cloudComp.active : (localComp.active || null),
     accessory: cloudComp.accessory || localComp.accessory || "none",
+    traits: (cloudComp.traits && cloudComp.traits.length) ? cloudComp.traits : (localComp.traits || []),
   };
 
   return merged;
@@ -1721,4 +1722,33 @@ export function subscribeToAllFriendChatMetas(myUid, friendUids, callback) {
     unsubs.push(() => off(metaRef, "value", handler));
   }
   return () => unsubs.forEach(u => u());
+}
+
+// --- Aggie Hangout ---
+// A hangout is a persistent lounge keyed by the user's UID. Friends can join your hangout to share traits.
+// Each user's hangout stores the visitors currently present.
+
+// Join a friend's hangout (or your own) — publish your Aggie data
+export async function joinHangout(hostUid, visitorUid, visitorData) {
+  if (!db) return;
+  await set(ref(db, `hangouts/${hostUid}/${visitorUid}`), {
+    ...removeUndefined(visitorData),
+    joinedAt: serverTimestamp(),
+  });
+}
+
+// Leave a hangout
+export async function leaveHangout(hostUid, visitorUid) {
+  if (!db) return;
+  await remove(ref(db, `hangouts/${hostUid}/${visitorUid}`));
+}
+
+// Subscribe to all visitors in a hangout (real-time). Returns unsubscribe function.
+export function subscribeToHangout(hostUid, callback) {
+  if (!db) return () => {};
+  const hangoutRef = ref(db, `hangouts/${hostUid}`);
+  const handler = onValue(hangoutRef, (snap) => {
+    callback(snap.exists() ? snap.val() : {});
+  });
+  return () => off(hangoutRef, "value", handler);
 }
