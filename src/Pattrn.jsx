@@ -3031,8 +3031,9 @@ function updateUrl(mode, level, replace = true, date = null, viewParam = null) {
   if (vaultVal) params.set("vault", vaultVal);
   const search = params.toString();
   const url = search ? `${window.location.pathname}?${search}` : window.location.pathname;
-  if (replace) window.history.replaceState({}, "", url);
-  else window.history.pushState({}, "", url);
+  const prevState = window.history.state || {};
+  if (replace) window.history.replaceState(prevState, "", url);
+  else window.history.pushState(prevState, "", url);
 }
 
 function setCoopUrlParam(paramName, value) {
@@ -3040,7 +3041,7 @@ function setCoopUrlParam(paramName, value) {
   const params = new URLSearchParams(window.location.search);
   params.set(paramName, value);
   const url = `${window.location.pathname}?${params}`;
-  window.history.replaceState({}, "", url);
+  window.history.replaceState(window.history.state || {}, "", url);
 }
 
 function clearCoopUrlParam(paramName) {
@@ -3048,7 +3049,7 @@ function clearCoopUrlParam(paramName) {
   const params = new URLSearchParams(window.location.search);
   params.delete(paramName);
   const url = params.toString() ? `${window.location.pathname}?${params}` : window.location.pathname;
-  window.history.replaceState({}, "", url);
+  window.history.replaceState(window.history.state || {}, "", url);
 }
 
 // --- Main App ---
@@ -3538,6 +3539,43 @@ export default function Pattrn() {
 
   // Radial context button state — stack for nested menus (empty = closed, ["root"] = top level, ["root","play"] = sub-menu)
   const [radialMenuStack, setRadialMenuStack] = useState([]);
+
+  // --- Browser history for view navigation ---
+  const skipHistoryPush = useRef(false);
+  const historyViewRef = useRef(view);
+  const isInitialLoad = useRef(true);
+
+  // Push a history entry whenever view changes (except popstate-driven or initial load)
+  useEffect(() => {
+    if (view === historyViewRef.current) return;
+    historyViewRef.current = view;
+    if (skipHistoryPush.current) {
+      skipHistoryPush.current = false;
+      return;
+    }
+    if (isInitialLoad.current) {
+      // First navigation from URL restore — replace rather than push
+      window.history.replaceState({ ...window.history.state, view }, "");
+      isInitialLoad.current = false;
+    } else {
+      window.history.pushState({ view }, "", window.location.href);
+    }
+  }, [view]);
+
+  // Handle browser back/forward
+  useEffect(() => {
+    // Seed the initial history entry with the current view
+    window.history.replaceState({ ...window.history.state, view: "menu" }, "");
+    const onPopState = (e) => {
+      const restoredView = e.state?.view || "menu";
+      skipHistoryPush.current = true;
+      setView(restoredView);
+      // Close any open menus on back navigation
+      setRadialMenuStack([]);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
   // Lock body scroll when context menu is open
   useEffect(() => {
     const menuOpen = radialMenuStack.length > 0;
