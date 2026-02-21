@@ -1341,7 +1341,7 @@ function weightedGenIndex(r) {
 // --- EASY: 5x5, each shape gets a fixed color, pattern is shapes ---
 function buildEasyPuzzles() {
   const puzzles = [];
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 200; i++) {
     const r = rng(i * 6151 + 101);
     const palIdx = Math.floor(r() * PALETTES.length);
     const pal = shuffle(PALETTES[palIdx], r);
@@ -1367,7 +1367,7 @@ function buildEasyPuzzles() {
 // --- MEDIUM: 7x7, shapes+colors always paired, always 3 tile types ---
 function buildMediumPuzzles() {
   const puzzles = [];
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 200; i++) {
     const r = rng(i * 7919 + 42);
     const palIdx = Math.floor(r() * PALETTES.length);
     const pal = shuffle(PALETTES[palIdx], r);
@@ -1399,7 +1399,7 @@ function buildMediumPuzzles() {
 // --- HARD: 7x7, independent color + shape patterns ---
 function buildHardPuzzles() {
   const puzzles = [];
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 200; i++) {
     const r = rng(i * 10007 + 777);
     const palIdx = Math.floor(r() * PALETTES.length);
     const pal = shuffle(PALETTES[palIdx], r);
@@ -1439,7 +1439,7 @@ function buildBlindPuzzles() {
   const validWeights = validGens.map(idx => GEN_WEIGHTS[idx]);
   const totalW = validWeights.reduce((a, b) => a + b, 0);
 
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 200; i++) {
     const r = rng(i * 13331 + 999);
     const palIdx = Math.floor(r() * PALETTES.length);
     const pal = shuffle(PALETTES[palIdx], r);
@@ -1612,7 +1612,7 @@ function buildCascadePuzzle(level, runSeed) {
 // --- SPIN: 7x7 paired puzzles, grid rotates 90° periodically ---
 function buildSpinPuzzles() {
   const puzzles = [];
-  for (let i = 0; i < 50; i++) {
+  for (let i = 0; i < 200; i++) {
     const r = rng(i * 9001 + 555);
     const palIdx = Math.floor(r() * PALETTES.length);
     const pal = shuffle(PALETTES[palIdx], r);
@@ -2698,16 +2698,16 @@ const ACHIEVEMENTS = [
   // Progress — per mode
   { id: "easy_5", cat: "progress", label: "Easy Going", desc: "Solve 5 Easy puzzles", tier: 1, check: (p) => countModeSolved(p.easy) >= 5 },
   { id: "easy_25", cat: "progress", label: "Easy Street", desc: "Solve 25 Easy puzzles", tier: 2, check: (p) => countModeSolved(p.easy) >= 25 },
-  { id: "easy_50", cat: "progress", label: "Easy Master", desc: "Solve all 50 Easy", tier: 3, check: (p) => countModeSolved(p.easy) >= 50 },
+  { id: "easy_50", cat: "progress", label: "Easy Master", desc: "Solve 50 Easy puzzles", tier: 3, check: (p) => countModeSolved(p.easy) >= 50 },
   { id: "med_5", cat: "progress", label: "Intermediate", desc: "Solve 5 Medium puzzles", tier: 1, check: (p) => countModeSolved(p.medium) >= 5 },
   { id: "med_25", cat: "progress", label: "Seasoned", desc: "Solve 25 Medium puzzles", tier: 2, check: (p) => countModeSolved(p.medium) >= 25 },
-  { id: "med_50", cat: "progress", label: "Medium Master", desc: "Solve all 50 Medium", tier: 3, check: (p) => countModeSolved(p.medium) >= 50 },
+  { id: "med_50", cat: "progress", label: "Medium Master", desc: "Solve 50 Medium puzzles", tier: 3, check: (p) => countModeSolved(p.medium) >= 50 },
   { id: "hard_5", cat: "progress", label: "Hardened", desc: "Solve 5 Hard puzzles", tier: 1, check: (p) => countModeSolved(p.hard) >= 5 },
   { id: "hard_25", cat: "progress", label: "Tough Cookie", desc: "Solve 25 Hard puzzles", tier: 2, check: (p) => countModeSolved(p.hard) >= 25 },
-  { id: "hard_50", cat: "progress", label: "Hard Master", desc: "Solve all 50 Hard", tier: 3, check: (p) => countModeSolved(p.hard) >= 50 },
+  { id: "hard_50", cat: "progress", label: "Hard Master", desc: "Solve 50 Hard puzzles", tier: 3, check: (p) => countModeSolved(p.hard) >= 50 },
   { id: "blind_5", cat: "progress", label: "Blind Faith", desc: "Solve 5 Blind puzzles", tier: 1, check: (p) => countModeSolved(p.blind) >= 5 },
   { id: "blind_25", cat: "progress", label: "Sixth Sense", desc: "Solve 25 Blind puzzles", tier: 2, check: (p) => countModeSolved(p.blind) >= 25 },
-  { id: "blind_50", cat: "progress", label: "Blind Master", desc: "Solve all 50 Blind", tier: 3, check: (p) => countModeSolved(p.blind) >= 50 },
+  { id: "blind_50", cat: "progress", label: "Blind Master", desc: "Solve 50 Blind puzzles", tier: 3, check: (p) => countModeSolved(p.blind) >= 50 },
   { id: "daily_7", cat: "progress", label: "Regular", desc: "Solve 7 Daily puzzles", tier: 1, check: (p) => countModeSolved(p.daily) >= 7 },
   { id: "daily_25", cat: "progress", label: "Devoted", desc: "Solve 25 Daily puzzles", tier: 2, check: (p) => countModeSolved(p.daily) >= 25 },
   { id: "cascade_1", cat: "progress", label: "Cascade Clear", desc: "Complete a Cascade run", tier: 1, check: (p) => countCascadeClears(p.cascade) >= 1 },
@@ -14672,7 +14672,8 @@ export default function Pattrn() {
       let bestTime = null, totalTime = 0, timedCount = 0;
       const grid = [];
 
-      for (let i = 0; i < 50; i++) {
+      const modeCount = d.key === "mosaic" ? 25 : d.key === "cascade" || d.key === "daily" ? 50 : (PUZZLE_SETS[d.key]?.length ?? 50);
+      for (let i = 0; i < modeCount; i++) {
         const key = d.key === "daily" ? getDailyKey(i) : i;
         const result = dp[key];
         if (d.key === "cascade") {
@@ -14698,7 +14699,7 @@ export default function Pattrn() {
       if (bestTime != null && (bestTimeAll === null || bestTime < bestTimeAll)) bestTimeAll = bestTime;
 
       sections.push({
-        ...d, solved, gold, silver, bronze, failed, bestTime, grid,
+        ...d, solved, gold, silver, bronze, failed, bestTime, grid, modeCount,
         avgTime: timedCount > 0 ? Math.round(totalTime / timedCount) : null,
       });
     }
@@ -14724,18 +14725,22 @@ export default function Pattrn() {
     const blockChars = { none: "\u2591", failed: "\u2593", gold: "\u2588", silver: "\u2593", bronze: "\u2592" };
 
     let text = "Agnus \uD83E\uDDE9\n\n";
+    let grandTotal = 0;
     for (const s of sections) {
-      text += `${emojis[s.key]} ${s.label}: ${s.solved}/50 solved`;
+      grandTotal += s.modeCount;
+      text += `${emojis[s.key]} ${s.label}: ${s.solved}/${s.modeCount} solved`;
       if (s.bestTime != null) text += ` \u2022 best ${formatTime(s.bestTime)}`;
       if (s.avgTime != null) text += ` \u2022 avg ${formatTime(s.avgTime)}`;
       text += "\n";
-      for (let row = 0; row < 5; row++) {
-        text += s.grid.slice(row * 10, (row + 1) * 10).map(g => blockChars[g]).join("") + "\n";
+      const cols = Math.min(20, s.modeCount);
+      const rows = Math.ceil(s.modeCount / cols);
+      for (let row = 0; row < rows; row++) {
+        text += s.grid.slice(row * cols, (row + 1) * cols).map(g => blockChars[g]).join("") + "\n";
       }
       text += "\n";
     }
     text += `\u2605 ${totalGold} gold \u2022 \u25CF ${totalSilver} silver \u2022 \u25C6 ${totalBronze} bronze \u2022 \u2717 ${totalFailed} failed\n`;
-    text += `Total: ${totalSolved}/300 solved`;
+    text += `Total: ${totalSolved}/${grandTotal} solved`;
     if (bestTimeAll != null) text += ` \u2022 Fastest: ${formatTime(bestTimeAll)}`;
     return text;
   };
@@ -18729,7 +18734,7 @@ export default function Pattrn() {
                   const solved = d.key === "cascade"
                     ? Object.keys(dp).filter((k) => /^\d+$/.test(k) && dp[k] === CASCADE_LEVELS.length).length
                     : Object.keys(dp).filter((k) => dp[k] > 0).length;
-                  const modeTotal = d.key === "mosaic" ? 25 : 50;
+                  const modeTotal = d.key === "mosaic" ? 25 : d.key === "cascade" ? 50 : (PUZZLE_SETS[d.key]?.length ?? 50);
                   const isCleared = !isVaultEntry && d.key !== "daily" && solved >= modeTotal;
                   const progressPct = isVaultEntry || d.key === "daily" ? 0 : Math.min(100, (solved / modeTotal) * 100);
                   const activeBg = isCleared ? C.gold : d.key === "blind" ? "#e06040" : C.accent;
@@ -18822,7 +18827,7 @@ export default function Pattrn() {
                           color: active ? (activeText + "99") : isCleared ? C.gold + "bb" : C.textDim,
                           textTransform: "none",
                         }}>
-                          {d.key === "daily" ? `${solved} solved` : d.key === "mosaic" ? `${solved}/25` : `${solved}/50`}{isCleared ? " \u2713" : ""}
+                          {d.key === "daily" ? `${solved} solved` : `${solved}/${modeTotal}`}{isCleared ? " \u2713" : ""}
                         </span>
                       )}
                     </button>
@@ -19208,7 +19213,7 @@ export default function Pattrn() {
           const mSolved = difficulty === "cascade"
             ? Object.keys(dp).filter(k => /^\d+$/.test(k) && dp[k] === CASCADE_LEVELS.length).length
             : Object.keys(dp).filter(k => dp[k] > 0).length;
-          const mTotal = 50;
+          const mTotal = difficulty === "cascade" ? 50 : (PUZZLE_SETS[difficulty]?.length ?? 50);
           const mPct = Math.min(100, (mSolved / mTotal) * 100);
           return mSolved > 0 ? (
             <div style={{
