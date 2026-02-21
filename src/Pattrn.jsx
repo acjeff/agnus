@@ -6867,7 +6867,7 @@ export default function Pattrn() {
           </div>
 
           {/* Menu content — always rendered, animated via transitions */}
-          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", flex: isOpen ? 1 : 0, height: isOpen ? undefined : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? (isWidePanel ? "hidden" : "auto") : "hidden", WebkitOverflowScrolling: "touch" }}>
+          <div style={{ padding: isOpen ? `${panelPad}px 0 0 0` : "0", height: isOpen ? `calc(100% - ${fabSize + (hasPassUI ? passUIHeight : 0)}px)` : 0, display: "flex", flexDirection: "column", minHeight: 0, overflowX: "hidden", overflowY: isOpen ? (isWidePanel ? "hidden" : "auto") : "hidden", WebkitOverflowScrolling: "touch", boxSizing: "border-box" }}>
             {isSignInMenu ? (() => {
               return (
                 <>
