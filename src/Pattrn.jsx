@@ -97,6 +97,11 @@ import {
   updateFriendChatLastRead,
   subscribeToFriendChatLastReads,
   subscribeToAllFriendChatMetas,
+  updateAggieState,
+  subscribeToAggieStates,
+  removeAggieState,
+  sendAggieInteraction,
+  subscribeToAggieInteractions,
 } from "./firebase.js";
 import VaultMode, { getVaultSummary } from "./vault/VaultMode.jsx";
 import VaultChat, { getUnreadCount } from "./vault/VaultChat.jsx";
@@ -3127,7 +3132,222 @@ const IDLE_ANIMS = {
   yawn: "aggieYawn 1.2s ease-in-out",
 };
 
-function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false }) {
+// --- Multiplayer Aggie Interactions ---
+const AGGIE_INTERACTIONS = [
+  { id: "wave", label: "Wave", emoji: "👋" },
+  { id: "high-five", label: "High Five", emoji: "🙌" },
+  { id: "bump", label: "Bump", emoji: "👊" },
+  { id: "dance", label: "Dance", emoji: "💃" },
+  { id: "nuzzle", label: "Nuzzle", emoji: "🥰" },
+  { id: "boop", label: "Boop", emoji: "👆" },
+];
+const AGGIE_INTERACTION_LINES = {
+  "wave": ["Hey there!", "Hiii!", "*waves*", "Hello friend!"],
+  "high-five": ["High five!", "Yeah!", "Wooo!", "*slap*"],
+  "bump": ["*bump*", "Fist bump!", "Boop!", "Pow!"],
+  "dance": ["*dances*", "Let's groove!", "Dance party!", "💃🕺"],
+  "nuzzle": ["*nuzzle*", "Cozy...", "Snuggle!", "Warm..."],
+  "boop": ["*boop*", "Boop!", "Got your nose!", "Hehe!"],
+};
+const AGGIE_INTERACTION_ANIMS = {
+  "wave": "aggiePeek 1s ease-in-out",
+  "high-five": "aggieBounce 0.5s ease-in-out",
+  "bump": "aggieWiggle 0.6s ease-in-out",
+  "dance": "aggieSpin 0.7s ease-in-out",
+  "nuzzle": "aggieStretch 0.8s ease-in-out",
+  "boop": "aggieBounce 0.5s ease-in-out",
+};
+const PEER_AGGIE_PROXIMITY = 120; // pixels — distance to show interaction menu
+
+// --- PeerAggie: Renders another player's Aggie as a ghost-like companion ---
+function PeerAggie({ state, myPos, mySize, onInteract }) {
+  const [interactionAnim, setInteractionAnim] = useState(null);
+  const [speech, setSpeech] = useState(null);
+  const speechTimer = useRef(null);
+  const size = state.size || 96;
+  const accessory = state.accessory || "none";
+  const mood = state.mood || null;
+
+  // Calculate distance to local Aggie
+  const dx = (state.x || 0) - (myPos?.x || 0);
+  const dy = (state.y || 0) - (myPos?.y || 0);
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  const isNear = dist < PEER_AGGIE_PROXIMITY;
+
+  // Handle incoming interaction animation
+  useEffect(() => {
+    if (state.activeInteraction) {
+      setInteractionAnim(AGGIE_INTERACTION_ANIMS[state.activeInteraction] || "aggieWiggle 0.6s ease-in-out");
+      const lines = AGGIE_INTERACTION_LINES[state.activeInteraction];
+      if (lines) {
+        const line = lines[Math.floor(Math.random() * lines.length)];
+        setSpeech(line);
+        clearTimeout(speechTimer.current);
+        speechTimer.current = setTimeout(() => setSpeech(null), 2500);
+      }
+      const t = setTimeout(() => setInteractionAnim(null), 1200);
+      return () => { clearTimeout(t); clearTimeout(speechTimer.current); };
+    }
+  }, [state.activeInteraction, state.interactionTs]);
+
+  const bodyAnim = interactionAnim
+    ? interactionAnim
+    : mood === "celebrate"
+      ? "companionCelebrate 0.4s ease infinite"
+      : mood === "sad"
+        ? "companionSad 1.5s ease-in-out infinite"
+        : "companionFloat 3s ease-in-out infinite";
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        left: state.x || 0,
+        top: state.y || 0,
+        zIndex: 89,
+        pointerEvents: "none",
+        transition: "left 1.2s ease-out, top 1.2s ease-out",
+      }}
+    >
+      {/* Username label */}
+      <div style={{
+        position: "absolute",
+        bottom: size + 2,
+        left: "50%",
+        transform: "translateX(-50%)",
+        whiteSpace: "nowrap",
+        fontSize: 10,
+        fontWeight: 700,
+        fontFamily: "'SF Mono', 'Fira Code', monospace",
+        color: "#c8c6f0",
+        background: "rgba(0,0,0,0.5)",
+        backdropFilter: "blur(4px)",
+        WebkitBackdropFilter: "blur(4px)",
+        padding: "2px 8px",
+        borderRadius: 8,
+        pointerEvents: "none",
+        letterSpacing: 0.3,
+      }}>
+        {state.username || "???"}
+      </div>
+
+      {/* Speech bubble */}
+      {speech && (
+        <div key={speech + Date.now()} style={{
+          position: "absolute",
+          bottom: size + 20,
+          left: 4,
+          whiteSpace: "nowrap",
+          pointerEvents: "none",
+          animation: "aggieSpeechFloat 3s ease-out forwards",
+          zIndex: 91,
+          padding: "5px 10px",
+          borderRadius: 12,
+          backgroundColor: "rgba(0, 0, 0, 0.45)",
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+          fontSize: 11,
+          fontWeight: 600,
+          fontFamily: "'SF Mono', 'Fira Code', monospace",
+          color: "#e0dff4",
+        }}>
+          {speech}
+        </div>
+      )}
+
+      {/* Aggie body — slightly transparent to indicate it's a peer */}
+      <div style={{
+        width: size,
+        height: size,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: 0.75,
+        filter: "drop-shadow(0 3px 8px rgba(0,0,0,0.5)) drop-shadow(0 0 6px rgba(100,90,180,0.3))",
+        animation: bodyAnim,
+        pointerEvents: isNear ? "auto" : "none",
+        cursor: isNear ? "pointer" : "default",
+      }}
+        onClick={isNear ? (e) => { e.stopPropagation(); onInteract?.(state); } : undefined}
+        title={isNear ? `Interact with ${state.username || "Aggie"}` : ""}
+      >
+        {renderAggieSVG(size, mood, true, accessory)}
+      </div>
+    </div>
+  );
+}
+
+// --- Aggie Interaction Menu (shows when clicking a nearby peer Aggie) ---
+function AggieInteractionMenu({ targetState, onSelect, onClose, position }) {
+  return (
+    <div style={{
+      position: "fixed",
+      left: position.x,
+      top: position.y,
+      zIndex: 200,
+      transform: "translate(-50%, -100%)",
+      display: "flex",
+      gap: 4,
+      padding: "6px 8px",
+      borderRadius: 16,
+      background: "rgba(10, 8, 20, 0.85)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+      border: "1px solid rgba(200,196,240,0.15)",
+      boxShadow: "0 8px 32px rgba(0,0,0,0.6)",
+      animation: "aggieMenuPop 0.2s ease-out",
+    }}>
+      <style>{`@keyframes aggieMenuPop { 0% { opacity: 0; transform: translate(-50%, -100%) scale(0.8); } 100% { opacity: 1; transform: translate(-50%, -100%) scale(1); } }`}</style>
+      {AGGIE_INTERACTIONS.map(action => (
+        <button
+          key={action.id}
+          onClick={(e) => { e.stopPropagation(); onSelect(action.id); }}
+          title={action.label}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 10,
+            border: "1px solid rgba(200,196,240,0.1)",
+            background: "rgba(30,26,50,0.8)",
+            cursor: "pointer",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 18,
+            transition: "background 0.15s, transform 0.15s",
+            padding: 0,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = "rgba(100,90,180,0.4)"; e.currentTarget.style.transform = "scale(1.15)"; }}
+          onMouseLeave={e => { e.currentTarget.style.background = "rgba(30,26,50,0.8)"; e.currentTarget.style.transform = "scale(1)"; }}
+        >
+          {action.emoji}
+        </button>
+      ))}
+      <button
+        onClick={(e) => { e.stopPropagation(); onClose(); }}
+        style={{
+          width: 28,
+          height: 28,
+          borderRadius: 8,
+          border: "none",
+          background: "rgba(255,100,100,0.2)",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 12,
+          color: "#ff8888",
+          alignSelf: "center",
+          padding: 0,
+        }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false, peerAggieStates, myUid, sessionType, sessionId, username: myUsername, onSendInteraction }) {
   const AGGIE_SIZE = size;
   const AVOID_PAD = 16; // extra padding around obstacles
 
@@ -3143,6 +3363,67 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
   const dragOffset = useRef({ x: 0, y: 0 });
   const posRef = useRef(pos);
   posRef.current = pos;
+
+  // --- Multiplayer Aggie state broadcasting ---
+  const [interactionMenuTarget, setInteractionMenuTarget] = useState(null); // peer state to show menu for
+  const [myActiveInteraction, setMyActiveInteraction] = useState(null);
+  const myInteractionTimer = useRef(null);
+  const broadcastTimer = useRef(null);
+  const lastBroadcastRef = useRef(null);
+
+  // Broadcast own Aggie state to Firebase when in a coop session
+  useEffect(() => {
+    if (!sessionId || !sessionType || !myUid) return;
+    const broadcast = () => {
+      const cur = posRef.current;
+      const state = {
+        x: Math.round(cur.x),
+        y: Math.round(cur.y),
+        accessory: accessory || "none",
+        size: size,
+        mood: mood || null,
+        username: myUsername || "???",
+        activeInteraction: myActiveInteraction || null,
+        interactionTs: myActiveInteraction ? Date.now() : null,
+      };
+      // Throttle: only write if something changed
+      const key = JSON.stringify(state);
+      if (key !== lastBroadcastRef.current) {
+        lastBroadcastRef.current = key;
+        updateAggieState(sessionType, sessionId, myUid, state).catch(() => {});
+      }
+    };
+    // Broadcast immediately, then every 800ms
+    broadcast();
+    broadcastTimer.current = setInterval(broadcast, 800);
+    return () => {
+      clearInterval(broadcastTimer.current);
+      // Clean up on unmount / session leave
+      removeAggieState(sessionType, sessionId, myUid).catch(() => {});
+    };
+  }, [sessionId, sessionType, myUid, accessory, size, mood, myUsername, myActiveInteraction]);
+
+  // Close interaction menu when clicking elsewhere
+  useEffect(() => {
+    if (!interactionMenuTarget) return;
+    const close = () => setInteractionMenuTarget(null);
+    window.addEventListener("pointerdown", close);
+    return () => window.removeEventListener("pointerdown", close);
+  }, [interactionMenuTarget]);
+
+  const handlePeerInteract = useCallback((peerState) => {
+    setInteractionMenuTarget(peerState);
+  }, []);
+
+  const handleSendInteraction = useCallback((actionId) => {
+    if (!interactionMenuTarget || !onSendInteraction) return;
+    onSendInteraction(interactionMenuTarget.uid, actionId);
+    // Play my own animation too
+    setMyActiveInteraction(actionId);
+    clearTimeout(myInteractionTimer.current);
+    myInteractionTimer.current = setTimeout(() => setMyActiveInteraction(null), 1200);
+    setInteractionMenuTarget(null);
+  }, [interactionMenuTarget, onSendInteraction]);
 
   // --- Obstacle avoidance helpers ---
   const getObstacles = useCallback(() => {
@@ -3431,13 +3712,15 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
   // Determine which body animation to use
   const bodyAnim = dragging
     ? "none"
-    : mood === "celebrate"
-      ? "companionCelebrate 0.4s ease infinite"
-      : mood === "sad"
-        ? "companionSad 1.5s ease-in-out infinite"
-        : idleAction
-          ? IDLE_ANIMS[idleAction]
-          : "none"; // wandering replaces the old float bob
+    : myActiveInteraction
+      ? (AGGIE_INTERACTION_ANIMS[myActiveInteraction] || "aggieWiggle 0.6s ease-in-out")
+      : mood === "celebrate"
+        ? "companionCelebrate 0.4s ease infinite"
+        : mood === "sad"
+          ? "companionSad 1.5s ease-in-out infinite"
+          : idleAction
+            ? IDLE_ANIMS[idleAction]
+            : "none"; // wandering replaces the old float bob
 
   // Determine if bubble should show on left (companion near right edge)
   const bubbleOnLeft = pos.x > window.innerWidth - 140;
@@ -3452,6 +3735,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       : "left 0.3s ease, top 0.3s ease";
 
   return (
+    <>
     <div
       style={{
         position: "fixed",
@@ -3613,6 +3897,34 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
         return tears;
       })()}
     </div>
+
+    {/* --- Peer Aggies from coop session --- */}
+    {peerAggieStates && Object.entries(peerAggieStates)
+      .filter(([uid]) => uid !== myUid)
+      .map(([uid, peerState]) => (
+        <PeerAggie
+          key={uid}
+          state={{ ...peerState, uid }}
+          myPos={pos}
+          mySize={AGGIE_SIZE}
+          onInteract={handlePeerInteract}
+        />
+      ))
+    }
+
+    {/* --- Interaction menu when clicking a nearby peer Aggie --- */}
+    {interactionMenuTarget && (
+      <AggieInteractionMenu
+        targetState={interactionMenuTarget}
+        onSelect={handleSendInteraction}
+        onClose={() => setInteractionMenuTarget(null)}
+        position={{
+          x: (interactionMenuTarget.x || 0) + (interactionMenuTarget.size || 96) / 2,
+          y: (interactionMenuTarget.y || 0) - 10,
+        }}
+      />
+    )}
+    </>
   );
 }
 
@@ -4045,6 +4357,12 @@ export default function Pattrn() {
   const [aggieSpeech, setAggieSpeech] = useState(null);
   const aggieSpeechTimer = useRef(null);
 
+  // --- Multiplayer Aggie state ---
+  const [peerAggieStates, setPeerAggieStates] = useState({});
+  const [aggieInteractions, setAggieInteractions] = useState({});
+  const aggieStatesUnsubRef = useRef(null);
+  const aggieInteractionsUnsubRef = useRef(null);
+
   // --- Staff Pick & Admin Manage state ---
   const [staffPickMosaic, setStaffPickMosaic] = useState(null); // the staff pick mosaic object
   const staffPickPuzzlesRef = useRef(null); // puzzles built from staff pick grid
@@ -4089,6 +4407,83 @@ export default function Pattrn() {
     }
     prevMenuOpenRef.current = isOpen;
   }, [radialMenuStack, triggerAggieSpeech]);
+
+  // --- Multiplayer Aggie subscriptions ---
+  // Determine active coop session type & ID
+  const activeCoopSessionType = vaultSessionId ? "coopVaultSessions" : coopMosaicSessionId ? "coopMosaicSessions" : coopSessionId ? "coopSessions" : null;
+  const activeCoopSessionId = vaultSessionId || coopMosaicSessionId || coopSessionId || null;
+
+  // Subscribe to peer Aggie states when in any coop session
+  useEffect(() => {
+    if (aggieStatesUnsubRef.current) { aggieStatesUnsubRef.current(); aggieStatesUnsubRef.current = null; }
+    if (!activeCoopSessionType || !activeCoopSessionId || !firebaseUser || !activeCosmetic) {
+      setPeerAggieStates({});
+      return;
+    }
+    const unsub = subscribeToAggieStates(activeCoopSessionType, activeCoopSessionId, (states) => {
+      setPeerAggieStates(states || {});
+    });
+    aggieStatesUnsubRef.current = unsub;
+    return () => { if (unsub) unsub(); aggieStatesUnsubRef.current = null; };
+  }, [activeCoopSessionType, activeCoopSessionId, firebaseUser, activeCosmetic]);
+
+  // Subscribe to Aggie interactions when in any coop session
+  useEffect(() => {
+    if (aggieInteractionsUnsubRef.current) { aggieInteractionsUnsubRef.current(); aggieInteractionsUnsubRef.current = null; }
+    if (!activeCoopSessionType || !activeCoopSessionId || !firebaseUser || !activeCosmetic) {
+      setAggieInteractions({});
+      return;
+    }
+    const unsub = subscribeToAggieInteractions(activeCoopSessionType, activeCoopSessionId, (interactions) => {
+      setAggieInteractions(interactions || {});
+    });
+    aggieInteractionsUnsubRef.current = unsub;
+    return () => { if (unsub) unsub(); aggieInteractionsUnsubRef.current = null; };
+  }, [activeCoopSessionType, activeCoopSessionId, firebaseUser, activeCosmetic]);
+
+  // Process incoming Aggie interactions targeted at me — show speech bubble & trigger reaction
+  const lastProcessedInteractionRef = useRef(null);
+  useEffect(() => {
+    if (!firebaseUser || !activeCosmetic) return;
+    const myUid = firebaseUser.uid;
+    // Find the most recent interaction targeting me
+    const incoming = Object.values(aggieInteractions)
+      .filter(i => i.toUid === myUid && i.timestamp)
+      .sort((a, b) => b.timestamp - a.timestamp)[0];
+    if (!incoming) return;
+    const key = `${incoming.fromUid}-${incoming.type}-${incoming.timestamp}`;
+    if (key === lastProcessedInteractionRef.current) return;
+    lastProcessedInteractionRef.current = key;
+    // Show speech from the interaction
+    const lines = AGGIE_INTERACTION_LINES[incoming.type];
+    if (lines) {
+      const line = lines[Math.floor(Math.random() * lines.length)];
+      triggerAggieSpeech(`${incoming.fromUsername || "Friend"}: ${line}`, 3000);
+    }
+  }, [aggieInteractions, firebaseUser, activeCosmetic, triggerAggieSpeech]);
+
+  // Build enriched peer Aggie states with interaction status
+  const enrichedPeerAggieStates = useMemo(() => {
+    if (!firebaseUser) return {};
+    const states = { ...peerAggieStates };
+    // Merge in active interactions for each peer
+    for (const interaction of Object.values(aggieInteractions)) {
+      if (states[interaction.fromUid] && interaction.toUid === firebaseUser.uid) {
+        states[interaction.fromUid] = {
+          ...states[interaction.fromUid],
+          activeInteraction: interaction.type,
+          interactionTs: interaction.timestamp,
+        };
+      }
+    }
+    return states;
+  }, [peerAggieStates, aggieInteractions, firebaseUser]);
+
+  // Handler to send an Aggie interaction from local player to a peer
+  const handleSendAggieInteraction = useCallback((toUid, actionId) => {
+    if (!activeCoopSessionType || !activeCoopSessionId || !firebaseUser) return;
+    sendAggieInteraction(activeCoopSessionType, activeCoopSessionId, firebaseUser.uid, toUid, actionId, username || firebaseUser.email).catch(() => {});
+  }, [activeCoopSessionType, activeCoopSessionId, firebaseUser, username]);
 
   // Listen for auth state changes
   useEffect(() => {
@@ -12391,7 +12786,7 @@ export default function Pattrn() {
 
   // --- Global modals element (included in every return) ---
   // --- Floating Aggie Companion ---
-  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} /> : null;
+  const floatingCosmeticEl = activeCosmetic ? <FloatingCosmetic mood={companionMood} accessory={aggieAccessory} speech={aggieSpeech} size={AGGIE_SIZES[aggieSize] || 96} onPuzzleScreen={view === "play"} peerAggieStates={activeCoopSessionId ? enrichedPeerAggieStates : null} myUid={firebaseUser?.uid} sessionType={activeCoopSessionType} sessionId={activeCoopSessionId} username={username || firebaseUser?.email} onSendInteraction={handleSendAggieInteraction} /> : null;
 
   const globalModalsEl = (
     <>
