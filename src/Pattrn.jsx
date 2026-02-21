@@ -6181,7 +6181,7 @@ export default function Pattrn() {
     const buildRootWithProfile = (viewSpecificItems) => {
       const items = [...viewSpecificItems];
       // Theme — always accessible at top level
-      items.push({ id: "root-theme", icon: "palette", label: "Theme", sub: "theme" });
+      items.push({ id: "root-theme", icon: "palette", label: "Theme", sub: "theme-list" });
       // Aggie — always accessible, no login required
       items.push({ id: "profile-aggie", icon: activeCosmetic ? "aggie-on" : "aggie-off", label: "Aggie", sub: "aggie-wardrobe" });
       if (firebaseConfigured && firebaseUser) {
@@ -8107,31 +8107,36 @@ export default function Pattrn() {
                         <span style={{
                           display: "flex", alignItems: "center", justifyContent: "center",
                           width: 28, height: 28, flexShrink: 0,
-                          borderRadius: 8,
-                          backgroundColor: theme.gridBg || C.surfaceLight,
-                          border: `1.5px solid ${theme.gridBorder || C.border}`,
-                          position: "relative", overflow: "hidden",
                         }}>
-                          {theme.icon ? (
-                            <span style={{ fontSize: 14, lineHeight: 1 }}>{theme.icon}</span>
-                          ) : (
-                            <span style={{ display: "flex", flexWrap: "wrap", gap: 1, padding: 3 }}>
-                              {(theme.palettes || PALETTES)[0].slice(0, 4).map((col, ci) => (
-                                <span key={ci} style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: col, display: "block" }} />
-                              ))}
-                            </span>
-                          )}
-                          {!unlocked && (
-                            <span style={{
-                              position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>
-                              <svg width="10" height="10" viewBox="0 0 14 14" fill="none">
-                                <rect x="2" y="6" width="10" height="7" rx="1.5" fill="none" stroke={C.textDim} strokeWidth="1.5"/>
-                                <path d="M4.5,6 V4 C4.5,2.3 5.6,1 7,1 C8.4,1 9.5,2.3 9.5,4 V6" fill="none" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round"/>
-                              </svg>
-                            </span>
-                          )}
+                          <span style={{
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            width: 28, height: 28,
+                            borderRadius: 8,
+                            backgroundColor: theme.gridBg || C.surfaceLight,
+                            border: `1.5px solid ${theme.gridBorder || C.border}`,
+                            position: "relative", overflow: "hidden",
+                          }}>
+                            {theme.icon ? (
+                              <span style={{ fontSize: 14, lineHeight: 1 }}>{theme.icon}</span>
+                            ) : (
+                              <span style={{ display: "flex", flexWrap: "wrap", gap: 1, padding: 3 }}>
+                                {(theme.palettes || PALETTES)[0].slice(0, 4).map((col, ci) => (
+                                  <span key={ci} style={{ width: 9, height: 9, borderRadius: 2, backgroundColor: col, display: "block" }} />
+                                ))}
+                              </span>
+                            )}
+                            {!unlocked && (
+                              <span style={{
+                                position: "absolute", inset: 0, backgroundColor: "rgba(0,0,0,0.5)",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                              }}>
+                                <svg width="10" height="10" viewBox="0 0 14 14" fill="none">
+                                  <rect x="2" y="6" width="10" height="7" rx="1.5" fill="none" stroke={C.textDim} strokeWidth="1.5"/>
+                                  <path d="M4.5,6 V4 C4.5,2.3 5.6,1 7,1 C8.4,1 9.5,2.3 9.5,4 V6" fill="none" stroke={C.textDim} strokeWidth="1.5" strokeLinecap="round"/>
+                                </svg>
+                              </span>
+                            )}
+                          </span>
                         </span>
                         <span style={{ flex: 1, textAlign: "left" }}>
                           {theme.name}
