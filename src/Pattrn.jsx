@@ -3188,6 +3188,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
     if (hitsObstacle(posRef.current.x, posRef.current.y, obstacles)) {
       const safe = findSafeSpot(posRef.current.x, posRef.current.y, obstacles);
       setPos(safe);
+      try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(safe)); } catch { /* ignore */ }
     }
 
     const wander = () => {
@@ -3217,14 +3218,17 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         nx = safe.x; ny = safe.y;
       }
 
+      const newPos = { x: nx, y: ny };
       if (wrapped) {
         // Instant teleport for wrapping, then resume smooth transitions
         setIsWrapping(true);
-        setPos({ x: nx, y: ny });
+        setPos(newPos);
         requestAnimationFrame(() => requestAnimationFrame(() => setIsWrapping(false)));
       } else {
-        setPos({ x: nx, y: ny });
+        setPos(newPos);
       }
+      // Persist so position survives refresh / page change
+      try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(newPos)); } catch { /* ignore */ }
     };
 
     const schedule = () => {
@@ -3250,8 +3254,10 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         if (nx < 0) nx = maxW;
         if (ny > maxH) ny = 0;
         if (ny < 0) ny = maxH;
+        const wrapped = { x: Math.max(0, Math.min(maxW, nx)), y: Math.max(0, Math.min(maxH, ny)) };
         setIsWrapping(true);
-        setPos({ x: Math.max(0, Math.min(maxW, nx)), y: Math.max(0, Math.min(maxH, ny)) });
+        setPos(wrapped);
+        try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(wrapped)); } catch { /* ignore */ }
         requestAnimationFrame(() => requestAnimationFrame(() => setIsWrapping(false)));
       }
     };
@@ -3267,6 +3273,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
       if (obs.length > 0 && hitsObstacle(posRef.current.x, posRef.current.y, obs)) {
         const safe = findSafeSpot(posRef.current.x, posRef.current.y, obs);
         setPos(safe);
+        try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(safe)); } catch { /* ignore */ }
       }
     }, 2000);
     return () => clearInterval(check);
@@ -3365,6 +3372,8 @@ function FloatingCosmetic({ mood, accessory, speech }) {
 
   // Determine if bubble should show on left (companion near right edge)
   const bubbleOnLeft = pos.x > window.innerWidth - 140;
+  // Show speech below Aggie when near top of screen (otherwise it's clipped)
+  const speechBelow = pos.y < 50;
 
   // Transition: none when dragging or wrapping, smooth 8s for wandering, quick 0.3s for snap
   const posTransition = dragging || isWrapping
@@ -3390,6 +3399,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
 @keyframes companionSad { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(3px) rotate(-2deg); } }
 @keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
 @keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(4px); } 10% { opacity: 1; transform: scale(1) translateY(0); } 60% { opacity: 0.85; transform: translateY(-18px); } 100% { opacity: 0; transform: translateY(-34px); } }
+@keyframes aggieSpeechFloatDown { 0% { opacity: 0; transform: scale(0.5) translateY(-4px); } 10% { opacity: 1; transform: scale(1) translateY(0); } 60% { opacity: 0.85; transform: translateY(18px); } 100% { opacity: 0; transform: translateY(34px); } }
 @keyframes aggieStretch { 0%,100% { transform: scaleX(1) scaleY(1); } 30% { transform: scaleX(1.15) scaleY(0.85); } 60% { transform: scaleX(0.9) scaleY(1.12); } }
 @keyframes aggieSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes aggiePeek { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-6px) rotate(-5deg); } 70% { transform: translateX(6px) rotate(5deg); } }
@@ -3405,13 +3415,15 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         return (
           <div key={displayText} style={{
             position: "absolute",
-            bottom: 73,
+            ...(speechBelow
+              ? { top: AGGIE_SIZE + 4 }
+              : { bottom: AGGIE_SIZE - 1 }),
             ...(bubbleOnLeft
               ? { right: 4, left: "auto" }
               : { left: 4, right: "auto" }),
             whiteSpace: "nowrap",
             pointerEvents: "none",
-            animation: "aggieSpeechFloat 2.5s ease-out forwards",
+            animation: `${speechBelow ? "aggieSpeechFloatDown" : "aggieSpeechFloat"} 2.5s ease-out forwards`,
             zIndex: 91,
             fontSize: 11,
             fontWeight: 600,
