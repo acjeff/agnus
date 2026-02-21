@@ -6052,7 +6052,7 @@ export default function Pattrn() {
       const isActive = activeThemeId === theme.id;
       return {
         id: `theme-${theme.id}`,
-        icon: "palette",
+        icon: null,
         label: (theme.icon || "\uD83C\uDFA8") + " " + theme.name + (isActive ? " \u2713" : ""),
         dimmed: !unlocked,
         action: unlocked ? () => { setActiveThemeId(theme.id); saveTheme(theme.id); } : null,
@@ -6331,7 +6331,7 @@ export default function Pattrn() {
     const isMobileMenu = viewportSize.w < 480;
     const mobileMenuMargin = 12; // breathing room around the panel on mobile
     const panelWidth = isMobileMenu && isOpen ? viewportSize.w - mobileMenuMargin * 2 : (isWidePanel ? 380 : isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth));
-    const itemHeight = 44;
+    const itemHeight = 52;
     const panelPad = 8;
     const dividerHeight = 13;
     const showNav = !isSubMenu;
