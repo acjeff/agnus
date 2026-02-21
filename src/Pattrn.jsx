@@ -9714,8 +9714,8 @@ export default function Pattrn() {
                           background: `radial-gradient(ellipse at 50% 80%, ${C.accent}08 0%, transparent 70%)`,
                         }} />
 
-                        {/* Owned items scattered in the room */}
-                        {ownedItems.map((item, idx) => {
+                        {/* Owned items scattered in the room (hidden on hangout tab) */}
+                        {aggieWardrobeTab !== "hangout" && ownedItems.map((item, idx) => {
                           const pos = ROOM_ITEM_POSITIONS[idx % ROOM_ITEM_POSITIONS.length];
                           const count = aggieInventory[item.id] || 0;
                           const isBeingUsed = aggieUsingItem && aggieUsingItem.id === item.id;
@@ -9794,7 +9794,7 @@ export default function Pattrn() {
                         })}
 
                         {/* Happiness pop-up after item use completes */}
-                        {aggieUsingItem && (
+                        {aggieWardrobeTab !== "hangout" && aggieUsingItem && (
                           <div style={{
                             position: "absolute", left: "50%", top: "30%",
                             transform: "translateX(-50%)",
@@ -9813,6 +9813,78 @@ export default function Pattrn() {
                           </div>
                         )}
 
+                        {/* Hangout peers — shown in the room when hangout tab is active */}
+                        {aggieWardrobeTab === "hangout" && (
+                          <>
+                            {Object.entries(hangoutPeers).map(([uid, peer], idx) => {
+                              const angle = (idx / Math.max(Object.keys(hangoutPeers).length, 1)) * Math.PI * 2 - Math.PI / 2;
+                              const rx = 55, ry = 35;
+                              const px = 50 + rx * Math.cos(angle);
+                              const py = 50 + ry * Math.sin(angle);
+                              return (
+                                <div key={uid} style={{
+                                  position: "absolute",
+                                  left: `${px}%`, top: `${py}%`,
+                                  transform: "translate(-50%, -50%)",
+                                  display: "flex", flexDirection: "column", alignItems: "center",
+                                  transition: "left 0.5s, top 0.5s",
+                                }}>
+                                  <div style={{ animation: `companionFloat ${2.5 + idx * 0.3}s ease-in-out infinite` }}>
+                                    {renderAggieSVG(48, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
+                                  </div>
+                                  <span style={{ fontSize: 7, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>
+                                    {peer.username || "???"}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                            {offlineHangouts.map((h, hIdx) => {
+                              const participants = h.participants || {};
+                              return Object.entries(participants)
+                                .filter(([uid]) => uid !== firebaseUser?.uid)
+                                .map(([uid, peer], pidx) => {
+                                  const totalLive = Object.keys(hangoutPeers).length;
+                                  const idx = totalLive + hIdx + pidx;
+                                  const totalAll = totalLive + offlineHangouts.length;
+                                  const angle = (idx / Math.max(totalAll, 1)) * Math.PI * 2 - Math.PI / 2;
+                                  const rx = 55, ry = 35;
+                                  const px = 50 + rx * Math.cos(angle);
+                                  const py = 50 + ry * Math.sin(angle);
+                                  return (
+                                    <div key={`offline-${uid}`} style={{
+                                      position: "absolute",
+                                      left: `${px}%`, top: `${py}%`,
+                                      transform: "translate(-50%, -50%)",
+                                      display: "flex", flexDirection: "column", alignItems: "center",
+                                      transition: "left 0.5s, top 0.5s",
+                                      opacity: 0.7,
+                                    }}>
+                                      <div style={{ animation: `companionFloat ${3 + idx * 0.3}s ease-in-out infinite` }}>
+                                        {renderAggieSVG(44, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
+                                      </div>
+                                      <span style={{ fontSize: 7, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>
+                                        {peer.username || "???"}
+                                      </span>
+                                      <span style={{ fontSize: 6, color: C.accent, fontFamily: "'Inter', sans-serif", opacity: 0.7 }}>
+                                        offline
+                                      </span>
+                                    </div>
+                                  );
+                                });
+                            })}
+                            {!hangoutActive && Object.keys(hangoutPeers).length === 0 && offlineHangouts.length === 0 && (
+                              <div style={{
+                                position: "absolute", inset: 0,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                                color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif", opacity: 0.6,
+                                pointerEvents: "none",
+                              }}>
+                                Send your Aggie to hang out with a friend!
+                              </div>
+                            )}
+                          </>
+                        )}
+
                         {/* Aggie — centered, big */}
                         <div style={{
                           position: "absolute",
@@ -9821,13 +9893,15 @@ export default function Pattrn() {
                           opacity: isOn ? 1 : 0.4, transition: "opacity 0.2s",
                         }}>
                           <div style={{
-                            width: 120, height: 120,
+                            width: aggieWardrobeTab === "hangout" ? 80 : 120,
+                            height: aggieWardrobeTab === "hangout" ? 80 : 120,
                             display: "flex", alignItems: "center", justifyContent: "center",
-                            animation: aggieUsingItem
+                            animation: aggieUsingItem && aggieWardrobeTab !== "hangout"
                               ? "aggieBounce 0.6s ease-in-out 1s 1"
                               : isOn ? "companionFloat 3s ease-in-out infinite" : "none",
+                            transition: "width 0.3s, height 0.3s",
                           }}>
-                            {renderAggieSVG(120, null, isOn, currentAccSlots, hMood)}
+                            {renderAggieSVG(aggieWardrobeTab === "hangout" ? 80 : 120, null, isOn, currentAccSlots, hMood)}
                           </div>
                         </div>
                       </div>
@@ -9891,7 +9965,7 @@ export default function Pattrn() {
                         display: "flex", gap: 0, borderRadius: 8, overflow: "hidden",
                         border: `1.5px solid ${C.border}`, flexShrink: 0, marginBottom: 8,
                       }}>
-                        {[["shop", "Shop"], ["accessories", "Accessories"], ["hangout", "Hangout"]].map(([key, label], tabIdx) => {
+                        {[["shop", "Shop"], ["accessories", "Look"], ["hangout", "Hangout"]].map(([key, label], tabIdx) => {
                           const active = aggieWardrobeTab === key;
                           const isHangoutActive = key === "hangout" && (hangoutActive || offlineHangouts.length > 0);
                           return (
@@ -10110,98 +10184,6 @@ export default function Pattrn() {
                         {/* Hangout tab */}
                         {aggieWardrobeTab === "hangout" && (
                           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-                            {/* Hangout lounge area */}
-                            <div style={{
-                              position: "relative",
-                              height: 160, borderRadius: 12,
-                              backgroundColor: C.surface,
-                              border: `1.5px solid ${C.border}`,
-                              overflow: "hidden",
-                            }}>
-                              {/* Ambient background */}
-                              <div style={{ position: "absolute", inset: 0, background: `radial-gradient(ellipse at 50% 80%, ${C.accent}08 0%, transparent 70%)` }} />
-                              {/* My aggie — centered */}
-                              <div style={{
-                                position: "absolute", left: "50%", top: "50%",
-                                transform: `translate(-50%, -50%)`,
-                                display: "flex", flexDirection: "column", alignItems: "center",
-                              }}>
-                                <div style={{ animation: "companionFloat 3s ease-in-out infinite" }}>
-                                  {renderAggieSVG(64, null, true, currentAccSlots, hMood)}
-                                </div>
-                                <span style={{ fontSize: 8, fontWeight: 600, color: C.accent, fontFamily: "'Inter', sans-serif", marginTop: 2 }}>You</span>
-                              </div>
-                              {/* Peer aggies — positioned around */}
-                              {Object.entries(hangoutPeers).map(([uid, peer], idx) => {
-                                const angle = (idx / Math.max(Object.keys(hangoutPeers).length, 1)) * Math.PI * 2 - Math.PI / 2;
-                                const rx = 55, ry = 35;
-                                const px = 50 + rx * Math.cos(angle);
-                                const py = 50 + ry * Math.sin(angle);
-                                return (
-                                  <div key={uid} style={{
-                                    position: "absolute",
-                                    left: `${px}%`, top: `${py}%`,
-                                    transform: "translate(-50%, -50%)",
-                                    display: "flex", flexDirection: "column", alignItems: "center",
-                                    transition: "left 0.5s, top 0.5s",
-                                  }}>
-                                    <div style={{ animation: `companionFloat ${2.5 + idx * 0.3}s ease-in-out infinite` }}>
-                                      {renderAggieSVG(48, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
-                                    </div>
-                                    <span style={{ fontSize: 7, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>
-                                      {peer.username || "???"}
-                                    </span>
-                                  </div>
-                                );
-                              })}
-                              {/* Offline hangout peers */}
-                              {offlineHangouts.map((h, hIdx) => {
-                                const participants = h.participants || {};
-                                return Object.entries(participants)
-                                  .filter(([uid]) => uid !== firebaseUser?.uid)
-                                  .map(([uid, peer], pidx) => {
-                                    const totalLive = Object.keys(hangoutPeers).length;
-                                    const idx = totalLive + hIdx + pidx;
-                                    const totalAll = totalLive + offlineHangouts.length;
-                                    const angle = (idx / Math.max(totalAll, 1)) * Math.PI * 2 - Math.PI / 2;
-                                    const rx = 55, ry = 35;
-                                    const px = 50 + rx * Math.cos(angle);
-                                    const py = 50 + ry * Math.sin(angle);
-                                    return (
-                                      <div key={`offline-${uid}`} style={{
-                                        position: "absolute",
-                                        left: `${px}%`, top: `${py}%`,
-                                        transform: "translate(-50%, -50%)",
-                                        display: "flex", flexDirection: "column", alignItems: "center",
-                                        transition: "left 0.5s, top 0.5s",
-                                        opacity: 0.7,
-                                      }}>
-                                        <div style={{ animation: `companionFloat ${3 + idx * 0.3}s ease-in-out infinite` }}>
-                                          {renderAggieSVG(44, null, true, peer.accessory || "none", peer.happinessMood || "neutral")}
-                                        </div>
-                                        <span style={{ fontSize: 7, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 1 }}>
-                                          {peer.username || "???"}
-                                        </span>
-                                        <span style={{ fontSize: 6, color: C.accent, fontFamily: "'Inter', sans-serif", opacity: 0.7 }}>
-                                          offline
-                                        </span>
-                                      </div>
-                                    );
-                                  });
-                              })}
-                              {/* Empty state */}
-                              {!hangoutActive && Object.keys(hangoutPeers).length === 0 && offlineHangouts.length === 0 && (
-                                <div style={{
-                                  position: "absolute", inset: 0,
-                                  display: "flex", alignItems: "center", justifyContent: "center",
-                                  color: C.textDim, fontSize: 11, fontFamily: "'Inter', sans-serif", opacity: 0.6,
-                                  pointerEvents: "none",
-                                }}>
-                                  Send your Aggie to hang out with a friend!
-                                </div>
-                              )}
-                            </div>
-
                             {/* Hangout controls */}
                             <div style={{ display: "flex", gap: 8 }}>
                               {!hangoutActive ? (
