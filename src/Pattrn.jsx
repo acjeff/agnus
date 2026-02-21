@@ -3260,9 +3260,9 @@ function PeerAggie({ state, myPos, mySize, onInteract }) {
 
       {/* Speech bubble */}
       {speech && (
-        <div key={speech + Date.now()} style={{
+        <div key={speech + "-" + prevSpeechSeqRef.current} style={{
           position: "absolute",
-          bottom: size + 20,
+          top: size + 4,
           left: 4,
           whiteSpace: "nowrap",
           pointerEvents: "none",
@@ -3894,8 +3894,6 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 
   // Determine if bubble should show on left (companion near right edge)
   const bubbleOnLeft = pos.x > window.innerWidth - 140;
-  // Show speech below Aggie when near top of screen (otherwise it's clipped)
-  const speechBelow = pos.y < 50;
 
   // Transition: none when dragging or wrapping, smooth glide when leaving puzzle, smooth 8s for wandering, quick 0.3s for snap
   const posTransition = dragging || isWrapping
@@ -3923,7 +3921,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes companionCelebrate { 0%,100% { transform: translateY(0) rotate(0deg) scale(1); } 25% { transform: translateY(-12px) rotate(-8deg) scale(1.1); } 50% { transform: translateY(-2px) rotate(6deg) scale(1.05); } 75% { transform: translateY(-10px) rotate(-4deg) scale(1.12); } }
 @keyframes companionSad { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(3px) rotate(-2deg); } }
 @keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
-@keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(4px) rotate(0deg); } 8% { opacity: 1; transform: scale(1) translateY(0) rotate(0deg); } 20% { opacity: 1; transform: translateY(-6px) rotate(1.5deg); } 35% { opacity: 0.95; transform: translateY(-12px) rotate(-1.2deg); } 50% { opacity: 0.85; transform: translateY(-18px) rotate(1deg); } 65% { opacity: 0.65; transform: translateY(-23px) rotate(-0.8deg); } 80% { opacity: 0.35; transform: translateY(-28px) rotate(0.5deg); } 100% { opacity: 0; transform: translateY(-34px) rotate(0deg); } }
+@keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(-4px); } 8% { opacity: 1; transform: scale(1) translateY(0); } 20% { opacity: 1; transform: translateY(6px) rotate(1.5deg); } 35% { opacity: 0.95; transform: translateY(12px) rotate(-1.2deg); } 50% { opacity: 0.85; transform: translateY(18px) rotate(1deg); } 65% { opacity: 0.65; transform: translateY(23px) rotate(-0.8deg); } 80% { opacity: 0.35; transform: translateY(28px) rotate(0.5deg); } 100% { opacity: 0; transform: translateY(34px); } }
 @keyframes aggieStretch { 0%,100% { transform: scaleX(1) scaleY(1); } 30% { transform: scaleX(1.15) scaleY(0.85); } 60% { transform: scaleX(0.9) scaleY(1.12); } }
 @keyframes aggieSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes aggiePeek { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-6px) rotate(-5deg); } 70% { transform: translateX(6px) rotate(5deg); } }
@@ -3973,9 +3971,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       {displayText && (
         <div key={displayText + "-" + speechSeqRef.current} style={{
           position: "absolute",
-          ...(speechBelow
-            ? { top: AGGIE_SIZE + 4 }
-            : { bottom: AGGIE_SIZE - 1 }),
+          top: AGGIE_SIZE + 4,
           ...(bubbleOnLeft
             ? { right: 4, left: "auto" }
             : { left: 4, right: "auto" }),
