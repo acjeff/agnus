@@ -1749,7 +1749,7 @@ function saveAggieAccessory(id) {
   try { if (id && id !== "none") localStorage.setItem(AGGIE_ACCESSORY_KEY, id); else localStorage.removeItem(AGGIE_ACCESSORY_KEY); } catch { /* ignore */ }
 }
 function loadAggieSize() {
-  try { const s = localStorage.getItem(AGGIE_SIZE_KEY); return s && AGGIE_SIZES[s] ? s : "medium"; } catch { return "medium"; }
+  try { const s = localStorage.getItem(AGGIE_SIZE_KEY); return s && AGGIE_SIZES[s] ? s : "large"; } catch { return "large"; }
 }
 function saveAggieSize(size) {
   try { localStorage.setItem(AGGIE_SIZE_KEY, size); } catch { /* ignore */ }
@@ -9310,15 +9310,11 @@ export default function Pattrn() {
   }, [view, puzzle, selectedToken, tokenRemaining]);
 
   // Auto-advance to next available token when current selection is exhausted
-  // (only when it was depleted by placing, not when user manually picked it)
   useEffect(() => {
     if (!puzzle || puzzle.mode === "hard" || !selectedToken) return;
     if ((tokenRemaining[selectedToken] ?? 0) > 0) return;
-    // If user explicitly selected this token from the picker, don't auto-advance
-    if (manualTokenSelectRef.current) {
-      manualTokenSelectRef.current = false;
-      return;
-    }
+    // Always reset the manual flag when a token is depleted
+    manualTokenSelectRef.current = false;
     const tokens = puzzle.usedTokens;
     const currentIdx = tokens.indexOf(selectedToken);
     if (currentIdx === -1) return;
@@ -9725,7 +9721,16 @@ export default function Pattrn() {
         return;
       }
       cancelWrongCellClear();
-      if (puzzle.mode !== "hard" && (tokenRemaining[selectedToken] ?? 0) <= 0) return;
+      if (puzzle.mode !== "hard" && (tokenRemaining[selectedToken] ?? 0) <= 0) {
+        // Allow swap: if the cell has a different token, remove it and place selected token
+        if (fills[key] && fills[key] !== selectedToken) {
+          triggerRemoveAnimation(key, fills[key]);
+          setFills(prev => ({ ...prev, [key]: selectedToken }));
+          triggerPlaceAnimation(key);
+          setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
+        }
+        return;
+      }
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       triggerPlaceAnimation(key);
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
@@ -9802,7 +9807,26 @@ export default function Pattrn() {
         return;
       }
       cancelWrongCellClear();
-      if (puzzle.mode !== "hard" && (tokenRemaining[selectedToken] ?? 0) <= 0) return;
+      if (puzzle.mode !== "hard" && (tokenRemaining[selectedToken] ?? 0) <= 0) {
+        // Allow swap: if the cell has a different token, remove it and place selected token
+        if (fills[key] && fills[key] !== selectedToken) {
+          triggerRemoveAnimation(key, fills[key]);
+          setFills(prev => ({ ...prev, [key]: selectedToken }));
+          triggerPlaceAnimation(key);
+          setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
+          // Aggie placement reactions for swap
+          const isCorrectPlace = selectedToken === puzzle.solution[r][c];
+          const roll = Math.random();
+          if (isCorrectPlace && roll < 0.10) {
+            triggerAggieSpeech(AGGIE_HINT_GOOD[Math.floor(Math.random() * AGGIE_HINT_GOOD.length)]);
+          } else if (!isCorrectPlace && roll < 0.08) {
+            triggerAggieSpeech(AGGIE_HINT_BAD[Math.floor(Math.random() * AGGIE_HINT_BAD.length)]);
+          } else if (roll < 0.20) {
+            triggerAggieSpeech(AGGIE_PLACE_LINES[Math.floor(Math.random() * AGGIE_PLACE_LINES.length)]);
+          }
+        }
+        return;
+      }
       setFills(prev => ({ ...prev, [key]: selectedToken }));
       triggerPlaceAnimation(key);
       setWrongCells(prev => { const n = new Set(prev); n.delete(key); return n; });
