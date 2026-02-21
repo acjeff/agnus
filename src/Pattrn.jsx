@@ -1787,8 +1787,6 @@ function renderAggieSVG(size, mood, animate, accessory) {
       <circle cx="64" cy="44" r="6" fill={eyeGlow} opacity="0.2" filter={`url(#${uid}glow)`} />
       <circle cx="36" cy="44" r="3.5" fill={eyeColor} />
       <circle cx="64" cy="44" r="3.5" fill={eyeColor} />
-      <path d="M36 51 L35 58" stroke={eyeColor} strokeWidth="1.2" strokeLinecap="round" opacity="0.3" />
-      <path d="M64 51 L65 58" stroke={eyeColor} strokeWidth="1.2" strokeLinecap="round" opacity="0.3" />
     </>
   ) : (
     <g style={animate ? { transformOrigin: "50px 44px", animation: blink } : undefined}>
@@ -3515,44 +3513,6 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
         return pieces;
       })()}
 
-      {/* Cartoon tears shooting from eyes on sad */}
-      {mood === "sad" && (() => {
-        const tears = [];
-        // Eye positions relative to Aggie's top-left
-        const eyes = [
-          { x: AGGIE_SIZE * 0.36, y: AGGIE_SIZE * 0.48, dir: -1 }, // left eye shoots left
-          { x: AGGIE_SIZE * 0.64, y: AGGIE_SIZE * 0.48, dir: 1 },  // right eye shoots right
-        ];
-        for (let eye = 0; eye < 2; eye++) {
-          const e = eyes[eye];
-          for (let t = 0; t < 5; t++) {
-            const delay = t * 0.5 + eye * 0.25;
-            // Shoot outward and slightly down — cartoon firehose style
-            const spreadAngle = (Math.random() - 0.5) * 0.7; // vertical spread
-            const shootDist = 40 + Math.random() * 50;
-            const tx = e.dir * shootDist * (0.8 + Math.random() * 0.4);
-            const ty = shootDist * 0.3 + Math.sin(spreadAngle) * 20;
-            const size = 5 + Math.random() * 3;
-            tears.push(
-              <div key={`${eye}-${t}`} style={{
-                position: "absolute",
-                left: e.x - size / 2,
-                top: e.y,
-                width: size,
-                height: size,
-                borderRadius: "50%",
-                background: "#6EA8FE",
-                pointerEvents: "none",
-                "--tx": `${tx}px`, "--ty": `${ty}px`,
-                animation: `aggieTearShoot 0.6s ${delay}s cubic-bezier(0.1, 0.6, 0.3, 1) infinite`,
-                opacity: 0,
-              }} />
-            );
-          }
-        }
-        return tears;
-      })()}
-
       {/* Speech text — priority: mood speech > parent speech prop > idle speech */}
       {(() => {
         const displayText = (speechLine && mood) ? speechLine : speech ? speech : idleSpeech;
@@ -3615,6 +3575,43 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       >
         {renderAggieSVG(AGGIE_SIZE, mood, true, accessory)}
       </div>
+
+      {/* Cartoon tears shooting from eyes — rendered after body so they layer on top */}
+      {mood === "sad" && (() => {
+        const tears = [];
+        const eyes = [
+          { x: AGGIE_SIZE * 0.36, y: AGGIE_SIZE * 0.48, dir: -1 },
+          { x: AGGIE_SIZE * 0.64, y: AGGIE_SIZE * 0.48, dir: 1 },
+        ];
+        for (let eye = 0; eye < 2; eye++) {
+          const e = eyes[eye];
+          for (let t = 0; t < 5; t++) {
+            const delay = t * 0.5 + eye * 0.25;
+            const spreadAngle = (Math.random() - 0.5) * 0.7;
+            const shootDist = 40 + Math.random() * 50;
+            const tx = e.dir * shootDist * (0.8 + Math.random() * 0.4);
+            const ty = shootDist * 0.3 + Math.sin(spreadAngle) * 20;
+            const size = 5 + Math.random() * 3;
+            tears.push(
+              <div key={`${eye}-${t}`} style={{
+                position: "absolute",
+                left: e.x - size / 2,
+                top: e.y,
+                width: size,
+                height: size,
+                borderRadius: "50%",
+                background: "#6EA8FE",
+                pointerEvents: "none",
+                zIndex: 2,
+                "--tx": `${tx}px`, "--ty": `${ty}px`,
+                animation: `aggieTearShoot 0.6s ${delay}s cubic-bezier(0.1, 0.6, 0.3, 1) infinite`,
+                opacity: 0,
+              }} />
+            );
+          }
+        }
+        return tears;
+      })()}
     </div>
   );
 }
