@@ -1650,6 +1650,54 @@ export function subscribeToFriendChatLastReads(myUid, callback) {
   return () => off(lastReadRef, "value", handler);
 }
 
+// --- Multiplayer Aggie State ---
+// Update this player's Aggie state in a coop session (position, accessory, size, mood, interaction)
+// sessionType: "coopSessions" | "coopMosaicSessions" | "coopVaultSessions"
+export async function updateAggieState(sessionType, sessionId, uid, state) {
+  if (!db) return;
+  const aggieRef = ref(db, `${sessionType}/${sessionId}/aggieStates/${uid}`);
+  await set(aggieRef, { ...state, lastUpdate: Date.now() });
+}
+
+// Subscribe to all players' Aggie states in a coop session. Returns unsubscribe function.
+export function subscribeToAggieStates(sessionType, sessionId, callback) {
+  if (!db) return () => {};
+  const aggieRef = ref(db, `${sessionType}/${sessionId}/aggieStates`);
+  const handler = onValue(aggieRef, (snap) => {
+    callback(snap.exists() ? snap.val() : {});
+  });
+  return () => off(aggieRef, "value", handler);
+}
+
+// Remove this player's Aggie state from a coop session (on leave/disconnect)
+export async function removeAggieState(sessionType, sessionId, uid) {
+  if (!db) return;
+  await remove(ref(db, `${sessionType}/${sessionId}/aggieStates/${uid}`));
+}
+
+// Send an Aggie interaction to another player's Aggie in a coop session
+export async function sendAggieInteraction(sessionType, sessionId, fromUid, toUid, interactionType, fromUsername) {
+  if (!db) return;
+  const interactionRef = push(ref(db, `${sessionType}/${sessionId}/aggieInteractions`));
+  await set(interactionRef, {
+    fromUid, toUid, type: interactionType, fromUsername, timestamp: Date.now(),
+  });
+  // Auto-cleanup after 4 seconds
+  setTimeout(() => {
+    remove(interactionRef).catch(() => {});
+  }, 4000);
+}
+
+// Subscribe to Aggie interactions in a coop session. Returns unsubscribe function.
+export function subscribeToAggieInteractions(sessionType, sessionId, callback) {
+  if (!db) return () => {};
+  const interactRef = ref(db, `${sessionType}/${sessionId}/aggieInteractions`);
+  const handler = onValue(interactRef, (snap) => {
+    callback(snap.exists() ? snap.val() : {});
+  });
+  return () => off(interactRef, "value", handler);
+}
+
 // Subscribe to all friend chat metas for a user's friends (for unread badges)
 export function subscribeToAllFriendChatMetas(myUid, friendUids, callback) {
   if (!db || !friendUids.length) { callback({}); return () => {}; }
