@@ -3389,7 +3389,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
 @keyframes companionCelebrate { 0%,100% { transform: translateY(0) rotate(0deg) scale(1); } 25% { transform: translateY(-12px) rotate(-8deg) scale(1.1); } 50% { transform: translateY(-2px) rotate(6deg) scale(1.05); } 75% { transform: translateY(-10px) rotate(-4deg) scale(1.12); } }
 @keyframes companionSad { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(3px) rotate(-2deg); } }
 @keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
-@keyframes speechBubbleIn { 0% { opacity: 0; transform: scale(0.3) translateY(8px); } 50% { opacity: 1; transform: scale(1.08) translateY(-2px); } 100% { opacity: 1; transform: scale(1) translateY(0); } }
+@keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(4px); } 10% { opacity: 1; transform: scale(1) translateY(0); } 60% { opacity: 0.85; transform: translateY(-18px); } 100% { opacity: 0; transform: translateY(-34px); } }
 @keyframes aggieStretch { 0%,100% { transform: scaleX(1) scaleY(1); } 30% { transform: scaleX(1.15) scaleY(0.85); } 60% { transform: scaleX(0.9) scaleY(1.12); } }
 @keyframes aggieSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes aggiePeek { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-6px) rotate(-5deg); } 70% { transform: translateX(6px) rotate(5deg); } }
@@ -3411,14 +3411,15 @@ function FloatingCosmetic({ mood, accessory, speech }) {
               : { left: 4, right: "auto" }),
             whiteSpace: "nowrap",
             pointerEvents: "none",
-            animation: "speechBubbleIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1) forwards",
+            animation: "aggieSpeechFloat 2.5s ease-out forwards",
             zIndex: 91,
             fontSize: 11,
-            fontWeight: 700,
-            fontFamily: "'Inter', system-ui, sans-serif",
-            color: "#ffffff",
-            textShadow: "0 1px 4px rgba(0,0,0,0.5)",
+            fontWeight: 600,
+            fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Menlo', 'Consolas', monospace",
+            color: "#dddcf0",
+            textShadow: "0 1px 6px rgba(0,0,0,0.6), 0 0 10px rgba(154,150,204,0.3)",
             lineHeight: 1.3,
+            letterSpacing: 0.3,
           }}>
             {displayText}
           </div>
