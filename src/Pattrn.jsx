@@ -3600,7 +3600,7 @@ function PeerAggie({ state, myPos, mySize, onInteract }) {
         transition: "left 1.2s ease-out, top 1.2s ease-out",
       }}
     >
-      {/* Username label */}
+      {/* Username label — only visible when the local player is nearby */}
       <div style={{
         position: "absolute",
         bottom: size + 2,
@@ -3618,6 +3618,8 @@ function PeerAggie({ state, myPos, mySize, onInteract }) {
         borderRadius: 8,
         pointerEvents: "none",
         letterSpacing: 0.3,
+        opacity: isNear ? 1 : 0,
+        transition: "opacity 0.3s ease",
       }}>
         {state.username || "???"}
       </div>
@@ -4301,6 +4303,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
 @keyframes roomItemBounce { 0%,100% { transform: translateY(0) scale(1); } 30% { transform: translateY(-5px) scale(1.05); } 60% { transform: translateY(-2px) scale(0.98); } }
 @keyframes roomItemSparkle { 0%,100% { filter: brightness(1); } 25% { filter: brightness(1.5); } 50% { filter: brightness(0.9); } 75% { filter: brightness(1.4); } }
 @keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(-4px); } 8% { opacity: 1; transform: scale(1) translateY(0); } 20% { opacity: 1; transform: translateY(6px) rotate(1.5deg); } 35% { opacity: 0.95; transform: translateY(12px) rotate(-1.2deg); } 50% { opacity: 0.85; transform: translateY(18px) rotate(1deg); } 65% { opacity: 0.65; transform: translateY(23px) rotate(-0.8deg); } 80% { opacity: 0.35; transform: translateY(28px) rotate(0.5deg); } 100% { opacity: 0; transform: translateY(34px); } }
+@keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(4px); } 8% { opacity: 1; transform: scale(1) translateY(0); } 20% { opacity: 1; transform: translateY(-6px) rotate(1.5deg); } 35% { opacity: 0.95; transform: translateY(-12px) rotate(-1.2deg); } 50% { opacity: 0.85; transform: translateY(-18px) rotate(1deg); } 65% { opacity: 0.65; transform: translateY(-23px) rotate(-0.8deg); } 80% { opacity: 0.35; transform: translateY(-28px) rotate(0.5deg); } 100% { opacity: 0; transform: translateY(-34px); } }
 @keyframes aggieStretch { 0%,100% { transform: scaleX(1) scaleY(1); } 30% { transform: scaleX(1.15) scaleY(0.85); } 60% { transform: scaleX(0.9) scaleY(1.12); } }
 @keyframes aggieSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes aggiePeek { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-6px) rotate(-5deg); } 70% { transform: translateX(6px) rotate(5deg); } }
