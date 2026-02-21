@@ -3121,6 +3121,9 @@ const IDLE_ANIMS = {
 };
 
 function FloatingCosmetic({ mood, accessory, speech }) {
+  const AGGIE_SIZE = 74;
+  const AVOID_PAD = 16; // extra padding around obstacles
+
   const [pos, setPos] = useState(() => {
     try {
       const saved = localStorage.getItem("pattrn-cosmetic-pos");
@@ -3134,34 +3137,140 @@ function FloatingCosmetic({ mood, accessory, speech }) {
   const posRef = useRef(pos);
   posRef.current = pos;
 
-  // --- Wandering ---
-  // Uses CSS transitions for ultra-smooth movement instead of per-frame updates.
-  // Every 10-20s, pick a nearby point and let the CSS transition glide there over several seconds.
+  // --- Obstacle avoidance helpers ---
+  const getObstacles = useCallback(() => {
+    if (typeof document === "undefined") return [];
+    const els = document.querySelectorAll("[data-aggie-avoid]");
+    return Array.from(els).map(el => {
+      const r = el.getBoundingClientRect();
+      return { left: r.left - AVOID_PAD, top: r.top - AVOID_PAD, right: r.right + AVOID_PAD, bottom: r.bottom + AVOID_PAD };
+    });
+  }, []);
+
+  const hitsObstacle = useCallback((x, y, obstacles) => {
+    return obstacles.some(o =>
+      x < o.right && x + AGGIE_SIZE > o.left &&
+      y < o.bottom && y + AGGIE_SIZE > o.top
+    );
+  }, []);
+
+  const findSafeSpot = useCallback((px, py, obstacles) => {
+    const maxW = window.innerWidth - AGGIE_SIZE;
+    const maxH = window.innerHeight - AGGIE_SIZE;
+    const clamp = (x, y) => ({ x: Math.max(0, Math.min(maxW, x)), y: Math.max(0, Math.min(maxH, y)) });
+    if (!hitsObstacle(px, py, obstacles)) return clamp(px, py);
+    // Try offsets at increasing distances in 8 directions
+    for (const dist of [90, 140, 200, 280]) {
+      for (const [dx, dy] of [[0,-1],[0,1],[-1,0],[1,0],[-1,-1],[1,-1],[-1,1],[1,1]]) {
+        const c = clamp(px + dx * dist, py + dy * dist);
+        if (!hitsObstacle(c.x, c.y, obstacles)) return c;
+      }
+    }
+    // Random fallback
+    for (let i = 0; i < 30; i++) {
+      const rx = Math.random() * maxW, ry = Math.random() * maxH;
+      if (!hitsObstacle(rx, ry, obstacles)) return { x: rx, y: ry };
+    }
+    return { x: 10, y: 10 };
+  }, [hitsObstacle]);
+
+  // --- Wandering with obstacle avoidance + screen wrapping ---
   const wanderTimerRef = useRef(null);
   const [isWandering, setIsWandering] = useState(false);
+  const [isWrapping, setIsWrapping] = useState(false); // true = instant teleport (no CSS transition)
 
   useEffect(() => {
     if (dragging || mood) { setIsWandering(false); return; }
     setIsWandering(true);
+
+    // Immediately check if current position overlaps an obstacle (e.g. puzzle just appeared)
+    const obstacles = getObstacles();
+    if (hitsObstacle(posRef.current.x, posRef.current.y, obstacles)) {
+      const safe = findSafeSpot(posRef.current.x, posRef.current.y, obstacles);
+      setPos(safe);
+    }
+
     const wander = () => {
       const cur = posRef.current;
-      const maxW = typeof window !== "undefined" ? window.innerWidth - 74 : 300;
-      const maxH = typeof window !== "undefined" ? window.innerHeight - 74 : 600;
-      const range = 35; // small drift radius
-      const nx = Math.max(0, Math.min(maxW, cur.x + (Math.random() - 0.5) * range * 2));
-      const ny = Math.max(0, Math.min(maxH, cur.y + (Math.random() - 0.5) * range * 2));
-      setPos({ x: nx, y: ny });
+      const maxW = window.innerWidth - AGGIE_SIZE;
+      const maxH = window.innerHeight - AGGIE_SIZE;
+      const obs = getObstacles();
+      const range = 35;
+
+      let nx = cur.x + (Math.random() - 0.5) * range * 2;
+      let ny = cur.y + (Math.random() - 0.5) * range * 2;
+
+      // Screen-edge wrapping: if past an edge, appear on opposite side
+      let wrapped = false;
+      if (nx < -AGGIE_SIZE / 2) { nx = maxW; wrapped = true; }
+      else if (nx > maxW + AGGIE_SIZE / 2) { nx = 0; wrapped = true; }
+      if (ny < -AGGIE_SIZE / 2) { ny = maxH; wrapped = true; }
+      else if (ny > maxH + AGGIE_SIZE / 2) { ny = 0; wrapped = true; }
+
+      // Keep within bounds
+      nx = Math.max(0, Math.min(maxW, nx));
+      ny = Math.max(0, Math.min(maxH, ny));
+
+      // Avoid obstacles
+      if (hitsObstacle(nx, ny, obs)) {
+        const safe = findSafeSpot(nx, ny, obs);
+        nx = safe.x; ny = safe.y;
+      }
+
+      if (wrapped) {
+        // Instant teleport for wrapping, then resume smooth transitions
+        setIsWrapping(true);
+        setPos({ x: nx, y: ny });
+        requestAnimationFrame(() => requestAnimationFrame(() => setIsWrapping(false)));
+      } else {
+        setPos({ x: nx, y: ny });
+      }
     };
-    wander(); // initial nudge
+
     const schedule = () => {
       wanderTimerRef.current = setTimeout(() => {
         wander();
         schedule();
-      }, 10000 + Math.random() * 12000); // 10-22s between moves
+      }, 10000 + Math.random() * 12000);
     };
     schedule();
     return () => clearTimeout(wanderTimerRef.current);
-  }, [dragging, mood]);
+  }, [dragging, mood, getObstacles, hitsObstacle, findSafeSpot]);
+
+  // --- Keep Aggie on screen after window resize ---
+  useEffect(() => {
+    const onResize = () => {
+      const maxW = window.innerWidth - AGGIE_SIZE;
+      const maxH = window.innerHeight - AGGIE_SIZE;
+      const cur = posRef.current;
+      if (cur.x > maxW || cur.y > maxH || cur.x < 0 || cur.y < 0) {
+        // Wrap around if off-screen
+        let nx = cur.x, ny = cur.y;
+        if (nx > maxW) nx = 0;
+        if (nx < 0) nx = maxW;
+        if (ny > maxH) ny = 0;
+        if (ny < 0) ny = maxH;
+        setIsWrapping(true);
+        setPos({ x: Math.max(0, Math.min(maxW, nx)), y: Math.max(0, Math.min(maxH, ny)) });
+        requestAnimationFrame(() => requestAnimationFrame(() => setIsWrapping(false)));
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
+  // --- Periodically check obstacle overlap (catches layout changes) ---
+  useEffect(() => {
+    if (dragging || mood) return;
+    const check = setInterval(() => {
+      const obs = getObstacles();
+      if (obs.length > 0 && hitsObstacle(posRef.current.x, posRef.current.y, obs)) {
+        const safe = findSafeSpot(posRef.current.x, posRef.current.y, obs);
+        setPos(safe);
+      }
+    }, 2000);
+    return () => clearInterval(check);
+  }, [dragging, mood, getObstacles, hitsObstacle, findSafeSpot]);
 
   // --- Idle actions ---
   const [idleSpeech, setIdleSpeech] = useState(null);
@@ -3206,7 +3315,6 @@ function FloatingCosmetic({ mood, accessory, speech }) {
     e.preventDefault();
     e.stopPropagation();
     setDragging(true);
-    wanderTarget.current = null; // stop wandering
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
     dragOffset.current = { x: clientX - posRef.current.x, y: clientY - posRef.current.y };
@@ -3217,12 +3325,19 @@ function FloatingCosmetic({ mood, accessory, speech }) {
     const onMove = (e) => {
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-      const nx = Math.max(0, Math.min(window.innerWidth - 74, clientX - dragOffset.current.x));
-      const ny = Math.max(0, Math.min(window.innerHeight - 74, clientY - dragOffset.current.y));
+      const nx = Math.max(0, Math.min(window.innerWidth - AGGIE_SIZE, clientX - dragOffset.current.x));
+      const ny = Math.max(0, Math.min(window.innerHeight - AGGIE_SIZE, clientY - dragOffset.current.y));
       setPos({ x: nx, y: ny });
     };
     const onUp = () => {
       setDragging(false);
+      // After drag, nudge away from obstacles if overlapping
+      const obs = getObstacles();
+      const cur = posRef.current;
+      if (hitsObstacle(cur.x, cur.y, obs)) {
+        const safe = findSafeSpot(cur.x, cur.y, obs);
+        setPos(safe);
+      }
       try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(posRef.current)); } catch { /* ignore */ }
     };
     window.addEventListener("pointermove", onMove);
@@ -3235,7 +3350,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
       window.removeEventListener("touchmove", onMove);
       window.removeEventListener("touchend", onUp);
     };
-  }, [dragging]);
+  }, [dragging, getObstacles, hitsObstacle, findSafeSpot]);
 
   // Determine which body animation to use
   const bodyAnim = dragging
@@ -3251,6 +3366,13 @@ function FloatingCosmetic({ mood, accessory, speech }) {
   // Determine if bubble should show on left (companion near right edge)
   const bubbleOnLeft = pos.x > window.innerWidth - 140;
 
+  // Transition: none when dragging or wrapping, smooth 8s for wandering, quick 0.3s for snap
+  const posTransition = dragging || isWrapping
+    ? "none"
+    : isWandering
+      ? "left 8s ease-in-out, top 8s ease-in-out"
+      : "left 0.3s ease, top 0.3s ease";
+
   return (
     <div
       style={{
@@ -3259,7 +3381,7 @@ function FloatingCosmetic({ mood, accessory, speech }) {
         top: pos.y,
         zIndex: 90,
         pointerEvents: "none",
-        transition: dragging ? "none" : isWandering ? "left 8s ease-in-out, top 8s ease-in-out" : "left 0.3s ease, top 0.3s ease",
+        transition: posTransition,
       }}
     >
       <style>{`
@@ -6515,6 +6637,7 @@ export default function Pattrn() {
 
         {/* Expanding Liquid Glass panel / pill */}
         <div
+          data-aggie-avoid="menu"
           style={{
             position: "fixed",
             bottom: isOpen && isMobileMenu ? mobileMenuMargin + keyboardOffset : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
@@ -16744,7 +16867,7 @@ export default function Pattrn() {
             )}
           </div>
         )}
-      <div key={gridEpoch} style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
+      <div key={gridEpoch} data-aggie-avoid="grid" style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
       <div style={{
         transform: isSpin ? `rotate(${spinAngle}deg)` : undefined,
         transition: isSpin ? "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
@@ -17064,7 +17187,7 @@ export default function Pattrn() {
 
       {/* Token picker — Liquid Glass pill above the menu pill */}
       {gameState === "playing" && puzzle && (
-        <div style={{
+        <div data-aggie-avoid="picker" style={{
           position: "fixed",
           bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
           left: "50%",
