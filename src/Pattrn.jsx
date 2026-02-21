@@ -3407,7 +3407,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96 }) {
 @keyframes companionCelebrate { 0%,100% { transform: translateY(0) rotate(0deg) scale(1); } 25% { transform: translateY(-12px) rotate(-8deg) scale(1.1); } 50% { transform: translateY(-2px) rotate(6deg) scale(1.05); } 75% { transform: translateY(-10px) rotate(-4deg) scale(1.12); } }
 @keyframes companionSad { 0%,100% { transform: translateY(0) rotate(0deg); } 50% { transform: translateY(3px) rotate(-2deg); } }
 @keyframes companionFloat { 0%,100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
-@keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(4px); } 10% { opacity: 1; transform: scale(1) translateY(0); } 60% { opacity: 0.85; transform: translateY(-18px); } 100% { opacity: 0; transform: translateY(-34px); } }
+@keyframes aggieSpeechFloat { 0% { opacity: 0; transform: scale(0.5) translateY(4px) rotate(0deg); } 8% { opacity: 1; transform: scale(1) translateY(0) rotate(0deg); } 20% { opacity: 1; transform: translateY(-6px) rotate(1.5deg); } 35% { opacity: 0.95; transform: translateY(-12px) rotate(-1.2deg); } 50% { opacity: 0.85; transform: translateY(-18px) rotate(1deg); } 65% { opacity: 0.65; transform: translateY(-23px) rotate(-0.8deg); } 80% { opacity: 0.35; transform: translateY(-28px) rotate(0.5deg); } 100% { opacity: 0; transform: translateY(-34px) rotate(0deg); } }
 @keyframes aggieStretch { 0%,100% { transform: scaleX(1) scaleY(1); } 30% { transform: scaleX(1.15) scaleY(0.85); } 60% { transform: scaleX(0.9) scaleY(1.12); } }
 @keyframes aggieSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 @keyframes aggiePeek { 0%,100% { transform: translateX(0); } 30% { transform: translateX(-6px) rotate(-5deg); } 70% { transform: translateX(6px) rotate(5deg); } }
@@ -3431,13 +3431,17 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96 }) {
               : { left: 4, right: "auto" }),
             whiteSpace: "nowrap",
             pointerEvents: "none",
-            animation: "aggieSpeechFloat 2.5s ease-out forwards",
+            animation: "aggieSpeechFloat 3s ease-out forwards",
             zIndex: 91,
+            padding: "5px 10px",
+            borderRadius: 12,
+            backgroundColor: "rgba(0, 0, 0, 0.45)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)",
             fontSize: 11,
             fontWeight: 600,
             fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Menlo', 'Consolas', monospace",
-            color: "#dddcf0",
-            textShadow: "0 1px 6px rgba(0,0,0,0.6), 0 0 10px rgba(154,150,204,0.3)",
+            color: "#e0dff4",
             lineHeight: 1.3,
             letterSpacing: 0.3,
           }}>
