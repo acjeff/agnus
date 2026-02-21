@@ -2103,6 +2103,89 @@ function renderAccessoryPreview(accId, size) {
   );
 }
 
+// Render shop item icons for Aggie's room preview
+function renderRoomItemIcon(itemId, size) {
+  const w = size || 20;
+  const icons = {
+    "treat": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="12" r="8" fill="#f0a0c0" opacity="0.8" />
+        <circle cx="12" cy="12" r="4" fill="#e06090" />
+        <circle cx="10" cy="10" r="1.5" fill="#fff" opacity="0.6" />
+      </svg>
+    ),
+    "toy": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <rect x="5" y="5" width="14" height="14" rx="2" fill="#7c5cbf" stroke="#9b7ed8" strokeWidth="1" />
+        <rect x="8" y="8" width="8" height="8" rx="1" fill="#9b7ed8" stroke="#c8b8ff" strokeWidth="0.5" />
+        <circle cx="12" cy="12" r="2" fill="#c8b8ff" />
+      </svg>
+    ),
+    "blanket": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <path d="M4 8 Q4 4 8 4 L16 4 Q20 4 20 8 L20 18 Q20 20 18 20 L6 20 Q4 20 4 18Z" fill="#6a8ab8" opacity="0.7" />
+        <path d="M6 8 L18 8 M6 12 L18 12 M6 16 L18 16" stroke="#8ab0d8" strokeWidth="1" opacity="0.5" />
+      </svg>
+    ),
+    "music-box": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <rect x="5" y="8" width="14" height="12" rx="2" fill="#DAA520" stroke="#B8860B" strokeWidth="1" />
+        <rect x="5" y="8" width="14" height="4" rx="1" fill="#B8860B" />
+        <circle cx="12" cy="16" r="2" fill="none" stroke="#fff" strokeWidth="0.8" opacity="0.6" />
+        <path d="M10 5 Q12 2 14 5" stroke="#DAA520" strokeWidth="1" fill="none" />
+        <circle cx="10" cy="5" r="1" fill="#DAA520" /><circle cx="14" cy="5" r="1" fill="#DAA520" />
+      </svg>
+    ),
+    "book": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <rect x="6" y="4" width="12" height="16" rx="1" fill="#4a6fa5" stroke="#3a5a8a" strokeWidth="1" />
+        <rect x="8" y="4" width="10" height="16" rx="1" fill="#5a82b8" />
+        <line x1="10" y1="8" x2="16" y2="8" stroke="#8ab0d8" strokeWidth="0.8" />
+        <line x1="10" y1="11" x2="16" y2="11" stroke="#8ab0d8" strokeWidth="0.8" />
+        <line x1="10" y1="14" x2="14" y2="14" stroke="#8ab0d8" strokeWidth="0.8" />
+      </svg>
+    ),
+    "lamp": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <circle cx="12" cy="8" r="6" fill="#FFD700" opacity="0.25" />
+        <circle cx="12" cy="8" r="3" fill="#FFD700" opacity="0.6" />
+        <circle cx="12" cy="8" r="1.5" fill="#fff" opacity="0.8" />
+        <rect x="10" y="14" width="4" height="6" rx="1" fill="#666" />
+        <rect x="8" y="19" width="8" height="2" rx="1" fill="#888" />
+      </svg>
+    ),
+    "plant": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <rect x="8" y="16" width="8" height="6" rx="1" fill="#8B4513" stroke="#6B3410" strokeWidth="0.5" />
+        <path d="M12 16 Q8 10 10 6 Q12 4 12 4 Q12 4 14 6 Q16 10 12 16" fill="#2d8a4e" />
+        <path d="M12 14 Q15 10 14 7" stroke="#1a6b3a" strokeWidth="0.5" fill="none" />
+        <path d="M12 12 Q9 9 10 7" stroke="#1a6b3a" strokeWidth="0.5" fill="none" />
+      </svg>
+    ),
+    "gem": (
+      <svg width={w} height={w} viewBox="0 0 24 24" fill="none">
+        <polygon points="12,3 20,10 12,21 4,10" fill="#a78bfa" stroke="#8b6ff0" strokeWidth="1" />
+        <polygon points="12,3 16,10 12,21" fill="#8b6ff0" opacity="0.6" />
+        <line x1="4" y1="10" x2="20" y2="10" stroke="#c8b8ff" strokeWidth="0.5" />
+        <polygon points="12,3 8,10 12,10" fill="#c8b8ff" opacity="0.3" />
+      </svg>
+    ),
+  };
+  return icons[itemId] || null;
+}
+
+// Fixed positions for room items (relative to a 200x160 room area)
+const ROOM_ITEM_POSITIONS = [
+  { x: 18, y: 120 },   // bottom-left
+  { x: 160, y: 118 },  // bottom-right
+  { x: 10, y: 70 },    // mid-left
+  { x: 165, y: 65 },   // mid-right
+  { x: 40, y: 30 },    // top-left
+  { x: 140, y: 28 },   // top-right
+  { x: 85, y: 125 },   // bottom-center
+  { x: 80, y: 25 },    // top-center
+];
+
 function loadActiveCosmetic() {
   try {
     const val = localStorage.getItem(ACTIVE_COSMETIC_KEY);
@@ -7403,30 +7486,28 @@ export default function Pattrn() {
       return h;
     })();
 
-    // Aggie wardrobe height — happiness, cogs, desire, tabbed shop/accessories
-    // Uses scrollable container so we use available screen height
+    // Aggie wardrobe height — two-half flex: room preview + scrollable tabs
+    // Uses most of available screen height since bottom half scrolls
     const aggieWardrobeContentHeight = (() => {
       if (!isAggieWardrobe) return 0;
       const screenH = typeof window !== "undefined" ? window.innerHeight : 700;
       const availH = screenH - bottomPx - 40;
       let h = panelPad + fabSize;
-      h += 20 + 4; // header + margin
-      h += 22 + 6; // cogs display
-      h += 24 + 8; // happiness bar
-      h += aggieDesire ? 28 + 8 : 0; // desire text
-      h += 12 + 8; // toggle row + gap
-      h += 28 + 10; // size selector + gap
-      h += 100 + 12; // preview area + gap
-      h += 30 + 10; // tab bar + gap
-      // Tab content — use whichever is active
-      if (aggieWardrobeTab === "shop") {
-        const shopRows = Math.ceil(AGGIE_SHOP_ITEMS.length / 2);
-        h += shopRows * 80;
-      } else {
-        const accRows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3);
-        h += accRows * 64;
-      }
-      h += 12; // bottom padding
+      // Top half: header row + happiness bar + desire + room + controls
+      h += 22 + 4; // header row
+      h += 18 + 6; // happiness bar
+      h += aggieDesire ? 24 + 6 : 0; // desire text
+      h += 160 + 6; // room preview
+      h += 26 + 8; // controls row (toggle + size)
+      // Bottom half: tabs + scrollable content
+      h += 30 + 8; // tab bar
+      // Tab content — use taller of the two for max
+      const shopRows = Math.ceil(AGGIE_SHOP_ITEMS.length / 2);
+      const accRows = Math.ceil((AGGIE_ACCESSORIES.length - 1) / 3);
+      const shopH = shopRows * 86;
+      const accH = accRows * 64;
+      h += Math.max(shopH, accH);
+      h += 16; // padding
       return Math.min(h, availH);
     })();
 
@@ -8522,6 +8603,8 @@ export default function Pattrn() {
                   ? `Wants you to solve ${aggieDesire.label}`
                   : `Wants a ${aggieDesire.label}`
                 : null;
+              // Collect owned items for room display
+              const ownedItems = AGGIE_SHOP_ITEMS.filter(item => (aggieInventory[item.id] || 0) > 0);
               return (
                 <>
                   <div style={{
@@ -8531,248 +8614,302 @@ export default function Pattrn() {
                     transition: isOpen
                       ? `opacity 0.2s ${springOpen} 0.06s, transform 0.25s ${springOpen} 0.06s`
                       : `opacity 0.1s ${springClose} 0s, transform 0.1s ${springClose} 0s`,
-                    maxHeight: "70vh", overflowY: "auto",
+                    display: "flex", flexDirection: "column",
+                    maxHeight: "70vh",
                   }}>
-                    {/* Header */}
-                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: C.accent, marginBottom: 4, textAlign: "center", letterSpacing: 2 }}>
-                      Aggie
-                    </div>
 
-                    {/* Cogs currency display */}
-                    <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: 6, marginBottom: 6 }}>
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                        <circle cx="12" cy="12" r="5" stroke={C.accent} strokeWidth="2" fill="none" />
-                        <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M16.9 16.9l2.1 2.1M4.9 19.1l2.1-2.1M16.9 7.1l2.1-2.1" stroke={C.accent} strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
-                      <span style={{ fontSize: 14, fontWeight: 700, color: C.accent, fontFamily: "'Inter', sans-serif" }}>
-                        {aggieCogs}
-                      </span>
-                      <span style={{ fontSize: 9, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
-                        Cogs
-                      </span>
-                    </div>
-
-                    {/* Happiness bar */}
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 3 }}>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
-                          Happiness
-                        </span>
-                        <span style={{ fontSize: 9, fontWeight: 700, color: happyColor, fontFamily: "'Inter', sans-serif" }}>
-                          {happyLabel}
-                        </span>
+                    {/* ===== TOP HALF: Aggie's Room ===== */}
+                    <div style={{ flex: "0 0 auto" }}>
+                      {/* Header row: title + cogs */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                        <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 16, fontWeight: 700, color: C.accent, letterSpacing: 2 }}>
+                          Aggie
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                            <circle cx="12" cy="12" r="5" stroke={C.accent} strokeWidth="2" fill="none" />
+                            <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M16.9 16.9l2.1 2.1M4.9 19.1l2.1-2.1M16.9 7.1l2.1-2.1" stroke={C.accent} strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                          <span style={{ fontSize: 13, fontWeight: 700, color: C.accent, fontFamily: "'Inter', sans-serif" }}>
+                            {aggieCogs}
+                          </span>
+                        </div>
                       </div>
-                      <div style={{
-                        width: "100%", height: 6, borderRadius: 3,
-                        backgroundColor: C.surface, border: `1px solid ${C.border}`,
-                        overflow: "hidden",
-                      }}>
+
+                      {/* Happiness bar */}
+                      <div style={{ marginBottom: 6 }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 2 }}>
+                          <span style={{ fontSize: 8, fontWeight: 700, color: C.textDim, fontFamily: "'Inter', sans-serif", textTransform: "uppercase", letterSpacing: 1 }}>
+                            Happiness
+                          </span>
+                          <span style={{ fontSize: 8, fontWeight: 700, color: happyColor, fontFamily: "'Inter', sans-serif" }}>
+                            {happyLabel}
+                          </span>
+                        </div>
                         <div style={{
-                          width: `${happyPct}%`, height: "100%", borderRadius: 3,
-                          backgroundColor: happyColor, transition: "width 0.5s, background-color 0.3s",
-                        }} />
+                          width: "100%", height: 5, borderRadius: 3,
+                          backgroundColor: C.surface, border: `1px solid ${C.border}`,
+                          overflow: "hidden",
+                        }}>
+                          <div style={{
+                            width: `${happyPct}%`, height: "100%", borderRadius: 3,
+                            backgroundColor: happyColor, transition: "width 0.5s, background-color 0.3s",
+                          }} />
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Desire — what Aggie wants */}
-                    {desireText && (
-                      <div style={{
-                        padding: "6px 10px", borderRadius: 8, marginBottom: 8,
-                        backgroundColor: happyColor + "12", border: `1px solid ${happyColor}30`,
-                        textAlign: "center",
-                      }}>
-                        <span style={{ fontSize: 10, fontWeight: 600, color: happyColor, fontFamily: "'Inter', sans-serif", fontStyle: "italic" }}>
-                          {desireText}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* On/Off toggle */}
-                    <div
-                      onClick={() => { const next = isOn ? null : AGGIE_ID; setActiveCosmetic(next); saveActiveCosmetic(next); }}
-                      style={{
-                        display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-                        padding: "6px 0", marginBottom: 8, cursor: "pointer", userSelect: "none",
-                      }}
-                    >
-                      <span style={{ fontSize: 11, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
-                        {isOn ? "On screen" : "Hidden"}
-                      </span>
-                      <div style={{
-                        width: 36, height: 20, borderRadius: 10,
-                        backgroundColor: isOn ? C.accent + "44" : C.surface,
-                        border: `1.5px solid ${isOn ? C.accent : C.border}`,
-                        position: "relative", transition: "all 0.2s",
-                      }}>
+                      {/* Desire — what Aggie wants */}
+                      {desireText && (
                         <div style={{
-                          width: 14, height: 14, borderRadius: 7,
-                          backgroundColor: isOn ? C.accent : C.textDim,
-                          position: "absolute", top: 2,
-                          left: isOn ? 18 : 2,
-                          transition: "all 0.2s",
-                        }} />
-                      </div>
-                    </div>
+                          padding: "4px 8px", borderRadius: 6, marginBottom: 6,
+                          backgroundColor: happyColor + "12", border: `1px solid ${happyColor}30`,
+                          textAlign: "center",
+                        }}>
+                          <span style={{ fontSize: 9, fontWeight: 600, color: happyColor, fontFamily: "'Inter', sans-serif", fontStyle: "italic" }}>
+                            {desireText}
+                          </span>
+                        </div>
+                      )}
 
-                    {/* Size selector */}
-                    <div style={{
-                      display: "flex", justifyContent: "center", gap: 6, marginBottom: 10,
-                    }}>
-                      {[["small", "S"], ["medium", "M"], ["large", "L"]].map(([key, label]) => {
-                        const active = aggieSize === key;
-                        return (
-                          <button key={key} onClick={() => { setAggieSize(key); saveAggieSize(key); }}
-                            style={{
-                              width: 36, height: 28, borderRadius: 8,
-                              border: `1.5px solid ${active ? C.accent : C.border}`,
-                              backgroundColor: active ? C.accent + "18" : C.surface,
-                              color: active ? C.accent : C.textDim,
-                              fontSize: 11, fontWeight: 700, fontFamily: "'Inter', sans-serif",
-                              cursor: "pointer", transition: "all 0.15s",
-                            }}
-                          >{label}</button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Aggie preview — shows current happiness mood expression */}
-                    <div style={{
-                      display: "flex", justifyContent: "center", padding: "8px 0 12px",
-                      opacity: isOn ? 1 : 0.4, transition: "opacity 0.2s",
-                    }}>
+                      {/* Aggie's Room — big preview with owned items placed around */}
                       <div style={{
-                        width: 80, height: 80,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        animation: isOn ? "companionFloat 3s ease-in-out infinite" : "none",
+                        position: "relative", width: "100%", height: 160,
+                        borderRadius: 12, marginBottom: 6, overflow: "hidden",
+                        backgroundColor: C.surface,
+                        border: `1.5px solid ${C.border}`,
                       }}>
-                        {renderAggieSVG(80, null, isOn, currentAcc, hMood)}
-                      </div>
-                    </div>
+                        {/* Room floor gradient */}
+                        <div style={{
+                          position: "absolute", inset: 0,
+                          background: `radial-gradient(ellipse at 50% 80%, ${C.accent}08 0%, transparent 70%)`,
+                        }} />
 
-                    {/* Tab bar: Shop / Accessories */}
-                    <div style={{
-                      display: "flex", gap: 0, marginBottom: 10, borderRadius: 8, overflow: "hidden",
-                      border: `1.5px solid ${C.border}`,
-                    }}>
-                      {[["shop", "Shop"], ["accessories", "Accessories"]].map(([key, label]) => {
-                        const active = aggieWardrobeTab === key;
-                        return (
-                          <button key={key} onClick={() => setAggieWardrobeTab(key)}
-                            style={{
-                              flex: 1, padding: "7px 0", border: "none",
-                              backgroundColor: active ? C.accent + "20" : C.surface,
-                              color: active ? C.accent : C.textDim,
-                              fontSize: 10, fontWeight: 700, fontFamily: "'Inter', sans-serif",
-                              letterSpacing: 1, textTransform: "uppercase",
-                              cursor: "pointer", transition: "all 0.15s",
-                              borderRight: key === "shop" ? `1px solid ${C.border}` : "none",
-                            }}
-                          >{label}</button>
-                        );
-                      })}
-                    </div>
-
-                    {/* Shop tab content */}
-                    {aggieWardrobeTab === "shop" && (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
-                        {AGGIE_SHOP_ITEMS.map(item => {
-                          const canAfford = aggieCogs >= item.cost;
-                          const isDesired = aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id;
-                          const owned = aggieInventory[item.id] || 0;
+                        {/* Owned items scattered in the room */}
+                        {ownedItems.map((item, idx) => {
+                          const pos = ROOM_ITEM_POSITIONS[idx % ROOM_ITEM_POSITIONS.length];
+                          const count = aggieInventory[item.id] || 0;
                           return (
-                            <div
-                              key={item.id}
-                              onClick={() => {
-                                if (!canAfford) return;
-                                buyAggieItem(item);
-                              }}
-                              style={{
-                                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-                                padding: "6px 4px", borderRadius: 8,
-                                backgroundColor: isDesired ? happyColor + "12" : C.surface,
-                                border: `1.5px solid ${isDesired ? happyColor + "50" : canAfford ? C.border : C.border + "60"}`,
-                                cursor: canAfford ? "pointer" : "default",
-                                opacity: canAfford ? 1 : 0.5,
-                                transition: "all 0.15s",
-                                position: "relative",
-                              }}
-                            >
-                              {isDesired && (
-                                <div style={{
-                                  position: "absolute", top: -4, right: -4,
-                                  width: 8, height: 8, borderRadius: 4,
-                                  backgroundColor: happyColor,
-                                }} />
-                              )}
-                              <span style={{
-                                fontSize: 9, fontWeight: 700, color: canAfford ? C.text : C.textDim,
-                                fontFamily: "'Inter', sans-serif", textAlign: "center",
-                                lineHeight: 1.2,
-                              }}>
-                                {item.label}
-                              </span>
-                              <span style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
-                                {item.desc}
-                              </span>
-                              <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 2 }}>
-                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
-                                  <circle cx="12" cy="12" r="5" stroke={canAfford ? C.accent : C.textDim} strokeWidth="2" fill="none" />
-                                  <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" strokeLinecap="round" />
-                                </svg>
-                                <span style={{ fontSize: 9, fontWeight: 700, color: canAfford ? C.accent : C.textDim, fontFamily: "'Inter', sans-serif" }}>
-                                  {item.cost}
-                                </span>
-                                <span style={{ fontSize: 8, color: C.correct, fontFamily: "'Inter', sans-serif", marginLeft: 2 }}>
-                                  +{item.happiness}
-                                </span>
-                              </div>
-                              {owned > 0 && (
-                                <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
-                                  owned: {owned}
+                            <div key={item.id} style={{
+                              position: "absolute", left: pos.x, top: pos.y,
+                              display: "flex", flexDirection: "column", alignItems: "center",
+                              opacity: 0.85, transition: "opacity 0.3s",
+                            }}>
+                              {renderRoomItemIcon(item.id, 22)}
+                              {count > 1 && (
+                                <span style={{
+                                  fontSize: 7, fontWeight: 700, color: C.textDim,
+                                  fontFamily: "'Inter', sans-serif", marginTop: -2,
+                                }}>
+                                  x{count}
                                 </span>
                               )}
                             </div>
                           );
                         })}
-                      </div>
-                    )}
 
-                    {/* Accessories tab content */}
-                    {aggieWardrobeTab === "accessories" && (
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-                        {AGGIE_ACCESSORIES.filter(a => a.id !== "none").map(a => {
-                          const isActive = currentAcc === a.id;
+                        {/* Aggie — centered, big */}
+                        <div style={{
+                          position: "absolute",
+                          left: "50%", top: "50%",
+                          transform: "translate(-50%, -50%)",
+                          opacity: isOn ? 1 : 0.4, transition: "opacity 0.2s",
+                        }}>
+                          <div style={{
+                            width: 120, height: 120,
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                            animation: isOn ? "companionFloat 3s ease-in-out infinite" : "none",
+                          }}>
+                            {renderAggieSVG(120, null, isOn, currentAcc, hMood)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Controls row: On/Off + Size */}
+                      <div style={{
+                        display: "flex", alignItems: "center", justifyContent: "space-between",
+                        marginBottom: 8,
+                      }}>
+                        {/* On/Off toggle */}
+                        <div
+                          onClick={() => { const next = isOn ? null : AGGIE_ID; setActiveCosmetic(next); saveActiveCosmetic(next); }}
+                          style={{
+                            display: "flex", alignItems: "center", gap: 6,
+                            cursor: "pointer", userSelect: "none",
+                          }}
+                        >
+                          <span style={{ fontSize: 10, fontWeight: 600, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                            {isOn ? "On screen" : "Hidden"}
+                          </span>
+                          <div style={{
+                            width: 32, height: 18, borderRadius: 9,
+                            backgroundColor: isOn ? C.accent + "44" : C.surface,
+                            border: `1.5px solid ${isOn ? C.accent : C.border}`,
+                            position: "relative", transition: "all 0.2s",
+                          }}>
+                            <div style={{
+                              width: 12, height: 12, borderRadius: 6,
+                              backgroundColor: isOn ? C.accent : C.textDim,
+                              position: "absolute", top: 2,
+                              left: isOn ? 16 : 2,
+                              transition: "all 0.2s",
+                            }} />
+                          </div>
+                        </div>
+                        {/* Size selector */}
+                        <div style={{ display: "flex", gap: 4 }}>
+                          {[["small", "S"], ["medium", "M"], ["large", "L"]].map(([key, label]) => {
+                            const active = aggieSize === key;
+                            return (
+                              <button key={key} onClick={() => { setAggieSize(key); saveAggieSize(key); }}
+                                style={{
+                                  width: 30, height: 24, borderRadius: 6,
+                                  border: `1.5px solid ${active ? C.accent : C.border}`,
+                                  backgroundColor: active ? C.accent + "18" : C.surface,
+                                  color: active ? C.accent : C.textDim,
+                                  fontSize: 10, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                                  cursor: "pointer", transition: "all 0.15s",
+                                }}
+                              >{label}</button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ===== BOTTOM HALF: Tabbed Shop / Accessories (scrollable) ===== */}
+                    <div style={{ flex: "1 1 0", minHeight: 0, display: "flex", flexDirection: "column" }}>
+                      {/* Tab bar */}
+                      <div style={{
+                        display: "flex", gap: 0, borderRadius: 8, overflow: "hidden",
+                        border: `1.5px solid ${C.border}`, flexShrink: 0, marginBottom: 8,
+                      }}>
+                        {[["shop", "Shop"], ["accessories", "Accessories"]].map(([key, label]) => {
+                          const active = aggieWardrobeTab === key;
                           return (
-                            <div
-                              key={a.id}
-                              onClick={() => {
-                                const next = isActive ? "none" : a.id;
-                                setAggieAccessory(next);
-                                saveAggieAccessory(next);
-                              }}
+                            <button key={key} onClick={() => setAggieWardrobeTab(key)}
                               style={{
-                                display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-                                padding: "8px 4px", borderRadius: 10,
-                                backgroundColor: isActive ? C.accent + "18" : C.surface,
-                                border: `1.5px solid ${isActive ? C.accent : C.border}`,
+                                flex: 1, padding: "7px 0", border: "none",
+                                backgroundColor: active ? C.accent + "20" : C.surface,
+                                color: active ? C.accent : C.textDim,
+                                fontSize: 10, fontWeight: 700, fontFamily: "'Inter', sans-serif",
+                                letterSpacing: 1, textTransform: "uppercase",
                                 cursor: "pointer", transition: "all 0.15s",
+                                borderRight: key === "shop" ? `1px solid ${C.border}` : "none",
                               }}
-                            >
-                              <div style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                                {renderAccessoryPreview(a.id, 28)}
-                              </div>
-                              <span style={{
-                                fontSize: 8, fontWeight: 600, color: isActive ? C.accent : C.textDim,
-                                fontFamily: "'Inter', sans-serif", textAlign: "center",
-                                lineHeight: 1.1, maxWidth: 60,
-                              }}>
-                                {a.label}
-                              </span>
-                            </div>
+                            >{label}</button>
                           );
                         })}
                       </div>
-                    )}
+
+                      {/* Scrollable tab content */}
+                      <div style={{ flex: "1 1 0", overflowY: "auto", minHeight: 0, paddingBottom: 4 }}>
+                        {/* Shop tab */}
+                        {aggieWardrobeTab === "shop" && (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 6 }}>
+                            {AGGIE_SHOP_ITEMS.map(item => {
+                              const canAfford = aggieCogs >= item.cost;
+                              const isDesired = aggieDesire && aggieDesire.type === "item" && aggieDesire.id === item.id;
+                              const owned = aggieInventory[item.id] || 0;
+                              return (
+                                <div
+                                  key={item.id}
+                                  onClick={() => {
+                                    if (!canAfford) return;
+                                    buyAggieItem(item);
+                                  }}
+                                  style={{
+                                    display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                                    padding: "6px 4px", borderRadius: 8,
+                                    backgroundColor: isDesired ? happyColor + "12" : C.surface,
+                                    border: `1.5px solid ${isDesired ? happyColor + "50" : canAfford ? C.border : C.border + "60"}`,
+                                    cursor: canAfford ? "pointer" : "default",
+                                    opacity: canAfford ? 1 : 0.5,
+                                    transition: "all 0.15s",
+                                    position: "relative",
+                                  }}
+                                >
+                                  {isDesired && (
+                                    <div style={{
+                                      position: "absolute", top: -4, right: -4,
+                                      width: 8, height: 8, borderRadius: 4,
+                                      backgroundColor: happyColor,
+                                    }} />
+                                  )}
+                                  <div style={{ marginBottom: 2 }}>
+                                    {renderRoomItemIcon(item.id, 20)}
+                                  </div>
+                                  <span style={{
+                                    fontSize: 9, fontWeight: 700, color: canAfford ? C.text : C.textDim,
+                                    fontFamily: "'Inter', sans-serif", textAlign: "center",
+                                    lineHeight: 1.2,
+                                  }}>
+                                    {item.label}
+                                  </span>
+                                  <span style={{ fontSize: 8, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                    {item.desc}
+                                  </span>
+                                  <div style={{ display: "flex", alignItems: "center", gap: 3, marginTop: 2 }}>
+                                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
+                                      <circle cx="12" cy="12" r="5" stroke={canAfford ? C.accent : C.textDim} strokeWidth="2" fill="none" />
+                                      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke={canAfford ? C.accent : C.textDim} strokeWidth="1.5" strokeLinecap="round" />
+                                    </svg>
+                                    <span style={{ fontSize: 9, fontWeight: 700, color: canAfford ? C.accent : C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                      {item.cost}
+                                    </span>
+                                    <span style={{ fontSize: 8, color: C.correct, fontFamily: "'Inter', sans-serif", marginLeft: 2 }}>
+                                      +{item.happiness}
+                                    </span>
+                                  </div>
+                                  {owned > 0 && (
+                                    <span style={{ fontSize: 7, color: C.textDim, fontFamily: "'Inter', sans-serif" }}>
+                                      owned: {owned}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Accessories tab */}
+                        {aggieWardrobeTab === "accessories" && (
+                          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
+                            {AGGIE_ACCESSORIES.filter(a => a.id !== "none").map(a => {
+                              const isActive = currentAcc === a.id;
+                              return (
+                                <div
+                                  key={a.id}
+                                  onClick={() => {
+                                    const next = isActive ? "none" : a.id;
+                                    setAggieAccessory(next);
+                                    saveAggieAccessory(next);
+                                  }}
+                                  style={{
+                                    display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+                                    padding: "8px 4px", borderRadius: 10,
+                                    backgroundColor: isActive ? C.accent + "18" : C.surface,
+                                    border: `1.5px solid ${isActive ? C.accent : C.border}`,
+                                    cursor: "pointer", transition: "all 0.15s",
+                                  }}
+                                >
+                                  <div style={{ width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
+                                    {renderAccessoryPreview(a.id, 28)}
+                                  </div>
+                                  <span style={{
+                                    fontSize: 8, fontWeight: 600, color: isActive ? C.accent : C.textDim,
+                                    fontFamily: "'Inter', sans-serif", textAlign: "center",
+                                    lineHeight: 1.1, maxWidth: 60,
+                                  }}>
+                                    {a.label}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
                   </div>
                 </>
               );
