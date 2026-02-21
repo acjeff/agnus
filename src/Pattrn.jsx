@@ -3159,6 +3159,26 @@ const AGGIE_INTERACTION_ANIMS = {
 };
 const PEER_AGGIE_PROXIMITY = 120; // pixels — distance to show interaction menu
 
+// --- Aggie Conversations (paired call-response lines for coop) ---
+const AGGIE_CONVERSATIONS = [
+  { prompt: "Hey...", response: "Hmm?" },
+  { prompt: "You thinking what I'm thinking?", response: "Probably not!" },
+  { prompt: "Psst!", response: "What??" },
+  { prompt: "*poke*", response: "Hey! Stop that!" },
+  { prompt: "This puzzle is tricky", response: "We got this!" },
+  { prompt: "Nice move!", response: "Thanks!" },
+  { prompt: "*stares*", response: "*stares back*" },
+  { prompt: "I'm bored", response: "Focus!" },
+  { prompt: "Wanna race?", response: "You're on!" },
+  { prompt: "Are you stuck?", response: "No... maybe..." },
+  { prompt: "I like your hat", response: "Why thank you" },
+  { prompt: "Tag, you're it!", response: "No tag-backs!" },
+  { prompt: "*whispers*", response: "*whispers back*" },
+  { prompt: "Teamwork!", response: "Makes the dream work!" },
+  { prompt: "Don't look at me", response: "Too late!" },
+  { prompt: "Almost done?", response: "Getting there..." },
+];
+
 // --- PeerAggie: Renders another player's Aggie as a ghost-like companion ---
 function PeerAggie({ state, myPos, mySize, onInteract }) {
   const [interactionAnim, setInteractionAnim] = useState(null);
@@ -3178,17 +3198,24 @@ function PeerAggie({ state, myPos, mySize, onInteract }) {
   useEffect(() => {
     if (state.activeInteraction) {
       setInteractionAnim(AGGIE_INTERACTION_ANIMS[state.activeInteraction] || "aggieWiggle 0.6s ease-in-out");
-      const lines = AGGIE_INTERACTION_LINES[state.activeInteraction];
-      if (lines) {
-        const line = lines[Math.floor(Math.random() * lines.length)];
-        setSpeech(line);
-        clearTimeout(speechTimer.current);
-        speechTimer.current = setTimeout(() => setSpeech(null), 2500);
-      }
+      // Speech is now synced via state.speech below
       const t = setTimeout(() => setInteractionAnim(null), 1200);
-      return () => { clearTimeout(t); clearTimeout(speechTimer.current); };
+      return () => clearTimeout(t);
     }
   }, [state.activeInteraction, state.interactionTs]);
+
+  // Handle synced speech from peer's Firebase broadcast
+  const prevSpeechSeqRef = useRef(null);
+  useEffect(() => {
+    if (state.speech && state.speechSeq != null && state.speechSeq !== prevSpeechSeqRef.current) {
+      prevSpeechSeqRef.current = state.speechSeq;
+      setSpeech(state.speech);
+      clearTimeout(speechTimer.current);
+      speechTimer.current = setTimeout(() => setSpeech(null), 3000);
+    } else if (!state.speech && prevSpeechSeqRef.current != null) {
+      prevSpeechSeqRef.current = null;
+    }
+  }, [state.speech, state.speechSeq]);
 
   const bodyAnim = interactionAnim
     ? interactionAnim
@@ -3366,6 +3393,15 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
   const peerAggieStatesRef = useRef(peerAggieStates);
   peerAggieStatesRef.current = peerAggieStates;
 
+  // --- Speech sync + conversation state ---
+  const speechSeqRef = useRef(0);
+  const currentSpeechRef = useRef(null);
+  const chatConvoRef = useRef(null); // { id: number, role: "prompt" | "response" } | null
+  const lastRespondedConvoRef = useRef(null);
+  const convoResponseTimer = useRef(null);
+  const chatSpeechTimerRef = useRef(null);
+  const [chatSpeech, setChatSpeech] = useState(null);
+
   // --- Multiplayer Aggie state broadcasting ---
   const [interactionMenuTarget, setInteractionMenuTarget] = useState(null); // peer state to show menu for
   const [myActiveInteraction, setMyActiveInteraction] = useState(null);
@@ -3378,6 +3414,8 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
     if (!sessionId || !sessionType || !myUid) return;
     const broadcast = () => {
       const cur = posRef.current;
+      const curSpeech = currentSpeechRef.current;
+      const convo = chatConvoRef.current;
       const state = {
         x: Math.round(cur.x),
         y: Math.round(cur.y),
@@ -3387,6 +3425,10 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
         username: myUsername || "???",
         activeInteraction: myActiveInteraction || null,
         interactionTs: myActiveInteraction ? Date.now() : null,
+        speech: curSpeech || null,
+        speechSeq: curSpeech ? speechSeqRef.current : null,
+        chatConvoId: convo ? convo.id : null,
+        chatRole: convo ? convo.role : null,
       };
       // Throttle: only write if something changed
       const key = JSON.stringify(state);
@@ -3691,9 +3733,25 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       timer = setTimeout(() => {
         const action = IDLE_ACTIONS[Math.floor(Math.random() * IDLE_ACTIONS.length)];
         setIdleAction(action);
-        // ~5% chance to say something idle
-        if (Math.random() < 0.05 && !speech) {
+        // In coop with peers: ~10% chance to start a conversation
+        const peerStates = peerAggieStatesRef.current;
+        const hasPeers = peerStates && Object.keys(peerStates).some(uid => uid !== myUid);
+        if (hasPeers && !speech && !chatSpeech && Math.random() < 0.10) {
+          const convoIdx = Math.floor(Math.random() * AGGIE_CONVERSATIONS.length);
+          const convo = AGGIE_CONVERSATIONS[convoIdx];
+          chatConvoRef.current = { id: convoIdx, role: "prompt" };
+          speechSeqRef.current += 1;
+          setChatSpeech(convo.prompt);
+          clearTimeout(chatSpeechTimerRef.current);
+          chatSpeechTimerRef.current = setTimeout(() => {
+            setChatSpeech(null);
+            chatConvoRef.current = null;
+          }, 2500);
+        }
+        // ~5% chance to say something idle (if not already speaking)
+        else if (Math.random() < 0.05 && !speech && !chatSpeech) {
           const line = AGGIE_IDLE_LINES[Math.floor(Math.random() * AGGIE_IDLE_LINES.length)];
+          speechSeqRef.current += 1;
           setIdleSpeech(line);
           clearTimeout(idleSpeechTimer.current);
           idleSpeechTimer.current = setTimeout(() => setIdleSpeech(null), 2500);
@@ -3704,8 +3762,8 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       }, 5000 + Math.random() * 5000); // 5-10s
     };
     scheduleIdle();
-    return () => { clearTimeout(timer); clearTimeout(idleSpeechTimer.current); };
-  }, [dragging, mood, speech]);
+    return () => { clearTimeout(timer); clearTimeout(idleSpeechTimer.current); clearTimeout(chatSpeechTimerRef.current); };
+  }, [dragging, mood, speech, chatSpeech, myUid]);
 
   // Pick a random speech line when mood changes
   const [speechLine, setSpeechLine] = useState(null);
@@ -3713,12 +3771,51 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
   useEffect(() => {
     if (mood && mood !== prevMoodRef.current) {
       const lines = mood === "celebrate" ? COMPANION_CELEBRATE_LINES : COMPANION_SAD_LINES;
+      speechSeqRef.current += 1;
       setSpeechLine(lines[Math.floor(Math.random() * lines.length)]);
     } else if (!mood) {
       setSpeechLine(null);
     }
     prevMoodRef.current = mood;
   }, [mood]);
+
+  // Increment speechSeq when parent speech prop changes
+  const prevSpeechPropRef = useRef(null);
+  useEffect(() => {
+    if (speech && speech !== prevSpeechPropRef.current) {
+      speechSeqRef.current += 1;
+    }
+    prevSpeechPropRef.current = speech;
+  }, [speech]);
+
+  // --- Respond to peer conversation prompts ---
+  useEffect(() => {
+    if (!sessionId || !myUid || !peerAggieStates) return;
+    if (convoResponseTimer.current) return; // Already responding
+    const peers = Object.entries(peerAggieStates).filter(([uid]) => uid !== myUid);
+    for (const [, peerState] of peers) {
+      if (peerState.chatConvoId != null && peerState.chatRole === "prompt" && peerState.speechSeq) {
+        const convoKey = `${peerState.chatConvoId}-${peerState.speechSeq}`;
+        if (convoKey === lastRespondedConvoRef.current) continue;
+        lastRespondedConvoRef.current = convoKey;
+        const convo = AGGIE_CONVERSATIONS[peerState.chatConvoId];
+        if (!convo) continue;
+        const delay = 1000 + Math.random() * 1500; // 1-2.5s
+        convoResponseTimer.current = setTimeout(() => {
+          convoResponseTimer.current = null;
+          chatConvoRef.current = { id: peerState.chatConvoId, role: "response" };
+          speechSeqRef.current += 1;
+          setChatSpeech(convo.response);
+          clearTimeout(chatSpeechTimerRef.current);
+          chatSpeechTimerRef.current = setTimeout(() => {
+            setChatSpeech(null);
+            chatConvoRef.current = null;
+          }, 2500);
+        }, delay);
+        break; // Only respond to one conversation at a time
+      }
+    }
+  }, [peerAggieStates, sessionId, myUid]);
 
   const onPointerDown = useCallback((e) => {
     e.preventDefault();
@@ -3790,6 +3887,10 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
           : idleAction
             ? IDLE_ANIMS[idleAction]
             : "none"; // wandering replaces the old float bob
+
+  // Compute display speech text — priority: mood > parent prop > conversation > idle
+  const displayText = (speechLine && mood) ? speechLine : speech ? speech : chatSpeech ? chatSpeech : idleSpeech;
+  currentSpeechRef.current = displayText || null;
 
   // Determine if bubble should show on left (companion near right edge)
   const bubbleOnLeft = pos.x > window.innerWidth - 140;
@@ -3868,39 +3969,35 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
         return pieces;
       })()}
 
-      {/* Speech text — priority: mood speech > parent speech prop > idle speech */}
-      {(() => {
-        const displayText = (speechLine && mood) ? speechLine : speech ? speech : idleSpeech;
-        if (!displayText) return null;
-        return (
-          <div key={displayText} style={{
-            position: "absolute",
-            ...(speechBelow
-              ? { top: AGGIE_SIZE + 4 }
-              : { bottom: AGGIE_SIZE - 1 }),
-            ...(bubbleOnLeft
-              ? { right: 4, left: "auto" }
-              : { left: 4, right: "auto" }),
-            whiteSpace: "nowrap",
-            pointerEvents: "none",
-            animation: "aggieSpeechFloat 3s ease-out forwards",
-            zIndex: 91,
-            padding: "5px 10px",
-            borderRadius: 12,
-            backgroundColor: "rgba(0, 0, 0, 0.45)",
-            backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)",
-            fontSize: 11,
-            fontWeight: 600,
-            fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Menlo', 'Consolas', monospace",
-            color: "#e0dff4",
-            lineHeight: 1.3,
-            letterSpacing: 0.3,
-          }}>
-            {displayText}
-          </div>
-        );
-      })()}
+      {/* Speech text — priority: mood speech > parent speech prop > conversation > idle speech */}
+      {displayText && (
+        <div key={displayText + "-" + speechSeqRef.current} style={{
+          position: "absolute",
+          ...(speechBelow
+            ? { top: AGGIE_SIZE + 4 }
+            : { bottom: AGGIE_SIZE - 1 }),
+          ...(bubbleOnLeft
+            ? { right: 4, left: "auto" }
+            : { left: 4, right: "auto" }),
+          whiteSpace: "nowrap",
+          pointerEvents: "none",
+          animation: "aggieSpeechFloat 3s ease-out forwards",
+          zIndex: 91,
+          padding: "5px 10px",
+          borderRadius: 12,
+          backgroundColor: "rgba(0, 0, 0, 0.45)",
+          backdropFilter: "blur(6px)",
+          WebkitBackdropFilter: "blur(6px)",
+          fontSize: 11,
+          fontWeight: 600,
+          fontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', 'JetBrains Mono', 'Menlo', 'Consolas', monospace",
+          color: "#e0dff4",
+          lineHeight: 1.3,
+          letterSpacing: 0.3,
+        }}>
+          {displayText}
+        </div>
+      )}
 
       {/* Companion body */}
       <div
