@@ -11926,7 +11926,7 @@ export default function Pattrn() {
       top: "calc(16px + env(safe-area-inset-top, 0px))",
       left: "50%", transform: "translateX(-50%)",
       zIndex: 1050,
-      maxWidth: "calc(100vw - 32px)", width: 360, boxSizing: "border-box",
+      width: "min(360px, calc(100vw - 32px))", boxSizing: "border-box",
       animation: "fadeUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both",
       pointerEvents: "auto",
     }}>
@@ -12044,7 +12044,7 @@ export default function Pattrn() {
       top: coopInviteToast ? "calc(80px + env(safe-area-inset-top, 0px))" : "calc(16px + env(safe-area-inset-top, 0px))",
       left: "50%", transform: "translateX(-50%)",
       zIndex: 1049,
-      maxWidth: "calc(100vw - 32px)", width: 320, boxSizing: "border-box",
+      width: "min(320px, calc(100vw - 32px))", boxSizing: "border-box",
       animation: "fadeUp 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both",
       pointerEvents: "auto",
     }}>
