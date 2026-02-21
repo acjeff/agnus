@@ -3742,6 +3742,7 @@ function AggieInteractionMenu({ targetState, onSelect, onClose, position }) {
 
 function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen = false, peerAggieStates, myUid, sessionType, sessionId, username: myUsername, onSendInteraction, happinessMood }) {
   const AGGIE_SIZE = size;
+  const AGGIE_TOP_PAD = 8; // minimum distance from top of screen
   const AVOID_PAD = 16; // extra padding around obstacles
 
   const [pos, setPos] = useState(() => {
@@ -3856,7 +3857,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
   const findSafeSpot = useCallback((px, py, obstacles) => {
     const maxW = window.innerWidth - AGGIE_SIZE;
     const maxH = window.innerHeight - AGGIE_SIZE;
-    const clamp = (x, y) => ({ x: Math.max(0, Math.min(maxW, x)), y: Math.max(0, Math.min(maxH, y)) });
+    const clamp = (x, y) => ({ x: Math.max(0, Math.min(maxW, x)), y: Math.max(AGGIE_TOP_PAD, Math.min(maxH, y)) });
     if (!hitsObstacle(px, py, obstacles)) return clamp(px, py);
     // Try offsets at increasing distances in 8 directions
     for (const dist of [90, 140, 200, 280]) {
@@ -3867,10 +3868,10 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
     }
     // Random fallback
     for (let i = 0; i < 30; i++) {
-      const rx = Math.random() * maxW, ry = Math.random() * maxH;
+      const rx = Math.random() * maxW, ry = AGGIE_TOP_PAD + Math.random() * (maxH - AGGIE_TOP_PAD);
       if (!hitsObstacle(rx, ry, obstacles)) return { x: rx, y: ry };
     }
-    return { x: 10, y: 10 };
+    return { x: 10, y: AGGIE_TOP_PAD };
   }, [hitsObstacle]);
 
   // --- Helper: get the puzzle grid bounding rect ---
@@ -3954,7 +3955,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
           // Horizontal wrapping within grid bounds
           if (nx < gridLeft) nx = gridLeft;
           if (nx > gridRight) nx = gridRight;
-          const ny = Math.max(0, targetY);
+          const ny = Math.max(AGGIE_TOP_PAD, targetY);
           // Avoid overlapping peer aggies
           const peerObs = getPeerObstacles();
           if (hitsObstacle(nx, ny, peerObs)) {
@@ -3981,11 +3982,11 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       if (nx < -AGGIE_SIZE / 2) { nx = maxW; wrapped = true; }
       else if (nx > maxW + AGGIE_SIZE / 2) { nx = 0; wrapped = true; }
       if (ny < -AGGIE_SIZE / 2) { ny = maxH; wrapped = true; }
-      else if (ny > maxH + AGGIE_SIZE / 2) { ny = 0; wrapped = true; }
+      else if (ny > maxH + AGGIE_SIZE / 2) { ny = AGGIE_TOP_PAD; wrapped = true; }
 
       // Keep within bounds
       nx = Math.max(0, Math.min(maxW, nx));
-      ny = Math.max(0, Math.min(maxH, ny));
+      ny = Math.max(AGGIE_TOP_PAD, Math.min(maxH, ny));
 
       // Avoid obstacles
       if (hitsObstacle(nx, ny, obs)) {
@@ -4022,14 +4023,14 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       const maxW = window.innerWidth - AGGIE_SIZE;
       const maxH = window.innerHeight - AGGIE_SIZE;
       const cur = posRef.current;
-      if (cur.x > maxW || cur.y > maxH || cur.x < 0 || cur.y < 0) {
+      if (cur.x > maxW || cur.y > maxH || cur.x < 0 || cur.y < AGGIE_TOP_PAD) {
         // Wrap around if off-screen
         let nx = cur.x, ny = cur.y;
         if (nx > maxW) nx = 0;
         if (nx < 0) nx = maxW;
-        if (ny > maxH) ny = 0;
-        if (ny < 0) ny = maxH;
-        const wrapped = { x: Math.max(0, Math.min(maxW, nx)), y: Math.max(0, Math.min(maxH, ny)) };
+        if (ny > maxH) ny = AGGIE_TOP_PAD;
+        if (ny < AGGIE_TOP_PAD) ny = maxH;
+        const wrapped = { x: Math.max(0, Math.min(maxW, nx)), y: Math.max(AGGIE_TOP_PAD, Math.min(maxH, ny)) };
         setIsWrapping(true);
         setPos(wrapped);
         try { localStorage.setItem("pattrn-cosmetic-pos", JSON.stringify(wrapped)); } catch { /* ignore */ }
@@ -4049,7 +4050,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
         // On puzzle screen, keep Aggie pinned above the grid
         const gridRect = getGridRect();
         if (gridRect) {
-          const targetY = Math.max(0, gridRect.top - AGGIE_SIZE - 8);
+          const targetY = Math.max(AGGIE_TOP_PAD, gridRect.top - AGGIE_SIZE - 8);
           const cur = posRef.current;
           const maxW = window.innerWidth - AGGIE_SIZE;
           const gridLeft = Math.max(0, gridRect.left - AGGIE_SIZE / 2);
@@ -4205,7 +4206,7 @@ function FloatingCosmetic({ mood, accessory, speech, size = 96, onPuzzleScreen =
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       const nx = Math.max(0, Math.min(window.innerWidth - AGGIE_SIZE, clientX - dragOffset.current.x));
-      const ny = Math.max(0, Math.min(window.innerHeight - AGGIE_SIZE, clientY - dragOffset.current.y));
+      const ny = Math.max(AGGIE_TOP_PAD, Math.min(window.innerHeight - AGGIE_SIZE, clientY - dragOffset.current.y));
       setPos({ x: nx, y: ny });
     };
     const onUp = () => {
@@ -14831,7 +14832,7 @@ export default function Pattrn() {
       {mosaicMsg && (
         <div style={{
           position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-          zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
+          zIndex: 10000, maxWidth: "min(400px, calc(100vw - 32px))", boxSizing: "border-box", textAlign: "center", padding: "14px 28px", borderRadius: 12,
           backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
           fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
           boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
@@ -14905,7 +14906,7 @@ export default function Pattrn() {
         {mosaicMsg && (
           <div style={{
             position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
+            zIndex: 10000, maxWidth: "min(400px, calc(100vw - 32px))", boxSizing: "border-box", textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
             fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
             boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
@@ -15287,7 +15288,7 @@ export default function Pattrn() {
         {mosaicMsg && (
           <div style={{
             position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
+            zIndex: 10000, maxWidth: "min(400px, calc(100vw - 32px))", boxSizing: "border-box", textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
             fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
             boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
@@ -15387,7 +15388,7 @@ export default function Pattrn() {
         {mosaicMsg && (
           <div style={{
             position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-            zIndex: 10000, maxWidth: 400, textAlign: "center", padding: "14px 28px", borderRadius: 12,
+            zIndex: 10000, maxWidth: "min(400px, calc(100vw - 32px))", boxSizing: "border-box", textAlign: "center", padding: "14px 28px", borderRadius: 12,
             backgroundColor: C.surface, border: `1px solid ${C.accent}44`,
             fontFamily: "'Inter', sans-serif", fontSize: 13, color: C.accent, letterSpacing: 0.5,
             boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
