@@ -7438,7 +7438,7 @@ export default function Pattrn() {
     const isWidePanel = isFriendsView || isVaultChat;
     const isMobileMenu = viewportSize.w < 480;
     const mobileMenuMargin = 20; // match button's right offset for consistent spacing
-    const panelWidth = (isMobileMenu || isAggieWardrobe) && isOpen ? viewportSize.w - mobileMenuMargin * 2 : (isWidePanel ? 380 : isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth));
+    const panelWidth = isMobileMenu && isOpen ? viewportSize.w - mobileMenuMargin * 2 : (isWidePanel ? 380 : isCustomPanel ? 300 : Math.max(200, closedWidth + openExtraWidth));
     const itemHeight = 52;
     const panelPad = 8;
     const dividerHeight = 13;
@@ -7953,9 +7953,9 @@ export default function Pattrn() {
           data-aggie-avoid="menu"
           style={{
             position: "fixed",
-            bottom: `calc(${bottomPx + (isOpen && isMobileMenu ? keyboardOffset : 0)}px + env(safe-area-inset-bottom, 0px))`,
-            right: mobileMenuMargin,
-            width: isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth),
+            bottom: isOpen ? `calc(40px + env(safe-area-inset-bottom, 0px))` : `calc(${bottomPx}px + env(safe-area-inset-bottom, 0px))`,
+            right: isOpen && isMobileMenu && isAggieWardrobe ? 10 : mobileMenuMargin,
+            width: isOpen && isMobileMenu && isAggieWardrobe ? "calc(100% - 20px)" : (isOpen ? panelWidth : (hasPassUI ? Math.max(panelWidth, closedWidth) : closedWidth)),
             height: isOpen ? openHeight : fabSize + passUIHeight,
             maxHeight: isOpen ? "85vh" : undefined,
             borderRadius: isOpen ? 22 : (hasPassUI ? 22 : fabSize / 2),
