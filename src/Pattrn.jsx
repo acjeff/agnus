@@ -4664,14 +4664,18 @@ export default function Pattrn() {
       return;
     }
     notifInitialLoadRef.current = true;
-    seenNotifIdsRef.current = new Set();
+    // Load previously-toasted notification IDs from localStorage so they don't re-toast on reload
+    try {
+      const stored = localStorage.getItem("pattrn_toasted_notif_ids");
+      seenNotifIdsRef.current = stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { seenNotifIdsRef.current = new Set(); }
     const unsub = subscribeToNotifications(firebaseUser.uid, (notifs) => {
       setNotifications(notifs);
       // Detect new co-op invite notifications and show a toast
       const currentIds = new Set(notifs.map(n => n.id));
       if (notifInitialLoadRef.current) {
-        // First load: just record existing IDs, don't toast
-        seenNotifIdsRef.current = currentIds;
+        // First load: mark all current IDs as seen (merge with persisted)
+        for (const id of currentIds) seenNotifIdsRef.current.add(id);
         notifInitialLoadRef.current = false;
       } else {
         // Find new co-op invites that weren't in the previous set
@@ -4692,8 +4696,13 @@ export default function Pattrn() {
             break; // Only show one toast at a time
           }
         }
-        seenNotifIdsRef.current = currentIds;
+        for (const id of currentIds) seenNotifIdsRef.current.add(id);
       }
+      // Persist seen IDs to localStorage (keep only IDs still in current notifications to avoid unbounded growth)
+      try {
+        const toStore = [...currentIds].filter(id => seenNotifIdsRef.current.has(id));
+        localStorage.setItem("pattrn_toasted_notif_ids", JSON.stringify(toStore));
+      } catch {}
     });
     notifUnsubRef.current = unsub;
     return () => {
@@ -5424,7 +5433,11 @@ export default function Pattrn() {
     achievements: [...savedAchievementIds],
     theme: coopOriginalThemeRef.current ?? activeThemeId,
     birthday,
-  }), [progress, times, savedAchievementIds, activeThemeId, birthday]);
+    companion: {
+      active: activeCosmetic || null,
+      accessory: aggieAccessory || "none",
+    },
+  }), [progress, times, savedAchievementIds, activeThemeId, birthday, activeCosmetic, aggieAccessory]);
 
   // Apply merged data to local state + localStorage
   const applyMergedData = useCallback((merged) => {
@@ -5448,6 +5461,16 @@ export default function Pattrn() {
     if (merged.birthday) {
       setBirthday(merged.birthday);
       try { localStorage.setItem(BIRTHDAY_KEY, merged.birthday); } catch { /* ignore */ }
+    }
+    if (merged.companion) {
+      if (merged.companion.active !== undefined) {
+        setActiveCosmetic(merged.companion.active);
+        saveActiveCosmetic(merged.companion.active);
+      }
+      if (merged.companion.accessory !== undefined) {
+        setAggieAccessory(merged.companion.accessory);
+        saveAggieAccessory(merged.companion.accessory);
+      }
     }
   }, []);
 
@@ -5849,7 +5872,7 @@ export default function Pattrn() {
     return () => {
       if (cloudSyncTimer.current) clearTimeout(cloudSyncTimer.current);
     };
-  }, [firebaseUser, progress, times, savedAchievementIds, activeThemeId, birthday, gatherLocalData, syncToCloud]);
+  }, [firebaseUser, progress, times, savedAchievementIds, activeThemeId, birthday, activeCosmetic, aggieAccessory, gatherLocalData, syncToCloud]);
 
   // On initial auth (page reload while logged in): pull cloud data and merge
   const hasRestoredFromCloud = useRef(false);
@@ -16792,6 +16815,7 @@ export default function Pattrn() {
           <div key={achievementToast.key} style={{
             position: "fixed", top: "calc(100px + env(safe-area-inset-top, 0px))", left: "50%",
             transform: "translateX(-50%)", zIndex: 100,
+            maxWidth: "calc(100vw - 32px)", boxSizing: "border-box",
             animation: toastDismissing
               ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
               : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
@@ -17137,6 +17161,7 @@ export default function Pattrn() {
           <div key={achievementToast.key} style={{
             position: "fixed", top: "calc(100px + env(safe-area-inset-top, 0px))", left: "50%",
             transform: "translateX(-50%)", zIndex: 100,
+            maxWidth: "calc(100vw - 32px)", boxSizing: "border-box",
             animation: toastDismissing
               ? "achievementToastOut 0.35s cubic-bezier(0.4, 0, 1, 1) forwards"
               : "achievementToastIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) both",
@@ -17263,6 +17288,7 @@ export default function Pattrn() {
           position: "fixed",
           top: "calc(60px + env(safe-area-inset-top, 0px))",
           left: "50%", transform: "translateX(-50%)", zIndex: 25,
+          maxWidth: "calc(100vw - 32px)", boxSizing: "border-box",
           backgroundColor: "#54A0FF", borderRadius: 10,
           padding: "8px 16px", boxShadow: "0 4px 16px rgba(84,160,255,0.4)",
           fontFamily: "'Inter', sans-serif", fontSize: 12, fontWeight: 700,

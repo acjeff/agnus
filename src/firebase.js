@@ -780,6 +780,14 @@ export function mergeGameData(local, cloud) {
   // Birthday: prefer whichever is set
   merged.birthday = local.birthday || cloud.birthday || null;
 
+  // Companion: prefer cloud (last-used companion settings from their account)
+  const localComp = local.companion || {};
+  const cloudComp = cloud.companion || {};
+  merged.companion = {
+    active: cloudComp.active !== undefined ? cloudComp.active : (localComp.active || null),
+    accessory: cloudComp.accessory || localComp.accessory || "none",
+  };
+
   return merged;
 }
 
