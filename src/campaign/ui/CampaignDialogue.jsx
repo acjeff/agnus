@@ -1,10 +1,10 @@
-// Pokemon-style dialogue box overlay
-// Character-by-character text reveal with tap to advance
+// Pokemon-style dialogue box overlay (compact for Game Boy screen)
+// Character-by-character text reveal with tap/A button to advance
 
 import React, { useState, useEffect, useRef } from "react";
 
 const PIXEL_FONT = "'Press Start 2P', monospace";
-const CHAR_DELAY = 30; // ms per character
+const CHAR_DELAY = 25; // ms per character
 
 export default function CampaignDialogue({ lines, portrait, onComplete, C }) {
   const [lineIndex, setLineIndex] = useState(0);
@@ -53,46 +53,55 @@ export default function CampaignDialogue({ lines, portrait, onComplete, C }) {
     }
   }
 
+  // Listen for A button (space/enter) to advance dialogue
+  useEffect(() => {
+    const handleKey = (e) => {
+      if (e.key === " " || e.key === "Enter") {
+        e.preventDefault();
+        handleTap();
+      }
+    };
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  });
+
   if (!lines || lines.length === 0) return null;
 
   return (
     <div
       onClick={handleTap}
-      onTouchEnd={(e) => { e.preventDefault(); handleTap(); }}
       style={{
         position: "absolute", bottom: 0, left: 0, right: 0,
-        paddingBottom: "env(safe-area-inset-bottom, 0px)",
         pointerEvents: "auto", zIndex: 20,
         cursor: "pointer",
       }}
     >
       <div style={{
-        margin: "0 12px 12px",
+        margin: "0 4px 4px",
         background: "rgba(0,0,0,0.92)",
-        borderRadius: 12,
-        border: "3px solid rgba(255,255,255,0.2)",
-        padding: "16px 20px",
-        display: "flex", gap: 14, alignItems: "flex-start",
-        boxShadow: "0 -4px 24px rgba(0,0,0,0.5)",
-        minHeight: 60,
+        borderRadius: 6,
+        border: "2px solid rgba(255,255,255,0.25)",
+        padding: "6px 8px",
+        display: "flex", gap: 6, alignItems: "flex-start",
+        minHeight: 36,
       }}>
-        {/* Portrait */}
+        {/* Portrait — small */}
         {portrait && (
           <div style={{
-            width: 48, height: 48, borderRadius: 8, flexShrink: 0,
+            width: 24, height: 24, borderRadius: 4, flexShrink: 0,
             background: "rgba(154,150,204,0.15)",
-            border: "2px solid rgba(154,150,204,0.3)",
+            border: "1px solid rgba(154,150,204,0.3)",
             display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 24,
+            fontSize: 12,
           }}>
             {portrait}
           </div>
         )}
 
         {/* Text area */}
-        <div style={{ flex: 1, minHeight: 40 }}>
+        <div style={{ flex: 1, minHeight: 20 }}>
           <div style={{
-            fontFamily: PIXEL_FONT, fontSize: 9, lineHeight: 1.8,
+            fontFamily: PIXEL_FONT, fontSize: 6, lineHeight: 1.7,
             color: "#e8e8ef",
             wordBreak: "break-word",
           }}>
@@ -105,12 +114,12 @@ export default function CampaignDialogue({ lines, portrait, onComplete, C }) {
           {/* Advance indicator */}
           {!isRevealing && (
             <div style={{
-              textAlign: "right", marginTop: 4,
-              fontSize: 8, color: "#6b6b8b",
+              textAlign: "right", marginTop: 2,
+              fontSize: 6, color: "#6b6b8b",
               fontFamily: PIXEL_FONT,
               animation: "dialogueBounce 0.8s ease-in-out infinite",
             }}>
-              {lineIndex < lines.length - 1 ? "\u25BC" : "[OK]"}
+              {lineIndex < lines.length - 1 ? "\u25BC" : "\u25A0 A"}
             </div>
           )}
         </div>
@@ -119,7 +128,7 @@ export default function CampaignDialogue({ lines, portrait, onComplete, C }) {
       <style>{`
         @keyframes dialogueBounce {
           0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(3px); }
+          50% { transform: translateY(2px); }
         }
       `}</style>
     </div>

@@ -19,6 +19,7 @@ import {
 import CampaignHUD from "./ui/CampaignHUD.jsx";
 import CampaignDialogue from "./ui/CampaignDialogue.jsx";
 import CampaignPause from "./ui/CampaignPause.jsx";
+import GameBoyShell from "./ui/GameBoyShell.jsx";
 
 const PIXEL_FONT = "'Press Start 2P', monospace";
 const VISIBILITY_RADIUS = 6;
@@ -709,20 +710,25 @@ export default function CampaignMode({
     );
   }
 
-  // ─── Dungeon view ─────────────────
+  // ─── Dungeon view (inside Game Boy shell) ─────────────────
   return (
-    <div style={{
-      position: "relative", width: "100vw", height: "100vh",
-      overflow: "hidden", backgroundColor: "#000",
-      touchAction: "none",
-    }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');`}</style>
-
-      {/* Game canvas */}
-      <canvas
-        ref={canvasRef}
-        style={{ width: "100%", height: "100%", display: "block", imageRendering: "pixelated" }}
-      />
+    <GameBoyShell
+      canvasRef={canvasRef}
+      onButtonA={() => {
+        // A = interact (fires space key via shell)
+      }}
+      onButtonB={() => {
+        // B = cancel / back — dismiss dialogue or open pause
+        if (dialogue) {
+          handleDialogueComplete();
+        } else {
+          setPaused(p => !p);
+        }
+      }}
+      onStart={() => setPaused(p => !p)}
+      onSelect={() => setPaused(p => !p)}
+    >
+      {/* All overlays render inside the screen area */}
 
       {/* HUD overlay */}
       {!paused && !dialogue && (
@@ -762,12 +768,12 @@ export default function CampaignMode({
       {/* Notification toast */}
       {notification && (
         <div style={{
-          position: "absolute", top: 80, left: "50%", transform: "translateX(-50%)",
-          background: "rgba(0,0,0,0.85)", borderRadius: 8,
-          padding: "8px 16px", border: `2px solid ${notification.color}44`,
-          fontFamily: PIXEL_FONT, fontSize: 8, color: notification.color,
+          position: "absolute", top: 12, left: "50%", transform: "translateX(-50%)",
+          background: "rgba(0,0,0,0.85)", borderRadius: 6,
+          padding: "6px 12px", border: `2px solid ${notification.color}44`,
+          fontFamily: PIXEL_FONT, fontSize: 7, color: notification.color,
           zIndex: 25, animation: "notifIn 0.3s ease",
-          pointerEvents: "none",
+          pointerEvents: "none", whiteSpace: "nowrap",
         }}>
           {notification.text}
         </div>
@@ -775,10 +781,10 @@ export default function CampaignMode({
 
       <style>{`
         @keyframes notifIn {
-          from { opacity: 0; transform: translateX(-50%) translateY(-10px); }
+          from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
           to { opacity: 1; transform: translateX(-50%) translateY(0); }
         }
       `}</style>
-    </div>
+    </GameBoyShell>
   );
 }
