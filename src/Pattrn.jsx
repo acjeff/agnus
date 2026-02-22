@@ -16922,7 +16922,7 @@ export default function Pattrn() {
         </div>
       )}
       {renderBackButton(playBackAction)}
-      {!isCampaign && renderContextButton("play", playPillButtons)}
+      {renderContextButton("play", playPillButtons)}
       {globalModalsEl}
     </div>
     </>
