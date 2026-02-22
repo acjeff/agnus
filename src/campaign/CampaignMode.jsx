@@ -108,6 +108,7 @@ export default function CampaignMode({
   // ─── State ─────────────────────────────
   const [campaignState, setCampaignState] = useState(() => loadCampaignState());
   const [screen, setScreen] = useState("chapter-select"); // "chapter-select" | "dungeon" | "puzzle" | "transition"
+  const [menuCursor, setMenuCursor] = useState(0); // cursor index for chapter select
   const [paused, setPaused] = useState(false);
   const [dialogue, setDialogue] = useState(null); // { lines: [], portrait }
   const [notification, setNotification] = useState(null); // { text, color }
@@ -593,120 +594,155 @@ export default function CampaignMode({
     return () => window.removeEventListener("keydown", handleKey);
   }, [screen]);
 
-  // ─── Chapter select screen ─────────────────
+  // ─── Chapter select menu helpers ─────────────────
+  const menuItems = [
+    ...CAMPAIGN_CHAPTERS.map((ch, idx) => ({ type: "chapter", chapter: ch, idx })),
+    { type: "back" },
+  ];
+
+  const handleMenuDpad = useCallback((dx, dy) => {
+    if (screen !== "chapter-select") return;
+    setMenuCursor(prev => {
+      const next = prev + dy;
+      if (next < 0) return menuItems.length - 1;
+      if (next >= menuItems.length) return 0;
+      return next;
+    });
+  }, [screen, menuItems.length]);
+
+  const handleMenuA = useCallback(() => {
+    if (screen !== "chapter-select") return;
+    const item = menuItems[menuCursor];
+    if (!item) return;
+    if (item.type === "back") {
+      onExit();
+    } else if (item.type === "chapter") {
+      const ch = item.chapter;
+      const isUnlocked = ch.unlock === null ||
+        (ch.unlock.chapter != null && stateRef.current.chapters[ch.unlock.chapter]?.completed);
+      if (isUnlocked) enterChapter(ch.id);
+    }
+  }, [screen, menuCursor, menuItems, onExit, enterChapter]);
+
+  const handleMenuB = useCallback(() => {
+    if (screen !== "chapter-select") return;
+    onExit();
+  }, [screen, onExit]);
+
+  // ─── Chapter select screen (inside Game Boy shell) ─────────────────
   if (screen === "chapter-select") {
-    return (
+    const menuScreenContent = (
       <div style={{
-        minHeight: "100vh", backgroundColor: "#0a0a0f", color: "#e8e8ef",
-        fontFamily: PIXEL_FONT, display: "flex", flexDirection: "column",
-        alignItems: "center", padding: 24,
-        paddingTop: "calc(24px + env(safe-area-inset-top, 0px))",
+        width: "100%", height: "100%",
+        backgroundColor: "#0a0a0f", color: "#e8e8ef",
+        fontFamily: PIXEL_FONT,
+        display: "flex", flexDirection: "column",
+        overflow: "auto",
+        padding: "8px 10px",
+        boxSizing: "border-box",
       }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');`}</style>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+          @keyframes cursorBlink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        `}</style>
 
         {/* Header */}
-        <button
-          onClick={onExit}
-          style={{
-            alignSelf: "flex-start", background: "none", border: "none",
-            color: "#6b6b8b", fontFamily: PIXEL_FONT, fontSize: 8,
-            cursor: "pointer", marginBottom: 16,
-          }}
-        >
-          \u25C0 BACK
-        </button>
-
-        <div style={{ fontSize: 14, letterSpacing: 3, marginBottom: 8, color: C?.accent || "#c8f03e" }}>
-          CAMPAIGN
-        </div>
-        <div style={{ fontSize: 7, color: "#6b6b8b", marginBottom: 32, letterSpacing: 1 }}>
-          DUNGEON CRAWLER
-        </div>
-
-        {/* Aggie status card */}
-        <div style={{
-          width: "100%", maxWidth: 360, marginBottom: 24,
-          background: "rgba(154,150,204,0.08)", borderRadius: 12,
-          border: "2px solid rgba(154,150,204,0.2)", padding: "16px 20px",
-        }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <div>
-              <div style={{ fontSize: 9, color: "#dddcf0", marginBottom: 4 }}>
-                AGGIE \u2022 Lv.{campaignState.aggie.level}
-              </div>
-              <div style={{ fontSize: 7, color: "#9a96cc", textTransform: "uppercase" }}>
-                {campaignState.aggie.evolutionStage}
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 12 }}>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 10, color: "#ffd700" }}>{campaignState.inventory.coins}</div>
-                <div style={{ fontSize: 6, color: "#6b6b8b" }}>COINS</div>
-              </div>
-              <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 10, color: "#4ade80" }}>{campaignState.stats.totalFloorsCleared}</div>
-                <div style={{ fontSize: 6, color: "#6b6b8b" }}>FLOORS</div>
-              </div>
-            </div>
+        <div style={{ textAlign: "center", marginBottom: 6 }}>
+          <div style={{ fontSize: 8, letterSpacing: 2, color: C?.accent || "#c8f03e", marginBottom: 3 }}>
+            CAMPAIGN
+          </div>
+          <div style={{
+            display: "flex", justifyContent: "center", gap: 12, fontSize: 6, color: "#6b6b8b",
+          }}>
+            <span>Lv.{campaignState.aggie.level}</span>
+            <span>\u25C9 {campaignState.inventory.coins}</span>
           </div>
         </div>
 
         {/* Chapter list */}
-        <div style={{ width: "100%", maxWidth: 360, display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
           {CAMPAIGN_CHAPTERS.map((chapter, idx) => {
             const chState = getChapterState(campaignState, chapter.id);
             const isUnlocked = chapter.unlock === null ||
               (chapter.unlock.chapter != null && campaignState.chapters[chapter.unlock.chapter]?.completed);
             const isCompleted = chState.completed;
+            const isCursorHere = menuCursor === idx;
 
-            // Count completed floors
             let floorsCleared = 0;
             for (let i = 0; i < chapter.floors; i++) {
               if (chState.floors[i]?.completed) floorsCleared++;
             }
 
             return (
-              <button
+              <div
                 key={chapter.id}
                 onClick={() => isUnlocked && enterChapter(chapter.id)}
-                disabled={!isUnlocked}
                 style={{
-                  width: "100%", padding: "16px 20px", borderRadius: 12,
-                  background: isUnlocked
-                    ? isCompleted
-                      ? "rgba(74,222,128,0.08)"
-                      : "rgba(255,255,255,0.04)"
-                    : "rgba(255,255,255,0.02)",
-                  border: `2px solid ${isUnlocked
-                    ? isCompleted ? "rgba(74,222,128,0.3)" : "rgba(255,255,255,0.1)"
-                    : "rgba(255,255,255,0.05)"}`,
+                  padding: "6px 8px", borderRadius: 4,
+                  background: isCursorHere ? "rgba(154,150,204,0.15)" : "transparent",
+                  border: isCursorHere ? "1px solid rgba(154,150,204,0.4)" : "1px solid transparent",
+                  opacity: isUnlocked ? 1 : 0.35,
                   cursor: isUnlocked ? "pointer" : "default",
-                  opacity: isUnlocked ? 1 : 0.4,
-                  textAlign: "left", fontFamily: PIXEL_FONT,
-                  transition: "all 0.2s",
+                  display: "flex", alignItems: "center", gap: 6,
+                  transition: "background 0.15s",
                 }}
               >
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                  <span style={{ fontSize: 9, color: isCompleted ? "#4ade80" : "#e8e8ef" }}>
+                {/* Cursor arrow */}
+                <span style={{
+                  fontSize: 8, color: "#9a96cc", width: 10, textAlign: "center",
+                  animation: isCursorHere ? "cursorBlink 1s ease infinite" : "none",
+                  visibility: isCursorHere ? "visible" : "hidden",
+                }}>
+                  {"\u25B6"}
+                </span>
+
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 7, color: isCompleted ? "#4ade80" : "#e8e8ef", marginBottom: 2 }}>
                     {isCompleted ? "\u2713 " : ""}{chapter.name}
-                  </span>
-                  {!isUnlocked && (
-                    <span style={{ fontSize: 7, color: "#555" }}>\uD83D\uDD12</span>
-                  )}
-                </div>
-                <div style={{ fontSize: 7, color: "#6b6b8b", marginBottom: 6 }}>
-                  {chapter.desc}
-                </div>
-                {isUnlocked && (
-                  <div style={{ fontSize: 7, color: "#555" }}>
-                    {floorsCleared}/{chapter.floors} floors
+                    {!isUnlocked && " \uD83D\uDD12"}
                   </div>
-                )}
-              </button>
+                  <div style={{ fontSize: 5, color: "#6b6b8b" }}>
+                    {chapter.desc} \u2022 {floorsCleared}/{chapter.floors}
+                  </div>
+                </div>
+              </div>
             );
           })}
+
+          {/* Back option */}
+          <div
+            onClick={onExit}
+            style={{
+              padding: "6px 8px", borderRadius: 4,
+              background: menuCursor === CAMPAIGN_CHAPTERS.length ? "rgba(154,150,204,0.15)" : "transparent",
+              border: menuCursor === CAMPAIGN_CHAPTERS.length ? "1px solid rgba(154,150,204,0.4)" : "1px solid transparent",
+              display: "flex", alignItems: "center", gap: 6,
+              cursor: "pointer", marginTop: 4,
+            }}
+          >
+            <span style={{
+              fontSize: 8, color: "#9a96cc", width: 10, textAlign: "center",
+              animation: menuCursor === CAMPAIGN_CHAPTERS.length ? "cursorBlink 1s ease infinite" : "none",
+              visibility: menuCursor === CAMPAIGN_CHAPTERS.length ? "visible" : "hidden",
+            }}>
+              {"\u25B6"}
+            </span>
+            <span style={{ fontSize: 7, color: "#f87171" }}>
+              \u25C0 BACK
+            </span>
+          </div>
         </div>
       </div>
+    );
+
+    return (
+      <GameBoyShell
+        screenContent={menuScreenContent}
+        onDpadPress={handleMenuDpad}
+        onButtonA={handleMenuA}
+        onButtonB={handleMenuB}
+        onStart={handleMenuA}
+        onSelect={handleMenuB}
+      />
     );
   }
 
@@ -714,11 +750,9 @@ export default function CampaignMode({
   return (
     <GameBoyShell
       canvasRef={canvasRef}
-      onButtonA={() => {
-        // A = interact (fires space key via shell)
-      }}
+      onDpadPress={(dx, dy) => handleMove(dx, dy)}
+      onButtonA={() => handleInteract()}
       onButtonB={() => {
-        // B = cancel / back — dismiss dialogue or open pause
         if (dialogue) {
           handleDialogueComplete();
         } else {

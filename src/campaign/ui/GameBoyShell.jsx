@@ -1,79 +1,80 @@
 // Game Boy-style shell that wraps the campaign canvas
 // Provides: physical d-pad, A/B buttons, start/select, speaker grille
 
-import React, { useCallback, useRef } from "react";
+import React, { useCallback, useRef, useEffect } from "react";
 
 const PIXEL_FONT = "'Press Start 2P', monospace";
 
 // Colors for the classic Game Boy shell
 const SHELL = {
-  body: "#8b8b9b",        // main shell gray
-  bodyDark: "#6b6b7b",    // shadow
-  bodyLight: "#a8a8b8",   // highlight
-  bezel: "#2a2a3a",       // screen bezel
-  bezelInner: "#1a1a28",  // inner bezel shadow
-  screen: "#0a0a0f",      // screen bg
-  dpad: "#1a1a2a",        // d-pad color
-  dpadFace: "#2a2a3a",    // d-pad face
-  dpadActive: "#3a3a5a",  // d-pad pressed
-  btnA: "#8b2252",        // A button (raspberry)
-  btnB: "#8b2252",        // B button
-  btnActive: "#b83070",   // pressed state
-  startSelect: "#4a4a5a", // start/select
-  label: "#3a3a4a",       // text labels
-  speaker: "#7b7b8b",     // speaker grille
-  speakerSlot: "#5a5a6a", // speaker slots
-  led: "#4ade80",         // power LED
+  body: "#8b8b9b",
+  bodyDark: "#6b6b7b",
+  bodyLight: "#a8a8b8",
+  bezel: "#2a2a3a",
+  bezelInner: "#1a1a28",
+  dpad: "#1a1a2a",
+  dpadFace: "#2a2a3a",
+  btnA: "#8b2252",
+  btnB: "#8b2252",
+  startSelect: "#4a4a5a",
+  label: "#3a3a4a",
+  speakerSlot: "#5a5a6a",
+  led: "#4ade80",
 };
+
+const MOVE_REPEAT_DELAY = 160; // ms between repeated d-pad moves
 
 export default function GameBoyShell({
   canvasRef,
-  onDpadPress,     // (dx, dy) => void
-  onDpadRelease,   // () => void
+  onDpadPress,     // (dx, dy) => void — direct move callback
   onButtonA,       // () => void — interact / confirm
   onButtonB,       // () => void — back / cancel
   onStart,         // () => void — pause
   onSelect,        // () => void — map/inventory
-  children,        // overlays (HUD, dialogue, pause) rendered inside screen area
+  screenContent,   // React node rendered inside the screen bezel (alternative to canvasRef)
+  children,        // overlays rendered inside screen area
 }) {
-  const dpadActiveRef = useRef(null);
   const repeatRef = useRef(null);
+  const activeDirRef = useRef(null);
 
-  // Dispatch keyboard events so the existing input handler picks them up
-  const pressKey = useCallback((key) => {
-    window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
-  }, []);
-  const releaseKey = useCallback((key) => {
-    window.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true }));
-  }, []);
-
-  // D-pad handlers with repeat
-  const startDpad = useCallback((key, dx, dy) => {
-    if (dpadActiveRef.current === key) return;
-    // Release previous
-    if (dpadActiveRef.current) {
-      releaseKey(dpadActiveRef.current);
-      clearInterval(repeatRef.current);
-    }
-    dpadActiveRef.current = key;
-    pressKey(key);
+  // ── Direct d-pad movement (no synthetic keyboard events) ──
+  const fireDpad = useCallback((dx, dy, dirKey) => {
     if (onDpadPress) onDpadPress(dx, dy);
-  }, [pressKey, releaseKey, onDpadPress]);
+  }, [onDpadPress]);
+
+  const startDpad = useCallback((dx, dy, dirKey) => {
+    // Stop any existing repeat
+    if (repeatRef.current) clearInterval(repeatRef.current);
+    activeDirRef.current = dirKey;
+
+    // Fire immediately
+    fireDpad(dx, dy, dirKey);
+
+    // Start repeating
+    repeatRef.current = setInterval(() => {
+      fireDpad(dx, dy, dirKey);
+    }, MOVE_REPEAT_DELAY);
+  }, [fireDpad]);
 
   const stopDpad = useCallback(() => {
-    if (dpadActiveRef.current) {
-      releaseKey(dpadActiveRef.current);
+    if (repeatRef.current) {
       clearInterval(repeatRef.current);
-      dpadActiveRef.current = null;
+      repeatRef.current = null;
     }
-    if (onDpadRelease) onDpadRelease();
-  }, [releaseKey, onDpadRelease]);
+    activeDirRef.current = null;
+  }, []);
 
-  // Prevent default touch behavior
-  const prevent = (e) => e.preventDefault();
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (repeatRef.current) clearInterval(repeatRef.current);
+    };
+  }, []);
 
-  // D-pad button style
-  const dpadBtn = (direction, active) => ({
+  const prevent = (e) => { e.preventDefault(); e.stopPropagation(); };
+
+  // ── Styles ──
+  const dpadBtnStyle = {
     width: 48, height: 48,
     background: SHELL.dpadFace,
     border: `2px solid ${SHELL.dpad}`,
@@ -84,20 +85,11 @@ export default function GameBoyShell({
     userSelect: "none", WebkitUserSelect: "none",
     WebkitTapHighlightColor: "transparent",
     touchAction: "none",
-  });
-
-  // D-pad center nub
-  const dpadCenter = {
-    width: 48, height: 48,
-    background: SHELL.dpad,
-    borderRadius: 4,
-    display: "flex", alignItems: "center", justifyContent: "center",
-    boxShadow: `inset 0 1px 3px rgba(0,0,0,0.4)`,
+    padding: 0,
   };
 
-  // Round action button style
-  const actionBtn = (color, size = 56) => ({
-    width: size, height: size,
+  const actionBtnStyle = (color) => ({
+    width: 56, height: 56,
     borderRadius: "50%",
     background: `radial-gradient(circle at 35% 35%, ${color}dd, ${color}88)`,
     border: `2px solid ${color}44`,
@@ -110,21 +102,31 @@ export default function GameBoyShell({
     fontFamily: PIXEL_FONT,
     fontSize: 14, fontWeight: 900,
     color: "rgba(255,255,255,0.9)",
-    letterSpacing: 0,
+    padding: 0,
   });
 
-  // Small pill button (start/select)
-  const pillBtn = {
+  const pillBtnStyle = {
     width: 52, height: 16,
     borderRadius: 8,
     background: SHELL.startSelect,
     border: "none",
-    boxShadow: `inset 0 1px 2px rgba(0,0,0,0.3)`,
+    boxShadow: "inset 0 1px 2px rgba(0,0,0,0.3)",
     cursor: "pointer",
     userSelect: "none", WebkitUserSelect: "none",
     WebkitTapHighlightColor: "transparent",
     touchAction: "none",
     transform: "rotate(-25deg)",
+    padding: 0,
+  };
+
+  // Pressed effect helpers
+  const pressEffect = (e) => {
+    e.currentTarget.style.boxShadow = `0 1px 0 ${SHELL.bodyDark}`;
+    e.currentTarget.style.transform = "translateY(2px)";
+  };
+  const releaseEffect = (e) => {
+    e.currentTarget.style.boxShadow = `0 3px 0 ${SHELL.bodyDark}, inset 0 1px 2px rgba(255,255,255,0.15)`;
+    e.currentTarget.style.transform = "translateY(0)";
   };
 
   return (
@@ -172,7 +174,6 @@ export default function GameBoyShell({
         position: "relative",
         flexShrink: 0,
       }}>
-        {/* Inner bezel */}
         <div style={{
           width: "100%", height: "100%",
           background: SHELL.bezelInner,
@@ -180,21 +181,23 @@ export default function GameBoyShell({
           overflow: "hidden",
           position: "relative",
         }}>
-          {/* Canvas */}
-          <canvas
-            ref={canvasRef}
-            style={{
-              width: "100%", height: "100%",
-              display: "block",
-              imageRendering: "pixelated",
-            }}
-          />
+          {/* Canvas OR custom screen content */}
+          {canvasRef ? (
+            <canvas
+              ref={canvasRef}
+              style={{
+                width: "100%", height: "100%",
+                display: "block",
+                imageRendering: "pixelated",
+              }}
+            />
+          ) : screenContent}
 
-          {/* Overlays rendered inside screen */}
+          {/* Overlays inside screen */}
           {children}
         </div>
 
-        {/* Screen label: top-left corner dot pattern */}
+        {/* Screen corner dots */}
         <div style={{
           position: "absolute", top: -2, left: 16,
           display: "flex", gap: 3,
@@ -223,7 +226,7 @@ export default function GameBoyShell({
         width: "100%", maxWidth: 400,
         display: "flex", flexDirection: "column",
         alignItems: "center", justifyContent: "center",
-        gap: 12,
+        gap: 16,
         padding: "0 16px",
         boxSizing: "border-box",
         minHeight: 0,
@@ -237,36 +240,45 @@ export default function GameBoyShell({
         }}>
 
           {/* ─── D-Pad ─── */}
-          <div style={{
-            display: "grid",
-            gridTemplateColumns: "48px 48px 48px",
-            gridTemplateRows: "48px 48px 48px",
-            gap: 0,
-          }}
-            onTouchEnd={stopDpad}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "48px 48px 48px",
+              gridTemplateRows: "48px 48px 48px",
+              gap: 0,
+              touchAction: "none",
+            }}
+            onTouchEnd={(e) => { prevent(e); stopDpad(); }}
+            onTouchCancel={stopDpad}
             onMouseUp={stopDpad}
             onMouseLeave={stopDpad}
           >
-            {/* Row 1 */}
+            {/* Up */}
             <div />
             <div
-              style={dpadBtn("up")}
-              onTouchStart={(e) => { prevent(e); startDpad("ArrowUp", 0, -1); }}
-              onMouseDown={() => startDpad("ArrowUp", 0, -1)}
+              style={dpadBtnStyle}
+              onTouchStart={(e) => { prevent(e); startDpad(0, -1, "up"); }}
+              onMouseDown={() => startDpad(0, -1, "up")}
             >
-              <span style={{ transform: "scaleX(1.4)" }}>{"\u25B2"}</span>
+              {"\u25B2"}
             </div>
             <div />
 
-            {/* Row 2 */}
+            {/* Left / Center / Right */}
             <div
-              style={dpadBtn("left")}
-              onTouchStart={(e) => { prevent(e); startDpad("ArrowLeft", -1, 0); }}
-              onMouseDown={() => startDpad("ArrowLeft", -1, 0)}
+              style={dpadBtnStyle}
+              onTouchStart={(e) => { prevent(e); startDpad(-1, 0, "left"); }}
+              onMouseDown={() => startDpad(-1, 0, "left")}
             >
-              <span style={{ transform: "scaleY(1.4)" }}>{"\u25C0"}</span>
+              {"\u25C0"}
             </div>
-            <div style={dpadCenter}>
+            <div style={{
+              width: 48, height: 48,
+              background: SHELL.dpad,
+              borderRadius: 4,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              boxShadow: "inset 0 1px 3px rgba(0,0,0,0.4)",
+            }}>
               <div style={{
                 width: 16, height: 16, borderRadius: "50%",
                 background: SHELL.dpadFace,
@@ -274,21 +286,21 @@ export default function GameBoyShell({
               }} />
             </div>
             <div
-              style={dpadBtn("right")}
-              onTouchStart={(e) => { prevent(e); startDpad("ArrowRight", 1, 0); }}
-              onMouseDown={() => startDpad("ArrowRight", 1, 0)}
+              style={dpadBtnStyle}
+              onTouchStart={(e) => { prevent(e); startDpad(1, 0, "right"); }}
+              onMouseDown={() => startDpad(1, 0, "right")}
             >
-              <span style={{ transform: "scaleY(1.4)" }}>{"\u25B6"}</span>
+              {"\u25B6"}
             </div>
 
-            {/* Row 3 */}
+            {/* Down */}
             <div />
             <div
-              style={dpadBtn("down")}
-              onTouchStart={(e) => { prevent(e); startDpad("ArrowDown", 0, 1); }}
-              onMouseDown={() => startDpad("ArrowDown", 0, 1)}
+              style={dpadBtnStyle}
+              onTouchStart={(e) => { prevent(e); startDpad(0, 1, "down"); }}
+              onMouseDown={() => startDpad(0, 1, "down")}
             >
-              <span style={{ transform: "scaleX(1.4)" }}>{"\u25BC"}</span>
+              {"\u25BC"}
             </div>
             <div />
           </div>
@@ -301,26 +313,11 @@ export default function GameBoyShell({
             {/* B button (left) */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
               <button
-                style={actionBtn(SHELL.btnB)}
-                onTouchStart={(e) => {
-                  prevent(e);
-                  e.currentTarget.style.boxShadow = `0 1px 0 ${SHELL.bodyDark}`;
-                  e.currentTarget.style.transform = "translateY(2px)";
-                  if (onButtonB) onButtonB();
-                }}
-                onTouchEnd={(e) => {
-                  e.currentTarget.style.boxShadow = `0 3px 0 ${SHELL.bodyDark}, inset 0 1px 2px rgba(255,255,255,0.15)`;
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
-                onMouseDown={(e) => {
-                  e.currentTarget.style.boxShadow = `0 1px 0 ${SHELL.bodyDark}`;
-                  e.currentTarget.style.transform = "translateY(2px)";
-                  if (onButtonB) onButtonB();
-                }}
-                onMouseUp={(e) => {
-                  e.currentTarget.style.boxShadow = `0 3px 0 ${SHELL.bodyDark}, inset 0 1px 2px rgba(255,255,255,0.15)`;
-                  e.currentTarget.style.transform = "translateY(0)";
-                }}
+                style={actionBtnStyle(SHELL.btnB)}
+                onTouchStart={(e) => { prevent(e); pressEffect(e); if (onButtonB) onButtonB(); }}
+                onTouchEnd={releaseEffect}
+                onMouseDown={(e) => { pressEffect(e); if (onButtonB) onButtonB(); }}
+                onMouseUp={releaseEffect}
               >
                 B
               </button>
@@ -330,31 +327,11 @@ export default function GameBoyShell({
             {/* A button (right, higher) */}
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4, marginTop: -16 }}>
               <button
-                style={actionBtn(SHELL.btnA)}
-                onTouchStart={(e) => {
-                  prevent(e);
-                  e.currentTarget.style.boxShadow = `0 1px 0 ${SHELL.bodyDark}`;
-                  e.currentTarget.style.transform = "translateY(2px)";
-                  // Fire interact: space key
-                  pressKey(" ");
-                  if (onButtonA) onButtonA();
-                }}
-                onTouchEnd={(e) => {
-                  e.currentTarget.style.boxShadow = `0 3px 0 ${SHELL.bodyDark}, inset 0 1px 2px rgba(255,255,255,0.15)`;
-                  e.currentTarget.style.transform = "translateY(0)";
-                  releaseKey(" ");
-                }}
-                onMouseDown={(e) => {
-                  e.currentTarget.style.boxShadow = `0 1px 0 ${SHELL.bodyDark}`;
-                  e.currentTarget.style.transform = "translateY(2px)";
-                  pressKey(" ");
-                  if (onButtonA) onButtonA();
-                }}
-                onMouseUp={(e) => {
-                  e.currentTarget.style.boxShadow = `0 3px 0 ${SHELL.bodyDark}, inset 0 1px 2px rgba(255,255,255,0.15)`;
-                  e.currentTarget.style.transform = "translateY(0)";
-                  releaseKey(" ");
-                }}
+                style={actionBtnStyle(SHELL.btnA)}
+                onTouchStart={(e) => { prevent(e); pressEffect(e); if (onButtonA) onButtonA(); }}
+                onTouchEnd={releaseEffect}
+                onMouseDown={(e) => { pressEffect(e); if (onButtonA) onButtonA(); }}
+                onMouseUp={releaseEffect}
               >
                 A
               </button>
@@ -365,19 +342,20 @@ export default function GameBoyShell({
 
         {/* ─── Start / Select ─── */}
         <div style={{
-          display: "flex", gap: 24, alignItems: "center",
+          display: "flex", gap: 32, alignItems: "center",
+          marginTop: -4,
         }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
             <button
-              style={pillBtn}
+              style={pillBtnStyle}
               onTouchStart={(e) => { prevent(e); if (onSelect) onSelect(); }}
               onMouseDown={() => { if (onSelect) onSelect(); }}
             />
             <span style={{ fontSize: 6, color: SHELL.label, letterSpacing: 1 }}>SELECT</span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
             <button
-              style={pillBtn}
+              style={pillBtnStyle}
               onTouchStart={(e) => { prevent(e); if (onStart) onStart(); }}
               onMouseDown={() => { if (onStart) onStart(); }}
             />
@@ -408,3 +386,5 @@ export default function GameBoyShell({
     </div>
   );
 }
+
+export { SHELL };
