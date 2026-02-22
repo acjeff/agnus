@@ -201,7 +201,6 @@ import TokenPicker from "./components/TokenPicker.jsx";
 import Particles from "./components/Particles.jsx";
 import GridDecoration from "./components/GridDecoration.jsx";
 import AttemptDots from "./components/AttemptDots.jsx";
-import ScoreBadge from "./components/ScoreBadge.jsx";
 import PeerAggie from "./components/PeerAggie.jsx";
 import AggieInteractionMenu from "./components/AggieInteractionMenu.jsx";
 
@@ -14594,15 +14593,16 @@ export default function Pattrn() {
                   </div>
                 )}
               </div>
-              {todayResult > 0 && (
+              {todayResult > 0 && (() => {
+                const todayMedalColor = todayResult <= 2 ? C.gold : todayResult <= 4 ? C.silver : C.bronze;
+                return (
                 <div style={{
                   display: "flex", alignItems: "center", gap: 10, marginBottom: 16,
-                  padding: "10px 14px", borderRadius: 12, backgroundColor: C.bg + "66",
+                  padding: "10px 14px", borderRadius: 12, backgroundColor: todayMedalColor + "12",
                   backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
-                  border: `1px solid ${C.border}44`,
+                  border: `1px solid ${todayMedalColor}44`,
                 }}>
-                  <ScoreBadge attempts={todayResult} />
-                  <span style={{ fontSize: 13, color: C.text, fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                  <span style={{ fontSize: 13, color: todayMedalColor, fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
                     Solved in {todayResult} attempt{todayResult !== 1 ? "s" : ""}
                   </span>
                   {todayTime != null && (
@@ -14611,7 +14611,7 @@ export default function Pattrn() {
                     </span>
                   )}
                 </div>
-              )}
+              );})()}
               <div style={{ display: "flex", gap: 10 }}>
                 <button
                   onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, todayLabel); }}
@@ -15129,9 +15129,10 @@ export default function Pattrn() {
                   const dailyCoopResult = (progress.coop || {})[`daily_${cell.seed}`];
                   const dailyCoopSolved = dailyCoopResult > 0;
                   const isBd = cell.isBirthday || cell.isExactBirthday;
-                  const borderColor = cell.isToday ? C.accent : isBd ? "#F472B6" : solved ? C.correct + "66" : failed ? C.incorrect + "44" : C.border;
-                  const bgColor = isBd ? "#F472B620" : solved ? C.correct + "15" : failed ? C.incorrect + "10" : C.surface;
-                  const numColor = cell.isFuture ? C.textDim + "44" : cell.isToday ? C.accent : isBd ? "#F472B6" : solved ? C.correct : failed ? C.incorrect : C.text;
+                  const dailyMedalColor = solved ? (cell.result <= 2 ? C.gold : cell.result <= 4 ? C.silver : C.bronze) : null;
+                  const borderColor = cell.isToday ? C.accent : isBd ? "#F472B6" : solved ? dailyMedalColor + "66" : failed ? C.incorrect + "44" : C.border;
+                  const bgColor = isBd ? "#F472B620" : solved ? dailyMedalColor + "15" : failed ? C.incorrect + "10" : C.surface;
+                  const numColor = cell.isFuture ? C.textDim + "44" : cell.isToday ? C.accent : isBd ? "#F472B6" : solved ? dailyMedalColor : failed ? C.incorrect : C.text;
                   return (
                     <button
                       key={cell.day}
@@ -15165,7 +15166,6 @@ export default function Pattrn() {
                         fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: cell.isToday ? 800 : isBd ? 800 : 600,
                         color: numColor, lineHeight: 1,
                       }}>{cell.day}</span>
-                      {solved && <ScoreBadge attempts={cell.result} />}
                       {solved && cell.time != null && (
                         <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 7, color: C.textDim, lineHeight: 1 }}>
                           {formatTime(cell.time)}
@@ -15418,9 +15418,10 @@ export default function Pattrn() {
               : null;
             const coopResult = (progress.coop || {})[`${difficulty}_${i}`];
             const coopSolved = coopResult > 0;
-            const borderColor = solved ? C.correct + "55" : failed ? C.incorrect + "44" : cascadeInProgress ? C.inProgress + "88" : C.border;
-            const bgColor = solved ? C.correct + "0d" : failed ? C.incorrect + "0a" : cascadeInProgress ? C.inProgress + "12" : C.surface;
-            const numColor = solved ? C.correct : failed ? C.incorrect : cascadeInProgress ? C.inProgress : C.text;
+            const medalColor = solved ? (result <= 2 ? C.gold : result <= 4 ? C.silver : C.bronze) : null;
+            const borderColor = solved ? medalColor + "55" : failed ? C.incorrect + "44" : cascadeInProgress ? C.inProgress + "88" : C.border;
+            const bgColor = solved ? medalColor + "0d" : failed ? C.incorrect + "0a" : cascadeInProgress ? C.inProgress + "12" : C.surface;
+            const numColor = solved ? medalColor : failed ? C.incorrect : cascadeInProgress ? C.inProgress : C.text;
             return (
               <button key={i} onClick={() => startPuzzle(i, view === "menu" ? difficulty : undefined)}
                 style={{
@@ -15429,10 +15430,10 @@ export default function Pattrn() {
                   cursor: "pointer", display: "flex", flexDirection: "column",
                   alignItems: "center", justifyContent: "center", gap: 2,
                   transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)", position: "relative", minWidth: 0,
-                  boxShadow: solved ? `0 0 8px ${C.correct}11` : "none",
+                  boxShadow: solved ? `0 0 8px ${medalColor}11` : "none",
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.boxShadow = `0 4px 12px ${C.accent}22`; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.boxShadow = solved ? `0 0 8px ${C.correct}11` : "none"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.boxShadow = solved ? `0 0 8px ${medalColor}11` : "none"; }}
               >
                 {coopSolved && (
                   <span style={{
@@ -15464,7 +15465,6 @@ export default function Pattrn() {
                   </>
                 ) : (
                   <>
-                    {result !== undefined && <ScoreBadge attempts={result} />}
                     {solved && time != null && (
                       <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 8, color: C.textDim, lineHeight: 1 }}>
                         {formatTime(time)}
