@@ -15989,7 +15989,7 @@ export default function Pattrn() {
       </div>
       </div>
       {/* Puzzle complete overlay — blurry area on top of finished grid */}
-      {gameState === "won" && showWinOverlay && (
+      {gameState === "won" && showWinOverlay && !cascadeLevelBanner && (
         <div style={{
           position: "absolute",
           inset: 0,
