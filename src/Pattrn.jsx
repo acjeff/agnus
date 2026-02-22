@@ -10414,13 +10414,16 @@ export default function Pattrn() {
         setCascadeLevelBanner({ level: cascadeLevel, coins: levelCoins, gridSize: CASCADE_LEVELS[cascadeLevel], isLastLevel });
         if (cascadeLevel < CASCADE_LEVELS.length - 1) {
           // Don't stop timer — it continues across cascade levels
+          // Mark as won during the banner so the Check button is hidden
+          // and a double-tap can't queue a second level increment.
+          setGameState("won");
           // Batch level change with state reset so the new puzzle and
           // cleared fills render in the same React commit — avoids a
           // flash of stale cell colours from the previous level.
           setTimeout(() => {
             setCascadeLevelBanner(null);
             setCascadeLevel((l) => l + 1);
-            resetCascadeLevelState();
+            resetCascadeLevelState(); // resets gameState back to "playing"
           }, 1600);
         } else {
           setTimeout(() => setCascadeLevelBanner(null), 3000);
