@@ -5,7 +5,7 @@ export function createInputHandler(onMove, onInteract) {
   const keys = new Set();
   let moveQueue = [];
   let moveInterval = null;
-  const MOVE_DELAY = 150; // ms between moves (tile-based)
+  const MOVE_DELAY = 120; // ms between moves (tile-based)
   let lastMoveTime = 0;
   let enabled = true;
 

@@ -8313,9 +8313,9 @@ export default function Pattrn() {
         campaignPuzzleCallbackRef.current(solved, attempts);
         campaignPuzzleCallbackRef.current = null;
       }
+      setCampaignPuzzleConfig(null);
+      setCampaignPuzzle(null);
       setView("campaign");
-      // Defer clearing puzzle data so the render doesn't access null puzzle
-      setTimeout(() => { setCampaignPuzzleConfig(null); setCampaignPuzzle(null); }, 0);
     }, 1500);
     return () => clearTimeout(timer);
   }, [isCampaign, gameState]);
@@ -15841,9 +15841,9 @@ export default function Pattrn() {
         campaignPuzzleCallbackRef.current(false, attempts);
         campaignPuzzleCallbackRef.current = null;
       }
+      setCampaignPuzzleConfig(null);
+      setCampaignPuzzle(null);
       setView("campaign");
-      // Defer clearing puzzle data so the render doesn't access null puzzle
-      setTimeout(() => { setCampaignPuzzleConfig(null); setCampaignPuzzle(null); }, 0);
       return;
     }
     if (isCoop) { leaveCoopSession(); setView("menu"); return; }
@@ -16480,7 +16480,7 @@ export default function Pattrn() {
           display: "flex", flexDirection: "column", gap: gridGap, padding: gridPad,
           position: "relative", zIndex: 1,
         }}>
-          {puzzle.solution.map((row, r) => (
+          {puzzle && puzzle.solution.map((row, r) => (
             <div key={r} style={{ display: "flex", gap: gridGap, position: "relative", zIndex: 1 }}>
               {row.map((token, c) => {
                 const key = `${r}-${c}`;

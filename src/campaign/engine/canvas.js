@@ -31,7 +31,11 @@ export function createCampaignEngine(canvasEl, theme) {
   let colors = getTileColors(theme || "cave");
 
   // Entities to render
-  let entities = []; // { x, y, draw(ctx, x, y, tileSize, frame) }
+  let entities = []; // { x, y, draw(ctx, x, y, tileSize, frame), smooth? }
+
+  // Smooth entity position tracking
+  const entityVisualPos = new Map(); // id -> { vx, vy }
+  const ENTITY_LERP = 0.25;
 
   // Animation frame counter
   let frame = 0;
@@ -388,13 +392,43 @@ export function createCampaignEngine(canvasEl, theme) {
       }
     }
 
+    // Update smooth entity positions
+    for (const entity of entities) {
+      if (entity.smooth) {
+        const id = entity.id || "default";
+        let vp = entityVisualPos.get(id);
+        if (!vp) {
+          vp = { vx: entity.x, vy: entity.y };
+          entityVisualPos.set(id, vp);
+        }
+        vp.vx += (entity.x - vp.vx) * ENTITY_LERP;
+        vp.vy += (entity.y - vp.vy) * ENTITY_LERP;
+        // Snap when very close to avoid permanent drift
+        if (Math.abs(entity.x - vp.vx) < 0.01) vp.vx = entity.x;
+        if (Math.abs(entity.y - vp.vy) < 0.01) vp.vy = entity.y;
+      }
+    }
+
     // Draw entities (sorted by y for depth)
-    const sortedEntities = [...entities].sort((a, b) => a.y - b.y);
+    const sortedEntities = [...entities].sort((a, b) => {
+      const ay = a.smooth ? (entityVisualPos.get(a.id || "default")?.vy ?? a.y) : a.y;
+      const by = b.smooth ? (entityVisualPos.get(b.id || "default")?.vy ?? b.y) : b.y;
+      return ay - by;
+    });
     for (const entity of sortedEntities) {
-      const key = `${entity.x},${entity.y}`;
-      if (visible.has(key) || entity.alwaysVisible) {
-        const ex = Math.floor(entity.x * tileSize + offsetX);
-        const ey = Math.floor(entity.y * tileSize + offsetY);
+      let drawX, drawY;
+      if (entity.smooth) {
+        const vp = entityVisualPos.get(entity.id || "default");
+        drawX = vp ? vp.vx : entity.x;
+        drawY = vp ? vp.vy : entity.y;
+      } else {
+        drawX = entity.x;
+        drawY = entity.y;
+      }
+      const tileKey = `${Math.round(drawX)},${Math.round(drawY)}`;
+      if (visible.has(tileKey) || entity.alwaysVisible) {
+        const ex = Math.floor(drawX * tileSize + offsetX);
+        const ey = Math.floor(drawY * tileSize + offsetY);
         entity.draw(ctx, ex, ey, tileSize, frame);
       }
     }

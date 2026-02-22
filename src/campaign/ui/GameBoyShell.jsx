@@ -22,7 +22,7 @@ const SHELL = {
   led: "#4ade80",
 };
 
-const MOVE_REPEAT_DELAY = 160; // ms between repeated d-pad moves
+const MOVE_REPEAT_DELAY = 120; // ms between repeated d-pad moves
 
 export default function GameBoyShell({
   canvasRef,

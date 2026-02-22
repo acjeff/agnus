@@ -230,9 +230,11 @@ export default function CampaignMode({
 
     // Player is Aggie
     entities.push({
+      id: "player",
       x: playerPos.x,
       y: playerPos.y,
       alwaysVisible: true,
+      smooth: true,
       draw: (ctx, sx, sy, ts, frame) => {
         drawAggieSprite(ctx, stateRef.current.aggie.evolutionStage, sx, sy, ts, frame);
       },
