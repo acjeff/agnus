@@ -27,6 +27,7 @@ import {
   orderByChild,
   equalTo,
 } from "firebase/database";
+import { CASCADE_LEVELS } from "./utils/puzzles.js";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -191,9 +192,9 @@ export function summariseGameData(data) {
     modes[mode] = solved;
     totalSolved += solved;
   }
-  // Cascade: count full clears (value === 10, i.e. all 10 levels)
+  // Cascade: count full clears (value === total number of levels)
   const cascade = progress.cascade || {};
-  const cascadeClears = Object.values(cascade).filter(v => v === 10).length;
+  const cascadeClears = Object.values(cascade).filter(v => v === CASCADE_LEVELS.length).length;
   modes.cascade = cascadeClears;
   totalSolved += cascadeClears;
   const achievements = (data.achievements || []).length;

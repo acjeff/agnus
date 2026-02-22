@@ -6,7 +6,6 @@ export const AGGIE_SIZE_KEY = "pattrn-aggie-size";
 export const AGGIE_SIZES = { small: 64, medium: 96, large: 128 };
 export const ACCESSORY_CATEGORIES = [
   { id: "hat", label: "Hats" },
-  { id: "hair", label: "Hair" },
   { id: "eyes", label: "Eyes" },
   { id: "face", label: "Face" },
   { id: "earring", label: "Earrings" },
@@ -33,9 +32,6 @@ export const AGGIE_ACCESSORIES = [
   { id: "eyes-red", label: "Red Eyes", cost: 15, category: "eyes" },
   { id: "eyes-green", label: "Green Eyes", cost: 15, category: "eyes" },
   { id: "eyes-gold", label: "Gold Eyes", cost: 30, category: "eyes" },
-  { id: "wig-curly", label: "Curly Wig", cost: 30, category: "hair" },
-  { id: "wig-punk", label: "Punk Spikes", cost: 35, category: "hair" },
-  { id: "wig-long", label: "Long Hair", cost: 25, category: "hair" },
 ];
 export const AGGIE_UNLOCKED_ACC_KEY = "pattrn-aggie-unlocked-acc";
 
