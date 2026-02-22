@@ -1225,6 +1225,7 @@ export default function Pattrn() {
   const justHandledInPointerUpRef = useRef(null);
   const wrongCellClearTimeoutRef = useRef(null);
   const playViewScrollRef = useRef(null);
+  const puzzleGridRef = useRef(null);
 
   const [currentDailyDate, setCurrentDailyDate] = useState(null); // "dd-mm-yyyy"
   const [calendarYear, setCalendarYear] = useState(() => new Date().getUTCFullYear());
@@ -14933,7 +14934,7 @@ export default function Pattrn() {
                   const modeTotal = d.key === "mosaic" ? 25 : d.key === "cascade" ? 50 : (PUZZLE_SETS[d.key]?.length ?? 50);
                   const isCleared = !isVaultEntry && d.key !== "daily" && solved >= modeTotal;
                   const progressPct = isVaultEntry || d.key === "daily" ? 0 : Math.min(100, (solved / modeTotal) * 100);
-                  const activeBg = isCleared ? C.gold : d.key === "blind" ? "#e06040" : C.accent;
+                  const activeBg = isCleared ? C.gold : d.key === "blind" ? "#e06040" : catColor;
                   const activeText = d.key === "blind" && !isCleared ? "#fff" : C.bg;
                   return (
                     <button
@@ -14968,7 +14969,27 @@ export default function Pattrn() {
                             }
                           }).catch(() => {});
                         }
-                        else { setDifficulty(d.key); }
+                        else {
+                          setDifficulty(d.key);
+                          // Scroll to first incomplete puzzle after render
+                          if (d.key !== "daily") {
+                            setTimeout(() => {
+                              const grid = puzzleGridRef.current;
+                              if (!grid) return;
+                              const dp = progress[d.key] || {};
+                              const items = d.key === "cascade" ? Array.from({ length: 50 }, (_, i) => i) : (PUZZLE_SETS[d.key] || []);
+                              const firstIncomplete = items.findIndex((p, i) => {
+                                const idx = d.key === "cascade" ? i : (p?.id ?? i);
+                                const res = dp[idx];
+                                if (d.key === "cascade") return res !== CASCADE_LEVELS.length;
+                                return !(res > 0);
+                              });
+                              if (firstIncomplete > 0 && grid.children[firstIncomplete]) {
+                                grid.children[firstIncomplete].scrollIntoView({ behavior: "smooth", block: "center" });
+                              }
+                            }, 120);
+                          }
+                        }
                       }}
                       style={{
                         padding: "14px 10px 12px",
@@ -15432,7 +15453,7 @@ export default function Pattrn() {
             </div>
           ) : null;
         })()}
-        <div style={{
+        <div ref={puzzleGridRef} style={{
           display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 8,
           width: "100%", animation: "fadeUp 0.45s 0.18s ease both",
         }}>
@@ -15459,8 +15480,8 @@ export default function Pattrn() {
             const coopResult = (progress.coop || {})[`${difficulty}_${i}`];
             const coopSolved = coopResult > 0;
             const medalColor = solved ? (result <= 2 ? C.gold : result <= 4 ? C.silver : C.bronze) : null;
-            const borderColor = solved ? medalColor + "55" : failed ? C.incorrect + "44" : cascadeInProgress ? C.inProgress + "88" : C.border;
-            const bgColor = solved ? medalColor + "0d" : failed ? C.incorrect + "0a" : cascadeInProgress ? C.inProgress + "12" : C.surface;
+            const borderColor = solved ? medalColor + "88" : failed ? C.incorrect + "44" : cascadeInProgress ? C.inProgress + "88" : C.border;
+            const bgColor = solved ? medalColor + "22" : failed ? C.incorrect + "0a" : cascadeInProgress ? C.inProgress + "12" : C.surface;
             const numColor = solved ? medalColor : failed ? C.incorrect : cascadeInProgress ? C.inProgress : C.text;
             return (
               <button key={i} onClick={() => startPuzzle(i, view === "menu" ? difficulty : undefined)}
@@ -15470,10 +15491,10 @@ export default function Pattrn() {
                   cursor: "pointer", display: "flex", flexDirection: "column",
                   alignItems: "center", justifyContent: "center", gap: 2,
                   transition: "all 0.2s cubic-bezier(0.4, 0, 0.2, 1)", position: "relative", minWidth: 0,
-                  boxShadow: solved ? `0 0 8px ${medalColor}11` : "none",
+                  boxShadow: solved ? `0 0 10px ${medalColor}33` : "none",
                 }}
                 onMouseEnter={e => { e.currentTarget.style.transform = "scale(1.08)"; e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.boxShadow = `0 4px 12px ${C.accent}22`; }}
-                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.boxShadow = solved ? `0 0 8px ${medalColor}11` : "none"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; e.currentTarget.style.borderColor = borderColor; e.currentTarget.style.boxShadow = solved ? `0 0 10px ${medalColor}33` : "none"; }}
               >
                 {coopSolved && (
                   <span style={{
@@ -15821,11 +15842,13 @@ export default function Pattrn() {
       navigator.clipboard.writeText(text).catch(() => {});
       setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
     }});
-    // Retry
-    playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => {
-      if (isCoop) leaveCoopSession();
-      startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true, isDaily ? currentDailyDate : null);
-    }});
+    // Retry (not for daily puzzles)
+    if (!isDaily) {
+      playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => {
+        if (isCoop) leaveCoopSession();
+        startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true);
+      }});
+    }
     // Next / Done / Back — the primary action
     if (isVault && vaultSessionId) {
       // Vault: return to vault overview (auto-handled by timeout, but add explicit button too)
