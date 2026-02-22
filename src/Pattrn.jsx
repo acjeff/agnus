@@ -11685,45 +11685,9 @@ export default function Pattrn() {
   }
 
   // --- CAMPAIGN MODE VIEW ---
-  if (view === "campaign") {
-    return (
-      <CampaignMode
-        C={C}
-        onExit={() => setView("menu")}
-        onStartPuzzle={(config, doorKey, callback) => {
-          // Generate a puzzle for the campaign door
-          const diff = config.mode;
-          const sets = PUZZLE_SETS[diff] || PUZZLE_SETS.easy;
-          // Pick a deterministic puzzle from the set based on doorKey hash
-          let hash = 0;
-          for (let i = 0; i < doorKey.length; i++) hash = ((hash << 5) - hash + doorKey.charCodeAt(i)) | 0;
-          const idx = Math.abs(hash) % sets.length;
-          const puz = sets[idx];
-
-          setCampaignPuzzleConfig(config);
-          setCampaignPuzzle(puz);
-          campaignPuzzleCallbackRef.current = callback;
-          setDifficulty("campaign");
-          setCurrentPuzzle(0);
-          setFills({});
-          setSelectedCell(null);
-          setSelectedToken(null);
-          setAttempts(0);
-          setGameState("playing");
-          setWrongCells(new Set());
-          setLockedCells(new Set());
-          setShowParticles(false);
-          setElapsedTime(0);
-          setView("play");
-          timerStart.current = Date.now();
-          if (timerInterval.current) clearInterval(timerInterval.current);
-          timerInterval.current = setInterval(() => {
-            setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
-          }, 1000);
-        }}
-      />
-    );
-  }
+  // Campaign mode: rendered persistently so dungeon state survives puzzle transitions
+  const campaignMounted = view === "campaign" || (view === "play" && isCampaign);
+  const campaignVisible = view === "campaign";
 
   // --- VAULT MODE VIEW ---
   if (view === "vault" && vaultSessionId) {
@@ -16058,12 +16022,51 @@ export default function Pattrn() {
   }
 
   return (
+    <>
+    {/* Campaign mode — stays mounted during puzzle play so dungeon state persists */}
+    {campaignMounted && (
+      <div style={{ position: "fixed", inset: 0, zIndex: campaignVisible ? 200 : -1, pointerEvents: campaignVisible ? "auto" : "none", visibility: campaignVisible ? "visible" : "hidden" }}>
+        <CampaignMode
+          C={C}
+          onExit={() => setView("menu")}
+          onStartPuzzle={(config, doorKey, callback) => {
+            const diff = config.mode;
+            const sets = PUZZLE_SETS[diff] || PUZZLE_SETS.easy;
+            let hash = 0;
+            for (let i = 0; i < doorKey.length; i++) hash = ((hash << 5) - hash + doorKey.charCodeAt(i)) | 0;
+            const idx = Math.abs(hash) % sets.length;
+            const puz = sets[idx];
+
+            setCampaignPuzzleConfig(config);
+            setCampaignPuzzle(puz);
+            campaignPuzzleCallbackRef.current = callback;
+            setDifficulty("campaign");
+            setCurrentPuzzle(0);
+            setFills({});
+            setSelectedCell(null);
+            setSelectedToken(null);
+            setAttempts(0);
+            setGameState("playing");
+            setWrongCells(new Set());
+            setLockedCells(new Set());
+            setShowParticles(false);
+            setElapsedTime(0);
+            setView("play");
+            timerStart.current = Date.now();
+            if (timerInterval.current) clearInterval(timerInterval.current);
+            timerInterval.current = setInterval(() => {
+              setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+            }, 1000);
+          }}
+        />
+      </div>
+    )}
     <div
       ref={playViewScrollRef}
       style={{
       height: "100dvh", minHeight: "100dvh", backgroundColor: C.bg, color: C.text,
       fontFamily: "'Inter', sans-serif",
-      display: "flex", flexDirection: "column",
+      display: campaignVisible ? "none" : "flex", flexDirection: "column",
       position: "relative", width: "100%",
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
@@ -16917,5 +16920,6 @@ export default function Pattrn() {
       {renderContextButton("play", playPillButtons)}
       {globalModalsEl}
     </div>
+    </>
   );
 }
