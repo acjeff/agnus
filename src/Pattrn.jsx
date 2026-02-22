@@ -11187,7 +11187,7 @@ export default function Pattrn() {
 
   // --- CAMPAIGN MODE VIEW ---
   // Campaign mode: rendered persistently so dungeon state survives puzzle transitions
-  const campaignMounted = view === "campaign" || (view === "play" && isCampaign);
+  const campaignMounted = isAdmin && (view === "campaign" || (view === "play" && isCampaign));
   const campaignVisible = view === "campaign";
 
   // --- VAULT MODE VIEW ---
@@ -14431,8 +14431,8 @@ export default function Pattrn() {
           </div>
         )}
 
-        {/* ── Campaign hero card ── */}
-        {(() => {
+        {/* ── Campaign hero card (admin only) ── */}
+        {isAdmin && (() => {
           const cState = loadCampaignState();
           const aggieLevel = cState.aggie?.level || 1;
           const floorsCleared = cState.stats?.totalFloorsCleared || 0;
