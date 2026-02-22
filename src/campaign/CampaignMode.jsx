@@ -271,11 +271,6 @@ export default function CampaignMode({
       if (tileType === TILE.TRAP) {
         handleTrap(newX, newY);
       }
-
-      // Check for stairs down
-      if (tileType === TILE.STAIRS_DOWN) {
-        handleStairsDown();
-      }
     }
   }, [paused, dialogue, screen]);
 
@@ -290,6 +285,15 @@ export default function CampaignMode({
     if (!dg) return;
 
     const pos = playerRef.current;
+
+    // First check if standing on stairs (interact from current tile)
+    const standingTile = dg.map[pos.y * dg.width + pos.x];
+    if (standingTile === TILE.STAIRS_DOWN) {
+      handleStairsDown();
+      return;
+    }
+
+    // Then check the tile we're facing
     const dirOffset = {
       down: { x: 0, y: 1 },
       up: { x: 0, y: -1 },
@@ -334,6 +338,7 @@ export default function CampaignMode({
     // After dialogue, trigger puzzle
     // We set a flag so the dialogue onComplete starts the puzzle
     const puzzleConfig = {
+      type: "door",
       mode: config.mode,
       gridSize: config.gridSize,
       maxAttempts: isBoss ? 3 : config.maxAttempts,
@@ -349,10 +354,52 @@ export default function CampaignMode({
   }, [activeChapter, activeFloor]);
 
   const pendingPuzzleRef = useRef(null);
+  const pendingDescentRef = useRef(false);
+
+  // Actually descend to next floor / complete chapter
+  const performDescent = useCallback(() => {
+    const chapter = CAMPAIGN_CHAPTERS[activeChapter];
+    if (!chapter) return;
+
+    const state = { ...stateRef.current };
+    const elapsed = Math.floor((Date.now() - floorStartTime) / 1000);
+    completeFloor(state, activeChapter, activeFloor, elapsed);
+
+    if (activeFloor >= chapter.floors - 1) {
+      // Chapter complete!
+      completeChapter(state, activeChapter, elapsed);
+      addXp(state, 200);
+      addCoins(state, 100);
+      setCampaignState({ ...state });
+
+      setDialogue({
+        lines: [pickLine(simpleRng, "chapterComplete"), "Returning to chapter select..."],
+        portrait: "\u{1F47E}",
+      });
+
+      setTimeout(() => {
+        setScreen("chapter-select");
+        setDialogue(null);
+      }, 3000);
+    } else {
+      setCampaignState({ ...state });
+      setTimeout(() => {
+        enterFloor(activeChapter, activeFloor + 1);
+      }, 500);
+    }
+  }, [activeChapter, activeFloor, floorStartTime, enterFloor]);
 
   // Handle dialogue completion — check if we should start a puzzle
   const handleDialogueComplete = useCallback(() => {
     setDialogue(null);
+
+    // If stairs were unlocked, descend now
+    if (pendingDescentRef.current) {
+      pendingDescentRef.current = false;
+      performDescent();
+      return;
+    }
+
     if (pendingPuzzleRef.current) {
       const config = pendingPuzzleRef.current;
       pendingPuzzleRef.current = null;
@@ -365,32 +412,32 @@ export default function CampaignMode({
         });
       }
     }
-  }, [onStartPuzzle, activeChapter, activeFloor]);
+  }, [onStartPuzzle, activeChapter, activeFloor, performDescent]);
 
-  // ─── Puzzle result handler ─────────────────
+  // ─── Puzzle result handler (handles doors, chests, and stairs) ─────────────────
   const handlePuzzleResult = useCallback((config, solved, attempts) => {
     setScreen("dungeon");
     const state = { ...stateRef.current };
+    const dg = dungeonRef.current;
 
-    if (solved) {
+    if (!solved) {
+      showNotification("Puzzle failed! Try again.", "#f87171");
+      return;
+    }
+
+    const xpGain = config.isBoss ? 50 : config.difficulty * 15;
+    const leveled = addXp(state, xpGain);
+    addCoins(state, config.difficulty * 10);
+
+    if (config.type === "door") {
       // Open the door on the map
-      const dg = dungeonRef.current;
       if (dg) {
         const idx = config.doorY * dg.width + config.doorX;
         dg.map[idx] = config.isBoss ? TILE.BOSS_DOOR_OPEN : TILE.DOOR_OPEN;
         setDungeon({ ...dg });
       }
-
-      // Record solve
       solveDoor(state, activeChapter, activeFloor, config.doorKey, attempts);
-
-      // XP reward
-      const xpGain = config.isBoss ? 50 : config.difficulty * 15;
-      const leveled = addXp(state, xpGain);
-      addCoins(state, config.difficulty * 10);
-
       showNotification(`+${xpGain} XP \u2022 +${config.difficulty * 10} coins`, "#4ade80");
-
       setDialogue({
         lines: [
           pickLine(simpleRng, "doorSolved"),
@@ -398,14 +445,44 @@ export default function CampaignMode({
         ],
         portrait: "\u{1F47E}",
       });
-
-      setCampaignState({ ...state });
-    } else {
-      showNotification("Puzzle failed! Try again later.", "#f87171");
+    } else if (config.type === "chest") {
+      // Open the chest on the map
+      if (dg) {
+        dg.map[config.doorY * dg.width + config.doorX] = TILE.CHEST_OPEN;
+        setDungeon({ ...dg });
+      }
+      openChest(state, activeChapter, activeFloor, config.doorKey);
+      // Roll loot
+      const loot = rollLoot(simpleRng);
+      addItem(state, loot.type, loot.amount);
+      addXp(state, 10);
+      const lootLabel = loot.type === "coins" ? `${loot.amount} coins`
+        : loot.type === "xp" ? `${loot.amount} bonus XP`
+        : loot.type === "key" ? "a skeleton key"
+        : loot.type === "potion" ? "a potion"
+        : "a rare item";
+      showNotification(`Found: ${lootLabel}!`, "#ffd700");
+      setDialogue({
+        lines: [pickLine(simpleRng, "chestOpen"), `You found ${lootLabel}!`],
+        portrait: "\u{1F47E}",
+      });
+    } else if (config.type === "stairs") {
+      // Mark stairs as unlocked and proceed
+      const floorState = getFloorState(state, activeChapter, activeFloor);
+      floorState.stairsUnlocked = true;
+      showNotification(`+${xpGain} XP \u2022 Stairs unlocked!`, "#4ade80");
+      setDialogue({
+        lines: ["The way forward is open!", ...(leveled ? [pickLine(simpleRng, "levelUp")] : [])],
+        portrait: "\u{1F47E}",
+      });
+      // After dialogue, actually descend (handled by pending descent flag)
+      pendingDescentRef.current = true;
     }
+
+    setCampaignState({ ...state });
   }, [activeChapter, activeFloor, showNotification]);
 
-  // ─── Chest interaction ─────────────────
+  // ─── Chest interaction (requires puzzle) ─────────────────
   const handleChestInteract = useCallback((chestX, chestY) => {
     const chestKey = `${chestX}-${chestY}`;
     const state = stateRef.current;
@@ -413,34 +490,28 @@ export default function CampaignMode({
 
     if (floorState.chests[chestKey]) return; // Already opened
 
-    // Open the chest on map
-    const dg = dungeonRef.current;
-    if (dg) {
-      dg.map[chestY * dg.width + chestX] = TILE.CHEST_OPEN;
-      setDungeon({ ...dg });
-    }
-
-    // Roll loot
-    const loot = rollLoot(simpleRng);
-    openChest(state, activeChapter, activeFloor, chestKey);
-    addItem(state, loot.type, loot.amount);
-    addXp(state, 10);
-
-    const lootLabel = loot.type === "coins" ? `${loot.amount} coins`
-      : loot.type === "xp" ? `${loot.amount} bonus XP`
-      : loot.type === "key" ? "a skeleton key"
-      : loot.type === "potion" ? "a potion"
-      : "a rare item";
-
-    showNotification(`Found: ${lootLabel}!`, "#ffd700");
+    const chapter = CAMPAIGN_CHAPTERS[activeChapter];
+    const floorDiff = chapter.difficulty[activeFloor] || 1;
+    // Chests use one step easier puzzle (min 1)
+    const chestDiff = Math.max(1, floorDiff - 1);
+    const config = DIFFICULTY_CONFIG[chestDiff];
 
     setDialogue({
-      lines: [pickLine(simpleRng, "chestFound"), `You found ${lootLabel}!`],
+      lines: [pickLine(simpleRng, "chestFound")],
       portrait: "\u{1F47E}",
     });
 
-    setCampaignState({ ...state });
-  }, [activeChapter, activeFloor, showNotification]);
+    pendingPuzzleRef.current = {
+      type: "chest",
+      mode: config.mode,
+      gridSize: config.gridSize,
+      maxAttempts: config.maxAttempts,
+      doorKey: chestKey,
+      doorX: chestX,
+      doorY: chestY,
+      difficulty: chestDiff,
+    };
+  }, [activeChapter, activeFloor]);
 
   // ─── Trap handler ─────────────────
   const handleTrap = useCallback((tx, ty) => {
@@ -470,44 +541,40 @@ export default function CampaignMode({
     }
   }, [showNotification]);
 
-  // ─── Stairs down ─────────────────
+  // ─── Stairs down (requires puzzle to unlock) ─────────────────
   const handleStairsDown = useCallback(() => {
     const chapter = CAMPAIGN_CHAPTERS[activeChapter];
     if (!chapter) return;
 
     const state = stateRef.current;
-    const elapsed = Math.floor((Date.now() - floorStartTime) / 1000);
-    completeFloor(state, activeChapter, activeFloor, elapsed);
+    const floorState = getFloorState(state, activeChapter, activeFloor);
 
-    if (activeFloor >= chapter.floors - 1) {
-      // Chapter complete!
-      completeChapter(state, activeChapter, elapsed);
-      addXp(state, 200);
-      addCoins(state, 100);
-      setCampaignState({ ...state });
-
-      setDialogue({
-        lines: [pickLine(simpleRng, "chapterComplete"), "Returning to chapter select..."],
-        portrait: "\u{1F47E}",
-      });
-
-      // After dialogue, return to chapter select
-      setTimeout(() => {
-        setScreen("chapter-select");
-        setDialogue(null);
-      }, 3000);
-    } else {
-      // Next floor
-      setCampaignState({ ...state });
-      setDialogue({
-        lines: [pickLine(simpleRng, "stairsDown")],
-        portrait: "\u{1F47E}",
-      });
-      setTimeout(() => {
-        enterFloor(activeChapter, activeFloor + 1);
-      }, 1500);
+    // If stairs already unlocked, descend immediately
+    if (floorState.stairsUnlocked) {
+      performDescent();
+      return;
     }
-  }, [activeChapter, activeFloor, floorStartTime, enterFloor]);
+
+    // Otherwise, require a puzzle to unlock
+    const floorDiff = chapter.difficulty[activeFloor] || 1;
+    const config = DIFFICULTY_CONFIG[floorDiff];
+
+    setDialogue({
+      lines: [pickLine(simpleRng, "stairsDown")],
+      portrait: "\u{1F47E}",
+    });
+
+    pendingPuzzleRef.current = {
+      type: "stairs",
+      mode: config.mode,
+      gridSize: config.gridSize,
+      maxAttempts: config.maxAttempts,
+      doorKey: `stairs-${activeFloor}`,
+      doorX: 0,
+      doorY: 0,
+      difficulty: floorDiff,
+    };
+  }, [activeChapter, activeFloor]);
 
   // ─── Ability usage ─────────────────
   const handleUseAbility = useCallback((abilityId) => {
