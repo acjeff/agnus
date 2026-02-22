@@ -24,6 +24,14 @@ const SHELL = {
 
 const MOVE_REPEAT_DELAY = 120; // ms between repeated d-pad moves
 
+// D-pad direction map: data-dir attribute → (dx, dy)
+const DIR_MAP = {
+  up:    [0, -1],
+  down:  [0,  1],
+  left:  [-1, 0],
+  right: [1,  0],
+};
+
 export default function GameBoyShell({
   canvasRef,
   onDpadPress,     // (dx, dy) => void — direct move callback
@@ -36,23 +44,27 @@ export default function GameBoyShell({
 }) {
   const repeatRef = useRef(null);
   const activeDirRef = useRef(null);
+  const dpadContainerRef = useRef(null);
 
   // ── Direct d-pad movement (no synthetic keyboard events) ──
-  const fireDpad = useCallback((dx, dy, dirKey) => {
+  const fireDpad = useCallback((dx, dy) => {
     if (onDpadPress) onDpadPress(dx, dy);
   }, [onDpadPress]);
 
   const startDpad = useCallback((dx, dy, dirKey) => {
+    // Don't restart if already in this direction
+    if (activeDirRef.current === dirKey) return;
+
     // Stop any existing repeat
     if (repeatRef.current) clearInterval(repeatRef.current);
     activeDirRef.current = dirKey;
 
     // Fire immediately
-    fireDpad(dx, dy, dirKey);
+    fireDpad(dx, dy);
 
     // Start repeating
     repeatRef.current = setInterval(() => {
-      fireDpad(dx, dy, dirKey);
+      fireDpad(dx, dy);
     }, MOVE_REPEAT_DELAY);
   }, [fireDpad]);
 
@@ -63,6 +75,49 @@ export default function GameBoyShell({
     }
     activeDirRef.current = null;
   }, []);
+
+  // Find which d-pad button is under a point (touch or mouse)
+  const getDirAtPoint = useCallback((clientX, clientY) => {
+    const container = dpadContainerRef.current;
+    if (!container) return null;
+    const buttons = container.querySelectorAll("[data-dir]");
+    for (const btn of buttons) {
+      const rect = btn.getBoundingClientRect();
+      if (clientX >= rect.left && clientX <= rect.right &&
+          clientY >= rect.top && clientY <= rect.bottom) {
+        return btn.getAttribute("data-dir");
+      }
+    }
+    return null;
+  }, []);
+
+  // Handle touch/mouse move over d-pad — switch direction without lifting
+  const handleDpadTouchMove = useCallback((e) => {
+    if (!activeDirRef.current) return; // not pressing
+    const touch = e.touches[0];
+    if (!touch) return;
+    const dir = getDirAtPoint(touch.clientX, touch.clientY);
+    if (dir && dir !== activeDirRef.current) {
+      const [dx, dy] = DIR_MAP[dir];
+      startDpad(dx, dy, dir);
+    } else if (!dir) {
+      // Finger left d-pad area
+      stopDpad();
+    }
+  }, [getDirAtPoint, startDpad, stopDpad]);
+
+  const handleDpadMouseMove = useCallback((e) => {
+    if (!activeDirRef.current) return; // not pressing
+    // Only track if mouse button is held
+    if (e.buttons === 0) { stopDpad(); return; }
+    const dir = getDirAtPoint(e.clientX, e.clientY);
+    if (dir && dir !== activeDirRef.current) {
+      const [dx, dy] = DIR_MAP[dir];
+      startDpad(dx, dy, dir);
+    } else if (!dir) {
+      stopDpad();
+    }
+  }, [getDirAtPoint, startDpad, stopDpad]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -241,6 +296,7 @@ export default function GameBoyShell({
 
           {/* ─── D-Pad ─── */}
           <div
+            ref={dpadContainerRef}
             style={{
               display: "grid",
               gridTemplateColumns: "48px 48px 48px",
@@ -250,12 +306,15 @@ export default function GameBoyShell({
             }}
             onTouchEnd={(e) => { prevent(e); stopDpad(); }}
             onTouchCancel={stopDpad}
+            onTouchMove={handleDpadTouchMove}
             onMouseUp={stopDpad}
             onMouseLeave={stopDpad}
+            onMouseMove={handleDpadMouseMove}
           >
             {/* Up */}
             <div />
             <div
+              data-dir="up"
               style={dpadBtnStyle}
               onTouchStart={(e) => { prevent(e); startDpad(0, -1, "up"); }}
               onMouseDown={() => startDpad(0, -1, "up")}
@@ -266,6 +325,7 @@ export default function GameBoyShell({
 
             {/* Left / Center / Right */}
             <div
+              data-dir="left"
               style={dpadBtnStyle}
               onTouchStart={(e) => { prevent(e); startDpad(-1, 0, "left"); }}
               onMouseDown={() => startDpad(-1, 0, "left")}
@@ -286,6 +346,7 @@ export default function GameBoyShell({
               }} />
             </div>
             <div
+              data-dir="right"
               style={dpadBtnStyle}
               onTouchStart={(e) => { prevent(e); startDpad(1, 0, "right"); }}
               onMouseDown={() => startDpad(1, 0, "right")}
@@ -296,6 +357,7 @@ export default function GameBoyShell({
             {/* Down */}
             <div />
             <div
+              data-dir="down"
               style={dpadBtnStyle}
               onTouchStart={(e) => { prevent(e); startDpad(0, 1, "down"); }}
               onMouseDown={() => startDpad(0, 1, "down")}

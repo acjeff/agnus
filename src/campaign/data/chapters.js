@@ -12,6 +12,7 @@ export const CAMPAIGN_CHAPTERS = [
     roomCount: [5, 8], // min, max rooms per floor
     chestsPerFloor: [1, 3],
     trapsPerFloor: [0, 2],
+    enemiesPerFloor: [2, 4],
     unlock: null, // always available
   },
   {
@@ -26,6 +27,7 @@ export const CAMPAIGN_CHAPTERS = [
     roomCount: [6, 10],
     chestsPerFloor: [1, 4],
     trapsPerFloor: [1, 3],
+    enemiesPerFloor: [3, 6],
     unlock: { chapter: 0 },
   },
   {
@@ -40,6 +42,7 @@ export const CAMPAIGN_CHAPTERS = [
     roomCount: [7, 12],
     chestsPerFloor: [2, 5],
     trapsPerFloor: [2, 4],
+    enemiesPerFloor: [4, 8],
     unlock: { chapter: 1 },
   },
 ];

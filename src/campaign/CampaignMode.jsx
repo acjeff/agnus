@@ -7,7 +7,7 @@ import { TILE, WALKABLE, INTERACTABLE } from "./data/tiles.js";
 import { generateDungeon } from "./generation/dungeon.js";
 import { createCampaignEngine } from "./engine/canvas.js";
 import { createInputHandler } from "./engine/input.js";
-import { drawAggieSprite } from "./data/sprites.js";
+import { drawAggieSprite, drawEnemySprite } from "./data/sprites.js";
 import {
   loadCampaignState, saveCampaignState,
   getChapterState, getFloorState,
@@ -120,6 +120,8 @@ export default function CampaignMode({
   const [playerPos, setPlayerPos] = useState({ x: 0, y: 0 });
   const [playerDir, setPlayerDir] = useState("down");
   const [floorStartTime, setFloorStartTime] = useState(null);
+  const [enemies, setEnemies] = useState([]); // { x, y, type, hp, maxHp, alive }
+  const [attackAnim, setAttackAnim] = useState(null); // { x, y, frame } for slash effect
 
   // Refs
   const canvasRef = useRef(null);
@@ -130,11 +132,18 @@ export default function CampaignMode({
   const playerRef = useRef(playerPos);
   const exploredRef = useRef(new Set());
   const dialogueAdvanceRef = useRef(null);
+  const enemiesRef = useRef(enemies);
+
+  // Pause menu handler refs (CampaignPause writes its handlers here)
+  const pauseDpadRef = useRef(null);
+  const pauseARef = useRef(null);
+  const pauseBRef = useRef(null);
 
   // Keep refs in sync
   useEffect(() => { stateRef.current = campaignState; }, [campaignState]);
   useEffect(() => { dungeonRef.current = dungeon; }, [dungeon]);
   useEffect(() => { playerRef.current = playerPos; }, [playerPos]);
+  useEffect(() => { enemiesRef.current = enemies; }, [enemies]);
 
   // ─── Notification helper ─────────────────
   const showNotification = useCallback((text, color) => {
@@ -177,6 +186,7 @@ export default function CampaignMode({
     setPlayerPos(dg.playerStart);
     setPlayerDir("down");
     setFloorStartTime(Date.now());
+    setEnemies(dg.enemies || []);
     setScreen("dungeon");
     exploredRef.current = new Set();
 
@@ -240,8 +250,58 @@ export default function CampaignMode({
       },
     });
 
+    // Enemies
+    const currentEnemies = enemiesRef.current;
+    currentEnemies.forEach((enemy, idx) => {
+      if (!enemy.alive) return;
+      entities.push({
+        id: `enemy-${idx}`,
+        x: enemy.x,
+        y: enemy.y,
+        smooth: true,
+        draw: (ctx, sx, sy, ts, frame) => {
+          drawEnemySprite(ctx, enemy.type, sx, sy, ts, frame, enemy.hp, enemy.maxHp);
+        },
+      });
+    });
+
+    // Attack slash animation
+    const atk = attackAnim;
+    if (atk) {
+      entities.push({
+        id: "attack-slash",
+        x: atk.x,
+        y: atk.y,
+        alwaysVisible: true,
+        draw: (ctx, sx, sy, ts) => {
+          const s = Math.floor(ts / 16);
+          const cx = sx + ts / 2;
+          const cy = sy + ts / 2;
+          const progress = (Date.now() - atk.startTime) / 200; // 200ms animation
+          if (progress >= 1) return;
+          ctx.globalAlpha = 1 - progress;
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 2 * s;
+          ctx.beginPath();
+          const r = ts * 0.4 * (0.5 + progress * 0.5);
+          ctx.arc(cx, cy, r, -Math.PI * 0.3, Math.PI * 0.3);
+          ctx.stroke();
+          // Small sparkles
+          ctx.fillStyle = "#ffd700";
+          for (let i = 0; i < 3; i++) {
+            const angle = -0.3 + i * 0.3;
+            const sr = r * (0.8 + progress * 0.4);
+            const sparkX = cx + Math.cos(angle) * sr;
+            const sparkY = cy + Math.sin(angle) * sr;
+            ctx.fillRect(sparkX - s, sparkY - s, 2 * s, 2 * s);
+          }
+          ctx.globalAlpha = 1;
+        },
+      });
+    }
+
     engine.setEntities(entities);
-  }, [playerPos, playerDir, dungeon]);
+  }, [playerPos, playerDir, dungeon, enemies, attackAnim]);
 
   // ─── Player movement ─────────────────
   const handleMove = useCallback((dx, dy) => {
@@ -267,6 +327,10 @@ export default function CampaignMode({
 
     // Can we walk there?
     if (WALKABLE.has(tileType)) {
+      // Block if an alive enemy is there
+      const blocked = enemiesRef.current.some(e => e.alive && e.x === newX && e.y === newY);
+      if (blocked) return;
+
       setPlayerPos({ x: newX, y: newY });
 
       // Check for trap
@@ -275,6 +339,112 @@ export default function CampaignMode({
       }
     }
   }, [paused, dialogue, screen]);
+
+  // ─── Attack (B button) ─────────────────
+  const handleAttack = useCallback(() => {
+    if (paused || dialogue || screen !== "dungeon") return;
+
+    const pos = playerRef.current;
+    const dir = { down: { x: 0, y: 1 }, up: { x: 0, y: -1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
+    const off = dir[playerDir] || dir.down;
+    const targetX = pos.x + off.x;
+    const targetY = pos.y + off.y;
+
+    // Show slash animation at target tile
+    setAttackAnim({ x: targetX, y: targetY, startTime: Date.now() });
+    setTimeout(() => setAttackAnim(null), 220);
+
+    // Check if an enemy is at the target position
+    const currentEnemies = [...enemiesRef.current];
+    const hitIdx = currentEnemies.findIndex(e => e.alive && e.x === targetX && e.y === targetY);
+    if (hitIdx < 0) return;
+
+    const enemy = { ...currentEnemies[hitIdx] };
+    enemy.hp -= 1;
+
+    if (enemy.hp <= 0) {
+      enemy.alive = false;
+      // XP and coins for kill
+      const state = { ...stateRef.current };
+      const xpGain = enemy.type === "wraith" ? 30 : enemy.type === "skeleton" ? 20 : 10;
+      const coinGain = enemy.type === "wraith" ? 15 : enemy.type === "skeleton" ? 10 : 5;
+      addXp(state, xpGain);
+      addCoins(state, coinGain);
+      setCampaignState({ ...state });
+      showNotification(`Defeated ${enemy.type}! +${xpGain} XP`, "#4ade80");
+    }
+
+    currentEnemies[hitIdx] = enemy;
+    setEnemies(currentEnemies);
+  }, [paused, dialogue, screen, playerDir, showNotification]);
+
+  // ─── Enemy AI — simple chase behavior ─────────────────
+  useEffect(() => {
+    if (screen !== "dungeon" || paused) return;
+
+    const ENEMY_MOVE_INTERVAL = 800; // enemies move every 800ms
+    const CHASE_RADIUS = 5; // tiles within which enemies chase
+
+    const interval = setInterval(() => {
+      const dg = dungeonRef.current;
+      const pos = playerRef.current;
+      if (!dg || !pos) return;
+
+      setEnemies(prev => {
+        let changed = false;
+        const next = prev.map(enemy => {
+          if (!enemy.alive) return enemy;
+
+          const dx = pos.x - enemy.x;
+          const dy = pos.y - enemy.y;
+          const dist = Math.abs(dx) + Math.abs(dy);
+
+          // Only chase if within radius and not adjacent (don't overlap player)
+          if (dist > CHASE_RADIUS || dist <= 1) return enemy;
+
+          // Move one step toward player (prefer larger axis)
+          let moveX = 0, moveY = 0;
+          if (Math.abs(dx) >= Math.abs(dy)) {
+            moveX = dx > 0 ? 1 : -1;
+          } else {
+            moveY = dy > 0 ? 1 : -1;
+          }
+
+          const newX = enemy.x + moveX;
+          const newY = enemy.y + moveY;
+
+          // Check walkability
+          if (newX < 0 || newX >= dg.width || newY < 0 || newY >= dg.height) return enemy;
+          const tile = dg.map[newY * dg.width + newX];
+          if (!WALKABLE.has(tile)) return enemy;
+
+          // Don't overlap with other enemies
+          const occupied = prev.some(e => e !== enemy && e.alive && e.x === newX && e.y === newY);
+          if (occupied) return enemy;
+
+          // Don't move onto player position
+          if (newX === pos.x && newY === pos.y) return enemy;
+
+          changed = true;
+          return { ...enemy, x: newX, y: newY };
+        });
+        return changed ? next : prev;
+      });
+    }, ENEMY_MOVE_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [screen, paused]);
+
+  // ─── Enemy contact damage ─────────────────
+  useEffect(() => {
+    if (screen !== "dungeon") return;
+    // Check if any alive enemy is adjacent to the player (Manhattan distance 1)
+    const adjacent = enemies.some(e =>
+      e.alive && Math.abs(e.x - playerPos.x) + Math.abs(e.y - playerPos.y) === 1
+    );
+    // We don't auto-damage, enemies just block and chase.
+    // Damage is through traps only for now; enemies are obstacles you attack with B.
+  }, [enemies, playerPos, screen]);
 
   // ─── Interaction ─────────────────
   const handleInteract = useCallback(() => {
@@ -785,19 +955,29 @@ export default function CampaignMode({
   return (
     <GameBoyShell
       canvasRef={canvasRef}
-      onDpadPress={(dx, dy) => handleMove(dx, dy)}
+      onDpadPress={(dx, dy) => {
+        if (paused && pauseDpadRef.current) {
+          pauseDpadRef.current(dx, dy);
+        } else {
+          handleMove(dx, dy);
+        }
+      }}
       onButtonA={() => {
-        if (dialogue && dialogueAdvanceRef.current) {
+        if (paused && pauseARef.current) {
+          pauseARef.current();
+        } else if (dialogue && dialogueAdvanceRef.current) {
           dialogueAdvanceRef.current();
         } else {
           handleInteract();
         }
       }}
       onButtonB={() => {
-        if (dialogue) {
+        if (paused && pauseBRef.current) {
+          pauseBRef.current();
+        } else if (dialogue) {
           handleDialogueComplete();
         } else {
-          setPaused(p => !p);
+          handleAttack();
         }
       }}
       onStart={() => setPaused(p => !p)}
@@ -837,6 +1017,9 @@ export default function CampaignMode({
           floorIdx={activeFloor}
           onResume={() => setPaused(false)}
           onQuit={() => { setPaused(false); setScreen("chapter-select"); }}
+          onDpadPress={pauseDpadRef}
+          onButtonA={pauseARef}
+          onButtonB={pauseBRef}
           C={C}
         />
       )}

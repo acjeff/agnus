@@ -255,6 +255,35 @@ function placeTraps(map, mapW, rooms, rng, count) {
   return traps;
 }
 
+// Place enemies in rooms (not on top of other entities)
+function placeEnemies(map, mapW, rooms, rng, count, floorDifficulty) {
+  const enemies = [];
+  const eligibleRooms = rooms.filter((r, i) => i > 0); // skip entry room
+  if (eligibleRooms.length === 0) return enemies;
+
+  for (let i = 0; i < count; i++) {
+    const room = eligibleRooms[randInt(rng, 0, eligibleRooms.length - 1)];
+    for (let attempt = 0; attempt < 10; attempt++) {
+      const ex = room.x + randInt(rng, 1, Math.max(1, room.w - 2));
+      const ey = room.y + randInt(rng, 1, Math.max(1, room.h - 2));
+      const idx = ey * mapW + ex;
+      if (map[idx] === TILE.FLOOR) {
+        // Pick enemy type based on difficulty
+        const types = floorDifficulty >= 3
+          ? ["slime", "bat", "skeleton", "wraith"]
+          : floorDifficulty >= 2
+          ? ["slime", "bat", "skeleton"]
+          : ["slime", "bat"];
+        const type = types[randInt(rng, 0, types.length - 1)];
+        const hp = type === "slime" ? 1 : type === "bat" ? 1 : type === "skeleton" ? 2 : 3;
+        enemies.push({ x: ex, y: ey, type, hp, maxHp: hp, alive: true });
+        break;
+      }
+    }
+  }
+  return enemies;
+}
+
 // Place decorative torches
 function placeTorches(map, mapW, mapH, rooms, rng) {
   for (const room of rooms) {
@@ -380,6 +409,11 @@ export function generateDungeon(chapterId, floorIdx, chapterConfig) {
   // Place torches
   placeTorches(map, mapW, mapH, rooms, rng);
 
+  // Place enemies
+  const [minEnemies, maxEnemies] = chapterConfig.enemiesPerFloor || [0, 0];
+  const numEnemies = randInt(rng, minEnemies, maxEnemies);
+  const enemies = placeEnemies(map, mapW, rooms, rng, numEnemies, floorDifficulty);
+
   return {
     map,
     width: mapW,
@@ -388,6 +422,7 @@ export function generateDungeon(chapterId, floorIdx, chapterConfig) {
     doors,
     chests,
     traps,
+    enemies,
     playerStart: { x: stairsUpX, y: stairsUpY },
     stairsDown: stairsDownX != null ? { x: stairsDownX, y: stairsDownY } : null,
     seed,
