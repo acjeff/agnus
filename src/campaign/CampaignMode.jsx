@@ -228,45 +228,10 @@ export default function CampaignMode({
     // Build entity list
     const entities = [];
 
-    // Player entity
+    // Player is Aggie
     entities.push({
       x: playerPos.x,
       y: playerPos.y,
-      alwaysVisible: true,
-      draw: (ctx, sx, sy, ts, frame) => {
-        // Simple pixel character
-        const s = Math.floor(ts / 16);
-        // Body
-        ctx.fillStyle = "#3a6aaa";
-        ctx.fillRect(sx + 4 * s, sy + 4 * s, 8 * s, 10 * s);
-        // Head
-        ctx.fillStyle = "#ffdbac";
-        ctx.fillRect(sx + 5 * s, sy + 1 * s, 6 * s, 5 * s);
-        // Hair
-        ctx.fillStyle = "#4a3728";
-        ctx.fillRect(sx + 5 * s, sy, 6 * s, 2 * s);
-        // Eyes
-        ctx.fillStyle = "#2a2a4a";
-        ctx.fillRect(sx + 6 * s, sy + 3 * s, 2 * s, s);
-        ctx.fillRect(sx + 9 * s, sy + 3 * s, 2 * s, s);
-        // Shoes
-        ctx.fillStyle = "#4a3a2a";
-        ctx.fillRect(sx + 4 * s, sy + 14 * s, 3 * s, 2 * s);
-        ctx.fillRect(sx + 9 * s, sy + 14 * s, 3 * s, 2 * s);
-      },
-    });
-
-    // Aggie companion (follows 1 tile behind)
-    const aggieOffset = {
-      down: { x: 0, y: -1 },
-      up: { x: 0, y: 1 },
-      left: { x: 1, y: 0 },
-      right: { x: -1, y: 0 },
-    };
-    const off = aggieOffset[playerDir] || aggieOffset.down;
-    entities.push({
-      x: playerPos.x + off.x,
-      y: playerPos.y + off.y,
       alwaysVisible: true,
       draw: (ctx, sx, sy, ts, frame) => {
         drawAggieSprite(ctx, stateRef.current.aggie.evolutionStage, sx, sy, ts, frame);
