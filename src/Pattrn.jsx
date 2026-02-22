@@ -15870,6 +15870,18 @@ export default function Pattrn() {
 
   // Pill action buttons for the bottom glass bar
   const playBackAction = () => {
+    if (isCampaign) {
+      // Campaign: return to dungeon, signal puzzle abandoned (failed)
+      stopTimer(); setRadialMenuStack([]);
+      if (campaignPuzzleCallbackRef.current) {
+        campaignPuzzleCallbackRef.current(false, attempts);
+        campaignPuzzleCallbackRef.current = null;
+      }
+      setCampaignPuzzleConfig(null);
+      setCampaignPuzzle(null);
+      setView("campaign");
+      return;
+    }
     if (isCoop) { leaveCoopSession(); setView("menu"); return; }
     // Vault mode: return to vault overview instead of home
     if (isVault && vaultSessionId) {
