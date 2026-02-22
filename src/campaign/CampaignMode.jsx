@@ -129,6 +129,7 @@ export default function CampaignMode({
   const dungeonRef = useRef(dungeon);
   const playerRef = useRef(playerPos);
   const exploredRef = useRef(new Set());
+  const dialogueAdvanceRef = useRef(null);
 
   // Keep refs in sync
   useEffect(() => { stateRef.current = campaignState; }, [campaignState]);
@@ -751,7 +752,13 @@ export default function CampaignMode({
     <GameBoyShell
       canvasRef={canvasRef}
       onDpadPress={(dx, dy) => handleMove(dx, dy)}
-      onButtonA={() => handleInteract()}
+      onButtonA={() => {
+        if (dialogue && dialogueAdvanceRef.current) {
+          dialogueAdvanceRef.current();
+        } else {
+          handleInteract();
+        }
+      }}
       onButtonB={() => {
         if (dialogue) {
           handleDialogueComplete();
@@ -783,6 +790,7 @@ export default function CampaignMode({
           lines={dialogue.lines}
           portrait={dialogue.portrait}
           onComplete={handleDialogueComplete}
+          advanceRef={dialogueAdvanceRef}
           C={C}
         />
       )}

@@ -8303,6 +8303,23 @@ export default function Pattrn() {
   const vaultActivePuzzle = isVaultSolving ? vaultPuzzlesRef.current?.[vaultSolvingTile] : null;
   const isCampaign = difficulty === "campaign";
   const puzzle = isCampaign ? campaignPuzzle : isVaultSolving ? vaultActivePuzzle : isCascade ? cascadePuzzle : isDaily ? currentDailyPuzzle : puzzles[currentPuzzle];
+
+  // Campaign auto-close: return to dungeon after a short delay on win/lose
+  useEffect(() => {
+    if (!isCampaign || (gameState !== "won" && gameState !== "lost")) return;
+    const timer = setTimeout(() => {
+      const solved = gameState === "won";
+      if (campaignPuzzleCallbackRef.current) {
+        campaignPuzzleCallbackRef.current(solved, attempts);
+        campaignPuzzleCallbackRef.current = null;
+      }
+      setCampaignPuzzleConfig(null);
+      setCampaignPuzzle(null);
+      setView("campaign");
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [isCampaign, gameState]);
+
   const diffProgress = progress[difficulty] || {};
   const isBlind = difficulty === "blind" && !isDaily;
   const isSpin = difficulty === "spin";
@@ -15947,46 +15964,39 @@ export default function Pattrn() {
       playPillButtons.push({ id: "preview", icon: "search", color: C.accent, onClick: () => setRadialMenuStack(["root", "mosaic-preview"]) });
     }
   } else if (gameState === "won") {
-    // Share
-    playPillButtons.push({ id: "share", icon: "share", color: "#fff", onClick: async () => {
-      let text;
-      if (isCoop) {
-        text = `Agnus Co-op \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\nSolved together \u2022 ${formatTime(elapsedTime)}`;
-      } else if (isCascade) {
-        text = `Agnus Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
-      } else if (isDaily) {
-        const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-        const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${currentDailyDate}` : "";
-        text = `Agnus Daily ${currentDailyDate}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}\n${dailyUrl}`;
-      } else {
-        const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-        text = `Agnus \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
-      }
-      const result = await tryNativeShare({ text });
-      if (result === "shared") { setShareMsg("Shared!"); setTimeout(() => setShareMsg(""), 2000); return; }
-      if (result === "cancelled") return;
-      navigator.clipboard.writeText(text).catch(() => {});
-      setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
-    }});
-    // Retry (not for daily puzzles)
-    if (!isDaily) {
-      playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => {
-        if (isCoop) leaveCoopSession();
-        startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true);
-      }});
-    }
-    // Next / Done / Back — the primary action
-    if (isCampaign) {
-      // Campaign: return to dungeon on win
-      playPillButtons.push({ id: "done", icon: "back", color: "#4ade80", onClick: () => {
-        if (campaignPuzzleCallbackRef.current) {
-          campaignPuzzleCallbackRef.current(true, attempts);
-          campaignPuzzleCallbackRef.current = null;
+    if (!isCampaign) {
+      // Share
+      playPillButtons.push({ id: "share", icon: "share", color: "#fff", onClick: async () => {
+        let text;
+        if (isCoop) {
+          text = `Agnus Co-op \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\nSolved together \u2022 ${formatTime(elapsedTime)}`;
+        } else if (isCascade) {
+          text = `Agnus Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
+        } else if (isDaily) {
+          const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
+          const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${currentDailyDate}` : "";
+          text = `Agnus Daily ${currentDailyDate}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}\n${dailyUrl}`;
+        } else {
+          const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
+          text = `Agnus \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
         }
-        setCampaignPuzzleConfig(null);
-        setCampaignPuzzle(null);
-        setView("campaign");
+        const result = await tryNativeShare({ text });
+        if (result === "shared") { setShareMsg("Shared!"); setTimeout(() => setShareMsg(""), 2000); return; }
+        if (result === "cancelled") return;
+        navigator.clipboard.writeText(text).catch(() => {});
+        setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
       }});
+      // Retry (not for daily puzzles)
+      if (!isDaily) {
+        playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => {
+          if (isCoop) leaveCoopSession();
+          startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true);
+        }});
+      }
+    }
+    // Next / Done / Back — the primary action (campaign auto-closes via effect)
+    if (isCampaign) {
+      // Campaign: auto-closes via effect — no pill buttons needed
     } else if (isVault && vaultSessionId) {
       // Vault: return to vault overview (auto-handled by timeout, but add explicit button too)
       playPillButtons.push({ id: "done", icon: "back", color: "#54A0FF", onClick: () => {
@@ -16014,16 +16024,7 @@ export default function Pattrn() {
     }
     // Retry / Back
     if (isCampaign) {
-      // Campaign: return to dungeon on fail
-      playPillButtons.push({ id: "done", icon: "back", color: "#f87171", onClick: () => {
-        if (campaignPuzzleCallbackRef.current) {
-          campaignPuzzleCallbackRef.current(false, attempts);
-          campaignPuzzleCallbackRef.current = null;
-        }
-        setCampaignPuzzleConfig(null);
-        setCampaignPuzzle(null);
-        setView("campaign");
-      }});
+      // Campaign: auto-closes via effect — no pill buttons needed
     } else if (isVault && vaultSessionId) {
       // Vault: return to vault (auto-handled by timeout, but show button too)
       playPillButtons.push({ id: "done", icon: "back", color: "#54A0FF", onClick: () => {
@@ -16635,8 +16636,29 @@ export default function Pattrn() {
         </div>
       </div>
       </div>
-      {/* Puzzle complete overlay — blurry area on top of finished grid */}
-      {gameState === "won" && showWinOverlay && (
+      {/* Puzzle complete overlay — campaign gets a pixel-art SUCCESS screen */}
+      {gameState === "won" && showWinOverlay && isCampaign && (
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "rgba(0,0,0,0.85)",
+          zIndex: 5,
+          animation: "fadeUp 0.4s ease both",
+          pointerEvents: "none",
+        }}>
+          <div style={{ fontSize: 28, fontWeight: 900, fontFamily: "'Press Start 2P', monospace", color: "#4ade80", letterSpacing: 3, textShadow: "0 0 16px #4ade8066, 0 2px 0 #2a8a50", animation: "fadeUp 0.35s ease both" }}>
+            SUCCESS!
+          </div>
+          <div style={{ fontSize: 8, fontFamily: "'Press Start 2P', monospace", color: "#9a96cc", marginTop: 10, animation: "fadeUp 0.5s 0.1s ease both", letterSpacing: 1 }}>
+            Door unlocked
+          </div>
+        </div>
+      )}
+      {gameState === "won" && showWinOverlay && !isCampaign && (
         <div style={{
           position: "absolute",
           inset: 0,
@@ -16760,8 +16782,29 @@ export default function Pattrn() {
         </button>
       )}
 
-      {/* Puzzle failed overlay — blurry area on top of failed grid */}
-      {gameState === "lost" && (
+      {/* Puzzle failed overlay — campaign gets pixel-art FAILED screen */}
+      {gameState === "lost" && isCampaign && (
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "rgba(0,0,0,0.85)",
+          zIndex: 5,
+          animation: "fadeUp 0.4s ease both",
+          pointerEvents: "none",
+        }}>
+          <div style={{ fontSize: 28, fontWeight: 900, fontFamily: "'Press Start 2P', monospace", color: "#f87171", letterSpacing: 3, textShadow: "0 0 16px #f8717166, 0 2px 0 #a03030", animation: "fadeUp 0.35s ease both" }}>
+            FAILED!
+          </div>
+          <div style={{ fontSize: 8, fontFamily: "'Press Start 2P', monospace", color: "#9a96cc", marginTop: 10, animation: "fadeUp 0.5s 0.1s ease both", letterSpacing: 1 }}>
+            The door remains sealed...
+          </div>
+        </div>
+      )}
+      {gameState === "lost" && !isCampaign && (
         <div style={{
           position: "absolute",
           inset: 0,

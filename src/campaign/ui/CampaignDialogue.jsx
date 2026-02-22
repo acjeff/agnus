@@ -6,7 +6,7 @@ import React, { useState, useEffect, useRef } from "react";
 const PIXEL_FONT = "'Press Start 2P', monospace";
 const CHAR_DELAY = 25; // ms per character
 
-export default function CampaignDialogue({ lines, portrait, onComplete, C }) {
+export default function CampaignDialogue({ lines, portrait, onComplete, advanceRef, C }) {
   const [lineIndex, setLineIndex] = useState(0);
   const [charIndex, setCharIndex] = useState(0);
   const [isRevealing, setIsRevealing] = useState(true);
@@ -52,6 +52,12 @@ export default function CampaignDialogue({ lines, portrait, onComplete, C }) {
       if (onComplete) onComplete();
     }
   }
+
+  // Expose handleTap to parent via advanceRef
+  useEffect(() => {
+    if (advanceRef) advanceRef.current = handleTap;
+    return () => { if (advanceRef) advanceRef.current = null; };
+  });
 
   // Listen for A button (space/enter) to advance dialogue
   useEffect(() => {
