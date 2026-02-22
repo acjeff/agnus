@@ -91,6 +91,7 @@ export function loadProgress() {
       spin: base.spin ?? {},
       mosaic: base.mosaic ?? {},
       coop: base.coop ?? {},
+      campaign: base.campaign ?? {},
       mosaicCompletions: base.mosaicCompletions ?? {},
       cascadeRunState,
       cascadeRunStateLastIndex: typeof cascadeRunStateLastIndex === "number" ? cascadeRunStateLastIndex : undefined,

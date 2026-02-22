@@ -135,6 +135,11 @@ import {
   clearVaultPendingUnlock,
 } from "./vault/VaultFirebase.js";
 
+// --- Campaign mode ---
+import CampaignMode from "./campaign/CampaignMode.jsx";
+import { CAMPAIGN_CHAPTERS, DIFFICULTY_CONFIG } from "./campaign/data/chapters.js";
+import { loadCampaignState } from "./campaign/state/campaignState.js";
+
 // --- Extracted modules ---
 import { BASE_COLORS, C } from "./constants/theme.js";
 import { SHAPES } from "./constants/shapes.jsx";
@@ -1214,6 +1219,11 @@ export default function Pattrn() {
   const [cascadeLives, setCascadeLives] = useState(3);
   const [cascadeRunIndex, setCascadeRunIndex] = useState(0);
   const [cascadeLevelBanner, setCascadeLevelBanner] = useState(null); // { level, coins, gridSize } — shown between cascade levels
+  // --- Campaign mode state ---
+  const [campaignPuzzleConfig, setCampaignPuzzleConfig] = useState(null); // { mode, gridSize, doorKey, ... }
+  const campaignPuzzleCallbackRef = useRef(null); // (solved, attempts) => void
+  const [campaignPuzzle, setCampaignPuzzle] = useState(null); // the actual puzzle object for campaign doors
+
   const timerStart = useRef(null);
   const timerInterval = useRef(null);
   const timerIsCascadeRun = useRef(false);
@@ -8291,7 +8301,8 @@ export default function Pattrn() {
   }, [isDaily, currentDailyDate]);
   const isVaultSolving = difficulty === "vault" && vaultSolvingTile !== null && vaultSolvingTile >= 0;
   const vaultActivePuzzle = isVaultSolving ? vaultPuzzlesRef.current?.[vaultSolvingTile] : null;
-  const puzzle = isVaultSolving ? vaultActivePuzzle : isCascade ? cascadePuzzle : isDaily ? currentDailyPuzzle : puzzles[currentPuzzle];
+  const isCampaign = difficulty === "campaign";
+  const puzzle = isCampaign ? campaignPuzzle : isVaultSolving ? vaultActivePuzzle : isCascade ? cascadePuzzle : isDaily ? currentDailyPuzzle : puzzles[currentPuzzle];
   const diffProgress = progress[difficulty] || {};
   const isBlind = difficulty === "blind" && !isDaily;
   const isSpin = difficulty === "spin";
@@ -11656,6 +11667,47 @@ export default function Pattrn() {
     );
   }
 
+  // --- CAMPAIGN MODE VIEW ---
+  if (view === "campaign") {
+    return (
+      <CampaignMode
+        C={C}
+        onExit={() => setView("menu")}
+        onStartPuzzle={(config, doorKey, callback) => {
+          // Generate a puzzle for the campaign door
+          const diff = config.mode;
+          const sets = PUZZLE_SETS[diff] || PUZZLE_SETS.easy;
+          // Pick a deterministic puzzle from the set based on doorKey hash
+          let hash = 0;
+          for (let i = 0; i < doorKey.length; i++) hash = ((hash << 5) - hash + doorKey.charCodeAt(i)) | 0;
+          const idx = Math.abs(hash) % sets.length;
+          const puz = sets[idx];
+
+          setCampaignPuzzleConfig(config);
+          setCampaignPuzzle(puz);
+          campaignPuzzleCallbackRef.current = callback;
+          setDifficulty("campaign");
+          setCurrentPuzzle(0);
+          setFills({});
+          setSelectedCell(null);
+          setSelectedToken(null);
+          setAttempts(0);
+          setGameState("playing");
+          setWrongCells(new Set());
+          setLockedCells(new Set());
+          setShowParticles(false);
+          setElapsedTime(0);
+          setView("play");
+          timerStart.current = Date.now();
+          if (timerInterval.current) clearInterval(timerInterval.current);
+          timerInterval.current = setInterval(() => {
+            setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+          }, 1000);
+        }}
+      />
+    );
+  }
+
   // --- VAULT MODE VIEW ---
   if (view === "vault" && vaultSessionId) {
     // Guard: require login for vault mode
@@ -14897,6 +14949,80 @@ export default function Pattrn() {
           </div>
         )}
 
+        {/* ── Campaign hero card ── */}
+        {(() => {
+          const cState = loadCampaignState();
+          const aggieLevel = cState.aggie?.level || 1;
+          const floorsCleared = cState.stats?.totalFloorsCleared || 0;
+          const currentCh = CAMPAIGN_CHAPTERS[cState.currentChapter] || CAMPAIGN_CHAPTERS[0];
+          return (
+            <div style={{
+              width: "100%", marginBottom: 24, animation: "fadeUp 0.4s 0.1s ease both",
+              borderRadius: 20, overflow: "hidden", position: "relative",
+              background: `linear-gradient(135deg, ${C.surface} 0%, #7c5cbf0d 60%, #7c5cbf18 100%)`,
+              border: "1px solid #7c5cbf33",
+              padding: "22px 20px", boxSizing: "border-box",
+              boxShadow: "0 4px 24px #7c5cbf0a, 0 1px 0 inset rgba(255,255,255,0.04)",
+            }}>
+              <div style={{ position: "absolute", top: -40, right: -40, width: 120, height: 120, borderRadius: "50%", background: "radial-gradient(circle, #7c5cbf15 0%, transparent 70%)", pointerEvents: "none" }} />
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, position: "relative" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40,
+                    borderRadius: 12, backgroundColor: "#7c5cbf15", border: "1px solid #7c5cbf33",
+                    fontSize: 20,
+                  }}>
+                    {"\u{1F5FA}\uFE0F"}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#a78bfa", textTransform: "uppercase", letterSpacing: 2, fontFamily: "'Inter', sans-serif", marginBottom: 4, fontWeight: 600 }}>
+                      Campaign
+                    </div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 800, color: C.text, lineHeight: 1.1 }}>
+                      Dungeon Crawler
+                    </div>
+                  </div>
+                </div>
+                {aggieLevel > 1 && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "6px 12px", borderRadius: 20,
+                    backgroundColor: "#9a96cc15", border: "1px solid #9a96cc33",
+                  }}>
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 800, color: "#9a96cc" }}>Lv.{aggieLevel}</span>
+                  </div>
+                )}
+              </div>
+              {floorsCleared > 0 && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10, marginBottom: 16,
+                  padding: "10px 14px", borderRadius: 12, backgroundColor: "#7c5cbf12",
+                  border: "1px solid #7c5cbf44",
+                }}>
+                  <span style={{ fontSize: 13, color: "#a78bfa", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                    {floorsCleared} floor{floorsCleared !== 1 ? "s" : ""} cleared
+                  </span>
+                </div>
+              )}
+              <button
+                onClick={() => setView("campaign")}
+                style={{
+                  width: "100%", padding: "14px 0", borderRadius: 14, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Inter', sans-serif", letterSpacing: 1.2,
+                  background: "linear-gradient(135deg, #7c5cbf 0%, #7c5cbfdd 100%)",
+                  color: "#fff", border: "none", cursor: "pointer",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                  boxShadow: "0 2px 12px #7c5cbf33",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 4px 20px #7c5cbf55"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 12px #7c5cbf33"; }}
+              >
+                {floorsCleared > 0 ? "Continue Adventure" : "Begin Adventure"}
+              </button>
+            </div>
+          );
+        })()}
+
         {/* Mode selector: categorized sections with improved cards */}
         <div style={{
           marginBottom: 24, animation: "fadeUp 0.45s 0.12s ease both",
@@ -15850,7 +15976,18 @@ export default function Pattrn() {
       }});
     }
     // Next / Done / Back — the primary action
-    if (isVault && vaultSessionId) {
+    if (isCampaign) {
+      // Campaign: return to dungeon on win
+      playPillButtons.push({ id: "done", icon: "back", color: "#4ade80", onClick: () => {
+        if (campaignPuzzleCallbackRef.current) {
+          campaignPuzzleCallbackRef.current(true, attempts);
+          campaignPuzzleCallbackRef.current = null;
+        }
+        setCampaignPuzzleConfig(null);
+        setCampaignPuzzle(null);
+        setView("campaign");
+      }});
+    } else if (isVault && vaultSessionId) {
       // Vault: return to vault overview (auto-handled by timeout, but add explicit button too)
       playPillButtons.push({ id: "done", icon: "back", color: "#54A0FF", onClick: () => {
         setVaultSolvingTile(null);
@@ -15876,7 +16013,18 @@ export default function Pattrn() {
       }});
     }
     // Retry / Back
-    if (isVault && vaultSessionId) {
+    if (isCampaign) {
+      // Campaign: return to dungeon on fail
+      playPillButtons.push({ id: "done", icon: "back", color: "#f87171", onClick: () => {
+        if (campaignPuzzleCallbackRef.current) {
+          campaignPuzzleCallbackRef.current(false, attempts);
+          campaignPuzzleCallbackRef.current = null;
+        }
+        setCampaignPuzzleConfig(null);
+        setCampaignPuzzle(null);
+        setView("campaign");
+      }});
+    } else if (isVault && vaultSessionId) {
       // Vault: return to vault (auto-handled by timeout, but show button too)
       playPillButtons.push({ id: "done", icon: "back", color: "#54A0FF", onClick: () => {
         setVaultSolvingTile(null);
