@@ -3823,11 +3823,20 @@ export default function Pattrn() {
         const dProg = prog.daily || {};
         const dTimes = tms.daily || {};
         const alreadyCompleted = (dProg[seed] ?? 0) > 0 && dTimes[seed] != null;
+        const alreadyFailed = dProg[seed] === 0 && seed in dProg;
         if (alreadyCompleted) {
           setFills(solutionFillsFromPuzzle(puz));
           setAttempts(dProg[seed]);
           setElapsedTime(dTimes[seed]);
           setGameState("won");
+          setLockedCells(new Set(puz.blanks));
+          setWrongCells(new Set());
+          setShowParticles(false);
+        } else if (alreadyFailed) {
+          setFills(solutionFillsFromPuzzle(puz));
+          setAttempts(0);
+          setElapsedTime(0);
+          setGameState("lost");
           setLockedCells(new Set(puz.blanks));
           setWrongCells(new Set());
           setShowParticles(false);
@@ -8516,12 +8525,31 @@ export default function Pattrn() {
       // In coop mosaic, also check shared tile times from Firebase for partner-completed tiles
       const savedTime = dTimes[lookupKey] ?? (isCoopMosaic ? coopMosaicSharedTileTimes[lookupKey] : undefined);
       const alreadyCompleted = !forceRestart && savedAttempts > 0 && savedTime != null && puz;
+      const alreadyFailed = !forceRestart && effectiveDiff === "daily" && savedAttempts === 0 && lookupKey in dProg && puz;
       if (alreadyCompleted) {
         isRevisitRef.current = true;
         setFills(solutionFillsFromPuzzle(puz));
         setAttempts(savedAttempts);
         setElapsedTime(savedTime);
         setGameState("won");
+        setShowWinOverlay(true);
+        setLockedCells(new Set(puz.blanks));
+        setSelectedCell(null);
+        setSelectedToken(null);
+        setWrongCells(new Set());
+        setClearedBlanks(new Set());
+        setShowParticles(false);
+        setGridEpoch((e) => e + 1);
+        stopTimer();
+        setView("play");
+        return;
+      }
+      if (alreadyFailed) {
+        isRevisitRef.current = true;
+        setFills(solutionFillsFromPuzzle(puz));
+        setAttempts(0);
+        setElapsedTime(0);
+        setGameState("lost");
         setShowWinOverlay(true);
         setLockedCells(new Set(puz.blanks));
         setSelectedCell(null);
@@ -14612,6 +14640,18 @@ export default function Pattrn() {
                   )}
                 </div>
               );})()}
+              {todayResult === 0 && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10, marginBottom: 16,
+                  padding: "10px 14px", borderRadius: 12, backgroundColor: C.incorrect + "12",
+                  backdropFilter: "blur(8px)", WebkitBackdropFilter: "blur(8px)",
+                  border: `1px solid ${C.incorrect}44`,
+                }}>
+                  <span style={{ fontSize: 13, color: C.incorrect, fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                    Failed
+                  </span>
+                </div>
+              )}
               <div style={{ display: "flex", gap: 10 }}>
                 <button
                   onClick={() => { setDifficulty("daily"); startPuzzle(0, "daily", false, todayLabel); }}
@@ -14626,7 +14666,7 @@ export default function Pattrn() {
                   onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = `0 4px 20px ${C.accent}55`; }}
                   onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = `0 2px 12px ${C.accent}33`; }}
                 >
-                  {todayResult > 0 ? "View Result" : "Play Today"}
+                  {todayResult !== undefined ? "View Result" : "Play Today"}
                 </button>
                 <button
                   onClick={async () => {
