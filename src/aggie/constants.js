@@ -115,7 +115,6 @@ export const AGGIE_PUZZLE_DESIRES = [
 
 // --- Aggie Inherent Traits ---
 // Each Aggie gets 1-2 random traits on first creation. Traits are permanent and provide passive bonuses.
-// When Aggies hang out together, they share trait benefits with each other.
 export const AGGIE_TRAITS_KEY = "pattrn-aggie-traits";
 export const AGGIE_TRAITS = [
   { id: "lucky", label: "Lucky", desc: "10% chance of bonus coins on puzzle complete", icon: "clover", color: "#22C55E", chance: 0.10, effect: "bonus_coins" },

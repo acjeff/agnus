@@ -124,28 +124,6 @@
         ".write": "auth != null && auth.uid === $uid"
       }
     },
-    "hangouts": {
-      "$hostUid": {
-        ".read": "auth != null",
-        "$visitorUid": {
-          ".write": "auth != null && auth.uid === $visitorUid"
-        }
-      }
-    },
-    "offlineHangouts": {
-      "$hangoutId": {
-        ".read": "auth != null && $hangoutId.contains(auth.uid)",
-        ".write": "auth != null && $hangoutId.contains(auth.uid)"
-      }
-    },
-    "userOfflineHangouts": {
-      "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
-        "$hangoutId": {
-          ".write": "auth != null"
-        }
-      }
-    },
     "mosaics": {
       "pending": {
         ".read": "auth != null && root.child('users/' + auth.uid + '/admin').val() === true",
