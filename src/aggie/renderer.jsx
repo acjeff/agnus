@@ -204,37 +204,6 @@ export function renderAggieSVG(size, mood, animate, accessory, happinessMood) {
         <polygon points="85,52 83,57 87,57" fill="#c8b8ff" opacity="0.5" />
       </g>
     ),
-    "wig-curly": (
-      <g key="wig-curly">
-        <path d="M18 36 Q10 20 22 10 Q30 4 40 6 Q48 2 56 6 Q66 4 74 10 Q86 20 78 36" fill="#5a3a1a" stroke="#4a2a10" strokeWidth="1.5" />
-        <circle cx="22" cy="14" r="6" fill="#6b4423" opacity="0.7" />
-        <circle cx="38" cy="8" r="7" fill="#6b4423" opacity="0.7" />
-        <circle cx="54" cy="7" r="6" fill="#5a3a1a" opacity="0.7" />
-        <circle cx="68" cy="10" r="6.5" fill="#6b4423" opacity="0.7" />
-        <circle cx="78" cy="18" r="5" fill="#5a3a1a" opacity="0.6" />
-        <circle cx="18" cy="24" r="5" fill="#5a3a1a" opacity="0.6" />
-        <circle cx="30" cy="10" r="4" fill="#7a5433" opacity="0.4" />
-        <circle cx="60" cy="8" r="4" fill="#7a5433" opacity="0.4" />
-      </g>
-    ),
-    "wig-punk": (
-      <g key="wig-punk">
-        <path d="M30 28 L26 -4 L34 18" fill="#cc2255" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
-        <path d="M42 26 L40 -8 L48 16" fill="#dd3366" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
-        <path d="M54 26 L56 -10 L60 16" fill="#cc2255" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
-        <path d="M66 28 L70 -4 L72 18" fill="#dd3366" stroke="#aa1144" strokeWidth="1" strokeLinejoin="round" />
-        <path d="M20 34 Q20 18 30 12 Q40 6 50 6 Q60 6 70 12 Q80 18 80 34" fill="#cc2255" stroke="#aa1144" strokeWidth="1.5" opacity="0.7" />
-      </g>
-    ),
-    "wig-long": (
-      <g key="wig-long">
-        <path d="M16 30 Q14 14 30 6 Q44 0 56 2 Q70 4 80 14 Q86 22 84 34" fill="#1a1a3a" stroke="#2a2a4a" strokeWidth="1.5" />
-        <path d="M16 30 Q12 50 16 72 Q18 80 22 82" stroke="#2a2a4a" strokeWidth="3" strokeLinecap="round" fill="none" />
-        <path d="M84 34 Q88 54 84 72 Q82 80 78 82" stroke="#2a2a4a" strokeWidth="3" strokeLinecap="round" fill="none" />
-        <path d="M20 34 Q18 44 20 56" stroke="#3a3a5a" strokeWidth="1.5" fill="none" opacity="0.4" />
-        <path d="M80 36 Q82 46 80 58" stroke="#3a3a5a" strokeWidth="1.5" fill="none" opacity="0.4" />
-      </g>
-    ),
   };
   const accessoryEl = accIds.length === 0 ? null : accIds.map(id => accessoryOverlays[id]).filter(Boolean);
 
@@ -318,9 +287,6 @@ export function renderAccessoryPreview(accId, size) {
     "eyes-red": <><circle cx="36" cy="48" r="10" fill="#cc3333" opacity="0.3" /><circle cx="36" cy="48" r="5" fill="#ff6666" /><circle cx="64" cy="48" r="10" fill="#cc3333" opacity="0.3" /><circle cx="64" cy="48" r="5" fill="#ff6666" /></>,
     "eyes-green": <><circle cx="36" cy="48" r="10" fill="#33aa55" opacity="0.3" /><circle cx="36" cy="48" r="5" fill="#66ff88" /><circle cx="64" cy="48" r="10" fill="#33aa55" opacity="0.3" /><circle cx="64" cy="48" r="5" fill="#66ff88" /></>,
     "eyes-gold": <><circle cx="36" cy="48" r="10" fill="#DAA520" opacity="0.3" /><circle cx="36" cy="48" r="5" fill="#FFD700" /><circle cx="64" cy="48" r="10" fill="#DAA520" opacity="0.3" /><circle cx="64" cy="48" r="5" fill="#FFD700" /></>,
-    "wig-curly": <><path d="M18 60 Q10 30 30 18 Q44 8 56 12 Q70 8 78 22 Q90 36 80 60" fill="#5a3a1a" stroke="#4a2a10" strokeWidth="2" /><circle cx="30" cy="22" r="8" fill="#6b4423" opacity="0.7" /><circle cx="50" cy="14" r="9" fill="#6b4423" opacity="0.7" /><circle cx="70" cy="22" r="8" fill="#5a3a1a" opacity="0.7" /></>,
-    "wig-punk": <><path d="M34 60 L28 4 L42 44" fill="#cc2255" stroke="#aa1144" strokeWidth="1.5" /><path d="M48 56 L46 0 L56 40" fill="#dd3366" stroke="#aa1144" strokeWidth="1.5" /><path d="M62 56 L64 0 L70 40" fill="#cc2255" stroke="#aa1144" strokeWidth="1.5" /><path d="M20 60 Q20 30 50 18 Q80 30 80 60" fill="#cc2255" opacity="0.5" /></>,
-    "wig-long": <><path d="M16 50 Q14 24 36 14 Q48 8 60 12 Q78 18 84 46" fill="#1a1a3a" stroke="#2a2a4a" strokeWidth="2" /><path d="M16 50 Q12 70 18 86" stroke="#2a2a4a" strokeWidth="4" strokeLinecap="round" fill="none" /><path d="M84 50 Q88 70 82 86" stroke="#2a2a4a" strokeWidth="4" strokeLinecap="round" fill="none" /></>,
   };
   return (
     <svg width={w} height={w} viewBox="0 0 100 100" fill="none">
