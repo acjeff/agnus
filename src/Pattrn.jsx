@@ -16065,13 +16065,12 @@ export default function Pattrn() {
       ref={playViewScrollRef}
       style={{
       height: "100dvh", minHeight: "100dvh",
-      backgroundColor: isCampaign ? "transparent" : C.bg,
+      backgroundColor: isCampaign ? "rgba(10,8,20,0.88)" : C.bg,
       color: isCampaign ? "#e8e0f0" : C.text,
-      fontFamily: isCampaign ? "'Press Start 2P', monospace" : "'Inter', sans-serif",
+      fontFamily: "'Inter', sans-serif",
       display: campaignVisible ? "none" : "flex", flexDirection: "column",
-      position: isCampaign ? "fixed" : "relative",
-      inset: isCampaign ? 0 : undefined,
-      zIndex: isCampaign ? 100 : undefined,
+      position: "relative",
+      zIndex: isCampaign ? 10 : undefined,
       width: "100%",
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
@@ -16236,10 +16235,10 @@ export default function Pattrn() {
       {/* Info row: now the top element of the play view */}
       <div ref={infoRowRef} style={{
         flexShrink: 0, zIndex: 10,
-        backgroundColor: isCampaign ? "rgba(10,8,20,0.85)" : (activeTheme.gridBg || C.surface),
+        backgroundColor: isCampaign ? "rgba(26,20,40,0.95)" : (activeTheme.gridBg || C.surface),
         display: "flex", flexDirection: "column", alignItems: "center",
-        paddingTop: isCampaign ? 10 : "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
-        ...(isCampaign ? { borderBottom: "2px solid #3d2e5c", boxShadow: "0 2px 8px rgba(0,0,0,0.5)" } : {}),
+        paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
+        ...(isCampaign ? { borderBottom: "2px solid #3d2e5c" } : {}),
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: gridTotalWidth }}>
           <div style={{ fontFamily: isCampaign ? "'Press Start 2P', monospace" : "'Inter', sans-serif", fontSize: isCampaign ? 12 : 18, fontWeight: 700, color: gameState === "won" ? (isCampaign ? "#4ade80" : C.correct) : gameState === "lost" ? (isCampaign ? "#f87171" : C.incorrect) : (isCampaign ? "#e8e0f0" : C.text), letterSpacing: 2 }}>
@@ -16255,7 +16254,7 @@ export default function Pattrn() {
               </span>
             )}
           </div>
-          {!isCoopMosaic && <AttemptDots max={isCoop ? 5 : maxAttempts} used={attempts} won={gameState === "won"} />}
+          {!isCoopMosaic && <AttemptDots max={isCoop ? 5 : maxAttempts} used={attempts} won={gameState === "won"} campaign={isCampaign} />}
         </div>
         {/* Coop status bar */}
         {isCoop && (() => {
@@ -16416,7 +16415,7 @@ export default function Pattrn() {
       )}
 
       {/* Grid area: flex child between header/info and footer, centered */}
-      <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: isCampaign ? "rgba(10,8,20,0.8)" : (activeTheme.gridBg || C.surface), boxSizing: "border-box", padding: edgePad, ...(isCampaign ? { border: "none" } : {}) }}>
+      <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: isCampaign ? "rgba(26,20,40,0.95)" : (activeTheme.gridBg || C.surface), boxSizing: "border-box", padding: edgePad }}>
         {!isCampaign && <GridDecoration decoration={activeTheme.decoration} />}
         {/* Coop mosaic players indicator — positioned top-left of puzzle panel */}
         {isCoopMosaic && coopMosaicAnyConnected && gameState === "playing" && (
@@ -16472,13 +16471,13 @@ export default function Pattrn() {
             )}
           </div>
         )}
-      <div key={gridEpoch} data-aggie-avoid="grid" style={{ animation: "slideIn 0.3s ease both", touchAction: "none", ...(isCampaign ? { border: "3px solid #3d2e5c", borderRadius: 4, backgroundColor: "rgba(26,20,40,0.9)", boxShadow: "0 0 20px rgba(124,92,191,0.15), inset 0 0 12px rgba(0,0,0,0.4)", imageRendering: "pixelated" } : {}) }}>
+      <div key={gridEpoch} data-aggie-avoid="grid" style={{ animation: "slideIn 0.3s ease both", touchAction: "none", ...(isCampaign ? { border: "3px solid #3d2e5c", borderRadius: 4, backgroundColor: "rgba(26,20,40,0.95)", boxShadow: "0 0 16px rgba(124,92,191,0.12), inset 0 0 8px rgba(0,0,0,0.3)" } : {}) }}>
       <div style={{
         transform: isSpin ? `rotate(${spinAngle}deg)` : undefined,
         transition: isSpin ? "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
       }}>
         <div style={{
-          display: "flex", flexDirection: "column", gap: isCampaign ? 1 : gridGap, padding: isCampaign ? 4 : gridPad,
+          display: "flex", flexDirection: "column", gap: gridGap, padding: gridPad,
           position: "relative", zIndex: 1,
         }}>
           {puzzle.solution.map((row, r) => (
@@ -16542,7 +16541,7 @@ export default function Pattrn() {
                       mode={puzzle.mode}
                       colorMap={themeColorMap}
                       shapesArr={themedShapes}
-                      themeId={activeThemeId}
+                      themeId={isCampaign ? "campaign" : activeThemeId}
                       isJustPlaced={justPlacedCells.has(key)}
                       isRemoving={!!removingCells[key]}
                       removingToken={removingCells[key] || null}
@@ -16857,29 +16856,28 @@ export default function Pattrn() {
       </div>
 
       {/* Fixed bottom bar: coop UI + game state info */}
-      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: isCampaign ? "transparent" : (activeTheme.gridBg || C.surface), paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? (isCampaign ? 56 : `calc(148px + env(safe-area-inset-bottom, 0px))`) : (isCampaign ? 12 : `calc(80px + env(safe-area-inset-bottom, 0px))`), display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: isCampaign ? "rgba(26,20,40,0.95)" : (activeTheme.gridBg || C.surface), paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
       </div>
 
       {/* Token picker — Liquid Glass pill above the menu pill */}
       {gameState === "playing" && puzzle && (
         <div data-aggie-avoid="picker" style={{
           position: "fixed",
-          bottom: isCampaign ? 12 : `calc(100px + env(safe-area-inset-bottom, 0px))`,
+          bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
           left: "50%",
           transform: "translateX(-50%)",
-          borderRadius: isCampaign ? 4 : 9999,
-          background: isCampaign ? "rgba(10,8,20,0.92)" : (activeTheme.gridBg || C.surface),
+          borderRadius: isCampaign ? 6 : 9999,
+          background: isCampaign ? "rgba(26,20,40,0.95)" : (activeTheme.gridBg || C.surface),
           backdropFilter: isCampaign ? "none" : "blur(28px) saturate(200%)",
           WebkitBackdropFilter: isCampaign ? "none" : "blur(28px) saturate(200%)",
           border: isCampaign ? "3px solid #3d2e5c" : "1px solid rgba(255,255,255,0.16)",
-          boxShadow: isCampaign ? "0 0 12px rgba(124,92,191,0.2)" : "none",
+          boxShadow: isCampaign ? "0 0 12px rgba(124,92,191,0.15)" : "none",
           zIndex: 85,
-          padding: isCampaign ? "4px 6px" : "6px 4px",
+          padding: "6px 4px",
           maxWidth: "calc(100vw - 40px)",
           overflow: "hidden",
-          ...(isCampaign ? { imageRendering: "pixelated" } : {}),
         }}>
-          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId}
+          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={isCampaign ? "campaign" : activeThemeId}
           />
         </div>
       )}
@@ -16923,29 +16921,7 @@ export default function Pattrn() {
           ))}
         </div>
       )}
-      {isCampaign ? (
-        <div
-          onClick={playBackAction}
-          style={{
-            position: "fixed",
-            bottom: 12,
-            left: 12,
-            padding: "6px 12px",
-            fontFamily: "'Press Start 2P', monospace",
-            fontSize: 8,
-            color: "#9a96cc",
-            backgroundColor: "rgba(10,8,20,0.9)",
-            border: "2px solid #3d2e5c",
-            borderRadius: 4,
-            cursor: "pointer",
-            zIndex: 85,
-            letterSpacing: 1,
-            imageRendering: "pixelated",
-          }}
-        >
-          ← BACK
-        </div>
-      ) : renderBackButton(playBackAction)}
+      {renderBackButton(playBackAction)}
       {!isCampaign && renderContextButton("play", playPillButtons)}
       {globalModalsEl}
     </div>
