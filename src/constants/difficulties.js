@@ -6,6 +6,7 @@ export const DIFFICULTIES = [
   { key: "daily", label: "Daily", desc: "1 a day", cat: "special", icon: "calendar" },
   { key: "cascade", label: "Cascade", desc: "Keep on", cat: "special", icon: "layers" },
   { key: "spin", label: "Spin", desc: "7\u00D77 \u2022 Dizzy", cat: "special", icon: "shuffle" },
+  { key: "campaign", label: "Campaign", desc: "Dungeon Crawler", cat: "adventure", icon: "map" },
 ];
 
 export const COOP_MODES = [

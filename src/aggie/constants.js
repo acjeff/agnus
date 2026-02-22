@@ -63,6 +63,7 @@ export const COINS_REWARD = {
   cascade: 30,
   vault: 20,
   mosaic: 10,
+  campaign: 15,
 };
 // Bonus for gold/first-try solves
 export const COINS_GOLD_BONUS = 5;

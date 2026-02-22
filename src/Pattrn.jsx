@@ -129,6 +129,11 @@ import {
   clearVaultPendingUnlock,
 } from "./vault/VaultFirebase.js";
 
+// --- Campaign mode ---
+import CampaignMode from "./campaign/CampaignMode.jsx";
+import { CAMPAIGN_CHAPTERS, DIFFICULTY_CONFIG } from "./campaign/data/chapters.js";
+import { loadCampaignState } from "./campaign/state/campaignState.js";
+
 // --- Extracted modules ---
 import { BASE_COLORS, C } from "./constants/theme.js";
 import { SHAPES } from "./constants/shapes.jsx";
@@ -1200,6 +1205,11 @@ export default function Pattrn() {
   const [cascadeLives, setCascadeLives] = useState(3);
   const [cascadeRunIndex, setCascadeRunIndex] = useState(0);
   const [cascadeLevelBanner, setCascadeLevelBanner] = useState(null); // { level, coins, gridSize } — shown between cascade levels
+  // --- Campaign mode state ---
+  const [campaignPuzzleConfig, setCampaignPuzzleConfig] = useState(null); // { mode, gridSize, doorKey, ... }
+  const campaignPuzzleCallbackRef = useRef(null); // (solved, attempts) => void
+  const [campaignPuzzle, setCampaignPuzzle] = useState(null); // the actual puzzle object for campaign doors
+
   const timerStart = useRef(null);
   const timerInterval = useRef(null);
   const timerIsCascadeRun = useRef(false);
@@ -7790,7 +7800,25 @@ export default function Pattrn() {
   }, [isDaily, currentDailyDate]);
   const isVaultSolving = difficulty === "vault" && vaultSolvingTile !== null && vaultSolvingTile >= 0;
   const vaultActivePuzzle = isVaultSolving ? vaultPuzzlesRef.current?.[vaultSolvingTile] : null;
-  const puzzle = isVaultSolving ? vaultActivePuzzle : isCascade ? cascadePuzzle : isDaily ? currentDailyPuzzle : puzzles[currentPuzzle];
+  const isCampaign = difficulty === "campaign";
+  const puzzle = isCampaign ? campaignPuzzle : isVaultSolving ? vaultActivePuzzle : isCascade ? cascadePuzzle : isDaily ? currentDailyPuzzle : puzzles[currentPuzzle];
+
+  // Campaign auto-close: return to dungeon after a short delay on win/lose
+  useEffect(() => {
+    if (!isCampaign || (gameState !== "won" && gameState !== "lost")) return;
+    const timer = setTimeout(() => {
+      const solved = gameState === "won";
+      if (campaignPuzzleCallbackRef.current) {
+        campaignPuzzleCallbackRef.current(solved, attempts);
+        campaignPuzzleCallbackRef.current = null;
+      }
+      setCampaignPuzzleConfig(null);
+      setCampaignPuzzle(null);
+      setView("campaign");
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [isCampaign, gameState]);
+
   const diffProgress = progress[difficulty] || {};
   const isBlind = difficulty === "blind" && !isDaily;
   const isSpin = difficulty === "spin";
@@ -11157,6 +11185,11 @@ export default function Pattrn() {
     );
   }
 
+  // --- CAMPAIGN MODE VIEW ---
+  // Campaign mode: rendered persistently so dungeon state survives puzzle transitions
+  const campaignMounted = isAdmin && (view === "campaign" || (view === "play" && isCampaign));
+  const campaignVisible = view === "campaign";
+
   // --- VAULT MODE VIEW ---
   if (view === "vault" && vaultSessionId) {
     // Guard: require login for vault mode
@@ -14398,6 +14431,80 @@ export default function Pattrn() {
           </div>
         )}
 
+        {/* ── Campaign hero card (admin only) ── */}
+        {isAdmin && (() => {
+          const cState = loadCampaignState();
+          const aggieLevel = cState.aggie?.level || 1;
+          const floorsCleared = cState.stats?.totalFloorsCleared || 0;
+          const currentCh = CAMPAIGN_CHAPTERS[cState.currentChapter] || CAMPAIGN_CHAPTERS[0];
+          return (
+            <div style={{
+              width: "100%", marginBottom: 24, animation: "fadeUp 0.4s 0.1s ease both",
+              borderRadius: 20, overflow: "hidden", position: "relative",
+              background: `linear-gradient(135deg, ${C.surface} 0%, #7c5cbf0d 60%, #7c5cbf18 100%)`,
+              border: "1px solid #7c5cbf33",
+              padding: "22px 20px", boxSizing: "border-box",
+              boxShadow: "0 4px 24px #7c5cbf0a, 0 1px 0 inset rgba(255,255,255,0.04)",
+            }}>
+              <div style={{ position: "absolute", top: -40, right: -40, width: 120, height: 120, borderRadius: "50%", background: "radial-gradient(circle, #7c5cbf15 0%, transparent 70%)", pointerEvents: "none" }} />
+              <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: 16, position: "relative" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", width: 40, height: 40,
+                    borderRadius: 12, backgroundColor: "#7c5cbf15", border: "1px solid #7c5cbf33",
+                    fontSize: 20,
+                  }}>
+                    {"\u{1F5FA}\uFE0F"}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 10, color: "#a78bfa", textTransform: "uppercase", letterSpacing: 2, fontFamily: "'Inter', sans-serif", marginBottom: 4, fontWeight: 600 }}>
+                      Campaign
+                    </div>
+                    <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 800, color: C.text, lineHeight: 1.1 }}>
+                      Dungeon Crawler
+                    </div>
+                  </div>
+                </div>
+                {aggieLevel > 1 && (
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    padding: "6px 12px", borderRadius: 20,
+                    backgroundColor: "#9a96cc15", border: "1px solid #9a96cc33",
+                  }}>
+                    <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 11, fontWeight: 800, color: "#9a96cc" }}>Lv.{aggieLevel}</span>
+                  </div>
+                )}
+              </div>
+              {floorsCleared > 0 && (
+                <div style={{
+                  display: "flex", alignItems: "center", gap: 10, marginBottom: 16,
+                  padding: "10px 14px", borderRadius: 12, backgroundColor: "#7c5cbf12",
+                  border: "1px solid #7c5cbf44",
+                }}>
+                  <span style={{ fontSize: 13, color: "#a78bfa", fontFamily: "'Inter', sans-serif", fontWeight: 600 }}>
+                    {floorsCleared} floor{floorsCleared !== 1 ? "s" : ""} cleared
+                  </span>
+                </div>
+              )}
+              <button
+                onClick={() => setView("campaign")}
+                style={{
+                  width: "100%", padding: "14px 0", borderRadius: 14, fontSize: 13, fontWeight: 700,
+                  fontFamily: "'Inter', sans-serif", letterSpacing: 1.2,
+                  background: "linear-gradient(135deg, #7c5cbf 0%, #7c5cbfdd 100%)",
+                  color: "#fff", border: "none", cursor: "pointer",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                  boxShadow: "0 2px 12px #7c5cbf33",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.boxShadow = "0 4px 20px #7c5cbf55"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = "0 2px 12px #7c5cbf33"; }}
+              >
+                {floorsCleared > 0 ? "Continue Adventure" : "Begin Adventure"}
+              </button>
+            </div>
+          );
+        })()}
+
         {/* Mode selector: categorized sections with improved cards */}
         <div style={{
           marginBottom: 24, animation: "fadeUp 0.45s 0.12s ease both",
@@ -15228,6 +15335,18 @@ export default function Pattrn() {
 
   // Pill action buttons for the bottom glass bar
   const playBackAction = () => {
+    if (isCampaign) {
+      // Campaign: return to dungeon, signal puzzle abandoned (failed)
+      stopTimer(); setRadialMenuStack([]);
+      if (campaignPuzzleCallbackRef.current) {
+        campaignPuzzleCallbackRef.current(false, attempts);
+        campaignPuzzleCallbackRef.current = null;
+      }
+      setCampaignPuzzleConfig(null);
+      setCampaignPuzzle(null);
+      setView("campaign");
+      return;
+    }
     if (isCoop) { leaveCoopSession(); setView("menu"); return; }
     // Vault mode: return to vault overview instead of home
     if (isVault && vaultSessionId) {
@@ -15322,36 +15441,40 @@ export default function Pattrn() {
       playPillButtons.push({ id: "preview", icon: "search", color: C.accent, onClick: () => setRadialMenuStack(["root", "mosaic-preview"]) });
     }
   } else if (gameState === "won") {
-    // Share
-    playPillButtons.push({ id: "share", icon: "share", color: "#fff", onClick: async () => {
-      let text;
-      if (isCoop) {
-        text = `Agnus Co-op \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\nSolved together \u2022 ${formatTime(elapsedTime)}`;
-      } else if (isCascade) {
-        text = `Agnus Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
-      } else if (isDaily) {
-        const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-        const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${currentDailyDate}` : "";
-        text = `Agnus Daily ${currentDailyDate}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}\n${dailyUrl}`;
-      } else {
-        const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
-        text = `Agnus \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
-      }
-      const result = await tryNativeShare({ text });
-      if (result === "shared") { setShareMsg("Shared!"); setTimeout(() => setShareMsg(""), 2000); return; }
-      if (result === "cancelled") return;
-      navigator.clipboard.writeText(text).catch(() => {});
-      setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
-    }});
-    // Retry (not for daily puzzles)
-    if (!isDaily) {
-      playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => {
-        if (isCoop) leaveCoopSession();
-        startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true);
+    if (!isCampaign) {
+      // Share
+      playPillButtons.push({ id: "share", icon: "share", color: "#fff", onClick: async () => {
+        let text;
+        if (isCoop) {
+          text = `Agnus Co-op \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\nSolved together \u2022 ${formatTime(elapsedTime)}`;
+        } else if (isCascade) {
+          text = `Agnus Cascade \uD83E\uDDE9\nCompleted 3×3 → 9×9 \u2022 ${formatTime(elapsedTime)}`;
+        } else if (isDaily) {
+          const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
+          const dailyUrl = typeof window !== "undefined" ? `${window.location.origin}${window.location.pathname}?mode=daily&date=${currentDailyDate}` : "";
+          text = `Agnus Daily ${currentDailyDate}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}\n${dailyUrl}`;
+        } else {
+          const medal = attempts <= 2 ? "\u2605" : attempts <= 4 ? "\u25CF" : "\u25C6";
+          text = `Agnus \uD83E\uDDE9 ${diffLabel} #${currentPuzzle + 1}\n${medal} Solved in ${attempts} attempt${attempts !== 1 ? "s" : ""} \u2022 ${formatTime(elapsedTime)}`;
+        }
+        const result = await tryNativeShare({ text });
+        if (result === "shared") { setShareMsg("Shared!"); setTimeout(() => setShareMsg(""), 2000); return; }
+        if (result === "cancelled") return;
+        navigator.clipboard.writeText(text).catch(() => {});
+        setShareMsg("Copied!"); setTimeout(() => setShareMsg(""), 2000);
       }});
+      // Retry (not for daily puzzles)
+      if (!isDaily) {
+        playPillButtons.push({ id: "retry", icon: "refresh", color: "#fff", onClick: () => {
+          if (isCoop) leaveCoopSession();
+          startPuzzle(isCascade ? cascadeRunIndex : currentPuzzle, isCascade ? "cascade" : undefined, true);
+        }});
+      }
     }
-    // Next / Done / Back — the primary action
-    if (isVault && vaultSessionId) {
+    // Next / Done / Back — the primary action (campaign auto-closes via effect)
+    if (isCampaign) {
+      // Campaign: auto-closes via effect — no pill buttons needed
+    } else if (isVault && vaultSessionId) {
       // Vault: return to vault overview (auto-handled by timeout, but add explicit button too)
       playPillButtons.push({ id: "done", icon: "back", color: "#54A0FF", onClick: () => {
         setVaultSolvingTile(null);
@@ -15377,7 +15500,9 @@ export default function Pattrn() {
       }});
     }
     // Retry / Back
-    if (isVault && vaultSessionId) {
+    if (isCampaign) {
+      // Campaign: auto-closes via effect — no pill buttons needed
+    } else if (isVault && vaultSessionId) {
       // Vault: return to vault (auto-handled by timeout, but show button too)
       playPillButtons.push({ id: "done", icon: "back", color: "#54A0FF", onClick: () => {
         setVaultSolvingTile(null);
@@ -15398,19 +15523,62 @@ export default function Pattrn() {
   }
 
   return (
+    <>
+    {/* Campaign mode — stays mounted during puzzle play so dungeon state persists */}
+    {campaignMounted && (
+      <div style={{ position: "fixed", inset: 0, zIndex: campaignVisible ? 200 : 1, pointerEvents: campaignVisible ? "auto" : "none" }}>
+        <CampaignMode
+          C={C}
+          onExit={() => setView("menu")}
+          onStartPuzzle={(config, doorKey, callback) => {
+            const diff = config.mode;
+            const sets = PUZZLE_SETS[diff] || PUZZLE_SETS.easy;
+            let hash = 0;
+            for (let i = 0; i < doorKey.length; i++) hash = ((hash << 5) - hash + doorKey.charCodeAt(i)) | 0;
+            const idx = Math.abs(hash) % sets.length;
+            const puz = sets[idx];
+
+            setCampaignPuzzleConfig(config);
+            setCampaignPuzzle(puz);
+            campaignPuzzleCallbackRef.current = callback;
+            setDifficulty("campaign");
+            setCurrentPuzzle(0);
+            setFills({});
+            setSelectedCell(null);
+            setSelectedToken(null);
+            setAttempts(0);
+            setGameState("playing");
+            setWrongCells(new Set());
+            setLockedCells(new Set());
+            setShowParticles(false);
+            setElapsedTime(0);
+            setView("play");
+            timerStart.current = Date.now();
+            if (timerInterval.current) clearInterval(timerInterval.current);
+            timerInterval.current = setInterval(() => {
+              setElapsedTime(Math.floor((Date.now() - timerStart.current) / 1000));
+            }, 1000);
+          }}
+        />
+      </div>
+    )}
     <div
       ref={playViewScrollRef}
       style={{
-      height: "100dvh", minHeight: "100dvh", backgroundColor: C.bg, color: C.text,
+      height: "100dvh", minHeight: "100dvh",
+      backgroundColor: isCampaign ? "rgba(10,8,20,0.88)" : C.bg,
+      color: isCampaign ? "#e8e0f0" : C.text,
       fontFamily: "'Inter', sans-serif",
-      display: "flex", flexDirection: "column",
-      position: "relative", width: "100%",
+      display: campaignVisible ? "none" : "flex", flexDirection: "column",
+      position: "relative",
+      zIndex: isCampaign ? 10 : undefined,
+      width: "100%",
       overflow: "hidden", overscrollBehavior: "none", touchAction: "none",
       boxSizing: "border-box",
     }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap'); * { -webkit-user-select: none; -moz-user-select: none; -ms-user-select: none; user-select: none; touch-action: manipulation; } @keyframes particlePop { 0%{transform:scale(0);opacity:1} 50%{opacity:1} 100%{transform:scale(1) translateY(-40px);opacity:0} } @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:translateY(0)} } @keyframes pulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes slideIn { from{opacity:0;transform:scale(0.96)} to{opacity:1;transform:scale(1)} } @keyframes shake { 0%,100%{transform:translateX(0)} 20%{transform:translateX(-6px)} 40%{transform:translateX(6px)} 60%{transform:translateX(-4px)} 80%{transform:translateX(4px)} } @keyframes fallIntoPlace { 0%{opacity:0;transform:translateY(-36px) scale(0.82)} 60%{transform:translateY(3px) scale(1.02)} 100%{opacity:1;transform:translateY(0) scale(1)} } @keyframes fallOff { 0%{opacity:1;transform:translateY(0) scale(1) rotate(0deg)} 8%{transform:translateY(-4px) scale(1.04) rotate(-3deg)} 100%{opacity:0;transform:translateY(180%) scale(0.75) rotate(18deg)} } @keyframes emptyCellIn { 0%{opacity:0} 100%{opacity:0.45} } @keyframes tilesWinCelebrate { 0%{transform:translateY(0) rotate(0deg) scale(1)} 30%{transform:translateY(-28px) rotate(180deg) scale(1.08)} 70%{transform:translateY(-32px) rotate(360deg) scale(1.08)} 100%{transform:translateY(0) rotate(360deg) scale(1)} } .token-picker-scroll::-webkit-scrollbar { display: none; } .reaction-scroll-container::-webkit-scrollbar { display: none; } @keyframes achievementToastIn { 0%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.6)} 40%{opacity:1;transform:translateX(-50%) translateY(6px) scale(1.05)} 60%{transform:translateX(-50%) translateY(-3px) scale(0.98)} 80%{transform:translateX(-50%) translateY(1px) scale(1.01)} 100%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} } @keyframes achievementBadgeSpin { 0%{transform:rotateY(0deg) scale(1)} 30%{transform:rotateY(180deg) scale(1.2)} 60%{transform:rotateY(360deg) scale(1.1)} 100%{transform:rotateY(360deg) scale(1)} } @keyframes achievementGlow { 0%{box-shadow:0 0 0px transparent} 30%{box-shadow:0 0 24px currentColor} 100%{box-shadow:0 0 0px transparent} } @keyframes achievementShimmer { 0%{background-position:200% center} 100%{background-position:-200% center} } @keyframes achievementSparkle { 0%{opacity:0;transform:scale(0) rotate(0deg)} 50%{opacity:1;transform:scale(1) rotate(180deg)} 100%{opacity:0;transform:scale(0) rotate(360deg)} } @keyframes achievementToastOut { 0%{opacity:1;transform:translateX(-50%) translateY(0) scale(1)} 100%{opacity:0;transform:translateX(-50%) translateY(-30px) scale(0.85)} } @keyframes snowFall { 0%{transform:translateY(0) translateX(0);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px));opacity:0.2} } @keyframes batFloat { 0%,100%{transform:translateY(0) translateX(0)} 25%{transform:translateY(-8px) translateX(6px)} 50%{transform:translateY(2px) translateX(-4px)} 75%{transform:translateY(-5px) translateX(8px)} } @keyframes neonPulse { 0%,100%{box-shadow:0 0 15px #FF008044,0 0 30px #00FF8022,inset 0 0 15px #FF008011} 33%{box-shadow:0 0 20px #00FF8044,0 0 40px #FF008022,inset 0 0 20px #00FF8011} 66%{box-shadow:0 0 20px #FFFF0044,0 0 40px #8000FF22,inset 0 0 20px #FFFF0011} } @keyframes bubbleRise { 0%{transform:translateY(0) translateX(0);opacity:1} 50%{transform:translateY(-150px) translateX(8px);opacity:0.6} 100%{transform:translateY(-300px) translateX(-4px);opacity:0} } @keyframes petalFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 100%{transform:translateY(calc(100% + 300px)) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.15} } @keyframes leafFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 50%{transform:translateY(150px) translateX(var(--drift, 15px)) rotate(180deg);opacity:0.7} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 15px) * -0.5)) rotate(360deg);opacity:0} } @keyframes starTwinkle { 0%,100%{opacity:0} 50%{opacity:var(--opacity, 0.6)} } @keyframes scanlineMove { 0%{background-position:0 -100%} 100%{background-position:0 200%} } @keyframes auroraShift { 0%{opacity:0.6;transform:translateX(-5%)} 100%{opacity:1;transform:translateX(5%)} } @keyframes heartFloat { 0%{transform:translateY(0) translateX(0) scale(1);opacity:1} 50%{transform:translateY(-150px) translateX(var(--drift, 5px)) scale(1.1);opacity:0.6} 100%{transform:translateY(-300px) translateX(calc(var(--drift, 5px) * -1)) scale(0.8);opacity:0} } @keyframes blockPlace { 0%{transform:scale(0.6);opacity:0} 60%{transform:scale(1.06);opacity:1} 100%{transform:scale(1);opacity:1} } @keyframes blockRemove { 0%{transform:scale(1);opacity:1} 100%{transform:scale(0.6);opacity:0} } @keyframes confettiFall { 0%{transform:translateY(0) translateX(0) rotate(0deg);opacity:1} 25%{transform:translateY(75px) translateX(calc(var(--drift, 10px) * 0.5)) rotate(180deg);opacity:0.8} 50%{transform:translateY(150px) translateX(var(--drift, 10px)) rotate(360deg);opacity:0.6} 100%{transform:translateY(calc(100% + 300px)) translateX(calc(var(--drift, 10px) * -0.3)) rotate(720deg);opacity:0} } @keyframes glitchScan { 0%{background-position:0 -100%} 100%{background-position:0 300%} } @keyframes glitchBorder { 0%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} 33%{box-shadow:inset -4px 0 0 rgba(255,0,64,0.35),inset 4px 0 0 rgba(0,255,221,0.3),inset 0 -2px 0 rgba(255,0,255,0.2),inset 0 2px 0 rgba(0,255,64,0.1)} 66%{box-shadow:inset 2px 0 0 rgba(0,255,221,0.2),inset -2px 0 0 rgba(255,0,64,0.3),inset 0 3px 0 rgba(255,0,255,0.15),inset 0 -1px 0 rgba(0,255,64,0.2)} 100%{box-shadow:inset 3px 0 0 rgba(255,0,64,0.25),inset -3px 0 0 rgba(0,255,221,0.25),inset 0 2px 0 rgba(255,0,255,0.15),inset 0 -2px 0 rgba(0,255,64,0.15)} } @keyframes glitchFlicker { 0%{opacity:0.08} 50%{opacity:0} } @keyframes glitchDisplace { 0%,92%{transform:translateX(0)} 93%{transform:translateX(-3px)} 94%{transform:translateX(4px)} 95%{transform:translateX(-2px)} 96%,100%{transform:translateX(0)} } @keyframes glitchBar { 0%,80%{opacity:0.6;transform:translateX(0)} 82%{opacity:1;transform:translateX(6px)} 84%{opacity:0.8;transform:translateX(-4px)} 86%{opacity:1;transform:translateX(3px)} 88%,100%{opacity:0.6;transform:translateX(0)} } @keyframes enigmaRotor { 0%{transform:rotate(0deg)} 100%{transform:rotate(360deg)} } @keyframes enigmaBgDrift { 0%{transform:translate(0%,0%) rotate(0deg)} 33%{transform:translate(5%,-3%) rotate(1deg)} 66%{transform:translate(-3%,5%) rotate(-1deg)} 100%{transform:translate(2%,2%) rotate(0.5deg)} } @keyframes enigmaWireDrift { 0%{transform:translate(0%,0%) scale(1)} 50%{transform:translate(3%,-2%) scale(1.02)} 100%{transform:translate(-2%,3%) scale(0.98)} } @keyframes enigmaGlow { 0%,100%{box-shadow:inset 0 0 20px rgba(201,168,76,0.04),inset 0 0 60px rgba(140,107,30,0.02)} 50%{box-shadow:inset 0 0 30px rgba(201,168,76,0.08),inset 0 0 80px rgba(140,107,30,0.04)} } @keyframes enigmaDecrypt { 0%{transform:rotateY(0deg) scale(1);opacity:0.4;filter:brightness(0.5)} 25%{transform:rotateY(90deg) scale(0.9);opacity:0.6;filter:brightness(0.7)} 50%{transform:rotateY(180deg) scale(0.95);opacity:0.8;filter:brightness(1.3)} 75%{transform:rotateY(270deg) scale(1.02);filter:brightness(1.1)} 100%{transform:rotateY(360deg) scale(1);opacity:1;filter:brightness(1)} } @keyframes coopPulse { 0%,100%{opacity:0.6} 50%{opacity:1} } @keyframes notificationPulse { 0%,100%{box-shadow:0 0 16px rgba(84,160,255,0.6),0 0 32px rgba(84,160,255,0.3)} 50%{box-shadow:0 0 24px rgba(84,160,255,0.8),0 0 48px rgba(84,160,255,0.5)} } @keyframes notificationMenuGlow { 0%,100%{box-shadow:0 0 20px rgba(84,160,255,0.4),inset 0 0 20px rgba(84,160,255,0.15)} 50%{box-shadow:0 0 30px rgba(84,160,255,0.6),inset 0 0 30px rgba(84,160,255,0.25)} } @keyframes subtleGlowPulse { 0%,100%{opacity:0.85} 50%{opacity:1} } @keyframes coopReactionFloat { 0%{transform:translateY(0) scale(0.5);opacity:0} 8%{transform:translateY(-5vh) scale(1.1);opacity:1} 15%{transform:translateY(-10vh) scale(1)} 70%{opacity:1} 100%{transform:translateY(-85vh) scale(1.2);opacity:0} }`}</style>
 
-      <Particles show={showParticles} />
+      {!isCampaign && <Particles show={showParticles} />}
 
       {/* Achievement toast */}
       {achievementToast && (() => {
@@ -15568,25 +15736,26 @@ export default function Pattrn() {
       {/* Info row: now the top element of the play view */}
       <div ref={infoRowRef} style={{
         flexShrink: 0, zIndex: 10,
-        backgroundColor: activeTheme.gridBg || C.surface,
+        backgroundColor: isCampaign ? "rgba(26,20,40,0.95)" : (activeTheme.gridBg || C.surface),
         display: "flex", flexDirection: "column", alignItems: "center",
         paddingTop: "calc(12px + env(safe-area-inset-top, 0px))", paddingBottom: 8, paddingLeft: 16, paddingRight: 16, boxSizing: "border-box",
+        ...(isCampaign ? { borderBottom: "2px solid #3d2e5c" } : {}),
       }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%", maxWidth: gridTotalWidth }}>
-          <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 700, color: gameState === "won" ? C.correct : gameState === "lost" ? C.incorrect : C.text, letterSpacing: 2 }}>
+          <div style={{ fontFamily: isCampaign ? "'Press Start 2P', monospace" : "'Inter', sans-serif", fontSize: isCampaign ? 12 : 18, fontWeight: 700, color: gameState === "won" ? (isCampaign ? "#4ade80" : C.correct) : gameState === "lost" ? (isCampaign ? "#f87171" : C.incorrect) : (isCampaign ? "#e8e0f0" : C.text), letterSpacing: 2 }}>
             {formatTime(elapsedTime)}
           </div>
           <div style={{ textAlign: "center" }}>
-            <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 10, color: isBlind ? "#e06040" : C.textDim, letterSpacing: 1, textTransform: "uppercase" }}>
-              {isCoop ? "Co-op " : isCoopMosaic ? "Co-op " : ""}{diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
+            <span style={{ fontFamily: isCampaign ? "'Press Start 2P', monospace" : "'Inter', sans-serif", fontSize: isCampaign ? 7 : 10, color: isBlind ? "#e06040" : (isCampaign ? "#9a96cc" : C.textDim), letterSpacing: 1, textTransform: "uppercase" }}>
+              {isCoop ? "Co-op " : isCoopMosaic ? "Co-op " : ""}{isCampaign ? "Dungeon" : diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
             </span>
-            {!isDaily && !isCascade && (
+            {!isDaily && !isCascade && !isCampaign && (
               <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.accent, letterSpacing: 2 }}>
                 #{currentPuzzle + 1}
               </span>
             )}
           </div>
-          {!isCoopMosaic && <AttemptDots max={isCoop ? 5 : maxAttempts} used={attempts} won={gameState === "won"} />}
+          {!isCoopMosaic && <AttemptDots max={isCoop ? 5 : maxAttempts} used={attempts} won={gameState === "won"} campaign={isCampaign} />}
         </div>
         {/* Coop status bar */}
         {isCoop && (() => {
@@ -15747,8 +15916,8 @@ export default function Pattrn() {
       )}
 
       {/* Grid area: flex child between header/info and footer, centered */}
-      <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: activeTheme.gridBg || C.surface, boxSizing: "border-box", padding: edgePad }}>
-        <GridDecoration decoration={activeTheme.decoration} />
+      <div style={{ flex: 1, minHeight: 0, position: "relative", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", backgroundColor: isCampaign ? "rgba(26,20,40,0.95)" : (activeTheme.gridBg || C.surface), boxSizing: "border-box", padding: edgePad }}>
+        {!isCampaign && <GridDecoration decoration={activeTheme.decoration} />}
         {/* Coop mosaic players indicator — positioned top-left of puzzle panel */}
         {isCoopMosaic && coopMosaicAnyConnected && gameState === "playing" && (
           <div
@@ -15803,7 +15972,7 @@ export default function Pattrn() {
             )}
           </div>
         )}
-      <div key={gridEpoch} data-aggie-avoid="grid" style={{ animation: "slideIn 0.3s ease both", touchAction: "none" }}>
+      <div key={gridEpoch} data-aggie-avoid="grid" style={{ animation: "slideIn 0.3s ease both", touchAction: "none", ...(isCampaign ? { border: "3px solid #3d2e5c", borderRadius: 4, backgroundColor: "rgba(26,20,40,0.95)", boxShadow: "0 0 16px rgba(124,92,191,0.12), inset 0 0 8px rgba(0,0,0,0.3)" } : {}) }}>
       <div style={{
         transform: isSpin ? `rotate(${spinAngle}deg)` : undefined,
         transition: isSpin ? "transform 0.8s cubic-bezier(0.4, 0, 0.2, 1)" : undefined,
@@ -15812,7 +15981,7 @@ export default function Pattrn() {
           display: "flex", flexDirection: "column", gap: gridGap, padding: gridPad,
           position: "relative", zIndex: 1,
         }}>
-          {puzzle.solution.map((row, r) => (
+          {puzzle && puzzle.solution.map((row, r) => (
             <div key={r} style={{ display: "flex", gap: gridGap, position: "relative", zIndex: 1 }}>
               {row.map((token, c) => {
                 const key = `${r}-${c}`;
@@ -15873,7 +16042,7 @@ export default function Pattrn() {
                       mode={puzzle.mode}
                       colorMap={themeColorMap}
                       shapesArr={themedShapes}
-                      themeId={activeThemeId}
+                      themeId={isCampaign ? "campaign" : activeThemeId}
                       isJustPlaced={justPlacedCells.has(key)}
                       isRemoving={!!removingCells[key]}
                       removingToken={removingCells[key] || null}
@@ -15988,8 +16157,30 @@ export default function Pattrn() {
         </div>
       </div>
       </div>
+      {/* Puzzle complete overlay — campaign gets a pixel-art SUCCESS screen */}
+      {gameState === "won" && showWinOverlay && isCampaign && (
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "rgba(0,0,0,0.85)",
+          zIndex: 5,
+          animation: "fadeUp 0.4s ease both",
+          pointerEvents: "none",
+        }}>
+          <div style={{ fontSize: 28, fontWeight: 900, fontFamily: "'Press Start 2P', monospace", color: "#4ade80", letterSpacing: 3, textShadow: "0 0 16px #4ade8066, 0 2px 0 #2a8a50", animation: "fadeUp 0.35s ease both" }}>
+            SUCCESS!
+          </div>
+          <div style={{ fontSize: 8, fontFamily: "'Press Start 2P', monospace", color: "#9a96cc", marginTop: 10, animation: "fadeUp 0.5s 0.1s ease both", letterSpacing: 1 }}>
+            Door unlocked
+          </div>
+        </div>
+      )}
       {/* Puzzle complete overlay — blurry area on top of finished grid */}
-      {gameState === "won" && showWinOverlay && !cascadeLevelBanner && (
+      {gameState === "won" && showWinOverlay && !isCampaign && !cascadeLevelBanner && (
         <div style={{
           position: "absolute",
           inset: 0,
@@ -16113,8 +16304,29 @@ export default function Pattrn() {
         </button>
       )}
 
-      {/* Puzzle failed overlay — blurry area on top of failed grid */}
-      {gameState === "lost" && (
+      {/* Puzzle failed overlay — campaign gets pixel-art FAILED screen */}
+      {gameState === "lost" && isCampaign && (
+        <div style={{
+          position: "absolute",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "rgba(0,0,0,0.85)",
+          zIndex: 5,
+          animation: "fadeUp 0.4s ease both",
+          pointerEvents: "none",
+        }}>
+          <div style={{ fontSize: 28, fontWeight: 900, fontFamily: "'Press Start 2P', monospace", color: "#f87171", letterSpacing: 3, textShadow: "0 0 16px #f8717166, 0 2px 0 #a03030", animation: "fadeUp 0.35s ease both" }}>
+            FAILED!
+          </div>
+          <div style={{ fontSize: 8, fontFamily: "'Press Start 2P', monospace", color: "#9a96cc", marginTop: 10, animation: "fadeUp 0.5s 0.1s ease both", letterSpacing: 1 }}>
+            The door remains sealed...
+          </div>
+        </div>
+      )}
+      {gameState === "lost" && !isCampaign && (
         <div style={{
           position: "absolute",
           inset: 0,
@@ -16146,7 +16358,7 @@ export default function Pattrn() {
       </div>
 
       {/* Fixed bottom bar: coop UI + game state info */}
-      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: activeTheme.gridBg || C.surface, paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+      <div ref={footerRef} style={{ flexShrink: 0, zIndex: 10, backgroundColor: isCampaign ? "rgba(26,20,40,0.95)" : (activeTheme.gridBg || C.surface), paddingTop: 10, paddingBottom: gameState === "playing" && puzzle ? `calc(148px + env(safe-area-inset-bottom, 0px))` : `calc(80px + env(safe-area-inset-bottom, 0px))`, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
       </div>
 
       {/* Token picker — Liquid Glass pill above the menu pill */}
@@ -16156,18 +16368,18 @@ export default function Pattrn() {
           bottom: `calc(100px + env(safe-area-inset-bottom, 0px))`,
           left: "50%",
           transform: "translateX(-50%)",
-          borderRadius: 9999,
-          background: activeTheme.gridBg || C.surface,
-          backdropFilter: "blur(28px) saturate(200%)",
-          WebkitBackdropFilter: "blur(28px) saturate(200%)",
-          border: "1px solid rgba(255,255,255,0.16)",
-          boxShadow: "none",
+          borderRadius: isCampaign ? 6 : 9999,
+          background: isCampaign ? "rgba(26,20,40,0.95)" : (activeTheme.gridBg || C.surface),
+          backdropFilter: isCampaign ? "none" : "blur(28px) saturate(200%)",
+          WebkitBackdropFilter: isCampaign ? "none" : "blur(28px) saturate(200%)",
+          border: isCampaign ? "3px solid #3d2e5c" : "1px solid rgba(255,255,255,0.16)",
+          boxShadow: isCampaign ? "0 0 12px rgba(124,92,191,0.15)" : "none",
           zIndex: 85,
           padding: "6px 4px",
           maxWidth: "calc(100vw - 40px)",
           overflow: "hidden",
         }}>
-          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={activeThemeId}
+          <TokenPicker tokens={puzzle.usedTokens} selectedToken={selectedToken} onSelect={handleTokenSelect} cellSize={pickerSize} mode={puzzle.mode} remaining={tokenRemaining} colorMap={themeColorMap} shapesArr={themedShapes} themeId={isCampaign ? "campaign" : activeThemeId}
           />
         </div>
       )}
@@ -16215,5 +16427,6 @@ export default function Pattrn() {
       {renderContextButton("play", playPillButtons)}
       {globalModalsEl}
     </div>
+    </>
   );
 }

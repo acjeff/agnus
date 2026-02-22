@@ -7,6 +7,7 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
   const isEasy = mode === "easy" || mode === "blind";
   const shapes = shapesArr || SHAPES;
   const isEnigma = themeId === "enigma";
+  const isCampaign = themeId === "campaign";
   const scrollRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
@@ -87,12 +88,14 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
   const doScroll = (dir) => { const el = scrollRef.current; if (el) el.scrollBy({ left: dir * (cellSize + 10) * 3, behavior: "smooth" }); };
   const handleTileClick = (token) => { if (!dragRef.current.moved) onSelect(token); };
 
-  const arrowStyle = { width: 28, height: 28, borderRadius: "50%", backgroundColor: C.surface, border: `1px solid ${C.border}`, color: C.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0, transition: "opacity 0.2s" };
+  const arrowStyle = isCampaign
+    ? { width: 28, height: 28, borderRadius: 3, backgroundColor: "rgba(26,20,40,0.9)", border: "2px solid #3d2e5c", color: "#9a96cc", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0, transition: "opacity 0.2s" }
+    : { width: 28, height: 28, borderRadius: "50%", backgroundColor: C.surface, border: `1px solid ${C.border}`, color: C.text, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0, transition: "opacity 0.2s" };
 
   return (
     <div style={{ position: "relative", maxWidth: "100%", display: "flex", alignItems: "center", gap: 4 }}>
       {canScrollLeft && <button onClick={() => doScroll(-1)} style={arrowStyle} aria-label="Scroll left">{"\u2039"}</button>}
-      <div ref={scrollRef} className="token-picker-scroll" style={{ display: "flex", gap: 10, justifyContent: overflows ? "flex-start" : "center", padding: "8px 16px", flexWrap: "nowrap", overflowX: "auto", flex: "1 1 auto", minWidth: 0, maxWidth: "100%", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", touchAction: "pan-x", willChange: "scroll-position" }}>
+      <div ref={scrollRef} className="token-picker-scroll" style={{ display: "flex", gap: isCampaign ? 6 : 10, justifyContent: overflows ? "flex-start" : "center", padding: "8px 16px", flexWrap: "nowrap", overflowX: "auto", flex: "1 1 auto", minWidth: 0, maxWidth: "100%", WebkitOverflowScrolling: "touch", scrollbarWidth: "none", msOverflowStyle: "none", touchAction: "pan-x", willChange: "scroll-position" }}>
         {tokens.map((token, i) => {
           const { color, shapeIndex } = parseToken(token);
           const displayColor = colorMap ? (colorMap[color] || color) : color;
@@ -103,30 +106,37 @@ function TokenPicker({ tokens, selectedToken, onSelect, cellSize, mode, remainin
             <div key={i} onClick={() => handleTileClick(token)}
               style={{
                 width: cellSize, height: cellSize,
-                borderRadius: isEnigma ? "50%" : 12,
+                borderRadius: isCampaign ? 3 : isEnigma ? "50%" : 12,
                 backgroundColor: displayColor,
-                border: isEnigma
+                border: isCampaign
+                  ? (selected ? "3px solid #e8e0f0" : "2px solid rgba(255,255,255,0.15)")
+                  : isEnigma
                   ? (selected ? "3px solid rgba(201,168,76,0.9)" : "2px solid rgba(201,168,76,0.35)")
                   : (selected ? `3px solid ${C.text}` : "3px solid transparent"),
-                cursor: exhausted ? "not-allowed" : "pointer", transition: "transform 0.2s cubic-bezier(0.4,0,0.2,1), opacity 0.2s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s cubic-bezier(0.4,0,0.2,1), border-color 0.2s cubic-bezier(0.4,0,0.2,1)",
-                transform: selected ? "scale(1.15)" : "scale(1)",
+                cursor: exhausted ? "not-allowed" : "pointer",
+                transition: isCampaign ? "box-shadow 0.15s" : "transform 0.2s cubic-bezier(0.4,0,0.2,1), opacity 0.2s cubic-bezier(0.4,0,0.2,1), box-shadow 0.2s cubic-bezier(0.4,0,0.2,1), border-color 0.2s cubic-bezier(0.4,0,0.2,1)",
+                transform: isCampaign ? undefined : (selected ? "scale(1.15)" : "scale(1)"),
                 opacity: exhausted ? 0.35 : 1,
-                boxShadow: isEnigma
+                boxShadow: isCampaign
+                  ? (selected ? `0 0 10px #7c5cbf88` : "none")
+                  : isEnigma
                   ? (selected ? `0 0 20px rgba(201,168,76,0.4), inset 0 0 8px rgba(0,0,0,0.3)` : `inset 0 0 6px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.4)`)
                   : (selected ? `0 0 20px ${displayColor}66` : `0 2px 8px ${displayColor}33`),
                 position: "relative", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
                 outline: isEnigma ? "1px solid rgba(201,168,76,0.1)" : undefined,
                 outlineOffset: isEnigma ? "3px" : undefined,
+                imageRendering: isCampaign ? "pixelated" : undefined,
               }}
             >
               {shapes[shapeIndex % shapes.length](cellSize * 0.5, getShapeStroke(displayColor, isEasy))}
               {left !== null && mode !== "hard" && (
                 <div style={{
                   position: "absolute", top: -6, right: -6,
-                  backgroundColor: exhausted ? C.textDim : (isEnigma ? "rgba(201,168,76,0.9)" : C.text),
-                  color: C.bg, fontSize: 10, fontWeight: 700,
-                  fontFamily: "'Inter', sans-serif",
-                  width: 18, height: 18, borderRadius: 9,
+                  backgroundColor: exhausted ? C.textDim : (isCampaign ? "#7c5cbf" : isEnigma ? "rgba(201,168,76,0.9)" : C.text),
+                  color: isCampaign ? "#e8e0f0" : C.bg,
+                  fontSize: isCampaign ? 8 : 10, fontWeight: 700,
+                  fontFamily: isCampaign ? "'Press Start 2P', monospace" : "'Inter', sans-serif",
+                  width: 18, height: 18, borderRadius: isCampaign ? 3 : 9,
                   display: "flex", alignItems: "center", justifyContent: "center",
                   lineHeight: 1,
                 }}>

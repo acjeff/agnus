@@ -10,6 +10,7 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
   const shapes = shapesArr || SHAPES;
   const isEasy = mode === "easy";
   const isEnigma = themeId === "enigma";
+  const isCampaign = themeId === "campaign";
   const fallAnimation = isPrefilled ? `fallIntoPlace 0.5s ${fallDelay}s cubic-bezier(0.34, 1.56, 0.64, 1) both` : "none";
   const wrongAnimation = isWrong ? `fallOff 0.32s ${wrongFallDelay}s cubic-bezier(0.55, 0.09, 0.68, 0.53) forwards` : "none";
   const isEmptyUnfilled = isBlank && !isFilled && !isRevealed && !isLocked && !isRemoving;
@@ -45,6 +46,21 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
     : isSelected ? `0 0 16px rgba(201,168,76,0.4), inset 0 0 10px rgba(201,168,76,0.12)`
     : showContent && displayColor ? `inset 0 0 6px rgba(0,0,0,0.3), 0 1px 4px rgba(0,0,0,0.4)` : "none";
 
+  // Campaign theme: sharp pixel-art tiles
+  const campaignBorder = isLocked ? `2px solid #4ade80`
+    : isSelected ? `2px solid #7c5cbf`
+    : isWrong ? `2px solid #f87171`
+    : isBlank && !isFilled && !isRevealed && !isRemoving ? `2px dashed #3d2e5c`
+    : showContent && displayColor ? `2px solid rgba(255,255,255,0.15)`
+    : `2px solid transparent`;
+  const campaignBoxShadow = isLocked ? `0 0 8px #4ade8055`
+    : isCorrect ? `0 0 8px #4ade8055`
+    : isWrong ? `0 0 8px #f8717155`
+    : isSelected ? `0 0 8px #7c5cbf66`
+    : "none";
+  const campaignBg = showContent && displayColor ? displayColor
+    : "rgba(26,20,40,0.8)";
+
   return (
     <div
       onClick={onClick}
@@ -53,21 +69,24 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
       onPointerEnter={onPointerEnter}
       style={{
         width: cellSize, height: cellSize,
-        borderRadius: isEnigma ? enigmaBorderRadius : (cellSize > 44 ? 10 : 8),
-        backgroundColor: showContent && displayColor ? displayColor
+        borderRadius: isCampaign ? 3 : isEnigma ? enigmaBorderRadius : (cellSize > 44 ? 10 : 8),
+        backgroundColor: isCampaign ? campaignBg
+          : showContent && displayColor ? displayColor
           : coopOwnerColor && isBlank && !isFilled && !isRevealed && !isLocked ? coopOwnerColor
           : (isEnigma ? "rgba(12,12,8,0.7)" : C.surfaceLight),
-        border: isEnigma ? enigmaActiveBorder
+        border: isCampaign ? campaignBorder
+          : isEnigma ? enigmaActiveBorder
           : isLocked ? `2.5px solid ${C.correct}`
           : isSelected ? `2.5px solid ${C.accent}`
           : isWrong ? `2.5px solid ${C.incorrect}`
           : isBlank && !isFilled && !isRevealed && !isRemoving ? (coopBorderColor ? `2.5px solid ${coopBorderColor}` : `2.5px dashed ${C.border}`)
           : "2.5px solid transparent",
         cursor: isBlank && !isRevealed && !isLocked ? "pointer" : "default",
-        transition: "transform 0.15s cubic-bezier(0.4,0,0.2,1), box-shadow 0.15s cubic-bezier(0.4,0,0.2,1)",
-        transform: isSelected ? "scale(1.08)" : "scale(1)",
+        transition: isCampaign ? "box-shadow 0.15s" : "transform 0.15s cubic-bezier(0.4,0,0.2,1), box-shadow 0.15s cubic-bezier(0.4,0,0.2,1)",
+        transform: isCampaign ? undefined : (isSelected ? "scale(1.08)" : "scale(1)"),
         opacity: isEmptyUnfilled && emptyCellDelay != null ? 0 : (isBlank && !isFilled && !isRevealed && !isLocked && !isRemoving ? 0.45 : 1),
-        boxShadow: isEnigma ? enigmaBoxShadow
+        boxShadow: isCampaign ? campaignBoxShadow
+          : isEnigma ? enigmaBoxShadow
           : isLocked ? `0 0 14px ${C.correct}55`
           : isCorrect ? `0 0 14px ${C.correct}55`
           : isWrong ? `0 0 12px ${C.incorrect}66`
@@ -78,6 +97,7 @@ function Cell({ token, isBlank, isSelected, isFilled, isCorrect, isWrong, isReve
         animation: resolvedAnimation,
         outline: isEnigma && showContent && displayColor ? "1px solid rgba(201,168,76,0.12)" : undefined,
         outlineOffset: isEnigma ? "3px" : undefined,
+        imageRendering: isCampaign ? "pixelated" : undefined,
       }}
     >
       {showContent && parsed && shapes[parsed.shapeIndex % shapes.length](iconSize, getShapeStroke(displayColor, isEasy))}

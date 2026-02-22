@@ -1,0 +1,102 @@
+// Tile type constants for dungeon maps
+export const TILE = {
+  VOID: 0,
+  FLOOR: 1,
+  WALL: 2,
+  WALL_TOP: 3,
+  DOOR_LOCKED: 4,
+  DOOR_OPEN: 5,
+  CHEST_CLOSED: 6,
+  CHEST_OPEN: 7,
+  STAIRS_DOWN: 8,
+  STAIRS_UP: 9,
+  TRAP: 10,
+  TRAP_REVEALED: 11,
+  WATER: 12,
+  TORCH: 13,
+  DECORATION: 14,
+  NPC: 15,
+  BOSS_DOOR: 16,
+  BOSS_DOOR_OPEN: 17,
+};
+
+export const WALKABLE = new Set([
+  TILE.FLOOR, TILE.DOOR_OPEN, TILE.CHEST_OPEN, TILE.STAIRS_DOWN,
+  TILE.STAIRS_UP, TILE.TRAP, TILE.TRAP_REVEALED, TILE.TORCH,
+  TILE.DECORATION, TILE.NPC, TILE.BOSS_DOOR_OPEN,
+]);
+
+export const INTERACTABLE = new Set([
+  TILE.DOOR_LOCKED, TILE.CHEST_CLOSED, TILE.STAIRS_DOWN,
+  TILE.STAIRS_UP, TILE.NPC, TILE.BOSS_DOOR,
+]);
+
+// Tile pixel art colors per theme — each tile type maps to draw instructions
+export function getTileColors(theme) {
+  const themes = {
+    cave: {
+      void: "#000000",
+      floor: ["#1a1428", "#1c1630", "#18122a"],
+      wall: "#2a1f3d",
+      wallTop: "#3d2e5c",
+      wallShadow: "#150e22",
+      door: "#5c3a1e",
+      doorLock: "#ffd700",
+      doorOpen: "#3a2510",
+      chest: "#8b6914",
+      chestGold: "#ffd700",
+      stairs: "#4a3a6a",
+      stairsShadow: "#2a1f4a",
+      trap: "#1a1428",
+      trapSpike: "#888",
+      water: "#1a2a5c",
+      waterShimmer: "#3a5a9c",
+      torch: "#ff8c00",
+      torchGlow: "#ffa50044",
+      accent: "#7c5cbf",
+    },
+    neon: {
+      void: "#000000",
+      floor: ["#05051a", "#06061e", "#040418"],
+      wall: "#0a0a2e",
+      wallTop: "#12124a",
+      wallShadow: "#030316",
+      door: "#1a0a3a",
+      doorLock: "#ff0080",
+      doorOpen: "#0a0520",
+      chest: "#2a1a4a",
+      chestGold: "#ff0080",
+      stairs: "#1a1a4a",
+      stairsShadow: "#0a0a2a",
+      trap: "#05051a",
+      trapSpike: "#ff0040",
+      water: "#0a1a3a",
+      waterShimmer: "#0040ff",
+      torch: "#ff0080",
+      torchGlow: "#ff008044",
+      accent: "#ff0080",
+    },
+    tower: {
+      void: "#000000",
+      floor: ["#0f1a0f", "#111c11", "#0d180d"],
+      wall: "#1a2a1a",
+      wallTop: "#2a3a2a",
+      wallShadow: "#0a140a",
+      door: "#3a2a1a",
+      doorLock: "#4ade80",
+      doorOpen: "#2a1a10",
+      chest: "#6b5a14",
+      chestGold: "#4ade80",
+      stairs: "#2a3a2a",
+      stairsShadow: "#1a2a1a",
+      trap: "#0f1a0f",
+      trapSpike: "#666",
+      water: "#0a2a1a",
+      waterShimmer: "#2a6a4a",
+      torch: "#4ade80",
+      torchGlow: "#4ade8044",
+      accent: "#4ade80",
+    },
+  };
+  return themes[theme] || themes.cave;
+}

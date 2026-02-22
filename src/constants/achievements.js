@@ -60,6 +60,10 @@ export const ACHIEVEMENTS = [
   { id: "first_fail", cat: "special", label: "Trial & Error", desc: "Fail a puzzle for the first time", tier: 1, check: (p) => SOLVE_MODES.some(m => countModeFailed(p[m]) >= 1) },
   { id: "coop_1", cat: "special", label: "Better Together", desc: "Complete a puzzle in Co-op mode", tier: 1, check: (p) => countCoopSolved(p.coop) >= 1 },
   { id: "cheat_turing", cat: "special", label: "Welcome Back, Alan", desc: "Born on the day the father of computing was born", tier: 3, check: () => false },
+  // Campaign
+  { id: "campaign_floor_1", cat: "special", label: "First Steps", desc: "Complete your first campaign floor", tier: 1, check: (p) => (p.campaign?.floorsCleared || 0) >= 1 },
+  { id: "campaign_chapter", cat: "special", label: "Chapter Closed", desc: "Complete a campaign chapter", tier: 2, check: (p) => (p.campaign?.chaptersCompleted || 0) >= 1 },
+  { id: "campaign_all", cat: "special", label: "Dungeon Master", desc: "Complete all campaign chapters", tier: 3, check: (p) => (p.campaign?.chaptersCompleted || 0) >= 3 },
 ];
 
 export function computeAchievements(progress, times, savedIds) {
