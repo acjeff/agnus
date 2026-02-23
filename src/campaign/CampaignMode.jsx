@@ -479,15 +479,49 @@ export default function CampaignMode({
   }, [screen, paused]);
 
   // ─── Enemy contact damage ─────────────────
+  // When an enemy is adjacent, it attacks on a cooldown interval
+  const enemyDmgCooldownRef = useRef(0); // timestamp of last enemy hit
+  const ENEMY_ATTACK_COOLDOWN = 1200; // ms between enemy hits
+
+  // Damage per enemy type (coins lost)
+  const ENEMY_DAMAGE = { slime: 5, bat: 8, skeleton: 12, wraith: 18 };
+
   useEffect(() => {
-    if (screen !== "dungeon") return;
-    // Check if any alive enemy is adjacent to the player (Manhattan distance 1)
-    const adjacent = enemies.some(e =>
-      e.alive && Math.abs(e.x - playerPos.x) + Math.abs(e.y - playerPos.y) === 1
-    );
-    // We don't auto-damage, enemies just block and chase.
-    // Damage is through traps only for now; enemies are obstacles you attack with B.
-  }, [enemies, playerPos, screen]);
+    if (screen !== "dungeon" || paused || dialogue) return;
+
+    const CHECK_INTERVAL = 300; // check adjacency every 300ms
+    const interval = setInterval(() => {
+      const pos = playerRef.current;
+      const now = Date.now();
+      if (now - enemyDmgCooldownRef.current < ENEMY_ATTACK_COOLDOWN) return;
+
+      // Find the strongest adjacent enemy
+      const currentEnemies = enemiesRef.current;
+      let attacker = null;
+      for (const e of currentEnemies) {
+        if (!e.alive) continue;
+        if (Math.abs(e.x - pos.x) + Math.abs(e.y - pos.y) !== 1) continue;
+        if (!attacker || (ENEMY_DAMAGE[e.type] || 5) > (ENEMY_DAMAGE[attacker.type] || 5)) {
+          attacker = e;
+        }
+      }
+      if (!attacker) return;
+
+      enemyDmgCooldownRef.current = now;
+      const dmg = ENEMY_DAMAGE[attacker.type] || 5;
+      const state = { ...stateRef.current };
+      const loss = Math.min(state.inventory.coins, dmg);
+      if (loss > 0) {
+        state.inventory.coins -= loss;
+        saveAggieCoins(state.inventory.coins);
+        saveCampaignState(state);
+        setCampaignState({ ...state });
+      }
+      showNotification(`${attacker.type} attacks! -${loss} coins`, "#f87171");
+    }, CHECK_INTERVAL);
+
+    return () => clearInterval(interval);
+  }, [screen, paused, dialogue, showNotification]);
 
   // ─── Interaction ─────────────────
   const handleInteract = useCallback(() => {
