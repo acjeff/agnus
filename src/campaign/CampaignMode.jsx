@@ -15,8 +15,8 @@ import {
   addXp, addCoins, addItem,
   resetFloorCooldowns, resetChapterCooldowns,
   useAbility, getUnlockedAbilities,
+  takeDamage, healToFull,
 } from "./state/campaignState.js";
-import { saveAggieCoins } from "../aggie/state.js";
 import CampaignHUD from "./ui/CampaignHUD.jsx";
 import CampaignDialogue from "./ui/CampaignDialogue.jsx";
 import CampaignPause from "./ui/CampaignPause.jsx";
@@ -126,6 +126,8 @@ export default function CampaignMode({
   const [floorStartTime, setFloorStartTime] = useState(null);
   const [enemies, setEnemies] = useState([]); // { x, y, type, hp, maxHp, alive }
   const [attackAnim, setAttackAnim] = useState(null); // { x, y, frame } for slash effect
+  const [damageFlash, setDamageFlash] = useState(false); // red screen flash on hit
+  const [deathAnim, setDeathAnim] = useState(null); // { startTime } for death sequence
 
   // Refs
   const canvasRef = useRef(null);
@@ -155,6 +157,26 @@ export default function CampaignMode({
     setTimeout(() => setNotification(null), 2500);
   }, []);
 
+  // ─── Damage flash helper ─────────────────
+  const triggerDamageFlash = useCallback(() => {
+    setDamageFlash(true);
+    setTimeout(() => setDamageFlash(false), 300);
+  }, []);
+
+  // ─── Death handler — reset to floor 0 of current chapter ─────────────────
+  const handleDeath = useCallback(() => {
+    setDeathAnim({ startTime: Date.now() });
+
+    // After death animation, reset to floor 0
+    setTimeout(() => {
+      const state = { ...stateRef.current };
+      healToFull(state);
+      setCampaignState({ ...state });
+      setDeathAnim(null);
+      enterFloor(activeChapter, 0);
+    }, 2500);
+  }, [activeChapter]);
+
   // ─── Enter a chapter ─────────────────
   const enterChapter = useCallback((chapterId) => {
     const chapter = CAMPAIGN_CHAPTERS[chapterId];
@@ -177,6 +199,8 @@ export default function CampaignMode({
 
     setActiveChapter(chapterId);
     resetChapterCooldowns(state);
+    healToFull(state);
+    setCampaignState({ ...state });
     enterFloor(chapterId, startFloor);
   }, []);
 
@@ -348,7 +372,7 @@ export default function CampaignMode({
 
   // ─── Player movement ─────────────────
   const handleMove = useCallback((dx, dy) => {
-    if (paused || dialogue || screen !== "dungeon") return;
+    if (paused || dialogue || screen !== "dungeon" || deathAnim) return;
 
     const dg = dungeonRef.current;
     if (!dg) return;
@@ -385,7 +409,7 @@ export default function CampaignMode({
 
   // ─── Attack (B button) ─────────────────
   const handleAttack = useCallback(() => {
-    if (paused || dialogue || screen !== "dungeon") return;
+    if (paused || dialogue || screen !== "dungeon" || deathAnim) return;
 
     const pos = playerRef.current;
     const dir = { down: { x: 0, y: 1 }, up: { x: 0, y: -1 }, left: { x: -1, y: 0 }, right: { x: 1, y: 0 } };
@@ -411,6 +435,10 @@ export default function CampaignMode({
       const state = { ...stateRef.current };
       const xpGain = enemy.type === "wraith" ? 30 : enemy.type === "skeleton" ? 20 : 10;
       const coinGain = enemy.type === "wraith" ? 15 : enemy.type === "skeleton" ? 10 : 5;
+      // Heal 1 HP on kill
+      if (state.health && state.health.hp < state.health.maxHp) {
+        state.health.hp = Math.min(state.health.maxHp, state.health.hp + 1);
+      }
       addXp(state, xpGain);
       addCoins(state, coinGain);
       setCampaignState({ ...state });
@@ -483,11 +511,11 @@ export default function CampaignMode({
   const enemyDmgCooldownRef = useRef(0); // timestamp of last enemy hit
   const ENEMY_ATTACK_COOLDOWN = 1200; // ms between enemy hits
 
-  // Damage per enemy type (coins lost)
-  const ENEMY_DAMAGE = { slime: 5, bat: 8, skeleton: 12, wraith: 18 };
+  // Damage per enemy type (HP lost)
+  const ENEMY_DAMAGE = { bat: 1, skeleton: 2, wraith: 3 };
 
   useEffect(() => {
-    if (screen !== "dungeon" || paused || dialogue) return;
+    if (screen !== "dungeon" || paused || dialogue || deathAnim) return;
 
     const CHECK_INTERVAL = 300; // check adjacency every 300ms
     const interval = setInterval(() => {
@@ -501,31 +529,31 @@ export default function CampaignMode({
       for (const e of currentEnemies) {
         if (!e.alive) continue;
         if (Math.abs(e.x - pos.x) + Math.abs(e.y - pos.y) !== 1) continue;
-        if (!attacker || (ENEMY_DAMAGE[e.type] || 5) > (ENEMY_DAMAGE[attacker.type] || 5)) {
+        if (!attacker || (ENEMY_DAMAGE[e.type] || 1) > (ENEMY_DAMAGE[attacker.type] || 1)) {
           attacker = e;
         }
       }
       if (!attacker) return;
 
       enemyDmgCooldownRef.current = now;
-      const dmg = ENEMY_DAMAGE[attacker.type] || 5;
+      const dmg = ENEMY_DAMAGE[attacker.type] || 1;
       const state = { ...stateRef.current };
-      const loss = Math.min(state.inventory.coins, dmg);
-      if (loss > 0) {
-        state.inventory.coins -= loss;
-        saveAggieCoins(state.inventory.coins);
-        saveCampaignState(state);
-        setCampaignState({ ...state });
+      const died = takeDamage(state, dmg);
+      setCampaignState({ ...state });
+      triggerDamageFlash();
+      showNotification(`${attacker.type} attacks! -${dmg} HP`, "#f87171");
+
+      if (died) {
+        handleDeath();
       }
-      showNotification(`${attacker.type} attacks! -${loss} coins`, "#f87171");
     }, CHECK_INTERVAL);
 
     return () => clearInterval(interval);
-  }, [screen, paused, dialogue, showNotification]);
+  }, [screen, paused, dialogue, deathAnim, showNotification, triggerDamageFlash, handleDeath]);
 
   // ─── Interaction ─────────────────
   const handleInteract = useCallback(() => {
-    if (paused || screen !== "dungeon") return;
+    if (paused || screen !== "dungeon" || deathAnim) return;
 
     // If dialogue is showing, ignore (dialogue handles its own taps)
     if (dialogue) return;
@@ -764,7 +792,7 @@ export default function CampaignMode({
 
   // ─── Trap handler ─────────────────
   const handleTrap = useCallback((tx, ty) => {
-    const state = stateRef.current;
+    const state = { ...stateRef.current };
     const abilities = getUnlockedAbilities(state);
     const hasTrapSense = abilities.some(a => a.id === "trap_sense");
 
@@ -777,19 +805,19 @@ export default function CampaignMode({
     if (hasTrapSense) {
       showNotification("Aggie sensed the trap! No damage.", "#9a96cc");
     } else {
-      // Lose some coins (syncs to shared coin store)
-      const loss = Math.min(state.inventory.coins, 10);
-      state.inventory.coins -= loss;
-      saveAggieCoins(state.inventory.coins);
-      saveCampaignState(state);
+      const died = takeDamage(state, 1);
       setCampaignState({ ...state });
-      showNotification(`Trap! Lost ${loss} coins.`, "#f87171");
+      triggerDamageFlash();
+      showNotification("Trap! -1 HP", "#f87171");
       setDialogue({
         lines: [pickLine(simpleRng, "trapTriggered")],
         portrait: "\u{1F47E}",
       });
+      if (died) {
+        handleDeath();
+      }
     }
-  }, [showNotification]);
+  }, [showNotification, triggerDamageFlash, handleDeath]);
 
   // ─── Stairs down (requires puzzle to unlock) ─────────────────
   const handleStairsDown = useCallback(() => {
@@ -1118,10 +1146,61 @@ export default function CampaignMode({
         </div>
       )}
 
+      {/* Damage flash overlay */}
+      {damageFlash && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 30,
+          background: "rgba(248,113,113,0.35)",
+          pointerEvents: "none",
+          animation: "damageFlash 0.3s ease-out forwards",
+        }} />
+      )}
+
+      {/* Death animation overlay */}
+      {deathAnim && (
+        <div style={{
+          position: "absolute", inset: 0, zIndex: 40,
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          pointerEvents: "none",
+          animation: "deathFadeIn 0.8s ease-in forwards",
+          background: "rgba(0,0,0,0)",
+        }}>
+          <div style={{
+            fontFamily: PIXEL_FONT, fontSize: 10, color: "#f87171",
+            textShadow: "0 0 8px #f87171, 0 0 20px rgba(248,113,113,0.5)",
+            animation: "deathTextIn 0.6s ease-out 0.5s both",
+            letterSpacing: 2,
+          }}>
+            DEFEATED
+          </div>
+          <div style={{
+            fontFamily: PIXEL_FONT, fontSize: 5, color: "#aaa",
+            animation: "deathTextIn 0.6s ease-out 1.2s both",
+            marginTop: 8,
+          }}>
+            Returning to Floor 1...
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes notifIn {
           from { opacity: 0; transform: translateX(-50%) translateY(-8px); }
           to { opacity: 1; transform: translateX(-50%) translateY(0); }
+        }
+        @keyframes damageFlash {
+          0% { opacity: 1; }
+          100% { opacity: 0; }
+        }
+        @keyframes deathFadeIn {
+          0% { background: rgba(139,0,0,0); }
+          40% { background: rgba(139,0,0,0.5); }
+          100% { background: rgba(0,0,0,0.95); }
+        }
+        @keyframes deathTextIn {
+          from { opacity: 0; transform: scale(1.5); }
+          to { opacity: 1; transform: scale(1); }
         }
       `}</style>
     </GameBoyShell>

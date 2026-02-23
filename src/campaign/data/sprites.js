@@ -146,7 +146,6 @@ export function drawSpriteFromArt(ctx, art, palette, x, y, scale) {
 
 // Enemy sprite configs
 const ENEMY_CONFIG = {
-  slime: { color: "#2a8a4a", eyeColor: "#fff", shadowColor: "#1a5a2a" },
   bat: { color: "#5a3a6a", eyeColor: "#ff4444", shadowColor: "#3a1a4a" },
   skeleton: { color: "#d0c8b8", eyeColor: "#ff2200", shadowColor: "#8a8070" },
   wraith: { color: "#4a2a6a", eyeColor: "#cc88ff", shadowColor: "#2a1a4a" },
@@ -154,46 +153,13 @@ const ENEMY_CONFIG = {
 
 // Draw an enemy sprite on the canvas
 export function drawEnemySprite(ctx, type, x, y, tileSize, frame, hp, maxHp) {
-  const config = ENEMY_CONFIG[type] || ENEMY_CONFIG.slime;
+  const config = ENEMY_CONFIG[type] || ENEMY_CONFIG.bat;
   const s = Math.floor(tileSize / 16);
   const cx = x + tileSize / 2;
   const cy = y + tileSize / 2;
   const bobOffset = Math.sin(frame * 0.06 + (type === "bat" ? 1.5 : 0)) * 2 * s;
 
-  if (type === "slime") {
-    // Bouncy slime blob
-    const squish = 1 + Math.sin(frame * 0.1) * 0.1;
-    const r = 6 * s;
-    ctx.fillStyle = config.shadowColor;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + bobOffset + 2 * s, r * 1.1, r * 0.4 / squish, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = config.color;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + bobOffset, r * squish, r / squish, 0, 0, Math.PI * 2);
-    ctx.fill();
-    // Highlight
-    ctx.fillStyle = config.color + "88";
-    ctx.beginPath();
-    ctx.ellipse(cx - 2 * s, cy + bobOffset - 2 * s, 2 * s, 1.5 * s, -0.3, 0, Math.PI * 2);
-    ctx.fill();
-    // Eyes
-    ctx.fillStyle = config.eyeColor;
-    ctx.beginPath();
-    ctx.arc(cx - 2 * s, cy + bobOffset - 1 * s, 1.5 * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(cx + 2 * s, cy + bobOffset - 1 * s, 1.5 * s, 0, Math.PI * 2);
-    ctx.fill();
-    // Pupils
-    ctx.fillStyle = "#111";
-    ctx.beginPath();
-    ctx.arc(cx - 1.5 * s, cy + bobOffset - 0.5 * s, 0.8 * s, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(cx + 2.5 * s, cy + bobOffset - 0.5 * s, 0.8 * s, 0, Math.PI * 2);
-    ctx.fill();
-  } else if (type === "bat") {
+  if (type === "bat") {
     // Flapping bat
     const wingAngle = Math.sin(frame * 0.15) * 0.6;
     // Body

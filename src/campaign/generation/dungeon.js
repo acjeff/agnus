@@ -270,12 +270,12 @@ function placeEnemies(map, mapW, rooms, rng, count, floorDifficulty) {
       if (map[idx] === TILE.FLOOR) {
         // Pick enemy type based on difficulty
         const types = floorDifficulty >= 3
-          ? ["slime", "bat", "skeleton", "wraith"]
+          ? ["bat", "skeleton", "wraith"]
           : floorDifficulty >= 2
-          ? ["slime", "bat", "skeleton"]
-          : ["slime", "bat"];
+          ? ["bat", "skeleton"]
+          : ["bat"];
         const type = types[randInt(rng, 0, types.length - 1)];
-        const hp = type === "slime" ? 1 : type === "bat" ? 1 : type === "skeleton" ? 2 : 3;
+        const hp = type === "bat" ? 1 : type === "skeleton" ? 2 : 3;
         enemies.push({ x: ex, y: ey, type, hp, maxHp: hp, alive: true });
         break;
       }
