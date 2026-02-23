@@ -21,8 +21,23 @@ import CampaignHUD from "./ui/CampaignHUD.jsx";
 import CampaignDialogue from "./ui/CampaignDialogue.jsx";
 import CampaignPause from "./ui/CampaignPause.jsx";
 import GameBoyShell from "./ui/GameBoyShell.jsx";
+import Win95Shell from "./ui/Win95Shell.jsx";
 
 const PIXEL_FONT = "'Press Start 2P', monospace";
+const DESKTOP_BREAKPOINT = 768;
+
+// Hook: detect desktop viewport
+function useIsDesktop() {
+  const [isDesktop, setIsDesktop] = useState(
+    () => typeof window !== "undefined" && window.innerWidth >= DESKTOP_BREAKPOINT
+  );
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= DESKTOP_BREAKPOINT);
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
+  return isDesktop;
+}
 const VISIBILITY_RADIUS = 6;
 
 // Aggie dialogue lines per context
@@ -109,6 +124,9 @@ export default function CampaignMode({
   aggieDebuff,     // active debuff from main game { type, charges }
   aggieHappiness,  // current happiness (0-100) from main game
 }) {
+  // ─── Desktop detection ─────────────────
+  const isDesktop = useIsDesktop();
+
   // ─── State ─────────────────────────────
   const [campaignState, setCampaignState] = useState(() => loadCampaignState());
   const [screen, setScreen] = useState("chapter-select"); // "chapter-select" | "dungeon" | "puzzle" | "transition"
@@ -1045,21 +1063,24 @@ export default function CampaignMode({
       </div>
     );
 
+    const ShellComponent = isDesktop ? Win95Shell : GameBoyShell;
     return (
-      <GameBoyShell
+      <ShellComponent
         screenContent={menuScreenContent}
         onDpadPress={handleMenuDpad}
         onButtonA={handleMenuA}
         onButtonB={handleMenuB}
         onStart={handleMenuA}
         onSelect={handleMenuB}
+        title="Campaign - Chapter Select"
       />
     );
   }
 
-  // ─── Dungeon view (inside Game Boy shell) ─────────────────
+  // ─── Dungeon view (inside shell — Win95 on desktop, GameBoy on mobile) ──
+  const DungeonShell = isDesktop ? Win95Shell : GameBoyShell;
   return (
-    <GameBoyShell
+    <DungeonShell
       canvasRef={canvasRef}
       onDpadPress={(dx, dy) => {
         if (paused && pauseDpadRef.current) {
@@ -1088,6 +1109,7 @@ export default function CampaignMode({
       }}
       onStart={() => setPaused(p => !p)}
       onSelect={() => setPaused(p => !p)}
+      title={`Campaign - ${CAMPAIGN_CHAPTERS[activeChapter]?.name || "Dungeon"}`}
     >
       {/* All overlays render inside the screen area */}
 
