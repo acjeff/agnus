@@ -1,4 +1,4 @@
-// Canvas rendering engine for campaign dungeon crawler
+// Canvas rendering engine for campaign mode
 // Handles: canvas setup, camera, render loop, tile drawing, lighting
 
 import { TILE, getTileColors } from "../data/tiles.js";
@@ -22,7 +22,7 @@ export function createCampaignEngine(canvasEl, theme) {
   let camY = 0;
   let camTargetX = 0;
   let camTargetY = 0;
-  const CAM_LERP = 0.12;
+  const CAM_LERP = 0.12; // tuned for ~60fps; normalized in updateCamera()
 
   // Current dungeon map
   let map = null;
@@ -35,7 +35,7 @@ export function createCampaignEngine(canvasEl, theme) {
 
   // Smooth entity position tracking
   const entityVisualPos = new Map(); // id -> { vx, vy }
-  const ENTITY_LERP = 0.25;
+  const DEFAULT_SMOOTH_MS = 120; // match input repeat so held movement feels continuous
 
   // Animation frame counter
   let frame = 0;
@@ -93,12 +93,6 @@ export function createCampaignEngine(canvasEl, theme) {
 
   function setVisible(visibleSet) {
     visible = visibleSet;
-  }
-
-  // Update camera with smooth lerp
-  function updateCamera() {
-    camX += (camTargetX - camX) * CAM_LERP;
-    camY += (camTargetY - camY) * CAM_LERP;
   }
 
   // Calculate visibility from player position
@@ -316,6 +310,16 @@ export function createCampaignEngine(canvasEl, theme) {
         ctx.fillRect(screenX + 8 * scale, screenY + 11 * scale, 4 * scale, 2 * scale);
         break;
 
+      case TILE.NPC:
+        // Floor underneath
+        ctx.fillStyle = colors.floor[0];
+        ctx.fillRect(screenX, screenY, ts, ts);
+        // Simple "person" marker (actual sprite is an entity)
+        ctx.fillStyle = colors.accent;
+        ctx.fillRect(screenX + 7 * scale, screenY + 5 * scale, 2 * scale, 2 * scale);
+        ctx.fillRect(screenX + 6 * scale, screenY + 7 * scale, 4 * scale, 4 * scale);
+        break;
+
       case TILE.BOSS_DOOR:
         ctx.fillStyle = colors.floor[0];
         ctx.fillRect(screenX, screenY, ts, ts);
@@ -347,8 +351,23 @@ export function createCampaignEngine(canvasEl, theme) {
     }
   }
 
+  function lerpFactorForDt(baseFactor, dtMs) {
+    // Convert a per-frame factor into a dt-normalized factor.
+    // baseFactor is calibrated at ~16.67ms (60fps).
+    const frameMs = 1000 / 60;
+    const t = Math.max(0, dtMs) / frameMs;
+    return 1 - Math.pow(1 - baseFactor, t);
+  }
+
+  // Update camera with smooth lerp
+  function updateCamera(dtMs) {
+    const f = lerpFactorForDt(CAM_LERP, dtMs);
+    camX += (camTargetX - camX) * f;
+    camY += (camTargetY - camY) * f;
+  }
+
   // Main render function
-  function render() {
+  function render(dtMs) {
     ctx.clearRect(0, 0, viewportW, viewportH);
 
     // Fill background with void
@@ -392,20 +411,34 @@ export function createCampaignEngine(canvasEl, theme) {
       }
     }
 
-    // Update smooth entity positions
+    // Update smooth entity positions (constant-speed, dt-based)
     for (const entity of entities) {
-      if (entity.smooth) {
-        const id = entity.id || "default";
-        let vp = entityVisualPos.get(id);
-        if (!vp) {
-          vp = { vx: entity.x, vy: entity.y };
-          entityVisualPos.set(id, vp);
-        }
-        vp.vx += (entity.x - vp.vx) * ENTITY_LERP;
-        vp.vy += (entity.y - vp.vy) * ENTITY_LERP;
-        // Snap when very close to avoid permanent drift
-        if (Math.abs(entity.x - vp.vx) < 0.01) vp.vx = entity.x;
-        if (Math.abs(entity.y - vp.vy) < 0.01) vp.vy = entity.y;
+      if (!entity.smooth) continue;
+      const id = entity.id || "default";
+      let vp = entityVisualPos.get(id);
+      if (!vp) {
+        vp = { vx: entity.x, vy: entity.y };
+        entityVisualPos.set(id, vp);
+        continue;
+      }
+
+      const targetX = entity.x;
+      const targetY = entity.y;
+      const dx = targetX - vp.vx;
+      const dy = targetY - vp.vy;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 1e-6) continue;
+
+      const smoothMs = Math.max(16, entity.smoothMs || DEFAULT_SMOOTH_MS);
+      const speedTilesPerSec = 1000 / smoothMs;
+      const maxStep = speedTilesPerSec * (Math.min(50, Math.max(0, dtMs)) / 1000);
+
+      if (dist <= maxStep) {
+        vp.vx = targetX;
+        vp.vy = targetY;
+      } else {
+        vp.vx += (dx / dist) * maxStep;
+        vp.vy += (dy / dist) * maxStep;
       }
     }
 
@@ -437,19 +470,23 @@ export function createCampaignEngine(canvasEl, theme) {
   }
 
   // Game loop
-  function tick() {
-    updateCamera();
-    render();
-    if (running) {
-      rafId = requestAnimationFrame(tick);
-    }
+  let lastTickTs = null;
+  function tick(ts) {
+    if (lastTickTs == null) lastTickTs = ts;
+    const dtMs = ts - lastTickTs;
+    lastTickTs = ts;
+
+    updateCamera(dtMs);
+    render(dtMs);
+    if (running) rafId = requestAnimationFrame(tick);
   }
 
   function start() {
     if (running) return;
     running = true;
     resize();
-    tick();
+    lastTickTs = null;
+    rafId = requestAnimationFrame(tick);
   }
 
   function stop() {
@@ -458,6 +495,7 @@ export function createCampaignEngine(canvasEl, theme) {
       cancelAnimationFrame(rafId);
       rafId = null;
     }
+    lastTickTs = null;
   }
 
   function destroy() {

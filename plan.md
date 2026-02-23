@@ -1,7 +1,7 @@
 # Campaign Mode Implementation Plan
 
 ## Overview
-A dungeon crawler campaign mode with Pokemon-aesthetic pixel art, rendered on HTML5 Canvas. Procedurally generated dungeons where puzzles unlock doors and chests. Aggie accompanies you as an active party member who evolves and gains abilities through campaign progress.
+A campaign mode with Pokemon-aesthetic pixel art, rendered on HTML5 Canvas. Procedurally generated dungeons where puzzles unlock doors and chests. Aggie accompanies you as an active party member who evolves and gains abilities through campaign progress.
 
 ---
 
@@ -335,7 +335,7 @@ if (view === "campaign") {
 ### 7c. Add to difficulties
 ```javascript
 // In constants/difficulties.js
-{ key: "campaign", label: "Campaign", desc: "Dungeon Crawler", cat: "adventure", icon: "map" }
+{ key: "campaign", label: "Glyphwalk", desc: "Adventure", cat: "adventure", icon: "map" }
 ```
 
 ### 7d. Add to Aggie rewards

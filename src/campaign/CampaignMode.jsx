@@ -1,10 +1,11 @@
-// CampaignMode — Main campaign dungeon crawler component
+// CampaignMode — Main campaign mode component
 // Manages: dungeon state, canvas lifecycle, player movement, puzzle transitions
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { CAMPAIGN_CHAPTERS, DIFFICULTY_CONFIG, CHEST_LOOT } from "./data/chapters.js";
 import { TILE, WALKABLE, INTERACTABLE } from "./data/tiles.js";
 import { generateDungeon } from "./generation/dungeon.js";
+import { generateTown } from "./generation/town.js";
 import { createCampaignEngine } from "./engine/canvas.js";
 import { createInputHandler } from "./engine/input.js";
 import { drawAggieSprite, drawEnemySprite } from "./data/sprites.js";
@@ -12,7 +13,7 @@ import {
   loadCampaignState, saveCampaignState,
   getChapterState, getFloorState,
   solveDoor, openChest, completeFloor, completeChapter,
-  addXp, addCoins, addItem,
+  addXp, addCoins, spendCoins, addItem,
   resetFloorCooldowns, resetChapterCooldowns,
   useAbility, getUnlockedAbilities,
   takeDamage, healToFull,
@@ -20,10 +21,39 @@ import {
 import CampaignHUD from "./ui/CampaignHUD.jsx";
 import CampaignDialogue from "./ui/CampaignDialogue.jsx";
 import CampaignPause from "./ui/CampaignPause.jsx";
+import CampaignShop from "./ui/CampaignShop.jsx";
 import GameBoyShell from "./ui/GameBoyShell.jsx";
 
 const PIXEL_FONT = "'Press Start 2P', monospace";
 const VISIBILITY_RADIUS = 6;
+const STEP_MS = 140; // Pokemon-like grid step duration
+
+const TOWN_SHOPS = {
+  inn: {
+    id: "inn",
+    title: "The Cozy Inn",
+    subtitle: "Rest to full HP.",
+    items: [
+      { id: "rest", label: "Rest (Full Heal)", cost: 20, kind: "heal_full" },
+    ],
+  },
+  items: {
+    id: "items",
+    title: "Item Shop",
+    subtitle: "Stock up for the road.",
+    items: [
+      { id: "potion", label: "Potion (+1)", cost: 25, kind: "potion", amount: 1 },
+    ],
+  },
+  keys: {
+    id: "keys",
+    title: "Keysmith",
+    subtitle: "For doors that bite back.",
+    items: [
+      { id: "key", label: "Skeleton Key (+1)", cost: 40, kind: "key", amount: 1 },
+    ],
+  },
+};
 
 // Aggie dialogue lines per context
 const AGGIE_LINES = {
@@ -121,6 +151,7 @@ export default function CampaignMode({
   const [activeChapter, setActiveChapter] = useState(null);
   const [activeFloor, setActiveFloor] = useState(null);
   const [dungeon, setDungeon] = useState(null);
+  const [town, setTown] = useState(() => generateTown());
   const [playerPos, setPlayerPos] = useState({ x: 0, y: 0 });
   const [playerDir, setPlayerDir] = useState("down");
   const [floorStartTime, setFloorStartTime] = useState(null);
@@ -128,6 +159,7 @@ export default function CampaignMode({
   const [attackAnim, setAttackAnim] = useState(null); // { x, y, frame } for slash effect
   const [damageFlash, setDamageFlash] = useState(false); // red screen flash on hit
   const [deathAnim, setDeathAnim] = useState(null); // { startTime } for death sequence
+  const [shop, setShop] = useState(null); // { id, title, subtitle, items }
 
   // Refs
   const canvasRef = useRef(null);
@@ -135,10 +167,24 @@ export default function CampaignMode({
   const inputRef = useRef(null);
   const stateRef = useRef(campaignState);
   const dungeonRef = useRef(dungeon);
+  const townRef = useRef(town);
   const playerRef = useRef(playerPos);
-  const exploredRef = useRef(new Set());
+  const playerVisualRef = useRef({ x: 0, y: 0 });
+  const moveRef = useRef(null); // { fromX, fromY, toX, toY, startTs, durationMs }
+  const playerDirRef = useRef(playerDir);
+  const tapDirRef = useRef(null); // { dx, dy } one-shot move (touch/mouse)
+  const desiredDirRef = useRef({ dx: 0, dy: 0 }); // keyboard-held direction intent
+  const handleTrapRef = useRef(null);
+  const handleStairsDownRef = useRef(null);
+  const dungeonReturnRef = useRef(null); // { chapterId, floorIdx } when entering town
+  const dungeonPosRef = useRef(null);
+  const townPosRef = useRef(null);
+  const dungeonExploredRef = useRef(new Set());
+  const townExploredRef = useRef(new Set());
+  const exploredRef = useRef(dungeonExploredRef.current);
   const dialogueAdvanceRef = useRef(null);
   const enemiesRef = useRef(enemies);
+  const attackAnimRef = useRef(attackAnim);
 
   // Pause menu handler refs (CampaignPause writes its handlers here)
   const pauseDpadRef = useRef(null);
@@ -148,8 +194,11 @@ export default function CampaignMode({
   // Keep refs in sync
   useEffect(() => { stateRef.current = campaignState; }, [campaignState]);
   useEffect(() => { dungeonRef.current = dungeon; }, [dungeon]);
+  useEffect(() => { townRef.current = town; }, [town]);
   useEffect(() => { playerRef.current = playerPos; }, [playerPos]);
+  useEffect(() => { playerDirRef.current = playerDir; }, [playerDir]);
   useEffect(() => { enemiesRef.current = enemies; }, [enemies]);
+  useEffect(() => { attackAnimRef.current = attackAnim; }, [attackAnim]);
 
   // ─── Notification helper ─────────────────
   const showNotification = useCallback((text, color) => {
@@ -213,10 +262,14 @@ export default function CampaignMode({
     setDungeon(dg);
     setPlayerPos(dg.playerStart);
     setPlayerDir("down");
+    playerRef.current = dg.playerStart;
+    playerVisualRef.current = { x: dg.playerStart.x, y: dg.playerStart.y };
+    moveRef.current = null;
     setFloorStartTime(Date.now());
     setEnemies(dg.enemies || []);
     setScreen("dungeon");
-    exploredRef.current = new Set();
+    dungeonExploredRef.current = new Set();
+    exploredRef.current = dungeonExploredRef.current;
 
     // Reset floor cooldowns
     const state = stateRef.current;
@@ -234,17 +287,24 @@ export default function CampaignMode({
 
   // ─── Canvas lifecycle ─────────────────
   useEffect(() => {
-    if (screen !== "dungeon" || !canvasRef.current || !dungeon) return;
+    if ((screen !== "dungeon" && screen !== "town") || !canvasRef.current) return;
+
+    const world = screen === "town" ? townRef.current : dungeon;
+    if (!world) return;
 
     const chapter = CAMPAIGN_CHAPTERS[activeChapter];
-    const engine = createCampaignEngine(canvasRef.current, chapter?.theme || "cave");
+    const theme = screen === "town" ? (world.theme || "tower") : (chapter?.theme || "cave");
+    const engine = createCampaignEngine(canvasRef.current, theme);
     engineRef.current = engine;
 
-    engine.setMap(dungeon.map, dungeon.width, dungeon.height);
-    engine.setCamera(playerPos.x, playerPos.y, true);
+    engine.setMap(world.map, world.width, world.height);
+    const startPos = playerRef.current;
+    playerVisualRef.current = { x: startPos.x, y: startPos.y };
+    moveRef.current = null;
+    engine.setCamera(startPos.x, startPos.y, true);
 
     // Compute initial visibility
-    engine.computeVisibility(playerPos.x, playerPos.y, VISIBILITY_RADIUS);
+    engine.computeVisibility(startPos.x, startPos.y, screen === "town" ? 999 : VISIBILITY_RADIUS);
     engine.setExplored(exploredRef.current);
 
     engine.start();
@@ -255,127 +315,26 @@ export default function CampaignMode({
     };
   }, [screen, dungeon, activeChapter]);
 
-  // ─── Update engine entities & camera on player move ─────
+  // ─── Visibility updates (tile-based) ─────
   useEffect(() => {
     const engine = engineRef.current;
-    if (!engine || !dungeon) return;
+    if (!engine || (screen !== "dungeon" && screen !== "town")) return;
+    engine.computeVisibility(playerPos.x, playerPos.y, screen === "town" ? 999 : VISIBILITY_RADIUS);
+    engine.setExplored(exploredRef.current);
+  }, [playerPos, dungeon, screen]);
 
-    engine.setCamera(playerPos.x, playerPos.y);
-    const vis = engine.computeVisibility(playerPos.x, playerPos.y, VISIBILITY_RADIUS);
+  function easeStep(t) {
+    // Smoothstep (ease-in-out) for more "Pokemon" feel
+    return t * t * (3 - 2 * t);
+  }
 
-    // Build entity list
-    const entities = [];
+  const tryBeginStepMove = useCallback((dx, dy, nowTs) => {
+    if (dx === 0 && dy === 0) return false;
+    if (paused || dialogue || shop || (screen !== "dungeon" && screen !== "town") || deathAnim) return false;
+    if (moveRef.current) return false;
 
-    // Player is Aggie — faces the direction they're moving
-    const currentDir = playerDir;
-    entities.push({
-      id: "player",
-      x: playerPos.x,
-      y: playerPos.y,
-      alwaysVisible: true,
-      smooth: true,
-      draw: (ctx, sx, sy, ts, frame) => {
-        drawAggieSprite(ctx, stateRef.current.aggie.evolutionStage, sx, sy, ts, frame, currentDir);
-      },
-    });
-
-    // Enemies
-    const currentEnemies = enemiesRef.current;
-    currentEnemies.forEach((enemy, idx) => {
-      if (!enemy.alive) return;
-      entities.push({
-        id: `enemy-${idx}`,
-        x: enemy.x,
-        y: enemy.y,
-        smooth: true,
-        draw: (ctx, sx, sy, ts, frame) => {
-          drawEnemySprite(ctx, enemy.type, sx, sy, ts, frame, enemy.hp, enemy.maxHp);
-        },
-      });
-    });
-
-    // Attack slash animation — travels from Aggie toward target
-    const atk = attackAnim;
-    if (atk) {
-      // We render this as a separate entity at the target, but offset the visuals
-      // to sweep from the player (fromX/fromY) toward the target (x/y)
-      entities.push({
-        id: "attack-slash",
-        x: atk.x,
-        y: atk.y,
-        alwaysVisible: true,
-        draw: (ctx, sx, sy, ts) => {
-          const s = Math.floor(ts / 16);
-          const progress = (Date.now() - atk.startTime) / 280; // 280ms animation
-          if (progress >= 1) return;
-
-          // Direction offset: slash sweeps from Aggie's tile toward target
-          const dx = atk.x - atk.fromX;
-          const dy = atk.y - atk.fromY;
-          // Start position: edge of Aggie's tile, end: center of target tile
-          const startX = sx + ts / 2 - dx * ts * 0.5;
-          const startY = sy + ts / 2 - dy * ts * 0.5;
-          const endX = sx + ts / 2;
-          const endY = sy + ts / 2;
-          const cx = startX + (endX - startX) * Math.min(1, progress * 1.5);
-          const cy = startY + (endY - startY) * Math.min(1, progress * 1.5);
-
-          // Rotation angle based on attack direction
-          const angle = Math.atan2(dy, dx);
-
-          ctx.save();
-          ctx.translate(cx, cy);
-          ctx.rotate(angle);
-
-          // Slash arc — sweeps across
-          ctx.globalAlpha = 1 - progress * 0.8;
-          ctx.strokeStyle = "#fff";
-          ctx.lineWidth = 2.5 * s;
-          ctx.beginPath();
-          const r = ts * 0.35 * (0.4 + progress * 0.6);
-          ctx.arc(0, 0, r, -Math.PI * 0.5, Math.PI * 0.5);
-          ctx.stroke();
-
-          // Inner energy line
-          ctx.strokeStyle = "#9a96cc";
-          ctx.lineWidth = 1.5 * s;
-          ctx.beginPath();
-          ctx.arc(0, 0, r * 0.6, -Math.PI * 0.4, Math.PI * 0.4);
-          ctx.stroke();
-
-          // Sparkle trail particles
-          ctx.fillStyle = "#ffd700";
-          for (let i = 0; i < 4; i++) {
-            const sparkAngle = -0.4 + i * 0.27;
-            const sr = r * (0.6 + progress * 0.6);
-            const sparkX = Math.cos(sparkAngle) * sr;
-            const sparkY = Math.sin(sparkAngle) * sr;
-            const sparkSize = s * (1.5 - progress);
-            ctx.fillRect(sparkX - sparkSize / 2, sparkY - sparkSize / 2, sparkSize, sparkSize);
-          }
-
-          // Glowing eye-color energy burst at leading edge
-          ctx.fillStyle = "#dddcf0";
-          ctx.globalAlpha = (1 - progress) * 0.6;
-          ctx.beginPath();
-          ctx.arc(r * 0.3, 0, s * 2 * (1 - progress * 0.5), 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.globalAlpha = 1;
-          ctx.restore();
-        },
-      });
-    }
-
-    engine.setEntities(entities);
-  }, [playerPos, playerDir, dungeon, enemies, attackAnim]);
-
-  // ─── Player movement ─────────────────
-  const handleMove = useCallback((dx, dy) => {
-    if (paused || dialogue || screen !== "dungeon" || deathAnim) return;
-
-    const dg = dungeonRef.current;
-    if (!dg) return;
+    const world = screen === "town" ? townRef.current : dungeonRef.current;
+    if (!world) return false;
 
     const pos = playerRef.current;
     const newX = pos.x + dx;
@@ -388,24 +347,205 @@ export default function CampaignMode({
     else if (dx > 0) setPlayerDir("right");
 
     // Bounds check
-    if (newX < 0 || newX >= dg.width || newY < 0 || newY >= dg.height) return;
+    if (newX < 0 || newX >= world.width || newY < 0 || newY >= world.height) return false;
 
-    const tileType = dg.map[newY * dg.width + newX];
+    const tileType = world.map[newY * world.width + newX];
 
     // Can we walk there?
-    if (WALKABLE.has(tileType)) {
-      // Block if an alive enemy is there
+    if (!WALKABLE.has(tileType)) return false;
+
+    // Block if an alive enemy is there
+    if (screen === "dungeon") {
       const blocked = enemiesRef.current.some(e => e.alive && e.x === newX && e.y === newY);
-      if (blocked) return;
-
-      setPlayerPos({ x: newX, y: newY });
-
-      // Check for trap
-      if (tileType === TILE.TRAP) {
-        handleTrap(newX, newY);
-      }
+      if (blocked) return false;
     }
-  }, [paused, dialogue, screen]);
+
+    const durationMs = STEP_MS;
+    // Ensure the visual starts from the latest committed tile position
+    playerVisualRef.current = { x: pos.x, y: pos.y };
+    moveRef.current = { fromX: pos.x, fromY: pos.y, toX: newX, toY: newY, startTs: nowTs, durationMs };
+    return true;
+  }, [paused, dialogue, shop, screen, deathAnim]);
+
+  const handleKeyboardDirChange = useCallback((dx, dy) => {
+    desiredDirRef.current = { dx, dy };
+    if (dx === 0 && dy === 0) return;
+    // Try to start moving immediately (no wait for next animation frame)
+    tryBeginStepMove(dx, dy, performance.now());
+  }, [tryBeginStepMove]);
+
+  // ─── Continuous movement + engine sync loop ─────
+  useEffect(() => {
+    if (screen !== "dungeon" && screen !== "town") return;
+
+    let raf = null;
+    let lastTs = null;
+
+    const tick = (ts) => {
+      raf = requestAnimationFrame(tick);
+
+      const engine = engineRef.current;
+      const dg = screen === "town" ? townRef.current : dungeonRef.current;
+      if (!engine || !dg) return;
+      if (lastTs == null) lastTs = ts;
+      lastTs = ts;
+
+      const desired = desiredDirRef.current;
+
+      // Advance an in-flight step move
+      const mv = moveRef.current;
+      if (mv && !paused && !dialogue && !shop && !deathAnim) {
+        const rawT = mv.durationMs > 0
+          ? Math.min(1, Math.max(0, (ts - mv.startTs) / mv.durationMs))
+          : 1;
+        const t = easeStep(rawT);
+        const vx = mv.fromX + (mv.toX - mv.fromX) * t;
+        const vy = mv.fromY + (mv.toY - mv.fromY) * t;
+        playerVisualRef.current = { x: vx, y: vy };
+
+        if (t >= 1) {
+          playerVisualRef.current = { x: mv.toX, y: mv.toY };
+          moveRef.current = null;
+          playerRef.current = { x: mv.toX, y: mv.toY };
+          setPlayerPos({ x: mv.toX, y: mv.toY });
+
+          // Trap check on arrival
+          if (screen === "dungeon") {
+            const tileType = dg.map[mv.toY * dg.width + mv.toX];
+            if (tileType === TILE.TRAP) {
+              if (handleTrapRef.current) handleTrapRef.current(mv.toX, mv.toY);
+            }
+          }
+        }
+      }
+
+      // Start a new step move when idle (keyboard-held direction)
+      if (!moveRef.current && !paused && !dialogue && !shop && !deathAnim) {
+        const tapDir = tapDirRef.current;
+        const dx = tapDir ? tapDir.dx : desired.dx;
+        const dy = tapDir ? tapDir.dy : desired.dy;
+
+        if (tapDir) tapDirRef.current = null;
+
+        if (dx !== 0 || dy !== 0) tryBeginStepMove(dx, dy, ts);
+      }
+
+      // Camera follows visual position
+      const pv = playerVisualRef.current;
+      engine.setCamera(pv.x, pv.y);
+
+      // Build entity list (render-time positions)
+      const entities = [];
+      const currentDir = playerDirRef.current;
+      entities.push({
+        id: "player",
+        x: pv.x,
+        y: pv.y,
+        alwaysVisible: true,
+        smooth: false,
+        draw: (ctx, sx, sy, ts2, frame) => {
+          drawAggieSprite(ctx, stateRef.current.aggie.evolutionStage, sx, sy, ts2, frame, currentDir);
+        },
+      });
+
+      if (screen === "dungeon") {
+        const currentEnemies = enemiesRef.current;
+        currentEnemies.forEach((enemy, idx) => {
+          if (!enemy.alive) return;
+          entities.push({
+            id: `enemy-${idx}`,
+            x: enemy.x,
+            y: enemy.y,
+            smooth: true,
+            draw: (ctx, sx, sy, ts2, frame) => {
+              drawEnemySprite(ctx, enemy.type, sx, sy, ts2, frame, enemy.hp, enemy.maxHp);
+            },
+          });
+        });
+      }
+
+      const atk = attackAnimRef.current;
+      if (atk) {
+        entities.push({
+          id: "attack-slash",
+          x: atk.x,
+          y: atk.y,
+          alwaysVisible: true,
+          draw: (ctx, sx, sy, ts2) => {
+            const s = Math.floor(ts2 / 16);
+            const progress = (Date.now() - atk.startTime) / 280;
+            if (progress >= 1) return;
+
+            const dx = atk.x - atk.fromX;
+            const dy = atk.y - atk.fromY;
+            const startX = sx + ts2 / 2 - dx * ts2 * 0.5;
+            const startY = sy + ts2 / 2 - dy * ts2 * 0.5;
+            const endX = sx + ts2 / 2;
+            const endY = sy + ts2 / 2;
+            const cx = startX + (endX - startX) * Math.min(1, progress * 1.5);
+            const cy = startY + (endY - startY) * Math.min(1, progress * 1.5);
+
+            const angle = Math.atan2(dy, dx);
+            ctx.save();
+            ctx.translate(cx, cy);
+            ctx.rotate(angle);
+
+            ctx.globalAlpha = 1 - progress * 0.8;
+            ctx.strokeStyle = "#fff";
+            ctx.lineWidth = 2.5 * s;
+            ctx.beginPath();
+            const r = ts2 * 0.35 * (0.4 + progress * 0.6);
+            ctx.arc(0, 0, r, -Math.PI * 0.5, Math.PI * 0.5);
+            ctx.stroke();
+
+            ctx.strokeStyle = "#9a96cc";
+            ctx.lineWidth = 1.5 * s;
+            ctx.beginPath();
+            ctx.arc(0, 0, r * 0.6, -Math.PI * 0.4, Math.PI * 0.4);
+            ctx.stroke();
+
+            ctx.fillStyle = "#ffd700";
+            for (let i = 0; i < 4; i++) {
+              const sparkAngle = -0.4 + i * 0.27;
+              const sr = r * (0.6 + progress * 0.6);
+              const sparkX = Math.cos(sparkAngle) * sr;
+              const sparkY = Math.sin(sparkAngle) * sr;
+              const sparkSize = s * (1.5 - progress);
+              ctx.fillRect(sparkX - sparkSize / 2, sparkY - sparkSize / 2, sparkSize, sparkSize);
+            }
+
+            ctx.fillStyle = "#dddcf0";
+            ctx.globalAlpha = (1 - progress) * 0.6;
+            ctx.beginPath();
+            ctx.arc(r * 0.3, 0, s * 2 * (1 - progress * 0.5), 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.globalAlpha = 1;
+            ctx.restore();
+          },
+        });
+      }
+
+      engine.setEntities(entities);
+    };
+
+    raf = requestAnimationFrame(tick);
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+      raf = null;
+      lastTs = null;
+    };
+  }, [screen, paused, dialogue, shop, deathAnim, tryBeginStepMove]);
+
+  // ─── Player movement ─────────────────
+  const handleMove = useCallback((dx, dy) => {
+    // Discrete move request (touch swipe / click-drag)
+    if (paused || dialogue || shop || (screen !== "dungeon" && screen !== "town") || deathAnim) return;
+    tapDirRef.current = { dx, dy };
+    if (!moveRef.current) {
+      tryBeginStepMove(dx, dy, performance.now());
+    }
+  }, [paused, dialogue, shop, screen, deathAnim, tryBeginStepMove]);
 
   // ─── Attack (B button) ─────────────────
   const handleAttack = useCallback(() => {
@@ -553,20 +693,80 @@ export default function CampaignMode({
 
   // ─── Interaction ─────────────────
   const handleInteract = useCallback(() => {
-    if (paused || screen !== "dungeon" || deathAnim) return;
+    if (paused || shop || (screen !== "dungeon" && screen !== "town") || deathAnim) return;
 
     // If dialogue is showing, ignore (dialogue handles its own taps)
     if (dialogue) return;
 
-    const dg = dungeonRef.current;
+    const dg = screen === "town" ? townRef.current : dungeonRef.current;
     if (!dg) return;
 
     const pos = playerRef.current;
 
+    // Town interactions
+    if (screen === "town") {
+      const standingTile = dg.map[pos.y * dg.width + pos.x];
+      if (standingTile === TILE.STAIRS_DOWN) {
+        if (dungeonReturnRef.current) {
+          // Return to the dungeon run
+          const backPos = dungeonPosRef.current;
+          exploredRef.current = dungeonExploredRef.current;
+          setScreen("dungeon");
+          if (backPos) {
+            playerRef.current = backPos;
+            setPlayerPos(backPos);
+            playerVisualRef.current = { x: backPos.x, y: backPos.y };
+          }
+        } else {
+          setScreen("chapter-select");
+        }
+        return;
+      }
+
+      // Check the tile we're facing for NPC
+      const dirOffset = {
+        down: { x: 0, y: 1 },
+        up: { x: 0, y: -1 },
+        left: { x: -1, y: 0 },
+        right: { x: 1, y: 0 },
+      };
+      const off = dirOffset[playerDir] || dirOffset.down;
+      const targetX = pos.x + off.x;
+      const targetY = pos.y + off.y;
+      if (targetX < 0 || targetX >= dg.width || targetY < 0 || targetY >= dg.height) return;
+      const tileType = dg.map[targetY * dg.width + targetX];
+      if (tileType === TILE.NPC) {
+        const npc = (dg.npcs || []).find(n => n.x === targetX && n.y === targetY);
+        const shopDef = npc ? TOWN_SHOPS[npc.id] : null;
+        if (shopDef) {
+          setShop(shopDef);
+          if (inputRef.current) inputRef.current.setEnabled(false);
+        }
+      }
+      return;
+    }
+
     // First check if standing on stairs (interact from current tile)
     const standingTile = dg.map[pos.y * dg.width + pos.x];
+    if (standingTile === TILE.STAIRS_UP) {
+      // Surface hub
+      dungeonReturnRef.current = { chapterId: activeChapter, floorIdx: activeFloor };
+      dungeonPosRef.current = { x: pos.x, y: pos.y };
+      exploredRef.current = townExploredRef.current;
+
+      const townMap = townRef.current || generateTown();
+      if (!townRef.current) setTown(townMap);
+      const spawn = townPosRef.current || townMap.spawn;
+      townPosRef.current = spawn;
+      playerRef.current = spawn;
+      setPlayerPos(spawn);
+      playerVisualRef.current = { x: spawn.x, y: spawn.y };
+      setPlayerDir("up");
+      setScreen("town");
+      return;
+    }
     if (standingTile === TILE.STAIRS_DOWN) {
-      handleStairsDown();
+      if (handleStairsDownRef.current) handleStairsDownRef.current();
       return;
     }
 
@@ -590,9 +790,9 @@ export default function CampaignMode({
     } else if (tileType === TILE.CHEST_CLOSED) {
       handleChestInteract(targetX, targetY);
     } else if (tileType === TILE.STAIRS_DOWN) {
-      handleStairsDown();
+      if (handleStairsDownRef.current) handleStairsDownRef.current();
     }
-  }, [paused, dialogue, screen, playerDir]);
+  }, [paused, dialogue, shop, screen, deathAnim, playerDir, activeChapter, activeFloor, setTown]);
 
   // ─── Door puzzle interaction ─────────────────
   const handleDoorInteract = useCallback((doorX, doorY, isBoss) => {
@@ -819,6 +1019,11 @@ export default function CampaignMode({
     }
   }, [showNotification, triggerDamageFlash, handleDeath]);
 
+  useEffect(() => {
+    handleTrapRef.current = handleTrap;
+    return () => { handleTrapRef.current = null; };
+  }, [handleTrap]);
+
   // ─── Stairs down (requires puzzle to unlock) ─────────────────
   const handleStairsDown = useCallback(() => {
     const chapter = CAMPAIGN_CHAPTERS[activeChapter];
@@ -854,6 +1059,39 @@ export default function CampaignMode({
     };
   }, [activeChapter, activeFloor]);
 
+  useEffect(() => {
+    handleStairsDownRef.current = handleStairsDown;
+    return () => { handleStairsDownRef.current = null; };
+  }, [handleStairsDown]);
+
+  const closeShop = useCallback(() => {
+    setShop(null);
+    desiredDirRef.current = { dx: 0, dy: 0 };
+    if (inputRef.current) inputRef.current.setEnabled(true);
+  }, []);
+
+  const handleShopBuy = useCallback((item) => {
+    const state = { ...stateRef.current };
+    const ok = spendCoins(state, item.cost);
+    if (!ok) {
+      showNotification("Not enough coins!", "#f87171");
+      return;
+    }
+
+    if (item.kind === "heal_full") {
+      healToFull(state);
+      showNotification("Rested. HP restored!", "#4ade80");
+    } else if (item.kind === "potion") {
+      addItem(state, "potion", item.amount || 1);
+      showNotification("Bought a potion.", "#4ade80");
+    } else if (item.kind === "key") {
+      addItem(state, "key", item.amount || 1);
+      showNotification("Bought a key.", "#4ade80");
+    }
+
+    setCampaignState({ ...state });
+  }, [showNotification]);
+
   // ─── Ability usage ─────────────────
   const handleUseAbility = useCallback((abilityId) => {
     const state = { ...stateRef.current };
@@ -882,9 +1120,48 @@ export default function CampaignMode({
 
   // ─── Input handler lifecycle ─────────────────
   useEffect(() => {
-    if (screen !== "dungeon") return;
+    if (screen !== "dungeon" && screen !== "town") return;
 
-    const input = createInputHandler(handleMove, handleInteract);
+    const moveRouter = (dx, dy) => {
+      if (deathAnim) return;
+      if (dialogue) return;
+      if (paused && pauseDpadRef.current) {
+        pauseDpadRef.current(dx, dy);
+        return;
+      }
+      handleMove(dx, dy);
+    };
+
+    const primaryRouter = () => {
+      if (deathAnim) return;
+      if (paused && pauseARef.current) {
+        pauseARef.current();
+        return;
+      }
+      if (dialogue && dialogueAdvanceRef.current) {
+        dialogueAdvanceRef.current();
+        return;
+      }
+      handleInteract();
+    };
+
+    const secondaryRouter = () => {
+      if (deathAnim) return;
+      if (paused && pauseBRef.current) {
+        pauseBRef.current();
+        return;
+      }
+      if (dialogue) {
+        handleDialogueComplete();
+        return;
+      }
+      handleAttack();
+    };
+
+    const input = createInputHandler(moveRouter, primaryRouter, secondaryRouter, {
+      keyboardMode: (paused || shop) ? "discrete" : "continuous",
+      onDirChange: handleKeyboardDirChange,
+    });
     inputRef.current = input;
     input.attach(canvasRef.current);
 
@@ -892,12 +1169,12 @@ export default function CampaignMode({
       input.detach(canvasRef.current);
       inputRef.current = null;
     };
-  }, [screen, handleMove, handleInteract]);
+  }, [screen, paused, shop, dialogue, deathAnim, handleMove, handleInteract, handleAttack, handleDialogueComplete, handleKeyboardDirChange]);
 
   // ─── Escape key for pause ─────────────────
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === "Escape" && screen === "dungeon") {
+      if (e.key === "Escape" && (screen === "dungeon" || screen === "town")) {
         setPaused(p => !p);
       }
     };
@@ -907,6 +1184,7 @@ export default function CampaignMode({
 
   // ─── Chapter select menu helpers ─────────────────
   const menuItems = [
+    { type: "town" },
     ...CAMPAIGN_CHAPTERS.map((ch, idx) => ({ type: "chapter", chapter: ch, idx })),
     { type: "back" },
   ];
@@ -927,6 +1205,23 @@ export default function CampaignMode({
     if (!item) return;
     if (item.type === "back") {
       onExit();
+    } else if (item.type === "town") {
+      dungeonReturnRef.current = null;
+      dungeonPosRef.current = null;
+      exploredRef.current = townExploredRef.current;
+      const tm = generateTown();
+      setTown(tm);
+      const spawn = townPosRef.current || tm.spawn;
+      townPosRef.current = spawn;
+      playerRef.current = spawn;
+      setPlayerPos(spawn);
+      playerVisualRef.current = { x: spawn.x, y: spawn.y };
+      moveRef.current = null;
+      setPlayerDir("up");
+      setPaused(false);
+      setDialogue(null);
+      setShop(null);
+      setScreen("town");
     } else if (item.type === "chapter") {
       const ch = item.chapter;
       const isUnlocked = ch.unlock === null ||
@@ -939,6 +1234,32 @@ export default function CampaignMode({
     if (screen !== "chapter-select") return;
     onExit();
   }, [screen, onExit]);
+
+  // ─── Keyboard for chapter select menu ─────────────────
+  useEffect(() => {
+    if (screen !== "chapter-select") return;
+
+    const handleKey = (e) => {
+      const key = (e.key || "").toLowerCase();
+
+      if (key === "arrowup" || key === "w") {
+        e.preventDefault();
+        handleMenuDpad(0, -1);
+      } else if (key === "arrowdown" || key === "s") {
+        e.preventDefault();
+        handleMenuDpad(0, 1);
+      } else if (key === "enter" || key === " " || key === "e") {
+        e.preventDefault();
+        handleMenuA();
+      } else if (key === "escape" || key === "backspace" || key === "q") {
+        e.preventDefault();
+        handleMenuB();
+      }
+    };
+
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [screen, handleMenuDpad, handleMenuA, handleMenuB]);
 
   // ─── Chapter select screen (inside Game Boy shell) ─────────────────
   if (screen === "chapter-select") {
@@ -971,12 +1292,52 @@ export default function CampaignMode({
 
         {/* Chapter list */}
         <div style={{ display: "flex", flexDirection: "column", gap: 4, flex: 1 }}>
+          {/* Town hub */}
+          <div
+            onClick={() => {
+              dungeonReturnRef.current = null;
+              dungeonPosRef.current = null;
+              exploredRef.current = townExploredRef.current;
+              const tm = generateTown();
+              setTown(tm);
+              const spawn = townPosRef.current || tm.spawn;
+              townPosRef.current = spawn;
+              playerRef.current = spawn;
+              setPlayerPos(spawn);
+              playerVisualRef.current = { x: spawn.x, y: spawn.y };
+              moveRef.current = null;
+              setPlayerDir("up");
+              setPaused(false);
+              setDialogue(null);
+              setShop(null);
+              setScreen("town");
+            }}
+            style={{
+              padding: "6px 8px", borderRadius: 4,
+              background: menuCursor === 0 ? "rgba(154,150,204,0.15)" : "transparent",
+              border: menuCursor === 0 ? "1px solid rgba(154,150,204,0.4)" : "1px solid transparent",
+              cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 6,
+              transition: "background 0.15s",
+            }}
+          >
+            <span style={{
+              fontSize: 8, color: "#9a96cc", width: 10, textAlign: "center",
+              animation: menuCursor === 0 ? "cursorBlink 1s ease infinite" : "none",
+              visibility: menuCursor === 0 ? "visible" : "hidden",
+            }}>{"\u25B6"}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 7, color: "#e8e8ef", marginBottom: 2 }}>Glyphwalk Town</div>
+              <div style={{ fontSize: 5, color: "#6b6b8b" }}>Shops, rest, and supplies</div>
+            </div>
+          </div>
+
           {CAMPAIGN_CHAPTERS.map((chapter, idx) => {
             const chState = getChapterState(campaignState, chapter.id);
             const isUnlocked = chapter.unlock === null ||
               (chapter.unlock.chapter != null && campaignState.chapters[chapter.unlock.chapter]?.completed);
             const isCompleted = chState.completed;
-            const isCursorHere = menuCursor === idx;
+            const isCursorHere = menuCursor === idx + 1;
 
             let floorsCleared = 0;
             for (let i = 0; i < chapter.floors; i++) {
@@ -1024,16 +1385,16 @@ export default function CampaignMode({
             onClick={onExit}
             style={{
               padding: "6px 8px", borderRadius: 4,
-              background: menuCursor === CAMPAIGN_CHAPTERS.length ? "rgba(154,150,204,0.15)" : "transparent",
-              border: menuCursor === CAMPAIGN_CHAPTERS.length ? "1px solid rgba(154,150,204,0.4)" : "1px solid transparent",
+              background: menuCursor === CAMPAIGN_CHAPTERS.length + 1 ? "rgba(154,150,204,0.15)" : "transparent",
+              border: menuCursor === CAMPAIGN_CHAPTERS.length + 1 ? "1px solid rgba(154,150,204,0.4)" : "1px solid transparent",
               display: "flex", alignItems: "center", gap: 6,
               cursor: "pointer", marginTop: 4,
             }}
           >
             <span style={{
               fontSize: 8, color: "#9a96cc", width: 10, textAlign: "center",
-              animation: menuCursor === CAMPAIGN_CHAPTERS.length ? "cursorBlink 1s ease infinite" : "none",
-              visibility: menuCursor === CAMPAIGN_CHAPTERS.length ? "visible" : "hidden",
+              animation: menuCursor === CAMPAIGN_CHAPTERS.length + 1 ? "cursorBlink 1s ease infinite" : "none",
+              visibility: menuCursor === CAMPAIGN_CHAPTERS.length + 1 ? "visible" : "hidden",
             }}>
               {"\u25B6"}
             </span>
@@ -1058,10 +1419,15 @@ export default function CampaignMode({
   }
 
   // ─── Dungeon view (inside Game Boy shell) ─────────────────
+  const hudChapterName = screen === "town" ? "Glyphwalk Town" : (CAMPAIGN_CHAPTERS[activeChapter]?.name || "");
+  const hudFloorIdx = screen === "town" ? 0 : (activeFloor ?? 0);
+  const hudTotalFloors = screen === "town" ? 1 : (CAMPAIGN_CHAPTERS[activeChapter]?.floors || 0);
+
   return (
     <GameBoyShell
       canvasRef={canvasRef}
       onDpadPress={(dx, dy) => {
+        if (shop) return;
         if (paused && pauseDpadRef.current) {
           pauseDpadRef.current(dx, dy);
         } else {
@@ -1069,6 +1435,7 @@ export default function CampaignMode({
         }
       }}
       onButtonA={() => {
+        if (shop) return;
         if (paused && pauseARef.current) {
           pauseARef.current();
         } else if (dialogue && dialogueAdvanceRef.current) {
@@ -1078,6 +1445,10 @@ export default function CampaignMode({
         }
       }}
       onButtonB={() => {
+        if (shop) {
+          closeShop();
+          return;
+        }
         if (paused && pauseBRef.current) {
           pauseBRef.current();
         } else if (dialogue) {
@@ -1086,8 +1457,8 @@ export default function CampaignMode({
           handleAttack();
         }
       }}
-      onStart={() => setPaused(p => !p)}
-      onSelect={() => setPaused(p => !p)}
+      onStart={() => { if (!shop) setPaused(p => !p); }}
+      onSelect={() => { if (!shop) setPaused(p => !p); }}
     >
       {/* All overlays render inside the screen area */}
 
@@ -1095,13 +1466,26 @@ export default function CampaignMode({
       {!paused && !dialogue && (
         <CampaignHUD
           campaignState={campaignState}
-          chapterName={CAMPAIGN_CHAPTERS[activeChapter]?.name || ""}
-          floorIdx={activeFloor}
-          totalFloors={CAMPAIGN_CHAPTERS[activeChapter]?.floors || 0}
+          chapterName={hudChapterName}
+          floorIdx={hudFloorIdx}
+          totalFloors={hudTotalFloors}
           onPause={() => setPaused(true)}
           onUseAbility={handleUseAbility}
           aggieBuff={aggieBuff}
           aggieDebuff={aggieDebuff}
+          C={C}
+        />
+      )}
+
+      {/* Shop overlay */}
+      {shop && (
+        <CampaignShop
+          title={shop.title}
+          subtitle={shop.subtitle}
+          coins={campaignState.inventory.coins}
+          items={shop.items}
+          onBuy={handleShopBuy}
+          onClose={closeShop}
           C={C}
         />
       )}

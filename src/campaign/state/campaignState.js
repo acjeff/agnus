@@ -223,6 +223,19 @@ export function addCoins(state, amount) {
   saveCampaignState(state);
 }
 
+export function canAfford(state, amount) {
+  return (state.inventory?.coins || 0) >= amount;
+}
+
+export function spendCoins(state, amount) {
+  if (amount <= 0) return true;
+  if (!canAfford(state, amount)) return false;
+  state.inventory.coins -= amount;
+  saveAggieCoins(state.inventory.coins);
+  saveCampaignState(state);
+  return true;
+}
+
 // Health helpers
 export { MAX_HP };
 

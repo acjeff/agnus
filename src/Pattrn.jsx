@@ -14462,7 +14462,7 @@ export default function Pattrn() {
                       Campaign
                     </div>
                     <div style={{ fontFamily: "'Inter', sans-serif", fontSize: 18, fontWeight: 800, color: C.text, lineHeight: 1.1 }}>
-                      Dungeon Crawler
+                      Glyphwalk
                     </div>
                   </div>
                 </div>
@@ -15751,7 +15751,7 @@ export default function Pattrn() {
           </div>
           <div style={{ textAlign: "center" }}>
             <span style={{ fontFamily: isCampaign ? "'Press Start 2P', monospace" : "'Inter', sans-serif", fontSize: isCampaign ? 7 : 10, color: isBlind ? "#e06040" : (isCampaign ? "#9a96cc" : C.textDim), letterSpacing: 1, textTransform: "uppercase" }}>
-              {isCoop ? "Co-op " : isCoopMosaic ? "Co-op " : ""}{isCampaign ? "Dungeon" : diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
+              {isCoop ? "Co-op " : isCoopMosaic ? "Co-op " : ""}{isCampaign ? "Glyphwalk" : diffLabel}{isDaily && currentDailyDate ? ` ${currentDailyDate}` : ""}{isCascade && cascadeLevelLabel ? ` ${cascadeLevelLabel}` : ""}{" "}
             </span>
             {!isDaily && !isCascade && !isCampaign && (
               <span style={{ fontFamily: "'Inter', sans-serif", fontSize: 13, fontWeight: 700, color: C.accent, letterSpacing: 2 }}>

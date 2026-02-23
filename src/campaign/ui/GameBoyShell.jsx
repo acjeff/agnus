@@ -1,7 +1,7 @@
 // Game Boy-style shell that wraps the campaign canvas
 // Provides: physical d-pad, A/B buttons, start/select, speaker grille
 
-import React, { useCallback, useRef, useEffect } from "react";
+import React, { useCallback, useRef, useEffect, useState } from "react";
 
 const PIXEL_FONT = "'Press Start 2P', monospace";
 
@@ -42,9 +42,27 @@ export default function GameBoyShell({
   screenContent,   // React node rendered inside the screen bezel (alternative to canvasRef)
   children,        // overlays rendered inside screen area
 }) {
+  const [isDesktop, setIsDesktop] = useState(false);
   const repeatRef = useRef(null);
   const activeDirRef = useRef(null);
   const dpadContainerRef = useRef(null);
+
+  useEffect(() => {
+    const mq = window.matchMedia?.("(hover: hover) and (pointer: fine) and (min-width: 900px)");
+    if (!mq) {
+      setIsDesktop(false);
+      return;
+    }
+    const update = () => setIsDesktop(!!mq.matches);
+    update();
+    // Safari < 14
+    if (mq.addEventListener) mq.addEventListener("change", update);
+    else mq.addListener(update);
+    return () => {
+      if (mq.removeEventListener) mq.removeEventListener("change", update);
+      else mq.removeListener(update);
+    };
+  }, []);
 
   // ── Direct d-pad movement (no synthetic keyboard events) ──
   const fireDpad = useCallback((dx, dy) => {
@@ -184,6 +202,152 @@ export default function GameBoyShell({
     e.currentTarget.style.transform = "translateY(0)";
   };
 
+  const renderScreen = (extraScreenStyle) => (
+    <div style={{
+      width: "100%", height: "100%",
+      background: SHELL.bezelInner,
+      borderRadius: 8,
+      overflow: "hidden",
+      position: "relative",
+      ...extraScreenStyle,
+    }}>
+      {canvasRef ? (
+        <canvas
+          ref={canvasRef}
+          style={{
+            width: "100%", height: "100%",
+            display: "block",
+            imageRendering: "pixelated",
+          }}
+        />
+      ) : screenContent}
+
+      {children}
+    </div>
+  );
+
+  if (isDesktop) {
+    return (
+      <div style={{
+        width: "100vw", height: "100vh",
+        background: "radial-gradient(1200px 800px at 50% 30%, #1b1b24 0%, #0b0b10 55%, #05050a 100%)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        fontFamily: PIXEL_FONT,
+        padding: "min(6vh, 56px) 24px",
+        boxSizing: "border-box",
+      }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+          @keyframes crtFlicker {
+            0% { filter: contrast(1.08) saturate(1.18) brightness(1.03); opacity: 1; }
+            7% { filter: contrast(1.06) saturate(1.16) brightness(1.01); opacity: 0.98; }
+            8% { filter: contrast(1.1) saturate(1.2) brightness(1.04); opacity: 1; }
+            39% { filter: contrast(1.08) saturate(1.18) brightness(1.02); opacity: 0.99; }
+            40% { filter: contrast(1.12) saturate(1.22) brightness(1.05); opacity: 1; }
+            100% { filter: contrast(1.08) saturate(1.18) brightness(1.03); opacity: 1; }
+          }
+          @keyframes crtScan {
+            0% { background-position: 0 0, 0 0; }
+            100% { background-position: 0 240px, 0 0; }
+          }
+        `}</style>
+
+        <div style={{
+          width: "min(1100px, 96vw)",
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 16,
+        }}>
+          <div style={{
+            width: "100%",
+            borderRadius: 26,
+            background: "linear-gradient(180deg, #2a2a33 0%, #13131a 65%, #0b0b10 100%)",
+            boxShadow: "0 22px 70px rgba(0,0,0,0.65)",
+            padding: 18,
+            boxSizing: "border-box",
+            border: "1px solid rgba(255,255,255,0.06)",
+          }}>
+            <div style={{
+              width: "100%",
+              aspectRatio: "10 / 9",
+              maxHeight: "78vh",
+              borderRadius: 20,
+              background: "radial-gradient(120% 120% at 50% 35%, #111319 0%, #07070c 60%, #030306 100%)",
+              padding: 10,
+              boxSizing: "border-box",
+              border: "1px solid rgba(255,255,255,0.06)",
+              position: "relative",
+            }}>
+              <div style={{
+                width: "100%",
+                height: "100%",
+                borderRadius: 16,
+                overflow: "hidden",
+                position: "relative",
+                animation: "crtFlicker 7s infinite",
+                boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.05), inset 0 0 40px rgba(0,0,0,0.75)",
+              }}>
+                {renderScreen({ borderRadius: 16 })}
+
+                {/* CRT overlays */}
+                <div style={{
+                  position: "absolute",
+                  inset: 0,
+                  pointerEvents: "none",
+                  backgroundImage: [
+                    "repeating-linear-gradient(to bottom, rgba(0,0,0,0.0) 0px, rgba(0,0,0,0.0) 2px, rgba(0,0,0,0.18) 3px, rgba(0,0,0,0.18) 4px)",
+                    "radial-gradient(120% 120% at 50% 40%, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.0) 40%, rgba(0,0,0,0.55) 100%)",
+                  ].join(","),
+                  mixBlendMode: "multiply",
+                  opacity: 0.65,
+                  animation: "crtScan 10s linear infinite",
+                }} />
+                <div style={{
+                  position: "absolute",
+                  inset: -2,
+                  pointerEvents: "none",
+                  background: "radial-gradient(80% 70% at 50% 45%, rgba(96,255,170,0.10) 0%, rgba(0,0,0,0) 55%)",
+                  mixBlendMode: "screen",
+                  opacity: 0.35,
+                }} />
+              </div>
+
+              {/* subtle glass edge */}
+              <div style={{
+                position: "absolute",
+                inset: 8,
+                borderRadius: 16,
+                pointerEvents: "none",
+                boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.06)",
+              }} />
+            </div>
+          </div>
+
+          <div style={{
+            width: "100%",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexWrap: "wrap",
+            gap: 16,
+            color: "rgba(232,232,239,0.85)",
+            fontSize: 8,
+            letterSpacing: 0.5,
+            userSelect: "none",
+          }}>
+            <div style={{ opacity: 0.9 }}>MOVE: WASD / ARROWS</div>
+            <div style={{ opacity: 0.9 }}>INTERACT: E / ENTER / SPACE</div>
+            <div style={{ opacity: 0.9 }}>ATTACK: F / RIGHT CLICK</div>
+            <div style={{ opacity: 0.9 }}>PAUSE: ESC</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       width: "100vw", height: "100vh",
@@ -229,28 +393,7 @@ export default function GameBoyShell({
         position: "relative",
         flexShrink: 0,
       }}>
-        <div style={{
-          width: "100%", height: "100%",
-          background: SHELL.bezelInner,
-          borderRadius: 8,
-          overflow: "hidden",
-          position: "relative",
-        }}>
-          {/* Canvas OR custom screen content */}
-          {canvasRef ? (
-            <canvas
-              ref={canvasRef}
-              style={{
-                width: "100%", height: "100%",
-                display: "block",
-                imageRendering: "pixelated",
-              }}
-            />
-          ) : screenContent}
-
-          {/* Overlays inside screen */}
-          {children}
-        </div>
+        {renderScreen()}
 
         {/* Screen corner dots */}
         <div style={{
