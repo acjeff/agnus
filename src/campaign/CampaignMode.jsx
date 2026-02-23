@@ -21,6 +21,7 @@ import CampaignHUD from "./ui/CampaignHUD.jsx";
 import CampaignDialogue from "./ui/CampaignDialogue.jsx";
 import CampaignPause from "./ui/CampaignPause.jsx";
 import GameBoyShell from "./ui/GameBoyShell.jsx";
+import CRTShell from "./ui/CRTShell.jsx";
 
 const PIXEL_FONT = "'Press Start 2P', monospace";
 const VISIBILITY_RADIUS = 6;
@@ -129,6 +130,9 @@ export default function CampaignMode({
   const [damageFlash, setDamageFlash] = useState(false); // red screen flash on hit
   const [deathAnim, setDeathAnim] = useState(null); // { startTime } for death sequence
 
+  // Desktop detection — CRT shell on desktop, Game Boy shell on mobile
+  const [isDesktop, setIsDesktop] = useState(() => window.innerWidth >= 768);
+
   // Refs
   const canvasRef = useRef(null);
   const engineRef = useRef(null);
@@ -150,6 +154,13 @@ export default function CampaignMode({
   useEffect(() => { dungeonRef.current = dungeon; }, [dungeon]);
   useEffect(() => { playerRef.current = playerPos; }, [playerPos]);
   useEffect(() => { enemiesRef.current = enemies; }, [enemies]);
+
+  // Desktop resize listener
+  useEffect(() => {
+    const check = () => setIsDesktop(window.innerWidth >= 768);
+    window.addEventListener("resize", check);
+    return () => window.removeEventListener("resize", check);
+  }, []);
 
   // ─── Notification helper ─────────────────
   const showNotification = useCallback((text, color) => {
@@ -253,7 +264,7 @@ export default function CampaignMode({
       engine.destroy();
       engineRef.current = null;
     };
-  }, [screen, dungeon, activeChapter]);
+  }, [screen, dungeon, activeChapter, isDesktop]);
 
   // ─── Update engine entities & camera on player move ─────
   useEffect(() => {
@@ -894,16 +905,79 @@ export default function CampaignMode({
     };
   }, [screen, handleMove, handleInteract]);
 
-  // ─── Escape key for pause ─────────────────
+  // ─── Comprehensive keyboard handler (all screens) ─────────────────
+  // Handles: chapter select nav, dialogue advance/skip, pause nav, attack, escape
+  // (Movement + interact are handled by createInputHandler in dungeon mode;
+  //  dialogue Space/Enter is also handled by CampaignDialogue's own listener)
   useEffect(() => {
     const handleKey = (e) => {
-      if (e.key === "Escape" && screen === "dungeon") {
-        setPaused(p => !p);
+      const key = e.key.toLowerCase();
+
+      // ── Chapter select: arrow nav, enter select, escape back ──
+      if (screen === "chapter-select") {
+        if (key === "arrowup" || key === "w") {
+          e.preventDefault(); handleMenuDpad(0, -1);
+        } else if (key === "arrowdown" || key === "s") {
+          e.preventDefault(); handleMenuDpad(0, 1);
+        } else if (key === "enter" || key === " ") {
+          e.preventDefault(); handleMenuA();
+        } else if (key === "escape" || key === "backspace") {
+          e.preventDefault(); handleMenuB();
+        }
+        return;
+      }
+
+      // ── Dungeon screen ──
+      if (screen !== "dungeon") return;
+
+      // Escape: dismiss dialogue OR toggle pause
+      if (key === "escape") {
+        e.preventDefault();
+        if (dialogue) {
+          handleDialogueComplete();
+        } else {
+          setPaused(p => !p);
+        }
+        return;
+      }
+
+      // Dialogue active: B to skip (Space/Enter already handled by CampaignDialogue)
+      if (dialogue) {
+        if (key === "b") {
+          e.preventDefault();
+          handleDialogueComplete();
+        }
+        return;
+      }
+
+      // Pause menu: arrow nav + enter/space confirm
+      if (paused) {
+        if (key === "arrowup" || key === "w") {
+          e.preventDefault();
+          if (pauseDpadRef.current) pauseDpadRef.current(0, -1);
+        } else if (key === "arrowdown" || key === "s") {
+          e.preventDefault();
+          if (pauseDpadRef.current) pauseDpadRef.current(0, 1);
+        } else if (key === "enter" || key === " ") {
+          e.preventDefault();
+          if (pauseARef.current) pauseARef.current();
+        } else if (key === "b") {
+          e.preventDefault();
+          if (pauseBRef.current) pauseBRef.current();
+        }
+        return;
+      }
+
+      // Normal gameplay: B key for attack
+      if (key === "b" && !deathAnim) {
+        e.preventDefault();
+        handleAttack();
       }
     };
+
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [screen]);
+  }, [screen, paused, dialogue, deathAnim, handleMenuDpad, handleMenuA, handleMenuB, handleAttack, handleDialogueComplete]);
 
   // ─── Chapter select menu helpers ─────────────────
   const menuItems = [
@@ -940,7 +1014,10 @@ export default function CampaignMode({
     onExit();
   }, [screen, onExit]);
 
-  // ─── Chapter select screen (inside Game Boy shell) ─────────────────
+  // Desktop → CRT monitor shell; Mobile → Game Boy shell
+  const Shell = isDesktop ? CRTShell : GameBoyShell;
+
+  // ─── Chapter select screen (inside shell) ─────────────────
   if (screen === "chapter-select") {
     const menuScreenContent = (
       <div style={{
@@ -1046,7 +1123,7 @@ export default function CampaignMode({
     );
 
     return (
-      <GameBoyShell
+      <Shell
         screenContent={menuScreenContent}
         onDpadPress={handleMenuDpad}
         onButtonA={handleMenuA}
@@ -1057,9 +1134,9 @@ export default function CampaignMode({
     );
   }
 
-  // ─── Dungeon view (inside Game Boy shell) ─────────────────
+  // ─── Dungeon view (inside shell) ─────────────────
   return (
-    <GameBoyShell
+    <Shell
       canvasRef={canvasRef}
       onDpadPress={(dx, dy) => {
         if (paused && pauseDpadRef.current) {
@@ -1203,6 +1280,6 @@ export default function CampaignMode({
           to { opacity: 1; transform: scale(1); }
         }
       `}</style>
-    </GameBoyShell>
+    </Shell>
   );
 }
