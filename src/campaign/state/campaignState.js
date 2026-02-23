@@ -5,6 +5,8 @@ import { loadAggieCoins, saveAggieCoins } from "../../aggie/state.js";
 
 const CAMPAIGN_KEY = "pattrn-campaign-v1";
 
+const MAX_HP = 10;
+
 function getDefaultState() {
   return {
     currentChapter: 0,
@@ -16,6 +18,10 @@ function getDefaultState() {
       totalXp: 0,
       evolutionStage: "hatchling",
       abilityCooldowns: {},
+    },
+    health: {
+      hp: MAX_HP,
+      maxHp: MAX_HP,
     },
     inventory: {
       // coins field is kept for backward compat but actual coins come from main game
@@ -39,6 +45,8 @@ export function loadCampaignState() {
     const base = raw ? { ...getDefaultState(), ...JSON.parse(raw) } : getDefaultState();
     // Sync coins from main game store (shared currency)
     base.inventory.coins = loadAggieCoins();
+    // Ensure health exists for backward compat
+    if (!base.health) base.health = { hp: MAX_HP, maxHp: MAX_HP };
     return base;
   } catch {
     const state = getDefaultState();
@@ -212,6 +220,22 @@ export function resetChapterCooldowns(state) {
 export function addCoins(state, amount) {
   state.inventory.coins += amount;
   saveAggieCoins(state.inventory.coins);
+  saveCampaignState(state);
+}
+
+// Health helpers
+export { MAX_HP };
+
+export function takeDamage(state, amount) {
+  if (!state.health) state.health = { hp: MAX_HP, maxHp: MAX_HP };
+  state.health.hp = Math.max(0, state.health.hp - amount);
+  saveCampaignState(state);
+  return state.health.hp <= 0; // returns true if dead
+}
+
+export function healToFull(state) {
+  if (!state.health) state.health = { hp: MAX_HP, maxHp: MAX_HP };
+  state.health.hp = state.health.maxHp;
   saveCampaignState(state);
 }
 

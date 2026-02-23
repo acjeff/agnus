@@ -27,6 +27,7 @@ export default function CampaignHUD({
   const abilities = getUnlockedAbilities(campaignState);
   const { level, evolutionStage } = campaignState.aggie;
   const { coins, keys, potions } = campaignState.inventory;
+  const { hp, maxHp } = campaignState.health || { hp: 10, maxHp: 10 };
 
   return (
     <div style={{
@@ -53,22 +54,46 @@ export default function CampaignHUD({
           </div>
         </div>
 
-        {/* Right: Coins + items compact row */}
-        <div style={{ display: "flex", gap: 4 }}>
-          {[
-            { icon: "\u25C9", value: coins, color: "#ffd700" },
-            { icon: "\u2737", value: keys, color: "#88ddff" },
-            { icon: "\u2665", value: potions, color: "#ff6688" },
-          ].filter(item => item.value > 0).map((item, i) => (
-            <div key={i} style={{
-              background: "rgba(0,0,0,0.7)", borderRadius: 4,
-              padding: "3px 5px",
-              display: "flex", alignItems: "center", gap: 3,
+        {/* Right: Health + Coins + items compact row */}
+        <div style={{ display: "flex", gap: 4, alignItems: "flex-start", flexDirection: "column" }}>
+          {/* Health bar */}
+          <div style={{
+            background: "rgba(0,0,0,0.7)", borderRadius: 4,
+            padding: "3px 5px",
+            display: "flex", alignItems: "center", gap: 3,
+            minWidth: 60,
+          }}>
+            <span style={{ fontSize: 7, color: "#f87171" }}>{"\u2665"}</span>
+            <div style={{
+              flex: 1, height: 4, backgroundColor: "rgba(255,255,255,0.15)",
+              borderRadius: 2, overflow: "hidden", minWidth: 36,
             }}>
-              <span style={{ fontSize: 7, color: item.color }}>{item.icon}</span>
-              <span style={{ fontSize: 6, color: "#fff" }}>{item.value}</span>
+              <div style={{
+                width: `${hp > 0 ? (hp / maxHp) * 100 : 0}%`, height: "100%",
+                backgroundColor: hp / maxHp > 0.5 ? "#4ade80" : hp / maxHp > 0.25 ? "#ffd700" : "#f87171",
+                borderRadius: 2,
+                transition: "width 0.3s ease, background-color 0.3s ease",
+              }} />
             </div>
-          ))}
+            <span style={{ fontSize: 5, color: "#fff" }}>{hp}/{maxHp}</span>
+          </div>
+          {/* Coins + items row */}
+          <div style={{ display: "flex", gap: 4 }}>
+            {[
+              { icon: "\u25C9", value: coins, color: "#ffd700" },
+              { icon: "\u2737", value: keys, color: "#88ddff" },
+              { icon: "\u2665", value: potions, color: "#ff6688" },
+            ].filter(item => item.value > 0).map((item, i) => (
+              <div key={i} style={{
+                background: "rgba(0,0,0,0.7)", borderRadius: 4,
+                padding: "3px 5px",
+                display: "flex", alignItems: "center", gap: 3,
+              }}>
+                <span style={{ fontSize: 7, color: item.color }}>{item.icon}</span>
+                <span style={{ fontSize: 6, color: "#fff" }}>{item.value}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
