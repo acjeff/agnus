@@ -6,6 +6,12 @@ import { getXpProgress, getUnlockedAbilities, isAbilityReady } from "../state/ca
 
 const PIXEL_FONT = "'Press Start 2P', monospace";
 
+const BUFF_META = {
+  hint_freq: { label: "FL", color: "#4a9eff", name: "Focus Lens" },
+  hint_accuracy: { label: "WS", color: "#f5c842", name: "Wisdom Scroll" },
+  hint_both: { label: "LC", color: "#2ecc71", name: "Lucky Clover" },
+};
+
 export default function CampaignHUD({
   campaignState,
   chapterName,
@@ -13,6 +19,8 @@ export default function CampaignHUD({
   totalFloors,
   onPause,
   onUseAbility,
+  aggieBuff,
+  aggieDebuff,
   C,
 }) {
   const xpProgress = getXpProgress(campaignState);
@@ -87,6 +95,25 @@ export default function CampaignHUD({
               backgroundColor: "#9a96cc", borderRadius: 2,
             }} />
           </div>
+          {/* Active buff from main game */}
+          {aggieBuff && aggieBuff.charges > 0 && (() => {
+            const meta = BUFF_META[aggieBuff.type] || { label: "BF", color: "#888", name: "Buff" };
+            return (
+              <div style={{
+                marginTop: 2, display: "flex", alignItems: "center", gap: 3,
+              }}>
+                <span style={{ fontSize: 4, color: meta.color }}>{meta.label}</span>
+                <span style={{ fontSize: 4, color: "#aaa" }}>x{aggieBuff.charges}</span>
+              </div>
+            );
+          })()}
+          {/* Active debuff from main game */}
+          {aggieDebuff && aggieDebuff.charges > 0 && (
+            <div style={{ marginTop: 1, display: "flex", alignItems: "center", gap: 3 }}>
+              <span style={{ fontSize: 4, color: "#f87171" }}>!</span>
+              <span style={{ fontSize: 4, color: "#f87171" }}>x{aggieDebuff.charges}</span>
+            </div>
+          )}
         </div>
       </div>
 

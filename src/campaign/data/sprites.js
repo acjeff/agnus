@@ -283,13 +283,24 @@ export function drawEnemySprite(ctx, type, x, y, tileSize, frame, hp, maxHp) {
   }
 }
 
-// Draw Aggie pixel sprite based on evolution stage
-export function drawAggieSprite(ctx, stage, x, y, tileSize, frame) {
+// Draw Aggie pixel sprite based on evolution stage, with directional facing
+// direction: "up" | "down" | "left" | "right" (defaults to "down")
+export function drawAggieSprite(ctx, stage, x, y, tileSize, frame, direction) {
   const config = AGGIE_CAMPAIGN_SPRITES[stage] || AGGIE_CAMPAIGN_SPRITES.hatchling;
   const s = Math.floor(tileSize / 16); // pixel scale
   const cx = x + tileSize / 2;
   const cy = y + tileSize / 2;
   const bobOffset = Math.sin(frame * 0.08) * 2 * s;
+  const dir = direction || "down";
+
+  // Directional eye offsets — eyes shift to face the direction of movement
+  const dirShift = {
+    down:  { ex: 0, ey: s * 0.5 },
+    up:    { ex: 0, ey: -s * 1.5 },
+    left:  { ex: -s * 2, ey: 0 },
+    right: { ex: s * 2, ey: 0 },
+  };
+  const eyeShift = dirShift[dir] || dirShift.down;
 
   // Glow aura
   if (config.aura) {
@@ -302,54 +313,127 @@ export function drawAggieSprite(ctx, stage, x, y, tileSize, frame) {
     ctx.fill();
   }
 
-  // Body — dark blob
+  // Body — dark smoky blob matching SVG Aggie's shape
+  // Outer wispy edge (semi-transparent for smoky effect)
   const blobR = (config.size / 2) * s;
+  ctx.fillStyle = config.color + "60"; // "#1a1624" at 60 opacity for wispy edge
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + bobOffset, blobR * 1.15, blobR * 1.05, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Main body — outer layer (matches SVG bodyEdge #1a1624)
   ctx.fillStyle = config.color;
   ctx.beginPath();
-  ctx.ellipse(cx, cy + bobOffset, blobR, blobR * 0.9, 0, 0, Math.PI * 2);
+  // Slightly organic shape: wider at top, tapers at bottom with wavy bottom edge
+  const waveBot = Math.sin(frame * 0.06) * s * 0.5;
+  ctx.moveTo(cx - blobR, cy + bobOffset);
+  ctx.quadraticCurveTo(cx - blobR * 0.9, cy + bobOffset - blobR * 0.95, cx, cy + bobOffset - blobR * 0.9);
+  ctx.quadraticCurveTo(cx + blobR * 0.9, cy + bobOffset - blobR * 0.95, cx + blobR, cy + bobOffset);
+  ctx.quadraticCurveTo(cx + blobR * 0.85, cy + bobOffset + blobR * 0.7 + waveBot, cx, cy + bobOffset + blobR * 0.75);
+  ctx.quadraticCurveTo(cx - blobR * 0.85, cy + bobOffset + blobR * 0.7 - waveBot, cx - blobR, cy + bobOffset);
   ctx.fill();
 
-  // Darker edge
+  // Inner core — darker (matches SVG bodyCore #0a0810)
   ctx.fillStyle = "#0a0810";
   ctx.beginPath();
-  ctx.ellipse(cx, cy + bobOffset, blobR * 0.85, blobR * 0.75, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy + bobOffset - s, blobR * 0.7, blobR * 0.6, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Eyes — glowing dots
-  const eyeSpread = blobR * 0.45;
-  const eyeY = cy + bobOffset - blobR * 0.1;
+  // Smoky wisps at bottom (pixel art tendrils trailing down)
+  const wispAlpha = 0.4 + Math.sin(frame * 0.05) * 0.15;
+  ctx.fillStyle = config.color;
+  ctx.globalAlpha = wispAlpha;
+  // Three small wisps dangling from the bottom
+  for (let i = -1; i <= 1; i++) {
+    const wispX = cx + i * blobR * 0.4;
+    const wispWave = Math.sin(frame * 0.07 + i * 2) * s;
+    const wispLen = blobR * (0.3 + Math.sin(frame * 0.04 + i) * 0.1);
+    ctx.fillRect(
+      wispX + wispWave - s * 0.5,
+      cy + bobOffset + blobR * 0.5,
+      s,
+      wispLen
+    );
+    // Taper: smaller pixel at the tip
+    ctx.fillRect(
+      wispX + wispWave - s * 0.25,
+      cy + bobOffset + blobR * 0.5 + wispLen,
+      s * 0.5,
+      s
+    );
+  }
+  ctx.globalAlpha = 1;
+
+  // Eyes — glowing dots, positioned based on facing direction
+  const baseEyeSpread = blobR * 0.4;
+  const eyeY = cy + bobOffset - blobR * 0.15 + eyeShift.ey;
+  const eyeCX = cx + eyeShift.ex;
   const eyeR = s * 2;
 
-  // Eye glow
-  ctx.fillStyle = config.glowColor + "60";
-  ctx.beginPath();
-  ctx.arc(cx - eyeSpread, eyeY, eyeR * 1.8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(cx + eyeSpread, eyeY, eyeR * 1.8, 0, Math.PI * 2);
-  ctx.fill();
+  // When facing left/right, adjust eye spread (leading eye bigger)
+  let leftEyeSpread = baseEyeSpread;
+  let rightEyeSpread = baseEyeSpread;
+  let leftEyeR = eyeR;
+  let rightEyeR = eyeR;
 
-  // Eye core
-  ctx.fillStyle = config.eyeColor;
-  ctx.beginPath();
-  ctx.arc(cx - eyeSpread, eyeY, eyeR, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(cx + eyeSpread, eyeY, eyeR, 0, Math.PI * 2);
-  ctx.fill();
+  if (dir === "left") {
+    leftEyeSpread = baseEyeSpread * 0.8;
+    rightEyeSpread = baseEyeSpread * 0.5;
+    rightEyeR = eyeR * 0.7; // far eye is smaller (perspective)
+  } else if (dir === "right") {
+    rightEyeSpread = baseEyeSpread * 0.8;
+    leftEyeSpread = baseEyeSpread * 0.5;
+    leftEyeR = eyeR * 0.7;
+  }
 
-  // Tendrils for sprout+
+  // When facing up, hide eyes (show back of head)
+  if (dir !== "up") {
+    // Eye glow
+    ctx.fillStyle = config.glowColor + "50";
+    ctx.beginPath();
+    ctx.arc(eyeCX - leftEyeSpread, eyeY, leftEyeR * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(eyeCX + rightEyeSpread, eyeY, rightEyeR * 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Eye core
+    ctx.fillStyle = config.eyeColor;
+    ctx.beginPath();
+    ctx.arc(eyeCX - leftEyeSpread, eyeY, leftEyeR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(eyeCX + rightEyeSpread, eyeY, rightEyeR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tiny mouth — subtle line below eyes (matching SVG mouth style)
+    const mouthY = eyeY + blobR * 0.35;
+    ctx.strokeStyle = config.glowColor + "55";
+    ctx.lineWidth = s * 0.8;
+    ctx.beginPath();
+    ctx.moveTo(eyeCX - s * 1.5, mouthY);
+    ctx.quadraticCurveTo(eyeCX, mouthY + s, eyeCX + s * 1.5, mouthY);
+    ctx.stroke();
+  } else {
+    // Facing up: show a faint glow on the back of the head
+    ctx.fillStyle = config.glowColor + "20";
+    ctx.beginPath();
+    ctx.arc(cx, cy + bobOffset - blobR * 0.2, blobR * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Tendrils for sprout+ (energy wisps on top)
   if (config.tendrils) {
     ctx.strokeStyle = config.glowColor + "80";
     ctx.lineWidth = s;
     const tendrilWave = Math.sin(frame * 0.06) * 3 * s;
     ctx.beginPath();
-    ctx.moveTo(cx - blobR * 0.6, cy + bobOffset - blobR * 0.5);
-    ctx.quadraticCurveTo(cx - blobR - 2 * s, cy + bobOffset - blobR + tendrilWave, cx - blobR * 0.3, cy + bobOffset - blobR * 0.9);
+    ctx.moveTo(cx - blobR * 0.5, cy + bobOffset - blobR * 0.5);
+    ctx.quadraticCurveTo(cx - blobR - 2 * s, cy + bobOffset - blobR + tendrilWave, cx - blobR * 0.2, cy + bobOffset - blobR * 0.95);
     ctx.stroke();
     ctx.beginPath();
-    ctx.moveTo(cx + blobR * 0.6, cy + bobOffset - blobR * 0.5);
-    ctx.quadraticCurveTo(cx + blobR + 2 * s, cy + bobOffset - blobR - tendrilWave, cx + blobR * 0.3, cy + bobOffset - blobR * 0.9);
+    ctx.moveTo(cx + blobR * 0.5, cy + bobOffset - blobR * 0.5);
+    ctx.quadraticCurveTo(cx + blobR + 2 * s, cy + bobOffset - blobR - tendrilWave, cx + blobR * 0.2, cy + bobOffset - blobR * 0.95);
     ctx.stroke();
   }
 
@@ -369,10 +453,10 @@ export function drawAggieSprite(ctx, stage, x, y, tileSize, frame) {
     for (let i = 0; i < 5; i++) {
       const angle = (frame * 0.02 + i * 1.256);
       const dist = blobR * 1.2 + Math.sin(frame * 0.05 + i) * 3 * s;
-      const sx = cx + Math.cos(angle) * dist;
-      const sy = cy + bobOffset + Math.sin(angle) * dist;
+      const sparkX = cx + Math.cos(angle) * dist;
+      const sparkY = cy + bobOffset + Math.sin(angle) * dist;
       const sparkleSize = (Math.sin(frame * 0.1 + i * 2) * 0.5 + 0.5) * s * 1.5;
-      ctx.fillRect(sx - sparkleSize / 2, sy - sparkleSize / 2, sparkleSize, sparkleSize);
+      ctx.fillRect(sparkX - sparkleSize / 2, sparkY - sparkleSize / 2, sparkleSize, sparkleSize);
     }
   }
 }

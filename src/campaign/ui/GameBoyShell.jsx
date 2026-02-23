@@ -407,21 +407,21 @@ export default function GameBoyShell({
           display: "flex", gap: 32, alignItems: "center",
           marginTop: -4,
         }}>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
             <button
               style={pillBtnStyle}
               onTouchStart={(e) => { prevent(e); if (onSelect) onSelect(); }}
               onMouseDown={() => { if (onSelect) onSelect(); }}
             />
-            <span style={{ fontSize: 6, color: SHELL.label, letterSpacing: 1 }}>SELECT</span>
+            <span style={{ fontSize: 6, color: SHELL.label, letterSpacing: 1, transform: "rotate(-25deg)", marginTop: 4 }}>SELECT</span>
           </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
             <button
               style={pillBtnStyle}
               onTouchStart={(e) => { prevent(e); if (onStart) onStart(); }}
               onMouseDown={() => { if (onStart) onStart(); }}
             />
-            <span style={{ fontSize: 6, color: SHELL.label, letterSpacing: 1 }}>START</span>
+            <span style={{ fontSize: 6, color: SHELL.label, letterSpacing: 1, transform: "rotate(-25deg)", marginTop: 4 }}>START</span>
           </div>
         </div>
       </div>
