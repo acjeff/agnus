@@ -16,6 +16,7 @@ import {
   resetFloorCooldowns, resetChapterCooldowns,
   useAbility, getUnlockedAbilities,
 } from "./state/campaignState.js";
+import { saveAggieCoins } from "../aggie/state.js";
 import CampaignHUD from "./ui/CampaignHUD.jsx";
 import CampaignDialogue from "./ui/CampaignDialogue.jsx";
 import CampaignPause from "./ui/CampaignPause.jsx";
@@ -104,6 +105,9 @@ export default function CampaignMode({
   onStartPuzzle,  // (puzzleConfig, doorKey, callback) => void
   onExit,          // () => void — return to main menu
   C,               // color constants
+  aggieBuff,       // active buff from main game { type, charges, freqMult? }
+  aggieDebuff,     // active debuff from main game { type, charges }
+  aggieHappiness,  // current happiness (0-100) from main game
 }) {
   // ─── State ─────────────────────────────
   const [campaignState, setCampaignState] = useState(() => loadCampaignState());
@@ -238,7 +242,8 @@ export default function CampaignMode({
     // Build entity list
     const entities = [];
 
-    // Player is Aggie
+    // Player is Aggie — faces the direction they're moving
+    const currentDir = playerDir;
     entities.push({
       id: "player",
       x: playerPos.x,
@@ -246,7 +251,7 @@ export default function CampaignMode({
       alwaysVisible: true,
       smooth: true,
       draw: (ctx, sx, sy, ts, frame) => {
-        drawAggieSprite(ctx, stateRef.current.aggie.evolutionStage, sx, sy, ts, frame);
+        drawAggieSprite(ctx, stateRef.current.aggie.evolutionStage, sx, sy, ts, frame, currentDir);
       },
     });
 
@@ -265,9 +270,11 @@ export default function CampaignMode({
       });
     });
 
-    // Attack slash animation
+    // Attack slash animation — travels from Aggie toward target
     const atk = attackAnim;
     if (atk) {
+      // We render this as a separate entity at the target, but offset the visuals
+      // to sweep from the player (fromX/fromY) toward the target (x/y)
       entities.push({
         id: "attack-slash",
         x: atk.x,
@@ -275,27 +282,63 @@ export default function CampaignMode({
         alwaysVisible: true,
         draw: (ctx, sx, sy, ts) => {
           const s = Math.floor(ts / 16);
-          const cx = sx + ts / 2;
-          const cy = sy + ts / 2;
-          const progress = (Date.now() - atk.startTime) / 200; // 200ms animation
+          const progress = (Date.now() - atk.startTime) / 280; // 280ms animation
           if (progress >= 1) return;
-          ctx.globalAlpha = 1 - progress;
+
+          // Direction offset: slash sweeps from Aggie's tile toward target
+          const dx = atk.x - atk.fromX;
+          const dy = atk.y - atk.fromY;
+          // Start position: edge of Aggie's tile, end: center of target tile
+          const startX = sx + ts / 2 - dx * ts * 0.5;
+          const startY = sy + ts / 2 - dy * ts * 0.5;
+          const endX = sx + ts / 2;
+          const endY = sy + ts / 2;
+          const cx = startX + (endX - startX) * Math.min(1, progress * 1.5);
+          const cy = startY + (endY - startY) * Math.min(1, progress * 1.5);
+
+          // Rotation angle based on attack direction
+          const angle = Math.atan2(dy, dx);
+
+          ctx.save();
+          ctx.translate(cx, cy);
+          ctx.rotate(angle);
+
+          // Slash arc — sweeps across
+          ctx.globalAlpha = 1 - progress * 0.8;
           ctx.strokeStyle = "#fff";
-          ctx.lineWidth = 2 * s;
+          ctx.lineWidth = 2.5 * s;
           ctx.beginPath();
-          const r = ts * 0.4 * (0.5 + progress * 0.5);
-          ctx.arc(cx, cy, r, -Math.PI * 0.3, Math.PI * 0.3);
+          const r = ts * 0.35 * (0.4 + progress * 0.6);
+          ctx.arc(0, 0, r, -Math.PI * 0.5, Math.PI * 0.5);
           ctx.stroke();
-          // Small sparkles
+
+          // Inner energy line
+          ctx.strokeStyle = "#9a96cc";
+          ctx.lineWidth = 1.5 * s;
+          ctx.beginPath();
+          ctx.arc(0, 0, r * 0.6, -Math.PI * 0.4, Math.PI * 0.4);
+          ctx.stroke();
+
+          // Sparkle trail particles
           ctx.fillStyle = "#ffd700";
-          for (let i = 0; i < 3; i++) {
-            const angle = -0.3 + i * 0.3;
-            const sr = r * (0.8 + progress * 0.4);
-            const sparkX = cx + Math.cos(angle) * sr;
-            const sparkY = cy + Math.sin(angle) * sr;
-            ctx.fillRect(sparkX - s, sparkY - s, 2 * s, 2 * s);
+          for (let i = 0; i < 4; i++) {
+            const sparkAngle = -0.4 + i * 0.27;
+            const sr = r * (0.6 + progress * 0.6);
+            const sparkX = Math.cos(sparkAngle) * sr;
+            const sparkY = Math.sin(sparkAngle) * sr;
+            const sparkSize = s * (1.5 - progress);
+            ctx.fillRect(sparkX - sparkSize / 2, sparkY - sparkSize / 2, sparkSize, sparkSize);
           }
+
+          // Glowing eye-color energy burst at leading edge
+          ctx.fillStyle = "#dddcf0";
+          ctx.globalAlpha = (1 - progress) * 0.6;
+          ctx.beginPath();
+          ctx.arc(r * 0.3, 0, s * 2 * (1 - progress * 0.5), 0, Math.PI * 2);
+          ctx.fill();
+
           ctx.globalAlpha = 1;
+          ctx.restore();
         },
       });
     }
@@ -350,9 +393,9 @@ export default function CampaignMode({
     const targetX = pos.x + off.x;
     const targetY = pos.y + off.y;
 
-    // Show slash animation at target tile
-    setAttackAnim({ x: targetX, y: targetY, startTime: Date.now() });
-    setTimeout(() => setAttackAnim(null), 220);
+    // Show slash animation traveling from Aggie to target tile
+    setAttackAnim({ x: targetX, y: targetY, fromX: pos.x, fromY: pos.y, dir: playerDir, startTime: Date.now() });
+    setTimeout(() => setAttackAnim(null), 280);
 
     // Check if an enemy is at the target position
     const currentEnemies = [...enemiesRef.current];
@@ -700,9 +743,10 @@ export default function CampaignMode({
     if (hasTrapSense) {
       showNotification("Aggie sensed the trap! No damage.", "#9a96cc");
     } else {
-      // Lose some coins
+      // Lose some coins (syncs to shared coin store)
       const loss = Math.min(state.inventory.coins, 10);
       state.inventory.coins -= loss;
+      saveAggieCoins(state.inventory.coins);
       saveCampaignState(state);
       setCampaignState({ ...state });
       showNotification(`Trap! Lost ${loss} coins.`, "#f87171");
@@ -994,6 +1038,8 @@ export default function CampaignMode({
           totalFloors={CAMPAIGN_CHAPTERS[activeChapter]?.floors || 0}
           onPause={() => setPaused(true)}
           onUseAbility={handleUseAbility}
+          aggieBuff={aggieBuff}
+          aggieDebuff={aggieDebuff}
           C={C}
         />
       )}

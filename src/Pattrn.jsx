@@ -7814,6 +7814,7 @@ export default function Pattrn() {
       }
       setCampaignPuzzleConfig(null);
       setCampaignPuzzle(null);
+      setAggieCoins(loadAggieCoins()); // re-sync shared coins after campaign puzzle
       setView("campaign");
     }, 1500);
     return () => clearTimeout(timer);
@@ -15529,7 +15530,10 @@ export default function Pattrn() {
       <div style={{ position: "fixed", inset: 0, zIndex: campaignVisible ? 200 : 1, pointerEvents: campaignVisible ? "auto" : "none" }}>
         <CampaignMode
           C={C}
-          onExit={() => setView("menu")}
+          aggieBuff={aggieBuff}
+          aggieDebuff={aggieDebuff}
+          aggieHappiness={aggieHappiness}
+          onExit={() => { setAggieCoins(loadAggieCoins()); setAggieBuff(loadAggieBuff()); setAggieDebuff(loadAggieDebuff()); setView("menu"); }}
           onStartPuzzle={(config, doorKey, callback) => {
             const diff = config.mode;
             const sets = PUZZLE_SETS[diff] || PUZZLE_SETS.easy;

@@ -1,4 +1,7 @@
 // Campaign progress persistence via localStorage
+// Coins are shared with the main game via the "pattrn-aggie-cogs" key
+
+import { loadAggieCoins, saveAggieCoins } from "../../aggie/state.js";
 
 const CAMPAIGN_KEY = "pattrn-campaign-v1";
 
@@ -15,6 +18,7 @@ function getDefaultState() {
       abilityCooldowns: {},
     },
     inventory: {
+      // coins field is kept for backward compat but actual coins come from main game
       coins: 0,
       keys: 0,
       potions: 0,
@@ -32,11 +36,14 @@ function getDefaultState() {
 export function loadCampaignState() {
   try {
     const raw = localStorage.getItem(CAMPAIGN_KEY);
-    if (!raw) return getDefaultState();
-    const parsed = JSON.parse(raw);
-    return { ...getDefaultState(), ...parsed };
+    const base = raw ? { ...getDefaultState(), ...JSON.parse(raw) } : getDefaultState();
+    // Sync coins from main game store (shared currency)
+    base.inventory.coins = loadAggieCoins();
+    return base;
   } catch {
-    return getDefaultState();
+    const state = getDefaultState();
+    state.inventory.coins = loadAggieCoins();
+    return state;
   }
 }
 
@@ -201,9 +208,10 @@ export function resetChapterCooldowns(state) {
   saveCampaignState(state);
 }
 
-// Add coins to campaign inventory
+// Add coins — writes to the shared main game coin store
 export function addCoins(state, amount) {
   state.inventory.coins += amount;
+  saveAggieCoins(state.inventory.coins);
   saveCampaignState(state);
 }
 
@@ -211,6 +219,7 @@ export function addCoins(state, amount) {
 export function addItem(state, itemType, amount) {
   if (itemType === "coins") {
     state.inventory.coins += amount;
+    saveAggieCoins(state.inventory.coins); // sync to shared coin store
   } else if (itemType === "key") {
     state.inventory.keys += amount;
   } else if (itemType === "potion") {
