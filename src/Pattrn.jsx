@@ -4003,7 +4003,19 @@ export default function Pattrn() {
     { id: "medium", icon: "layers", label: "Medium", action: () => { quickPlayStart("medium", getRandomUncompletedPuzzle("medium")); } },
     { id: "hard", icon: "zap", label: "Hard", action: () => { quickPlayStart("hard", getRandomUncompletedPuzzle("hard")); } },
     { id: "daily", icon: "calendar", label: "Daily", action: () => { quickPlayStart("daily", null, getTodayDailyDateStr()); } },
-    { id: "cascade", icon: "layers", label: "Cascade", action: () => { quickPlayStart("cascade", cascadeRunIndex); } },
+    { id: "cascade", icon: "layers", label: "Cascade", action: () => {
+      const prog = loadProgress();
+      const rs = prog.cascadeRunState || {};
+      const cp = prog.cascade || {};
+      // Prefer last in-progress run, then first not-fully-completed run
+      const lastIdx = prog.cascadeRunStateLastIndex;
+      if (lastIdx != null && rs[lastIdx]) {
+        quickPlayStart("cascade", lastIdx);
+      } else {
+        const first = Array.from({ length: 50 }, (_, i) => i).find(i => cp[i] !== CASCADE_LEVELS.length);
+        quickPlayStart("cascade", first ?? 0);
+      }
+    } },
   ];
 
   // Theme sub-menu — select a theme inline
@@ -7989,6 +8001,7 @@ export default function Pattrn() {
     }
     let cascadeElapsed = 0;
     if (effectiveDiff === "cascade") {
+      setCascadeLevelBanner(null);
       setCascadeRunIndex(idx);
       cascadeRunIndexRef.current = idx;
       const prog = loadProgress();
@@ -15070,9 +15083,9 @@ export default function Pattrn() {
             const idx = isCascade ? i : p?.id ?? i;
             const result = isCascade ? (diffProgress[idx] ?? -1) : diffProgress[idx];
             const solved = isCascade ? result === CASCADE_LEVELS.length : result > 0;
-            const failed = isCascade ? (result >= 0 && result < CASCADE_LEVELS.length) : result === 0;
             const cascadeRunState = progress.cascadeRunState || {};
-            const cascadeInProgress = isCascade && result === -1 && cascadeRunState[idx] != null;
+            const cascadeInProgress = isCascade && result !== CASCADE_LEVELS.length && cascadeRunState[idx] != null;
+            const failed = isCascade ? (result >= 0 && result < CASCADE_LEVELS.length && !cascadeInProgress) : result === 0;
             const time = diffTimes[idx];
             const cascadeLevels = result >= 0 && result <= CASCADE_LEVELS.length ? result : null;
             const cascadeInProgressLevel = cascadeInProgress && cascadeRunState[idx]?.level != null ? cascadeRunState[idx].level : null;
@@ -15088,7 +15101,7 @@ export default function Pattrn() {
               : null;
             const coopResult = (progress.coop || {})[`${difficulty}_${i}`];
             const coopSolved = coopResult > 0;
-            const medalColor = solved ? (result <= 2 ? C.gold : result <= 4 ? C.silver : C.bronze) : null;
+            const medalColor = solved ? (isCascade ? C.gold : (result <= 2 ? C.gold : result <= 4 ? C.silver : C.bronze)) : null;
             const borderColor = solved ? medalColor + "88" : failed ? C.incorrect + "44" : cascadeInProgress ? C.inProgress + "88" : C.border;
             const bgColor = solved ? medalColor + "22" : failed ? C.incorrect + "0a" : cascadeInProgress ? C.inProgress + "12" : C.surface;
             const numColor = solved ? medalColor : failed ? C.incorrect : cascadeInProgress ? C.inProgress : C.text;
@@ -15358,7 +15371,10 @@ export default function Pattrn() {
       setView("vault");
       return;
     }
-    if (difficulty === "cascade") {
+    if (difficulty === "cascade" && gameState === "playing") {
+      // Only save run state when actively playing — if gameState is "won",
+      // the win handler already saved the correct next-level state and
+      // cascadeLevel hasn't been incremented yet (deferred in setTimeout).
       const runState = { level: cascadeLevel, elapsedSeconds: getElapsedSeconds(), fills: { ...fills }, attempts };
       const nextProgress = { ...progress, cascadeRunState: { ...(progress.cascadeRunState || {}), [cascadeRunIndex]: runState }, cascadeRunStateLastIndex: cascadeRunIndex };
       setProgress(nextProgress); saveProgress(nextProgress);
@@ -16352,11 +16368,9 @@ export default function Pattrn() {
           <div style={{ fontSize: 26, fontWeight: 700, fontFamily: "'Inter', sans-serif", color: C.incorrect, animation: "fadeUp 0.5s 0.05s ease both" }}>
             {isCoop ? "Co-op failed" : isCascade ? "Run over" : "Not this time"}
           </div>
-          {(isCoop || isCascade || !isCoop) && (
-            <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 6, animation: "fadeUp 0.55s 0.1s ease both" }}>
-              {isCoop ? "Out of attempts" : isCascade ? `Reached ${puzzle?.gridSize ?? 0}×${puzzle?.gridSize ?? 0}` : "Better luck next time"}
-            </div>
-          )}
+          <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 6, animation: "fadeUp 0.55s 0.1s ease both" }}>
+            {isCoop ? "Out of attempts" : isCascade ? `Reached ${puzzle?.gridSize ?? 0}×${puzzle?.gridSize ?? 0}` : "Better luck next time"}
+          </div>
         </div>
       )}
       </div>
