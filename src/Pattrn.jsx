@@ -1216,6 +1216,7 @@ export default function Pattrn() {
   const cascadeFillsRef = useRef({});
   const cascadeAttemptsRef = useRef(0);
   const cascadeRunIndexRef = useRef(0);
+  const cascadeTransitionRef = useRef(false); // true for one render after cascade level change — suppresses entrance animations
   const isPainting = useRef(false);
   const pendingCellRef = useRef(null);
   const justHandledInPointerUpRef = useRef(null);
@@ -3491,6 +3492,12 @@ export default function Pattrn() {
     };
   }, [view, currentPuzzle, cascadeLevel, difficulty, cascadeRunIndex]);
 
+  // Clear cascade transition flag after the render that used it, so subsequent
+  // renders get normal entrance animations.
+  useEffect(() => {
+    if (cascadeTransitionRef.current) cascadeTransitionRef.current = false;
+  });
+
   const cancelWrongCellClear = useCallback(() => {
     if (wrongCellClearTimeoutRef.current) {
       clearTimeout(wrongCellClearTimeoutRef.current);
@@ -3763,6 +3770,9 @@ export default function Pattrn() {
     cascadeAttemptsRef.current = attempts;
     cascadeRunIndexRef.current = cascadeRunIndex;
   }
+  // Read cascade transition flag for this render (suppresses entrance animations),
+  // then schedule clearing it so subsequent renders animate normally.
+  const cascadeSkipEntrance = cascadeTransitionRef.current;
   // --- Bottom Tab Bar helper ---
   // --- Context Button (Liquid Glass FAB) ---
   // Close radial menu when view changes
@@ -8202,7 +8212,11 @@ export default function Pattrn() {
     setRemovingCells({});
     setSelectedCell(null);
     setSelectedToken(null);
-    setGridEpoch((e) => e + 1);
+    // Don't increment gridEpoch here — avoid unmounting the entire grid during
+    // cascade level transitions which causes all tiles to briefly vanish and
+    // replay entrance animations ("disappearing tiles"). Instead, let React
+    // update cells in-place for a smooth transition.
+    cascadeTransitionRef.current = true; // suppress entrance animations for next render
     // Timer is not reset — it persists across cascade stages for the whole run
   }, []);
 
@@ -11018,13 +11032,13 @@ export default function Pattrn() {
           textShadow: "0 2px 12px rgba(0,0,0,0.6), 0 0 30px rgba(255,215,0,0.3)",
           animation: cascadeLevelBanner.isLastLevel ? "cascadeBannerPulse 0.6s ease-in-out 0.4s 3" : undefined,
         }}>
-          {cascadeLevelBanner.isLastLevel ? "CASCADE COMPLETE!" : `Level ${cascadeLevelBanner.level + 1} Clear!`}
+          {cascadeLevelBanner.isLastLevel ? "CASCADE COMPLETE!" : `Level ${cascadeLevelBanner.level + 1}/${CASCADE_LEVELS.length} Clear!`}
         </div>
         <div style={{
           fontSize: 14, fontWeight: 600, color: "rgba(255,255,255,0.7)",
           fontFamily: "'Inter', sans-serif",
         }}>
-          {cascadeLevelBanner.gridSize}x{cascadeLevelBanner.gridSize} solved
+          {cascadeLevelBanner.gridSize}×{cascadeLevelBanner.gridSize} solved
         </div>
         <div style={{
           display: "flex", alignItems: "center", gap: 6, marginTop: 4,
@@ -11049,7 +11063,7 @@ export default function Pattrn() {
             fontFamily: "'Inter', sans-serif", marginTop: 2,
             animation: "cascadeBannerFade 0.4s ease 0.5s both",
           }}>
-            Next: {CASCADE_LEVELS[cascadeLevelBanner.level + 1]}x{CASCADE_LEVELS[cascadeLevelBanner.level + 1]}
+            Next: Level {cascadeLevelBanner.level + 2} ({CASCADE_LEVELS[cascadeLevelBanner.level + 1]}×{CASCADE_LEVELS[cascadeLevelBanner.level + 1]})
           </div>
         )}
       </div>
@@ -15342,7 +15356,7 @@ export default function Pattrn() {
 
   // --- PLAY VIEW ---
   const diffLabel = isDaily ? "Daily" : isCascade ? "Cascade" : DIFFICULTIES.find(d => d.key === difficulty)?.label || "";
-  const cascadeLevelLabel = isCascade && puzzle ? `${puzzle.gridSize}×${puzzle.gridSize}` : null;
+  const cascadeLevelLabel = isCascade && puzzle ? `${cascadeLevel + 1}/${CASCADE_LEVELS.length} · ${puzzle.gridSize}×${puzzle.gridSize}` : null;
   const totalPuzzles = puzzles.length;
   const lockedCount = lockedCells.size;
   const totalBlanks = puzzle ? puzzle.blanks.size : 0;
@@ -16018,11 +16032,11 @@ export default function Pattrn() {
                 const displayToken = fillToken;
                 const cellIndex = r * gridSize + c;
                 const isWrongCell = wrongCells.has(key) && gameState !== "lost";
-                const fallDelay = isBlankCell ? 0 : cellIndex * 0.032;
+                const fallDelay = (isBlankCell || cascadeSkipEntrance) ? 0 : cellIndex * 0.032;
                 const wrongFallDelay = isWrongCell ? cellIndex * 0.015 : 0;
                 const totalCells = gridSize * gridSize;
                 const emptyCellDelayRaw = (totalCells - 1) * 0.032 + 0.5;
-                const emptyCellDelay = isBlankCell && clearedBlanks.has(key) ? null : emptyCellDelayRaw;
+                const emptyCellDelay = isBlankCell && (clearedBlanks.has(key) || cascadeSkipEntrance) ? null : emptyCellDelayRaw;
                 const isWon = gameState === "won";
                 const winCelebrateDelay = isWon ? cellIndex * 0.04 : 0;
                 // Coop ownership visual hints
@@ -16048,7 +16062,7 @@ export default function Pattrn() {
                       isWrong={isWrongCell}
                       isRevealed={isRevealed}
                       isLocked={isLockedCell && gameState === "playing"}
-                      isPrefilled={!isBlankCell}
+                      isPrefilled={!isBlankCell && !cascadeSkipEntrance}
                       fallDelay={fallDelay}
                       wrongFallDelay={wrongFallDelay}
                       emptyCellDelay={emptyCellDelay}
@@ -16369,7 +16383,7 @@ export default function Pattrn() {
             {isCoop ? "Co-op failed" : isCascade ? "Run over" : "Not this time"}
           </div>
           <div style={{ fontSize: 11, color: C.textDim, fontFamily: "'Inter', sans-serif", marginTop: 6, animation: "fadeUp 0.55s 0.1s ease both" }}>
-            {isCoop ? "Out of attempts" : isCascade ? `Reached ${puzzle?.gridSize ?? 0}×${puzzle?.gridSize ?? 0}` : "Better luck next time"}
+            {isCoop ? "Out of attempts" : isCascade ? `Reached level ${cascadeLevel + 1} (${puzzle?.gridSize ?? 0}×${puzzle?.gridSize ?? 0})` : "Better luck next time"}
           </div>
         </div>
       )}
