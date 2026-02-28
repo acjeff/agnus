@@ -147,7 +147,7 @@ import {
   buildDailyPuzzle, getTodayDailyIndex, getDailyKey, getDailySeedForDate,
   getTodayDailyDateStr, MONTH_NAMES, getDailyStreak,
   CASCADE_LEVELS, CASCADE_LEVEL_COINS, getCascadeRunSeed, buildCascadePuzzle,
-  PUZZLE_SETS, formatCascadeProgression,
+  PUZZLE_SETS, formatCascadeProgression, blankTokens,
 } from "./utils/puzzles.js";
 import {
   STORAGE_KEY, TIMES_KEY, BIRTHDAY_KEY, THEME_KEY, ACHIEV_KEY, CHEAT_BIRTHDAY,
@@ -188,7 +188,7 @@ import {
   COMPANION_CELEBRATE_LINES, COMPANION_SAD_LINES,
   AGGIE_PLACE_LINES, AGGIE_REMOVE_LINES, AGGIE_WRONG_LINES,
   AGGIE_HINT_GOOD, AGGIE_HINT_BAD, AGGIE_MENU_LINES, AGGIE_IDLE_LINES,
-  AGGIE_SABOTAGE_LINES, AGGIE_DEBUFF_LINES,
+  AGGIE_DEBUFF_LINES,
   getMoodLines,
   IDLE_ACTIONS, IDLE_ANIMS, AGGIE_TOY_LINES,
   AGGIE_INTERACTION_LINES, AGGIE_INTERACTION_ANIMS, AGGIE_CONVERSATIONS,
@@ -2507,7 +2507,7 @@ export default function Pattrn() {
       const allCells = [];
       for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) allCells.push(`${row}-${col}`);
       const blanks = new Set(shuffle(allCells, mr).slice(0, numBlanks));
-      const usedTokens = [...new Set(solution.flat())];
+      const usedTokens = blankTokens(solution, blanks);
       puzzles.push({ id: ti, solution, blanks, usedTokens, gridSize: 5, mode: "mosaic" });
     }
     return puzzles;
@@ -8477,31 +8477,6 @@ export default function Pattrn() {
         }
       }
       if (hintFiredH && hasBuffH) consumeBuffCharge();
-      // Miserable Aggie sabotage — may mess with a correctly placed piece (~8% chance per placement)
-      if (aggieHappinessMood === "miserable" && !hasBuffH && Object.keys(fills).length > 2 && Math.random() < 0.08) {
-        const correctFills = Object.entries(fills).filter(([k, v]) => {
-          const [fr, fc] = k.split("-").map(Number);
-          return v === puzzle.solution[fr][fc] && k !== key;
-        });
-        if (correctFills.length > 0) {
-          const [victimKey] = correctFills[Math.floor(Math.random() * correctFills.length)];
-          // 50/50: either remove the piece or swap it to a wrong value
-          if (Math.random() < 0.5) {
-            triggerRemoveAnimation(victimKey, fills[victimKey]);
-            setFills(prev => { const next = { ...prev }; delete next[victimKey]; return next; });
-            triggerAggieSpeech(AGGIE_SABOTAGE_LINES[Math.floor(Math.random() * AGGIE_SABOTAGE_LINES.length)]);
-          } else {
-            const [vr, vc] = victimKey.split("-").map(Number);
-            const correctVal = puzzle.solution[vr][vc];
-            const wrongVals = puzzle.tokens.filter(t => t !== correctVal);
-            if (wrongVals.length > 0) {
-              const wrongVal = wrongVals[Math.floor(Math.random() * wrongVals.length)];
-              setFills(prev => ({ ...prev, [victimKey]: wrongVal }));
-              triggerAggieSpeech(AGGIE_SABOTAGE_LINES[Math.floor(Math.random() * AGGIE_SABOTAGE_LINES.length)]);
-            }
-          }
-        }
-      }
     } else {
       setSelectedCell(key);
     }

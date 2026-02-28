@@ -92,13 +92,6 @@ const AGGIE_MISERABLE_SAD = [
   "Good.", "Deserved.", "Ha ha ha.", "Shocking.",
   "*slow clap*", "Music to my ears",
 ];
-// Sabotage lines — when miserable Aggie messes with pieces
-const AGGIE_SABOTAGE_LINES = [
-  "Oops~", "Did I do that?", "*whistles innocently*", "Butterfingers!",
-  "Heh heh heh...", "My bad... or was it?", "Clumsy me!",
-  "Oh no, how sad", "*snicker*", "Accidents happen~",
-];
-
 // Debuff applied lines — what Aggie says when a debuff kicks in
 const AGGIE_DEBUFF_LINES = {
   brain_fog: ["My head's all fuzzy...", "Can't think straight...", "Everything's blurry...", "Brain... fog...", "*confused noises*"],
@@ -249,7 +242,6 @@ export {
   AGGIE_MISERABLE_HINT_BAD,
   AGGIE_MISERABLE_CELEBRATE,
   AGGIE_MISERABLE_SAD,
-  AGGIE_SABOTAGE_LINES,
   AGGIE_DEBUFF_LINES,
   AGGIE_ECSTATIC_IDLE,
   AGGIE_ECSTATIC_CELEBRATE,
