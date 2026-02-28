@@ -12,6 +12,11 @@ export function shuffle(arr, r) {
   return a;
 }
 
+// Extract only the tokens that appear in blank cells (what the player actually needs to place)
+export function blankTokens(solution, blanks) {
+  return [...new Set([...blanks].map(k => { const [r, c] = k.split("-").map(Number); return solution[r][c]; }))];
+}
+
 // --- Pattern generators (parameterized by grid size) ---
 export function makeGenerators(sz) {
   const mid = Math.floor(sz / 2);
@@ -123,7 +128,7 @@ export function buildEasyPuzzles() {
     for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) allCells.push(`${row}-${col}`);
     const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
 
-    const usedTokens = [...new Set(solution.flat())];
+    const usedTokens = blankTokens(solution, blanks);
     puzzles.push({ id: i, solution, blanks, usedTokens, gridSize: 5, mode: "easy" });
   }
   return puzzles;
@@ -155,7 +160,7 @@ export function buildMediumPuzzles() {
     for (let row = 0; row < 7; row++) for (let col = 0; col < 7; col++) allCells.push(`${row}-${col}`);
     const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
 
-    const usedTokens = [...new Set(solution.flat())];
+    const usedTokens = blankTokens(solution, blanks);
     puzzles.push({ id: i, solution, blanks, usedTokens, gridSize: 7, mode: "medium" });
   }
   return puzzles;
@@ -190,7 +195,7 @@ export function buildHardPuzzles() {
     for (let row = 0; row < 7; row++) for (let col = 0; col < 7; col++) allCells.push(`${row}-${col}`);
     const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
 
-    const usedTokens = [...new Set(solution.flat())];
+    const usedTokens = blankTokens(solution, blanks);
     puzzles.push({ id: i, solution, blanks, usedTokens, gridSize: 7, mode: "hard" });
   }
   return puzzles;
@@ -226,7 +231,7 @@ export function buildBlindPuzzles() {
     for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) allCells.push(`${row}-${col}`);
     const blanks = new Set(allCells);
 
-    const usedTokens = [...new Set(solution.flat())];
+    const usedTokens = blankTokens(solution, blanks);
     puzzles.push({ id: i, solution, blanks, usedTokens, gridSize: 5, mode: "blind" });
   }
   return puzzles;
@@ -279,7 +284,7 @@ export function buildDailyPuzzle(seed) {
   const allCells = [];
   for (let row = 0; row < 7; row++) for (let col = 0; col < 7; col++) allCells.push(`${row}-${col}`);
   const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
-  const usedTokens = [...new Set(solution.flat())];
+  const usedTokens = blankTokens(solution, blanks);
   return { id: 0, solution, blanks, usedTokens, gridSize: 7, mode: "medium" };
 }
 
@@ -370,7 +375,7 @@ export function buildCascadePuzzle(level, runSeed) {
   const allCells = [];
   for (let row = 0; row < sz; row++) for (let col = 0; col < sz; col++) allCells.push(`${row}-${col}`);
   const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
-  const usedTokens = [...new Set(solution.flat())];
+  const usedTokens = blankTokens(solution, blanks);
   return { id: level, solution, blanks, usedTokens, gridSize: sz, mode: "medium" };
 }
 
@@ -398,7 +403,7 @@ export function buildSpinPuzzles() {
     const allCells = [];
     for (let row = 0; row < 7; row++) for (let col = 0; col < 7; col++) allCells.push(`${row}-${col}`);
     const blanks = new Set(shuffle(allCells, r).slice(0, numBlanks));
-    const usedTokens = [...new Set(solution.flat())];
+    const usedTokens = blankTokens(solution, blanks);
     // Spin interval: starts at 10s for puzzle 0, decreases to 5s for puzzle 49
     const spinInterval = Math.max(5, 10 - Math.floor(i / 10));
     puzzles.push({ id: i, solution, blanks, usedTokens, gridSize: 7, mode: "spin", spinInterval });
@@ -459,7 +464,7 @@ export function buildMosaicPuzzles() {
     const allCells = [];
     for (let row = 0; row < 5; row++) for (let col = 0; col < 5; col++) allCells.push(`${row}-${col}`);
     const blanks = new Set(shuffle(allCells, rr).slice(0, numBlanks));
-    const usedTokens = [...new Set(solution.flat())];
+    const usedTokens = blankTokens(solution, blanks);
     puzzles.push({ id: ti, solution, blanks, usedTokens, gridSize: 5, mode: "mosaic" });
   }
   return puzzles;
