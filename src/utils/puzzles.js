@@ -332,10 +332,10 @@ export function getDailyStreak(progress) {
 }
 
 // --- CASCADE: 50 runs, each 3x3 -> 9x9; attempts persist across levels; progress = how far you got per run ---
-export const CASCADE_LEVELS = [3, 3, 4, 4, 5, 5, 6, 7, 8, 9]; // gridSize per level 0..9
+export const CASCADE_LEVELS = [3, 4, 5, 5, 6, 6, 7, 7, 8, 9]; // gridSize per level 0..9
 export const CASCADE_RUN_SEED_BASE = 50000;
 // Coin reward per cascade level (increases as you progress through the run)
-export const CASCADE_LEVEL_COINS = [2, 2, 3, 3, 5, 5, 8, 10, 15, 25]; // total 78 for full run
+export const CASCADE_LEVEL_COINS = [2, 3, 5, 5, 6, 6, 8, 8, 15, 25]; // total 83 for full run
 
 export function formatCascadeProgression(completedUpToLevel, failedAtLevel) {
   // completedUpToLevel: last level we cleared (0..6). failedAtLevel: level we failed (null if run complete).
